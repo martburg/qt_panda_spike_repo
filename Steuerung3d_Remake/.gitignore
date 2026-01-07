@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# VS Code
+.vscode/
+
+# Build / dist
+build/
+dist/
+*.log
+
+
+# Obsidian volatile files (don't commit)
+vault/
+
+# logs + lockfile from your local saver
+Logs/*.log
+Logs/server.lock
+
+# Attachments: choose ONE policy:
+# If you want attachments in git, keep them tracked (comment next line)
+# If you want attachments out of git, uncomment:
+# vault/Attachments/
+
+# OS junk
+Thumbs.db
+.DS_Store

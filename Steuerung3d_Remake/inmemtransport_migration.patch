@@ -1,0 +1,177 @@
+--- src/steuerung3d/apps/core_service/__main__.py+++ src/steuerung3d/apps/core_service/__main__.py@@ -3,11 +3,10 @@ from steuerung3d.common.timebase import Timebase
+ from steuerung3d.core.engine import CoreEngine
+ from steuerung3d.core.intent_handler import apply_intent
+-from steuerung3d.core.intents import EnableAxis, JogAxis, SetEstop
++from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, SetEstop
+ from steuerung3d.core.state import MachineState
+-from steuerung3d.protocol.inmem_bus import InMemBus
++from steuerung3d.protocol.transport import InMemTransport
+ 
+-from steuerung3d.core.intents import EnableAxis, JogAxis, SetEstop, ArmLiveMode
+ 
+ def main() -> int:
+     tb = Timebase(dt_s=0.01)  # 100 Hz
+@@ -15,11 +14,11 @@     st.ensure_axis("X")
+     st.ensure_axis("Y")
+ 
+-    bus = InMemBus()
++    transport = InMemTransport()
+ 
+     # "Client side": send a couple intents
+-    bus.publish_intent(EnableAxis(axis_id="X", enable=True))
+-    bus.publish_intent(JogAxis(axis_id="X", vel=0.5))
++    transport.publish_intent(EnableAxis(axis_id="X", enable=True))
++    transport.publish_intent(JogAxis(axis_id="X", vel=0.5))
+ 
+     def on_step(state: MachineState, dt: float) -> None:
+         # v0.1 "plant": integrate vel directly
+@@ -28,15 +27,15 @@ 
+         # demonstrate estop mid-run
+         if state.tick == 250:
+-            bus.publish_intent(SetEstop(estop=True))
++            transport.publish_intent(SetEstop(estop=True))
+         if state.tick == 350:
+-            bus.publish_intent(SetEstop(estop=False))
+-            bus.publish_intent(ArmLiveMode())
+-            bus.publish_intent(EnableAxis(axis_id="X", enable=True))
+-            bus.publish_intent(JogAxis(axis_id="X", vel=0.5))
++            transport.publish_intent(SetEstop(estop=False))
++            transport.publish_intent(ArmLiveMode())
++            transport.publish_intent(EnableAxis(axis_id="X", enable=True))
++            transport.publish_intent(JogAxis(axis_id="X", vel=0.5))
+ 
+     def on_snapshot(snap) -> None:
+-        bus.publish_telemetry(snap)
++        transport.publish_telemetry(snap)
+ 
+         # "Client side": print occasionally
+         if snap.tick % 50 == 0:
+@@ -49,7 +48,7 @@     eng = CoreEngine(
+         timebase=tb,
+         state=st,
+-        drain_intents=bus.drain_intents,
++        drain_intents=transport.drain_intents,
+         handle_intent=apply_intent,
+         on_step=on_step,
+         on_snapshot=on_snapshot,
+
+--- src/steuerung3d/core/inmem_bus.py+++ src/steuerung3d/core/inmem_bus.py@@ -1,38 +1,30 @@ from __future__ import annotations
+ 
+-from collections import deque
+-from dataclasses import dataclass, field
+-from typing import Deque, List
++"""Deprecated module.
+ 
+-from steuerung3d.core.intents import Intent
+-from steuerung3d.core.telemetry import TelemetrySnapshot
++Historically we used a simple deque-based :class:`InMemBus` to shuttle intents and
++telemetry between a client and the core engine in a single process.
+ 
++As of v0.1 we standardize on :class:`steuerung3d.protocol.transport.InMemTransport`,
++which is thread-safe (uses :class:`queue.Queue`) and matches the transport seam we
++need for future UDP/ZMQ/WebSocket transports.
+ 
+-@dataclass
+-class InMemBus:
+-    _intent_q: Deque[Intent] = field(default_factory=deque)
+-    _telemetry_q: Deque[TelemetrySnapshot] = field(default_factory=deque)
++This module is kept *only* for backwards compatibility. New code should import:
+ 
+-    # --- intents (client -> core) ---
+-    def publish_intent(self, intent: Intent) -> None:
+-        self._intent_q.append(intent)
++    from steuerung3d.protocol.transport import InMemTransport
+ 
+-    def drain_intents(self, limit: int = 1000) -> List[Intent]:
+-        out: List[Intent] = []
+-        n = 0
+-        while self._intent_q and n < limit:
+-            out.append(self._intent_q.popleft())
+-            n += 1
+-        return out
++and use that instance wherever an in-memory transport is required.
++"""
+ 
+-    # --- telemetry (core -> client) ---
+-    def publish_telemetry(self, snap: TelemetrySnapshot) -> None:
+-        self._telemetry_q.append(snap)
++from warnings import warn
+ 
+-    def drain_telemetry(self, limit: int = 1000) -> List[TelemetrySnapshot]:
+-        out: List[TelemetrySnapshot] = []
+-        n = 0
+-        while self._telemetry_q and n < limit:
+-            out.append(self._telemetry_q.popleft())
+-            n += 1
+-        return out
++from steuerung3d.protocol.transport import InMemTransport as InMemBus
++
++warn(
++    "steuerung3d.core.inmem_bus.InMemBus is deprecated; use "
++    "steuerung3d.protocol.transport.InMemTransport instead.",
++    DeprecationWarning,
++    stacklevel=2,
++)
++
++__all__ = ["InMemBus"]
+
+--- src/steuerung3d/protocol/inmem_bus.py+++ src/steuerung3d/protocol/inmem_bus.py@@ -1,38 +1,30 @@ from __future__ import annotations
+ 
+-from collections import deque
+-from dataclasses import dataclass, field
+-from typing import Deque, List
++"""Deprecated module.
+ 
+-from steuerung3d.core.intents import Intent
+-from steuerung3d.core.telemetry import TelemetrySnapshot
++`InMemBus` used to live here (deque-based). The project now standardizes on the
++thread-safe `InMemTransport` implementation in `steuerung3d.protocol.transport`.
+ 
++This shim preserves the old import path:
+ 
+-@dataclass
+-class InMemBus:
+-    _intent_q: Deque[Intent] = field(default_factory=deque)
+-    _telemetry_q: Deque[TelemetrySnapshot] = field(default_factory=deque)
++    from steuerung3d.protocol.inmem_bus import InMemBus
+ 
+-    # --- intents (client -> core) ---
+-    def publish_intent(self, intent: Intent) -> None:
+-        self._intent_q.append(intent)
++but returns the new implementation.
+ 
+-    def drain_intents(self, limit: int = 1000) -> List[Intent]:
+-        out: List[Intent] = []
+-        n = 0
+-        while self._intent_q and n < limit:
+-            out.append(self._intent_q.popleft())
+-            n += 1
+-        return out
++Prefer:
+ 
+-    # --- telemetry (core -> client) ---
+-    def publish_telemetry(self, snap: TelemetrySnapshot) -> None:
+-        self._telemetry_q.append(snap)
++    from steuerung3d.protocol.transport import InMemTransport
++"""
+ 
+-    def drain_telemetry(self, limit: int = 1000) -> List[TelemetrySnapshot]:
+-        out: List[TelemetrySnapshot] = []
+-        n = 0
+-        while self._telemetry_q and n < limit:
+-            out.append(self._telemetry_q.popleft())
+-            n += 1
+-        return out
++from warnings import warn
++
++from steuerung3d.protocol.transport import InMemTransport as InMemBus
++
++warn(
++    "steuerung3d.protocol.inmem_bus.InMemBus is deprecated; use "
++    "steuerung3d.protocol.transport.InMemTransport instead.",
++    DeprecationWarning,
++    stacklevel=2,
++)
++
++__all__ = ["InMemBus"]
+

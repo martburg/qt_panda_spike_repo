@@ -1,0 +1,23 @@
+# configs/plc_stack.toml
+
+[app]
+dt_s = 0.01
+log_path = "logs/session_plc.jsonl"
+realtime = true
+
+[plc_udp]
+bind_host = "0.0.0.0"
+bind_port = 50002
+
+target_host = "172.16.17.5"
+target_port = 50001
+
+# order matters: must match PLC field ordering
+axis_ids = ["X", "Y", "Z"]
+
+# semicolon-delimited ascii is your current assumption
+delimiter = ";"
+encoding = "ascii"
+float_fmt = "{:.6f}"
+true_token = "1"
+false_token = "0"
