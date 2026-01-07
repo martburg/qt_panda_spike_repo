@@ -28,6 +28,8 @@ src/steuerung3d/apps/core_service/__init__.py
 src/steuerung3d/apps/core_service/__main__.py
 src/steuerung3d/apps/dev_stack/__init__.py
 src/steuerung3d/apps/dev_stack/__main__.py
+src/steuerung3d/apps/log_viewer/__init__.py
+src/steuerung3d/apps/log_viewer/__main__.py
 src/steuerung3d/apps/plc_stack/__init__.py
 src/steuerung3d/apps/plc_stack/__main__.py
 src/steuerung3d/apps/plc_stack/builder.py
@@ -36,7 +38,13 @@ src/steuerung3d/apps/replay_player/__main__.py
 src/steuerung3d/common/__init__.py
 src/steuerung3d/common/timebase.py
 src/steuerung3d/config/__init__.py
+src/steuerung3d/config/cli_client_config.py
+src/steuerung3d/config/core_service_config.py
+src/steuerung3d/config/dev_stack_config.py
+src/steuerung3d/config/log_viewer_config.py
 src/steuerung3d/config/plc_stack_config.py
+src/steuerung3d/config/replay_player_config.py
+src/steuerung3d/config/toml_loader.py
 src/steuerung3d/configs/__init__.py
 src/steuerung3d/core/__init__.py
 src/steuerung3d/core/command_frame.py
@@ -60,6 +68,7 @@ src/steuerung3d/tests/__init__.py
 src/steuerung3d/tests/test_intents.py
 src/steuerung3d/tests/test_state_machine_modes.py
 src/steuerung3d/tests/unit/__init__.py
+src/steuerung3d/tests/unit/test_command_frame_regression.py
 src/steuerung3d/tests/unit/test_engine_tick.py
 src/steuerung3d/tests/unit/test_plc_device_builder.py
 src/steuerung3d/tests/unit/test_record_replay_smoke.py

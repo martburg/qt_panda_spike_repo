@@ -1,52 +1,66 @@
-# Configuration
+# Configuration (TOML)
 
-We use **TOML** as the configuration format for runtime wiring.
+All runtime entrypoints are configured via **TOML files** under the repo root `configs/` directory.
 
-## Status
+## Shared conventions
 
-- TOML is now *active* for the PLC stack (`apps/plc_stack`).
-- This is still a **stub phase**:
-  - we ship a default `configs/plc_stack.toml`
-  - apps default to that file path
-  - additional app stacks will be migrated to TOML incrementally
+Most stacks have an `[app]` section with:
 
-## Why TOML (design decision)
+- `dt_s` — tick step (seconds)
+- `realtime` — whether to sleep to real time (if the runner supports it)
+- `log_path` — JSONL output path (stacks that record)
 
-- human-readable, versionable config file in the repo
-- easy to review changes in PRs
-- supports nested structures cleanly (`[[plc_endpoints]]` lists)
+## PLC stack (`configs/plc_stack.toml`)
 
-## PLC stack schema
+`[[plc_endpoints]]` maps axis ownership to PLC endpoints (UDP bind + target).
+See `docs/plc_stack.md`.
 
-### `[app]`
-- `dt_s`: engine tick step in seconds
-- `realtime`: whether the core runner sleeps to real time
-- `log_path`: JSONL log output path
+Run:
+```bash
+python -m steuerung3d.apps.plc_stack --config configs/plc_stack.toml
+```
 
-### `[[plc_endpoints]]`
-One table per PLC endpoint.
+## Dev stack (`configs/dev_stack.toml`)
 
-Required:
-- `name`
-- `bind_host`, `bind_port`
-- `target_host`, `target_port`
-- `axis_ids` (list of axes owned by this endpoint)
+SIM-first run of core + sim device + recording.
 
-Optional (codec hints, used as defaults):
-- `delimiter`
-- `encoding`
-- `float_fmt`
-- `true_token`, `false_token`
+Run:
+```bash
+python -m steuerung3d.apps.dev_stack --config configs/dev_stack.toml
+```
 
-## Validation rules
+## Replay player (`configs/replay_player.toml`)
 
-- At least one endpoint must exist
-- endpoint names must be unique
-- each axis can only be owned by one endpoint
-- ports must be > 0, target_host must be present
+Offline replay of a JSONL session.
 
-## Future direction (not done yet)
+Run:
+```bash
+python -m steuerung3d.apps.replay_player path/to/session.jsonl --config configs/replay_player.toml
+```
 
-- unify all app configs (dev_stack, plc_stack, replay) under one schema
-- provide “profiles” for different rigs or deployments
-- support overrides (CLI flags, env) without losing reproducibility
+## CLI client (`configs/cli_client.toml`)
+
+Human-driven intent publishing from terminal.
+
+Run:
+```bash
+python -m steuerung3d.apps.cli_client --config configs/cli_client.toml
+```
+
+## Core service (`configs/core_service.toml`)
+
+Headless core runner for development.
+
+Run:
+```bash
+python -m steuerung3d.apps.core_service --config configs/core_service.toml
+```
+
+## Log viewer (`configs/log_viewer.toml`)
+
+Defaults for the `log_viewer` CLI.
+
+Run:
+```bash
+python -m steuerung3d.apps.log_viewer path/to/session.jsonl --config configs/log_viewer.toml
+```

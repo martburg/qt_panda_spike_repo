@@ -49,8 +49,7 @@ The architecture logs **CommandFrames** alongside intents and telemetry:
 - `JsonlReader.iter_command_frames()` reads them back.
 - The replay path can compare generated vs recorded command frames to detect nondeterminism/regressions.
 
-This is the main “glass box” tool: you can inspect exactly what *full-state setpoint* was emitted per tick,
-and compare **commanded vs measured** behavior.
+To *use* these logs, see `docs/logging.md` and the `log_viewer` CLI.
 
 ## Legacy / compatibility (“shim”)
 
@@ -65,20 +64,3 @@ In our case:
 - while raising deprecation warnings and guiding migration.
 
 Goal: remove duplicate queue/bus implementations and converge on `InMemTransport`.
-
-## Migration guidance
-
-Prefer:
-
-```python
-from steuerung3d.protocol.transport import InMemTransport
-t = InMemTransport()
-```
-
-If you see `InMemBus` in code, treat it as legacy and replace it.
-
-## Why this design
-
-- **Deterministic testing:** in-memory transport + SIM device gives reproducible tests.
-- **Replaceable IO:** the core has no dependency on UDP, sockets, UI frameworks.
-- **Better debugging:** record/replay + command frames gives “black box → glass box” visibility.

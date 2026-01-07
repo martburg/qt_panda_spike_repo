@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
+from steuerung3d.config.toml_loader import load_toml
 
 # --------------------
 # Dataclasses (schema)
@@ -14,7 +15,6 @@ class AppConfig:
     dt_s: float = 0.01
     realtime: bool = True
     log_path: str = "logs/session_plc.jsonl"
-
 
 @dataclass(frozen=True)
 class PlcEndpointConfig:
@@ -31,12 +31,10 @@ class PlcEndpointConfig:
     true_token: str = "1"
     false_token: str = "0"
 
-
 @dataclass(frozen=True)
 class PlcStackConfig:
     app: AppConfig
     plc_endpoints: List[PlcEndpointConfig]
-
 
 # --------------------
 # Loader
@@ -55,7 +53,7 @@ def load_plc_stack_config(path: Path) -> PlcStackConfig:
     if not path.exists():
         raise FileNotFoundError(f"Config not found: {path}")
 
-    raw = _load_toml(path)
+    raw = load_toml(path)
 
     app_raw = raw.get("app", {}) or {}
     app = AppConfig(
@@ -106,7 +104,6 @@ def load_plc_stack_config(path: Path) -> PlcStackConfig:
     _validate(endpoints)
     return PlcStackConfig(app=app, plc_endpoints=endpoints)
 
-
 def _validate(endpoints: List[PlcEndpointConfig]) -> None:
     if not endpoints:
         raise ValueError("No plc_endpoints configured. Add at least one [[plc_endpoints]] entry.")
@@ -132,7 +129,6 @@ def _validate(endpoints: List[PlcEndpointConfig]) -> None:
                 raise ValueError(f"Axis '{ax}' is owned by both '{owned[ax]}' and '{e.name}'")
             owned[ax] = e.name
 
-
 def _legacy_plc_udp_to_endpoint(legacy: dict) -> dict:
     axis_ids = legacy.get("axis_ids", ["X"])
     return {
@@ -149,12 +145,3 @@ def _legacy_plc_udp_to_endpoint(legacy: dict) -> dict:
         "false_token": legacy.get("false_token", "0"),
     }
 
-
-def _load_toml(path: Path) -> dict:
-    # Python >= 3.11: tomllib (stdlib); else: tomli (dependency)
-    try:
-        import tomllib  # type: ignore
-        return tomllib.loads(path.read_text(encoding="utf-8"))
-    except ModuleNotFoundError:
-        import tomli  # type: ignore
-        return tomli.loads(path.read_text(encoding="utf-8"))

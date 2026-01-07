@@ -16,15 +16,6 @@ The PLC accepts **full state setpoints** (not incremental commands).
 This matches our `CommandFrame` approach:
 each tick the engine emits the full commanded state for all axes.
 
-## Config-driven axis mapping
-
-We must support mixed assignments, e.g.
-
-- one PLC per axis (Anton/Burt/Cecil/Debby)
-- one PLC owning multiple axes
-
-The configuration owns that mapping (not the code).
-
 ## Builder surface (importable API)
 
 ### `build_core(cfg, device_step, enable_logging=True)`
@@ -38,7 +29,7 @@ Builds:
   - apply intents
   - call `device_step(state, command_frame, dt)`
   - publish telemetry
-  - **record command frames** (deep debugging)
+  - record command frames (deep debugging)
 
 Returns a runtime bundle (transport, engine, state, timebase).
 
@@ -56,24 +47,8 @@ Builds the PLC edge adapter:
 The optional factories exist so unit tests can pass **fake links/codecs**
 and avoid binding sockets.
 
-### `collect_axes(cfg)`
-
-Utility that flattens all endpoint `axis_ids` into an ordered, de-duplicated list.
-
 ## App entrypoint
 
-`python -m steuerung3d.apps.plc_stack --config configs/plc_stack.toml`
-
-The entrypoint:
-- loads config (TOML)
-- builds PLC device via `build_plc_device`
-- builds core runtime via `build_core`
-- starts the runner
-
-## Testing strategy (no PLC required)
-
-- “core + SIM device” tests validate intent → commandframe → telemetry behavior
-- builder-path tests validate config → endpoints construction using fake links
-- deep-debugging tests validate that command frames are recorded and replayable
-
-This lets us move fast without PLC availability.
+```bash
+python -m steuerung3d.apps.plc_stack --config configs/plc_stack.toml
+```

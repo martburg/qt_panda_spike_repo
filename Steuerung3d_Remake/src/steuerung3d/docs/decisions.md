@@ -7,61 +7,46 @@ Think of them as lightweight ADRs (Architecture Decision Records).
 
 **Decision:** The core engine talks to a `Transport` API, not directly to sockets/UDP/UI.
 
-**Reason:**
-- unit tests become deterministic
-- record/replay is natural
-- IO backends can evolve without rewriting the core
+**Reason:** deterministic tests, record/replay, replaceable IO.
 
 ## 2) Full-state setpoints (CommandFrame)
 
 **Decision:** The device boundary consumes full-state commanded setpoints each tick.
 
-**Reason:**
-- matches PLC reality (“full state setpoints”)
-- simplifies recovery: any tick contains the whole intended state
-- makes logging + debugging more meaningful (“what did we command?”)
+**Reason:** matches PLC reality; improves recovery; improves debuggability.
 
 ## 3) UDP for PLC edge adapter
 
-**Decision:** We stick to UDP for PLC communication.
+**Decision:** Stick to UDP for PLC communication.
 
-**Reason:**
-- no influence on PLC sender/receiver side
-- PLC protocol is already UDP
-- we keep reliability features at higher layers if needed, but do not require them
+**Reason:** PLC is fixed; reliability handled elsewhere if needed.
 
 ## 4) Config file over environment variables
 
-**Decision:** Prefer TOML config checked into the repo (or deployed alongside it).
+**Decision:** Prefer TOML config checked into the repo.
 
-**Reason:**
-- reproducible setups (especially important on set)
-- easier to review and share
-- supports multi-endpoint + multi-axis mapping cleanly
+**Reason:** reproducible on set; reviewable; supports multi-endpoint mapping.
 
 ## 5) Multi-axis mapping is config-owned
 
 **Decision:** Axis-to-PLC assignment lives in config, not code.
 
-**Reason:**
-- supports “one PLC per axis” and “one PLC for multiple axes”
-- avoids hardcoding rig topology
-- allows incremental migration from legacy setups
+**Reason:** supports mixed assignments; avoids hardcoded topology.
 
 ## 6) Builders are importable (testable wiring)
 
-**Decision:** `apps/plc_stack` exposes `build_core` and `build_plc_device` as importable functions.
+**Decision:** `apps/plc_stack` exposes `build_core` and `build_plc_device`.
 
-**Reason:**
-- tests can validate “real wiring” without running CLI entrypoints
-- PLC construction can be tested with fake links (no sockets, no PLC needed)
-- production and tests stay aligned
+**Reason:** tests and production stay aligned; PLC construction testable without sockets.
 
 ## 7) Deep debugging via CommandFrame logging
 
 **Decision:** Record command frames per tick alongside intents + telemetry in JSONL.
 
-**Reason:**
-- enables “commanded vs measured” analysis offline
-- makes replay deterministic and regression-friendly
-- catches accidental behavior changes early
+**Reason:** commanded vs measured analysis; deterministic replay; catches regressions.
+
+## 8) Regression testing via command sequence fingerprint
+
+**Decision:** Maintain a stable fingerprint (hash) of the command-frame sequence for a deterministic scenario.
+
+**Reason:** quickly detects accidental behavioral drift across refactors.

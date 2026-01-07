@@ -1,0 +1,18 @@
+[app]
+dt_s = 0.01
+realtime = true
+log_path = "logs/session_plc.jsonl"
+
+[[plc_endpoints]]
+name = "Anton"
+bind_host = "0.0.0.0"
+bind_port = 51001
+target_host = "172.16.17.1"
+target_port = 50001
+axis_ids = ["X"]
+
+delimiter = ";"
+encoding = "ascii"
+float_fmt = "{:.6f}"
+true_token = "1"
+false_token = "0"

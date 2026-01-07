@@ -1,28 +1,41 @@
 from __future__ import annotations
 
-import sys
+import argparse
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
+from steuerung3d.adapters.sim.device import SimDevice
 from steuerung3d.common.timebase import Timebase
-from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.command_frame import CommandFrame
+from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.recording import JsonlReader
 from steuerung3d.protocol.transport import InMemTransport
 
-from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
-from steuerung3d.adapters.sim.device import SimDevice
+from steuerung3d.config.replay_player_config import load_replay_player_config
+
+
+def _parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Steuerung3D replay player (deterministic log replay)")
+    p.add_argument("logfile", type=Path, help="Path to JSONL log file")
+    p.add_argument(
+        "--config",
+        type=Path,
+        default=Path("configs/replay_player.toml"),
+        help="Path to TOML config (default: configs/replay_player.toml)",
+    )
+    return p.parse_args()
+
 
 def main() -> int:
-    if len(sys.argv) < 2:
-        print("usage: python -m apps.replay_player <logfile.jsonl>")
-        return 2
+    args = _parse_args()
+    cfg = load_replay_player_config(args.config)
 
-    path = Path(sys.argv[1])
+    path = args.logfile
     r = JsonlReader(path)
 
     intents_by_tick: Dict[int, List] = defaultdict(list)
@@ -31,7 +44,6 @@ def main() -> int:
 
     max_tick = 0
     for tick, intent in r.iter_intents():
-        # if tick is missing, treat as tick 0
         t = int(tick) if tick is not None else 0
         intents_by_tick[t].append(intent)
 
@@ -40,14 +52,15 @@ def main() -> int:
         max_tick = max(max_tick, snap.tick)
 
     # Optional: deep debugging stream (command frames)
-    for cf in r.iter_command_frames():
-        command_by_tick[cf.tick] = cf
+    if bool(cfg.replay.compare_command_frames):
+        for cf in r.iter_command_frames():
+            command_by_tick[cf.tick] = cf
 
-    # Recreate a fresh core
     transport = InMemTransport()
-    tb = Timebase(dt_s=0.01)
+    tb = Timebase(dt_s=float(cfg.app.dt_s))
     st = MachineState()
-    # v0.1: derive axis set from recorded telemetry (more robust than hardcoding X)
+
+    # derive axis set from recorded telemetry
     if telemetry_by_tick:
         first = telemetry_by_tick[min(telemetry_by_tick.keys())]
         for axis_id in first.axes.keys():
@@ -66,8 +79,7 @@ def main() -> int:
         nonlocal last_cmd
         last_cmd = cf
 
-    plant = SimAxisPlant()
-    device = SimDevice(plant)
+    device = SimDevice(SimAxisPlant())
 
     eng = CoreEngine(
         timebase=tb,
@@ -82,8 +94,6 @@ def main() -> int:
     mismatches = 0
     cmd_mismatches = 0
 
-    # Deterministic replay loop:
-    # intents are injected at the *start* of step when state.tick == recorded_tick
     while st.tick < max_tick:
         current_tick = st.tick
 
@@ -92,17 +102,15 @@ def main() -> int:
 
         eng.step_once()
 
-        # compare after step (snap tick == st.tick)
         if last_snap is not None and last_snap.tick in telemetry_by_tick:
             ref = telemetry_by_tick[last_snap.tick]
-            if not _telemetry_close(last_snap, ref):
+            if not _telemetry_close(last_snap, ref, eps=float(cfg.replay.eps)):
                 mismatches += 1
                 print(f"[mismatch] tick={last_snap.tick}")
 
-        # Deep debugging: compare command frames if present in the log.
-        if last_cmd is not None and last_cmd.tick in command_by_tick:
+        if command_by_tick and last_cmd is not None and last_cmd.tick in command_by_tick:
             ref_cf = command_by_tick[last_cmd.tick]
-            if not _command_frame_close(last_cmd, ref_cf):
+            if not _command_frame_close(last_cmd, ref_cf, eps=float(cfg.replay.eps)):
                 cmd_mismatches += 1
                 print(f"[cmd mismatch] tick={last_cmd.tick}")
 
@@ -111,14 +119,6 @@ def main() -> int:
     else:
         print(f"Replay done. ticks={st.tick}, mismatches={mismatches}")
     return 0
-
-
-def _plant_integrate_x(state: MachineState, dt: float) -> None:
-    # v0.1: same "plant" used in dev_stack: integrate vel into pos
-    ax = state.axes.get("X")
-    if ax is None:
-        return
-    ax.pos += ax.vel * dt
 
 
 def _telemetry_close(a: TelemetrySnapshot, b: TelemetrySnapshot, eps: float = 1e-9) -> bool:
