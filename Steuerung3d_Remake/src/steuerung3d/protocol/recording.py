@@ -4,17 +4,17 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic_ns
-from typing import Any, Dict, Iterator, Optional
+from typing import Any, Dict, Iterable, Iterator, Optional
 
-from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.intents import Intent
+from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.codec import (
     encode_intent,
     encode_telemetry,
+    encode_command_frame,
     decode_intent,
     decode_telemetry,
-    encode_command_frame,
     decode_command_frame,
 )
 from steuerung3d.protocol.transport import Transport
@@ -52,13 +52,13 @@ class JsonlRecorder:
             "payload": encode_telemetry(snap),
         })
 
-    def record_command_frame(self, cmd: CommandFrame) -> None:
+    def record_command_frame(self, frame: CommandFrame) -> None:
         self.write_record({
             "schema": LOG_SCHEMA,
             "kind": "command_frame",
             "wall_ns": monotonic_ns(),
-            "tick": cmd.tick,
-            "payload": encode_command_frame(cmd),
+            "tick": frame.tick,
+            "payload": encode_command_frame(frame),
         })
 
 

@@ -16,9 +16,8 @@ StepHook = Callable[[MachineState, float], None]
 IntentDrainHook = Callable[[], Sequence[Intent]]
 IntentHandlerHook = Callable[[MachineState, Intent], None]
 SnapshotHook = Callable[[TelemetrySnapshot], None]
-DeviceStepHook = Callable[[MachineState, CommandFrame, float], None]
 CommandFrameHook = Callable[[CommandFrame], None]
-
+DeviceStepHook = Callable[[MachineState, CommandFrame, float], None]
 
 @dataclass
 class CoreEngine:
@@ -31,8 +30,6 @@ class CoreEngine:
     device_step: Optional[DeviceStepHook] = None
     on_step: Optional[StepHook] = None
     on_snapshot: Optional[SnapshotHook] = None
-
-    # v0.1.1: log/debug hook
     on_command_frame: Optional[CommandFrameHook] = None
 
     def step_once(self) -> None:
@@ -53,7 +50,8 @@ class CoreEngine:
         # 4) build command frame and step device (SIM or real adapter)
         cmd_frame = build_command_frame(self.state)
 
-        # 4a) emit command frame (for logging/debug)
+        # Optional: log/observe the command frame that is about to be sent to the device.
+        # This enables “deep debugging” (commanded vs measured) when paired with telemetry logging.
         if self.on_command_frame is not None:
             self.on_command_frame(cmd_frame)
 
@@ -66,7 +64,7 @@ class CoreEngine:
         # 5) emit telemetry snapshot
         if self.on_snapshot is not None:
             self.on_snapshot(TelemetrySnapshot.from_state(self.state))
-
+    
     def run_for_ticks(self, n: int) -> None:
         if n < 0:
             raise ValueError("n must be >= 0")

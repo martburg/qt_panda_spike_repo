@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any, Dict
 
-from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
 from steuerung3d.core.intents import (
     ArmLiveMode,
     ClearFault,
@@ -13,6 +12,7 @@ from steuerung3d.core.intents import (
     JogAxis,
     SetEstop,
 )
+from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
 
 
@@ -69,17 +69,17 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
 
 
 # ---------------------------
-# CommandFrame
+# Command frames
 # ---------------------------
 
-def encode_command_frame(cmd: CommandFrame) -> Dict[str, Any]:
-    return asdict(cmd)
+def encode_command_frame(frame: CommandFrame) -> Dict[str, Any]:
+    return asdict(frame)
 
 
 def decode_command_frame(payload: Dict[str, Any]) -> CommandFrame:
     axes_in = payload["axes"]
     axes_out: Dict[str, AxisSetpoint] = {
-        axis_id: AxisSetpoint(**sp) for axis_id, sp in axes_in.items()
+        axis_id: AxisSetpoint(**ax) for axis_id, ax in axes_in.items()
     }
     return CommandFrame(
         tick=int(payload["tick"]),
