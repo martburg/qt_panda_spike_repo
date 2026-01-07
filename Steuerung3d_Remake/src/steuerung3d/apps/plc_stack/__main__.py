@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-import argparse
 import time
 from pathlib import Path
 
 from steuerung3d.adapters.links.udp_link import UdpLink
+from steuerung3d.adapters.plc.multi_plc_device import MultiPlcDevice
 from steuerung3d.adapters.plc.plc_codec import PlcCodec
 from steuerung3d.adapters.plc.plc_config import PlcWireSpec
-from steuerung3d.adapters.plc.plc_device import PlcDevice
+from steuerung3d.adapters.plc.plc_endpoint import PlcEndpoint
+from steuerung3d.adapters.plc.validate import validate_endpoints
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
@@ -17,50 +18,51 @@ from steuerung3d.protocol.core_runner import CoreRunner
 from steuerung3d.protocol.recording import JsonlRecorder, LoggedTransport
 from steuerung3d.protocol.transport import InMemTransport
 
-from steuerung3d.config.plc_stack_config import load_plc_stack_config
 
-
-def _parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Steuerung3D PLC stack (UDP PLC transport)")
-    p.add_argument(
-        "--config",
-        type=Path,
-        default=Path("configs/plc_stack.toml"),
-        help="Path to plc stack TOML config (default: configs/plc_stack.toml)",
-    )
-    return p.parse_args()
+# TODO: replace this static list with a config file (TOML) once multi-axis is active.
+# Mixed assignment is supported: each endpoint can own 1..N axes.
+PLC_ENDPOINTS = [
+    # name, target_host, target_port, bind_host, bind_port, axis_ids
+    ("Anton", "172.16.17.1", 50001, "0.0.0.0", 51001, ["X"]),
+    ("Burt",  "172.16.17.2", 50001, "0.0.0.0", 51002, ["Y"]),
+    ("Cecil", "172.16.17.3", 50001, "0.0.0.0", 51003, ["Z"]),
+    ("Debby", "172.16.17.4", 50001, "0.0.0.0", 51004, ["W"]),
+]
 
 
 def main() -> int:
-    args = _parse_args()
-    cfg = load_plc_stack_config(args.config)
-
     # --- internal transport (core <-> client in-process) ---
     raw = InMemTransport()
-    rec = JsonlRecorder(Path(cfg.app.log_path))
+    rec = JsonlRecorder(Path("logs/session_plc.jsonl"))
     transport = LoggedTransport(raw, rec)
 
-    # --- PLC UDP link ---
-    link = UdpLink(
-        bind=(cfg.plc_udp.bind_host, cfg.plc_udp.bind_port),
-        target=(cfg.plc_udp.target_host, cfg.plc_udp.target_port),
-    )
+    # --- build PLC endpoints ---
+    endpoints: list[PlcEndpoint] = []
+    all_axes: list[str] = []
 
-    spec = PlcWireSpec(
-        axis_ids=cfg.plc_udp.axis_ids,
-        delimiter=cfg.plc_udp.delimiter,
-        encoding=cfg.plc_udp.encoding,
-        float_fmt=cfg.plc_udp.float_fmt,
-        true_token=cfg.plc_udp.true_token,
-        false_token=cfg.plc_udp.false_token,
-    )
-    codec = PlcCodec(spec=spec)
-    device = PlcDevice(link=link, codec=codec)
+    for name, target_host, target_port, bind_host, bind_port, axis_ids in PLC_ENDPOINTS:
+        all_axes.extend(axis_ids)
+
+        spec = PlcWireSpec(axis_ids=list(axis_ids))
+        codec = PlcCodec(spec=spec)
+        link = UdpLink(bind=(bind_host, bind_port), target=(target_host, target_port))
+
+        endpoints.append(
+            PlcEndpoint(
+                name=name,
+                axis_ids=list(axis_ids),
+                link=link,
+                codec=codec,
+            )
+        )
+
+    validate_endpoints(endpoints)
+    device = MultiPlcDevice(endpoints=endpoints)
 
     # --- core ---
-    tb = Timebase(dt_s=float(cfg.app.dt_s))
+    tb = Timebase(dt_s=0.01)  # 100 Hz default
     st = MachineState()
-    for a in cfg.plc_udp.axis_ids:
+    for a in all_axes:
         st.ensure_axis(a)
 
     eng = CoreEngine(
@@ -73,14 +75,16 @@ def main() -> int:
         on_command_frame=rec.record_command_frame,
     )
 
-    runner = CoreRunner(engine=eng, realtime=bool(cfg.app.realtime))
+    runner = CoreRunner(engine=eng, realtime=True)
     runner.start()
 
-    # --- basic demo client behavior ---
+    # --- demo behavior ---
     transport.publish_intent(ArmLiveMode())
-    for a in cfg.plc_udp.axis_ids:
+    for a in all_axes:
         transport.publish_intent(EnableAxis(axis_id=a, enable=True))
-    transport.publish_intent(JogAxis(axis_id=cfg.plc_udp.axis_ids[0], vel=0.6))
+
+    # Jog the first axis
+    transport.publish_intent(JogAxis(axis_id=all_axes[0], vel=0.6))
 
     t0 = time.time()
     last_print = 0
@@ -91,11 +95,12 @@ def main() -> int:
             for snap in snaps:
                 if snap.tick - last_print >= 50:
                     last_print = snap.tick
-                    ax0 = snap.axes[cfg.plc_udp.axis_ids[0]]
+                    ax0 = snap.axes[all_axes[0]]
                     print(
                         f"tick={snap.tick:5d} t={snap.t_s:6.2f}s mode={snap.mode} "
-                        f"estop={snap.estop} {cfg.plc_udp.axis_ids[0]}(en={ax0.enabled}, vel={ax0.vel:5.2f}, pos={ax0.pos:8.3f}) "
-                        f"plc_last_rx_tick={device.last_rx_tick}"
+                        f"estop={snap.estop} fault={snap.fault} "
+                        f"{all_axes[0]}(en={ax0.enabled}, vel={ax0.vel:5.2f}, pos={ax0.pos:8.3f}) "
+                        f"rx_ticks={device.last_rx_tick_by_endpoint}"
                     )
 
             if 2.5 < (time.time() - t0) < 2.55:
@@ -109,7 +114,8 @@ def main() -> int:
     finally:
         runner.stop()
         runner.join(timeout=1.0)
-        link.close()
+        for ep in endpoints:
+            ep.link.close()
 
     return 0
 
