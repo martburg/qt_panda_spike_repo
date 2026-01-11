@@ -16,8 +16,8 @@ StepHook = Callable[[MachineState, float], None]
 IntentDrainHook = Callable[[], Sequence[Intent]]
 IntentHandlerHook = Callable[[MachineState, Intent], None]
 SnapshotHook = Callable[[TelemetrySnapshot], None]
-CommandFrameHook = Callable[[CommandFrame], None]
 DeviceStepHook = Callable[[MachineState, CommandFrame, float], None]
+CommandFrameHook = Callable[[CommandFrame], None]
 
 @dataclass
 class CoreEngine:
@@ -50,8 +50,6 @@ class CoreEngine:
         # 4) build command frame and step device (SIM or real adapter)
         cmd_frame = build_command_frame(self.state)
 
-        # Optional: log/observe the command frame that is about to be sent to the device.
-        # This enables “deep debugging” (commanded vs measured) when paired with telemetry logging.
         if self.on_command_frame is not None:
             self.on_command_frame(cmd_frame)
 

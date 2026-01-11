@@ -11,11 +11,13 @@ src/steuerung3d/adapters/links/base.py
 src/steuerung3d/adapters/links/udp_link.py
 src/steuerung3d/adapters/plc/__init__.py
 src/steuerung3d/adapters/plc/frame_slice.py
+src/steuerung3d/adapters/plc/line_codec.py
 src/steuerung3d/adapters/plc/multi_plc_device.py
 src/steuerung3d/adapters/plc/plc_codec.py
 src/steuerung3d/adapters/plc/plc_config.py
 src/steuerung3d/adapters/plc/plc_device.py
 src/steuerung3d/adapters/plc/plc_endpoint.py
+src/steuerung3d/adapters/plc/udp_device.py
 src/steuerung3d/adapters/plc/validate.py
 src/steuerung3d/adapters/plc_stack/__init__.py
 src/steuerung3d/adapters/sim/__init__.py
@@ -30,6 +32,8 @@ src/steuerung3d/apps/dev_stack/__init__.py
 src/steuerung3d/apps/dev_stack/__main__.py
 src/steuerung3d/apps/log_viewer/__init__.py
 src/steuerung3d/apps/log_viewer/__main__.py
+src/steuerung3d/apps/plc_sim/__init__.py
+src/steuerung3d/apps/plc_sim/__main__.py
 src/steuerung3d/apps/plc_stack/__init__.py
 src/steuerung3d/apps/plc_stack/__main__.py
 src/steuerung3d/apps/plc_stack/builder.py
@@ -71,6 +75,7 @@ src/steuerung3d/tests/unit/__init__.py
 src/steuerung3d/tests/unit/test_command_frame_regression.py
 src/steuerung3d/tests/unit/test_engine_tick.py
 src/steuerung3d/tests/unit/test_plc_device_builder.py
+src/steuerung3d/tests/unit/test_plc_line_codec.py
 src/steuerung3d/tests/unit/test_record_replay_smoke.py
 src/steuerung3d/tests/unit/test_sim_axis_plant.py
 src/steuerung3d/tests/unit/test_toml_driven_multi_axis.py

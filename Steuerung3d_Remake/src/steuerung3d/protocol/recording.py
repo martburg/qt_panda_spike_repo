@@ -7,16 +7,8 @@ from time import monotonic_ns
 from typing import Any, Dict, Iterable, Iterator, Optional
 
 from steuerung3d.core.intents import Intent
-from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.telemetry import TelemetrySnapshot
-from steuerung3d.protocol.codec import (
-    encode_intent,
-    encode_telemetry,
-    encode_command_frame,
-    decode_intent,
-    decode_telemetry,
-    decode_command_frame,
-)
+from steuerung3d.protocol.codec import encode_intent, encode_telemetry, decode_intent, decode_telemetry
 from steuerung3d.protocol.transport import Transport
 
 
@@ -52,15 +44,6 @@ class JsonlRecorder:
             "payload": encode_telemetry(snap),
         })
 
-    def record_command_frame(self, frame: CommandFrame) -> None:
-        self.write_record({
-            "schema": LOG_SCHEMA,
-            "kind": "command_frame",
-            "wall_ns": monotonic_ns(),
-            "tick": frame.tick,
-            "payload": encode_command_frame(frame),
-        })
-
 
 class JsonlReader:
     def __init__(self, path: Path):
@@ -86,11 +69,6 @@ class JsonlReader:
         for rec in self.iter_records():
             if rec["kind"] == "telemetry":
                 yield decode_telemetry(rec["payload"])
-
-    def iter_command_frames(self) -> Iterator[CommandFrame]:
-        for rec in self.iter_records():
-            if rec["kind"] == "command_frame":
-                yield decode_command_frame(rec["payload"])
 
 
 @dataclass

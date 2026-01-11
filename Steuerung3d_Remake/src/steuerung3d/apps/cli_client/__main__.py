@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import argparse
 import sys
 import time
-from pathlib import Path
 
 from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
 from steuerung3d.adapters.sim.device import SimDevice
@@ -22,8 +20,6 @@ from steuerung3d.core.state import MachineState
 from steuerung3d.protocol.core_runner import CoreRunner
 from steuerung3d.protocol.transport import InMemTransport
 
-from steuerung3d.config.cli_client_config import load_cli_client_config
-
 
 HELP = """commands:
   help
@@ -36,17 +32,6 @@ HELP = """commands:
   show                 -> print one latest telemetry (if available)
   quit
 """
-
-
-def _parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Steuerung3D CLI client (SIM stack for v0.1)")
-    p.add_argument(
-        "--config",
-        type=Path,
-        default=Path("configs/cli_client.toml"),
-        help="Path to TOML config (default: configs/cli_client.toml)",
-    )
-    return p.parse_args()
 
 
 def parse_and_send(cmd: str, tr: InMemTransport) -> bool:
@@ -95,16 +80,12 @@ def parse_and_send(cmd: str, tr: InMemTransport) -> bool:
 
 
 def main() -> int:
-    args = _parse_args()
-    cfg = load_cli_client_config(args.config)
-
     tr = InMemTransport()
 
-    tb = Timebase(dt_s=float(cfg.app.dt_s))
+    tb = Timebase(dt_s=0.01)
     st = MachineState()
-    for ax in cfg.client.axis_ids:
-        st.ensure_axis(ax)
-        st.ensure_axis_cmd(ax)
+    st.ensure_axis("X")
+    st.ensure_axis_cmd("X")
 
     device = SimDevice(SimAxisPlant())
 
@@ -124,7 +105,7 @@ def main() -> int:
         on_snapshot=on_snapshot,
     )
 
-    runner = CoreRunner(engine=eng, realtime=bool(cfg.app.realtime))
+    runner = CoreRunner(engine=eng, realtime=True)
     runner.start()
 
     print("CLI client started.")
@@ -134,15 +115,14 @@ def main() -> int:
 
     try:
         while True:
-            # periodic telemetry print (first axis)
-            if latest is not None and latest.tick - last_print_tick >= 100:
+            # periodic telemetry print
+            if latest is not None and latest.tick - last_print_tick >= 100:  # every 1s
                 last_print_tick = latest.tick
-                ax0 = cfg.client.axis_ids[0] if cfg.client.axis_ids else None
-                if ax0 and ax0 in latest.axes:
-                    x = latest.axes[ax0]
+                x = latest.axes.get("X")
+                if x:
                     print(
                         f"[tele] tick={latest.tick} t={latest.t_s:.2f}s mode={latest.mode} "
-                        f"estop={latest.estop} {ax0}(en={x.enabled}, vel={x.vel:.3f}, pos={x.pos:.3f})"
+                        f"estop={latest.estop} X(en={x.enabled}, vel={x.vel:.3f}, pos={x.pos:.3f})"
                     )
                 else:
                     print(f"[tele] tick={latest.tick} t={latest.t_s:.2f}s mode={latest.mode} estop={latest.estop}")
@@ -158,6 +138,7 @@ def main() -> int:
                 if latest is None:
                     print("(no telemetry yet)")
                 else:
+                    x = latest.axes.get("X")
                     print(latest)
                 continue
 

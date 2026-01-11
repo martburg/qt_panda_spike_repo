@@ -1,30 +1,38 @@
 from __future__ import annotations
 
-"""Deprecated module.
+from collections import deque
+from dataclasses import dataclass, field
+from typing import Deque, List
 
-Historically we used a simple deque-based :class:`InMemBus` to shuttle intents and
-telemetry between a client and the core engine in a single process.
+from steuerung3d.core.intents import Intent
+from steuerung3d.core.telemetry import TelemetrySnapshot
 
-As of v0.1 we standardize on :class:`steuerung3d.protocol.transport.InMemTransport`,
-which is thread-safe (uses :class:`queue.Queue`) and matches the transport seam we
-need for future UDP/ZMQ/WebSocket transports.
 
-This module is kept *only* for backwards compatibility. New code should import:
+@dataclass
+class InMemBus:
+    _intent_q: Deque[Intent] = field(default_factory=deque)
+    _telemetry_q: Deque[TelemetrySnapshot] = field(default_factory=deque)
 
-    from steuerung3d.protocol.transport import InMemTransport
+    # --- intents (client -> core) ---
+    def publish_intent(self, intent: Intent) -> None:
+        self._intent_q.append(intent)
 
-and use that instance wherever an in-memory transport is required.
-"""
+    def drain_intents(self, limit: int = 1000) -> List[Intent]:
+        out: List[Intent] = []
+        n = 0
+        while self._intent_q and n < limit:
+            out.append(self._intent_q.popleft())
+            n += 1
+        return out
 
-from warnings import warn
+    # --- telemetry (core -> client) ---
+    def publish_telemetry(self, snap: TelemetrySnapshot) -> None:
+        self._telemetry_q.append(snap)
 
-from steuerung3d.protocol.transport import InMemTransport as InMemBus
-
-warn(
-    "steuerung3d.core.inmem_bus.InMemBus is deprecated; use "
-    "steuerung3d.protocol.transport.InMemTransport instead.",
-    DeprecationWarning,
-    stacklevel=2,
-)
-
-__all__ = ["InMemBus"]
+    def drain_telemetry(self, limit: int = 1000) -> List[TelemetrySnapshot]:
+        out: List[TelemetrySnapshot] = []
+        n = 0
+        while self._telemetry_q and n < limit:
+            out.append(self._telemetry_q.popleft())
+            n += 1
+        return out
