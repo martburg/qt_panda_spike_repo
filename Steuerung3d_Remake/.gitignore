@@ -19,6 +19,7 @@ vault/
 # logs + lockfile from your local saver
 Logs/*.log
 Logs/server.lock
+*.jsonl
 
 # Attachments: choose ONE policy:
 # If you want attachments in git, keep them tracked (comment next line)
@@ -28,3 +29,11 @@ Logs/server.lock
 # OS junk
 Thumbs.db
 .DS_Store
+logs/
+*.egg-info/
+src/logs/
+
+# tooling
+.pytest_cache/
+.mypy_cache/
+.venv/

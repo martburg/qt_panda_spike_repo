@@ -15,13 +15,13 @@ What it does:
 Run from the **repo root**:
 
 ```powershell
-python -m steuerung3d.apps.dev_stack --config config\dev_plc.toml
+python -m steuerung3d.apps.dev_stack --config configs\dev_plc.toml
 ```
 
 If you run from `src/` you must adjust the path:
 
 ```powershell
-python -m steuerung3d.apps.dev_stack --config ..\config\dev_plc.toml
+python -m steuerung3d.apps.dev_stack --config ..\configs\dev_plc.toml
 ```
 
 ## Device selection

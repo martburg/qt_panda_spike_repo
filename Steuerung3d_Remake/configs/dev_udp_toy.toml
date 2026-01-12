@@ -1,0 +1,6 @@
+[device]
+kind = "udp_plc_toy"
+
+[device.udp_plc_toy]
+remote_ip = "127.0.0.1"
+remote_port = 55001

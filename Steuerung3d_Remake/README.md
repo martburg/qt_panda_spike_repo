@@ -53,7 +53,7 @@ pytest -q
 From the **repo root**:
 
 ```powershell
-python -m steuerung3d.apps.dev_stack --config config\dev_plc.toml
+python -m steuerung3d.apps.dev_stack --config configs\dev_plc.toml
 ```
 
 - If the configured `controller_ip` (e.g. `172.16.17.5`) is **not present** on this host, the dev stack automatically falls back to **loopback UDP PLC simulators** and still exercises the real legacy codec/device.
