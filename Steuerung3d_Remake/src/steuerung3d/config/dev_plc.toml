@@ -1,0 +1,39 @@
+[device]
+kind = "plc_twincat_legacy_fleet"
+
+[device.plc_twincat_legacy_fleet.defaults]
+controller_ip = "172.16.17.5"
+remote_port = 15001
+timeout_s = 0.02
+modus = "E"
+intent = true
+
+[[device.plc_twincat_legacy_fleet.axes]]
+axis_id = "Anton"
+remote_ip = "172.16.17.1"
+local_port = 15001
+
+[[device.plc_twincat_legacy_fleet.axes]]
+axis_id = "Burt"
+remote_ip = "172.16.17.2"
+local_port = 15002
+
+[[device.plc_twincat_legacy_fleet.axes]]
+axis_id = "Cecil"
+remote_ip = "172.16.17.3"
+local_port = 15003
+
+[[device.plc_twincat_legacy_fleet.axes]]
+axis_id = "Debby"
+remote_ip = "172.16.17.4"
+local_port = 15004
+
+[[device.plc_twincat_legacy_fleet.axes]]
+axis_id = "Eugene"
+remote_ip = "172.16.17.5"
+local_port = 15005
+
+[[device.plc_twincat_legacy_fleet.axes]]
+axis_id = "Fred"
+remote_ip = "172.16.17.6"
+local_port = 15006

@@ -71,6 +71,14 @@ class UdpPlcDevice:
             data, _addr = sock.recvfrom(65535)
         except socket.timeout:
             return
+        except ConnectionResetError:
+            # Windows: ICMP Port Unreachable -> WSAECONNRESET on recvfrom
+            return
+        except OSError as e:
+            # also common on Windows: WSAECONNRESET = 10054
+            if getattr(e, "winerror", None) == 10054:
+                return
+            raise
 
         txt = data.decode("utf-8", errors="replace")
         for ln in txt.replace("\r", "\n").split("\n"):

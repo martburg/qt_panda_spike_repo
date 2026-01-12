@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Any
 
 from steuerung3d.core.mode import Mode
 
@@ -13,6 +13,7 @@ class AxisState:
     vel: float = 0.0
     enabled: bool = False
     fault: bool = False
+    meta: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
 class AxisCommandState:

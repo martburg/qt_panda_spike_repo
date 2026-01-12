@@ -19,6 +19,11 @@ src/steuerung3d/adapters/plc/plc_device.py
 src/steuerung3d/adapters/plc/plc_endpoint.py
 src/steuerung3d/adapters/plc/udp_device.py
 src/steuerung3d/adapters/plc/validate.py
+src/steuerung3d/adapters/plc/plc_twincat_legacy/__init__.py
+src/steuerung3d/adapters/plc/plc_twincat_legacy/codec.py
+src/steuerung3d/adapters/plc/plc_twincat_legacy/config.py
+src/steuerung3d/adapters/plc/plc_twincat_legacy/device.py
+src/steuerung3d/adapters/plc/plc_twincat_legacy/fleet.py
 src/steuerung3d/adapters/plc_stack/__init__.py
 src/steuerung3d/adapters/sim/__init__.py
 src/steuerung3d/adapters/sim/axis_plant.py

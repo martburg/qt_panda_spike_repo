@@ -1,3 +1,12 @@
+"""
+Legacy PLC semicolon-line codec (Anton).
+
+Implements the exact field order used by the Beckhoff ST program
+`KommAnton__MAIN.st`.
+
+See: docs/protocols/legacy_plc_anton.md
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

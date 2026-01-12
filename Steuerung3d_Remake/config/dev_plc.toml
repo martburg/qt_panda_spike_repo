@@ -1,0 +1,36 @@
+[device]
+kind = "plc_twincat_legacy_fleet"
+
+[device.plc_twincat_legacy_fleet.defaults]
+# The local controller IP to bind sockets to (real controller subnet)
+controller_ip = "172.16.17.5"
+
+# Remote port each PLC listens on
+remote_port = 15001
+
+# UDP receive timeout per frame
+timeout_s = 0.02
+
+# Legacy fields (kept for compatibility / logging)
+modus = "E"
+intent = true
+
+[[device.plc_twincat_legacy_fleet.axes]]
+axis_id = "Anton"
+remote_ip = "172.16.17.1"
+local_port = 15001
+
+[[device.plc_twincat_legacy_fleet.axes]]
+axis_id = "Burt"
+remote_ip = "172.16.17.2"
+local_port = 15002
+
+[[device.plc_twincat_legacy_fleet.axes]]
+axis_id = "Cecil"
+remote_ip = "172.16.17.3"
+local_port = 15003
+
+[[device.plc_twincat_legacy_fleet.axes]]
+axis_id = "Debby"
+remote_ip = "172.16.17.4"
+local_port = 15004
