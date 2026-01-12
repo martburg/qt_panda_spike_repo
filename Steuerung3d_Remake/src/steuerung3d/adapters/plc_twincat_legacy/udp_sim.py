@@ -10,18 +10,19 @@ from typing import Dict, Optional, Tuple
 from steuerung3d.adapters.plc_twincat_legacy.codec import WINCH_UP_FIELDS
 
 
-def _uplink_line(*, name: str, pos: float, vel: float, lifetick_tx: int = 0) -> str:
+def _uplink_line(*, name: str, pos: float, vel: float, lifetick_tx: int = 0, enabled: bool = False) -> str:
     """Build a minimal valid uplink line: 38 prefix fields + EOD + tail."""
     prefix = ["0"] * len(WINCH_UP_FIELDS)  # should be 38
 
-    # Set the few fields we care about
     def setf(field: str, value: str) -> None:
         i = WINCH_UP_FIELDS.index(field)
         prefix[i] = value
 
+    STATUS_READY = 4356  # derived from ST: StatusnachUI == 4356 is treated as ready
+
     setf("OwnPID", "9999")
     setf("LifetickUItx", str(int(lifetick_tx) & 0xFFFF))
-    setf("Status", "0")
+    setf("Status", str(STATUS_READY if enabled else 0))
     setf("GuideStatus", "0")
     setf("PosIst", f"{pos}")
     setf("SpeedIstUI", f"{vel}")
@@ -30,7 +31,6 @@ def _uplink_line(*, name: str, pos: float, vel: float, lifetick_tx: int = 0) -> 
 
     tail = ["SIM_TIME", "0", "0", "0", "0", "0", "0"]  # 7 tail fields
     return ";".join(prefix + ["EOD"] + tail) + ";"
-
 
 @dataclass
 class TwinCATLegacyPlcUdpSim:
@@ -87,6 +87,7 @@ class TwinCATLegacyPlcUdpSim:
                     pos=self.pos,
                     vel=self.vel,
                     lifetick_tx=lifetick,
+                    enabled=enable,
                 ).encode("utf-8")
                 try:
                     self._sock.sendto(reply, addr)

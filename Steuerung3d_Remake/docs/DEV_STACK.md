@@ -68,4 +68,11 @@ Logs are written to `logs/session.jsonl` (JSON Lines) via the recorder.
 - Windows does not ship `curses` by default; the dev stack is plain stdout for portability.
 - UDP on Windows may raise `WinError 10054` (ICMP Port Unreachable mapped to a socket error). The UDP
   device adapters treat this like a dropped packet (best effort receive).
+  Config path: run from repo root, pass --config configs/dev_plc.toml (or mention relative path).
+- PLC network fallback:
+  when controller IP (e.g. 172.16.17.5) not present, dev_stack automatically uses UDP SIM fleet
+  mention loopback IP strategy 127.0.0.x so all sims can share port 15001
+- One truth policy:
+  AxisState.enabled is measured (uplink), derived from Status=4356 and EStopStatus=0
+  commanded enable is not the truth (optionally available in ax.meta["cmd_enable"] if you kept it)
 

@@ -74,28 +74,34 @@ class TwinCATLegacyWinchUdpDevice:
         # Always ensure the axis exists and we can store telemetry
         ax = state.ensure_axis(self.axis_id)
 
-        # Default setpoint if axis not present in cmd.axes
+    # Default setpoint if axis not present in cmd.axes
         sp = getattr(cmd, "axes", {}).get(self.axis_id)
+
         if sp is None:
-            enable = False
-            vel = 0.0
+            enable_cmd = False
+            vel_cmd = 0.0
         else:
-            enable = bool(sp.enable)
-            vel = float(sp.vel)
+            enable_cmd = bool(sp.enable)
+            vel_cmd = float(sp.vel)
 
         # Lifetick must be present EVERY frame; make it deterministic:
         lifetick = int(getattr(cmd, "tick", 0)) & 0xFFFF
 
-        # Rebase PosSoll on enable rising edge (following error friendly)
-        if enable and not self._last_enable:
-            base = self._last_pos_ist if self._last_pos_ist != 0.0 else float(ax.pos)
-            self._pos_soll = base
+        # Apply global safety gating AFTER reading the command
+        enable = enable_cmd and (not state.estop) and (not state.fault)
+        vel = vel_cmd if enable else 0.0
+
+       # rising edge detect (after gating)
+        rebased = enable and (not self._last_enable)
+
+        if rebased:
+            # Load integrator with last known PosIst (following-error friendly)
+            self._pos_soll = float(ax.pos)
+        elif enable:
+            # Integrate only when enabled and not on rebase tick
+            self._pos_soll += vel * float(dt)
 
         self._last_enable = enable
-
-        # Integrate PosSoll while enabled (until core has explicit position setpoint)
-        if enable:
-            self._pos_soll += vel * float(dt)
 
         # Minimal placeholder ControlIN (refine later once we confirm bitfield)
         control_in = 1 if enable else 0
@@ -152,4 +158,14 @@ class TwinCATLegacyWinchUdpDevice:
 
         status_word = parse_int(f.get("Status", "0"), default=0)
         estop_status = parse_int(f.get("EStopStatus", "0"), default=0)
+        
+        # Heuristic from ST: StatusnachUI == 4356 is treated as "ready/allowed to do things"
+        STATUS_READY = 4356
+        ax.enabled = (estop_status == 0) and (status_word == STATUS_READY)
+
+        # Keep command intent visible for debugging (optional but very useful)
+        ax.meta["cmd_enable"] = bool(enable)
+        ax.meta["status_word"] = int(status_word)
+        ax.meta["estop_status"] = int(estop_status)
+
         ax.fault = (estop_status != 0) or (status_word != 0)
