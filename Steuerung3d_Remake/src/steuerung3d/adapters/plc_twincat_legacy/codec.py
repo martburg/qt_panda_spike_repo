@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Mapping, Optional, Tuple
 
+from steuerung3d.protocol.legacy_plc import parse_uplink as parse_legacy_uplink
+
 
 def _split_fields(line: str, sep: str = ";") -> List[str]:
     raw = [p.strip() for p in line.strip().split(sep)]
@@ -183,35 +185,39 @@ class TwinCATLegacyWinchCodec:
 
         return self.sep.join(parts) + self.sep
 
+    
     def decode_uplink(self, line: str) -> TwinCATLegacyWinchUplink:
-        tokens = _split_fields(line, self.sep)
+        """Parse PLC->controller status line into named fields.
 
-        eod_i: Optional[int] = None
-        for i, t in enumerate(tokens):
-            if t == self.eod_token or t.startswith(self.eod_token):
-                eod_i = i
-                break
+        Delegates the wire-format parsing to `steuerung3d.protocol.legacy_plc`.
+        We keep the adapter-local `TwinCATLegacyWinchUplink` wrapper for backward
+        compatibility with existing tests and device code.
+        """
+        parsed = parse_legacy_uplink(line)
 
-        if eod_i is None:
-            prefix = tokens
-            tail_tokens: List[str] = []
-        else:
-            prefix = tokens[:eod_i]
-            tail_tokens = tokens[eod_i + 1 :]
+        # Keep adapter-local convention: include best-effort extras if someone
+        # sends longer frames than expected.
+        fields = dict(parsed.fields)
+        tail = dict(parsed.tail)
 
-        fields: Dict[str, str] = {}
-        for i, name in enumerate(WINCH_UP_FIELDS):
-            if i >= len(prefix):
-                break
-            fields[name] = prefix[i]
+        # Best-effort: if the message had more tokens than we mapped, preserve them
+        # under the same keys used before.
+        tokens = [t.strip() for t in line.strip().split(self.sep)]
+        if tokens and tokens[-1] == "":
+            tokens = tokens[:-1]
+        try:
+            eod_idx = tokens.index("EOD")
+        except ValueError:
+            try:
+                eod_idx = tokens.index("EOD\\")
+            except ValueError:
+                eod_idx = len(tokens)
+
+        prefix = tokens[:eod_idx]
+        tail_tokens = tokens[eod_idx + 1 :] if eod_idx < len(tokens) else []
+
         if len(prefix) > len(WINCH_UP_FIELDS):
             fields["_extra_prefix"] = self.sep.join(prefix[len(WINCH_UP_FIELDS) :])
-
-        tail: Dict[str, str] = {}
-        for i, name in enumerate(WINCH_UP_TAIL_FIELDS):
-            if i >= len(tail_tokens):
-                break
-            tail[name] = tail_tokens[i]
         if len(tail_tokens) > len(WINCH_UP_TAIL_FIELDS):
             tail["_extra_tail"] = self.sep.join(tail_tokens[len(WINCH_UP_TAIL_FIELDS) :])
 
