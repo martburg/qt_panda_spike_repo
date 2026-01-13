@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from transitions import Machine
 
-from .axis_types import AxisTelemetry, AxisRequest, AxisCommand
+from ..axis_types import AxisTelemetry, AxisRequest, AxisCommand
 
 
 # States: keep them controller-side and semantic
@@ -18,7 +18,7 @@ ST_FAULT        = "fault"        # fault seen -> safe outputs until cleared
 
 
 @dataclass
-class AxisFsmConfig:
+class LegacyTwinCATFsmConfig:
     controller_pid: str
     default_control_pid_tx: int = 0
     safe_modus: str = "E"         # in your legacy, 'E' seems “normal”
@@ -26,7 +26,7 @@ class AxisFsmConfig:
     write_modus: str = "w"
 
 
-class AxisFSM:
+class LegacyTwinCATAxisFSM:
     """
     Controller-side state machine.
 
@@ -37,7 +37,7 @@ class AxisFSM:
     Output per tick:
       - AxisCommand (semantic), which adapter encodes into legacy downlink tokens.
     """
-    def __init__(self, cfg: AxisFsmConfig):
+    def __init__(self, cfg: LegacyTwinCATFsmConfig):
         self.cfg = cfg
         self.machine = Machine(
             model=self,

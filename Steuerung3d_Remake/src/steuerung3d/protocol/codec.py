@@ -12,7 +12,7 @@ from steuerung3d.core.intents import (
     JogAxis,
     SetEstop,
 )
-from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
+from steuerung3d.core.telemetry import AxisTelemetryLight, TelemetrySnapshot
 
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
 
@@ -57,8 +57,8 @@ def encode_telemetry(snap: TelemetrySnapshot) -> Dict[str, Any]:
 
 def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
     axes_in = payload["axes"]
-    axes_out: Dict[str, AxisTelemetry] = {
-        axis_id: AxisTelemetry(**ax) for axis_id, ax in axes_in.items()
+    axes_out: Dict[str, AxisTelemetryLight] = {
+        axis_id: AxisTelemetryLight(**ax) for axis_id, ax in axes_in.items()
     }
     return TelemetrySnapshot(
         tick=int(payload["tick"]),

@@ -13,6 +13,8 @@ from steuerung3d.adapters.plc_twincat_legacy.codec import (
     parse_int,
 )
 
+from steuerung3d.core.axis_types import AxisTelemetry as LegacyAxisTelemetry
+
 
 @dataclass
 class TwinCATLegacyWinchUdpDevice:
@@ -73,6 +75,7 @@ class TwinCATLegacyWinchUdpDevice:
 
         # Always ensure the axis exists and we can store telemetry
         ax = state.ensure_axis(self.axis_id)
+        ax.kind = "legacy_twincat"
 
     # Default setpoint if axis not present in cmd.axes
         sp = getattr(cmd, "axes", {}).get(self.axis_id)
@@ -147,25 +150,55 @@ class TwinCATLegacyWinchUdpDevice:
         up = self.codec.decode_uplink(txt)
         f = up.fields
 
+        # --- parse measured basics (common surface) ---
         pos_ist = float(parse_float(f.get("PosIst", "0"), default=ax.pos))
         vel_ist = float(parse_float(f.get("SpeedIstUI", "0"), default=ax.vel))
+
+        status_word = int(parse_int(f.get("Status", "0"), default=0))
+        estop_status = int(parse_int(f.get("EStopStatus", "0"), default=0))
+
+        # Heuristic from ST: Status == 4356 treated as "ready"
+        STATUS_READY = 4356
+        estop_active = (estop_status != 0)
+        enabled_meas = (not estop_active) and (status_word == STATUS_READY)
+
+        # IMPORTANT: do NOT treat status_word != 0 as a fault.
+        # Until we decode a real fault bit, keep this conservative:
+        fault_active = False
+
+        # --- write common surface (for logging/UI/TelemetrySnapshot) ---
         ax.pos = pos_ist
         ax.vel = vel_ist
-        ax.enabled = enable
+        ax.enabled = enabled_meas
+        ax.fault = fault_active
 
-        # cache for next enable edge
+        # --- axis kind + full legacy telemetry blob (Step 2 design rule) ---
+        ax.tel = LegacyAxisTelemetry(
+            link_ok=True,
+            name=self.axis_id,
+            # keys may differ by codec; keep safe defaults if missing
+            own_pid_rx=str(f.get("OwnPID", "")),
+            lifetick_tx=int(parse_int(f.get("LifetickUItx", "0"), default=0)),
+            status_word=status_word,
+            guide_status_word=int(parse_int(f.get("GuideStatus", "0"), default=0)),
+            estop_status_dword=estop_status,
+            system_time=str(f.get("SystemTime", "")),
+
+            pos_ist=pos_ist,
+            vel_ist=vel_ist,
+
+            estop_active=estop_active,
+            fault_active=fault_active,
+            enabled=enabled_meas,
+        )
+
+        # --- keep commanded intent visible for debugging (meta only) ---
+        ax.meta["cmd_enable"] = bool(enable)
+        ax.meta["cmd_vel"] = float(vel)
+        ax.meta["status_word"] = status_word
+        ax.meta["estop_status"] = estop_status
+        ax.meta["own_pid_tx"] = self.own_pid
+
+        # cache for next enable edge (following-error friendly)
         self._last_pos_ist = pos_ist
 
-        status_word = parse_int(f.get("Status", "0"), default=0)
-        estop_status = parse_int(f.get("EStopStatus", "0"), default=0)
-        
-        # Heuristic from ST: StatusnachUI == 4356 is treated as "ready/allowed to do things"
-        STATUS_READY = 4356
-        ax.enabled = (estop_status == 0) and (status_word == STATUS_READY)
-
-        # Keep command intent visible for debugging (optional but very useful)
-        ax.meta["cmd_enable"] = bool(enable)
-        ax.meta["status_word"] = int(status_word)
-        ax.meta["estop_status"] = int(estop_status)
-
-        ax.fault = (estop_status != 0) or (status_word != 0)

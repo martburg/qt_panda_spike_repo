@@ -1,18 +1,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from steuerung3d.core.mode import Mode
 
 
 @dataclass
 class AxisState:
-    # --- measured (what the device reports / sim produces) ---
+    # --- axis type discriminator ---
+    kind: str = "generic" 
+    # --- measured (common surface) ---
     pos: float = 0.0
     vel: float = 0.0
     enabled: bool = False
     fault: bool = False
+
+    # --- kind-specific full telemetry (opaque to most of core) ---
+    tel: Optional[object] = None
+
+    # extra free-form info (keep)
     meta: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
@@ -34,6 +41,7 @@ class MachineState:
 
     axes: Dict[str, AxisState] = field(default_factory=dict)
     axis_cmd: Dict[str, AxisCommandState] = field(default_factory=dict)
+    axis_fsm: Dict[str, Any] = field(default_factory=dict)   # runtime objects (AxisFSM)
 
     # high-level health/safety flags (v0.1)
     estop: bool = False
