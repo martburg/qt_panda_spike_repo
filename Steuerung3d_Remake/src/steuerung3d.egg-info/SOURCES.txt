@@ -19,12 +19,13 @@ src/steuerung3d/adapters/plc/plc_device.py
 src/steuerung3d/adapters/plc/plc_endpoint.py
 src/steuerung3d/adapters/plc/udp_device.py
 src/steuerung3d/adapters/plc/validate.py
-src/steuerung3d/adapters/plc/plc_twincat_legacy/__init__.py
-src/steuerung3d/adapters/plc/plc_twincat_legacy/codec.py
-src/steuerung3d/adapters/plc/plc_twincat_legacy/config.py
-src/steuerung3d/adapters/plc/plc_twincat_legacy/device.py
-src/steuerung3d/adapters/plc/plc_twincat_legacy/fleet.py
 src/steuerung3d/adapters/plc_stack/__init__.py
+src/steuerung3d/adapters/plc_twincat_legacy/__init__.py
+src/steuerung3d/adapters/plc_twincat_legacy/codec.py
+src/steuerung3d/adapters/plc_twincat_legacy/config.py
+src/steuerung3d/adapters/plc_twincat_legacy/device.py
+src/steuerung3d/adapters/plc_twincat_legacy/fleet.py
+src/steuerung3d/adapters/plc_twincat_legacy/udp_sim.py
 src/steuerung3d/adapters/sim/__init__.py
 src/steuerung3d/adapters/sim/axis_plant.py
 src/steuerung3d/adapters/sim/device.py
@@ -64,6 +65,7 @@ src/steuerung3d/core/inmem_bus.py
 src/steuerung3d/core/intent_handler.py
 src/steuerung3d/core/intents.py
 src/steuerung3d/core/mode.py
+src/steuerung3d/core/ramp.py
 src/steuerung3d/core/state.py
 src/steuerung3d/core/state_machine.py
 src/steuerung3d/core/telemetry.py
@@ -75,6 +77,10 @@ src/steuerung3d/protocol/recording.py
 src/steuerung3d/protocol/transport.py
 src/steuerung3d/tests/__init__.py
 src/steuerung3d/tests/test_intents.py
+src/steuerung3d/tests/test_plc_twincat_legacy_codec.py
+src/steuerung3d/tests/test_plc_twincat_legacy_device_udp.py
+src/steuerung3d/tests/test_plc_twincat_legacy_fleet_from_toml.py
+src/steuerung3d/tests/test_ramp.py
 src/steuerung3d/tests/test_state_machine_modes.py
 src/steuerung3d/tests/unit/__init__.py
 src/steuerung3d/tests/unit/test_command_frame_regression.py

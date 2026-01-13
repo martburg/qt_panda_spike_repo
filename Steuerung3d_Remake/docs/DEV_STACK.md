@@ -23,6 +23,18 @@ If you run from `src/` you must adjust the path:
 ```powershell
 python -m steuerung3d.apps.dev_stack --config ..\configs\dev_plc.toml
 ```
+## PLC TwinCAT Legacy (Fleet) vs UDP SIM fallback
+
+When running with `plc_twincat_legacy_fleet` on a machine that does **not** have the configured controller IP
+(e.g. `172.16.17.5`) present, `dev_stack` will automatically fall back to a local UDP simulation fleet.
+
+The UDP SIM fleet:
+- spawns one simulated PLC endpoint per axis
+- uses loopback IPs (`127.0.0.x`) so multiple simulated PLCs can share the same remote port (e.g. 15001)
+- matches the **measured truth** semantics:
+  - `AxisState.enabled` is derived from uplink `Status==4356` and `EStopStatus==0`
+
+See: `docs/PLC_TWINCAT_LEGACY.md`
 
 ## Device selection
 

@@ -150,7 +150,7 @@ class TwinCATLegacyWinchCodec:
     sep: str = ";"
     eod_token: str = "EOD"
 
-    def encode_downlink(self, d: LegacyWinchDownlink) -> str:
+    def encode_downlink(self, d: TwinCATLegacyWinchDownlink) -> str:
         def fmt(x: object) -> str:
             if isinstance(x, bool):
                 return "True" if x else "False"
@@ -183,7 +183,7 @@ class TwinCATLegacyWinchCodec:
 
         return self.sep.join(parts) + self.sep
 
-    def decode_uplink(self, line: str) -> LegacyWinchUplink:
+    def decode_uplink(self, line: str) -> TwinCATLegacyWinchUplink:
         tokens = _split_fields(line, self.sep)
 
         eod_i: Optional[int] = None
