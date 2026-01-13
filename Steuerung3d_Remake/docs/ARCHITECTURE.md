@@ -63,3 +63,55 @@ The core produces a `CommandFrame` that is independent of transport and device d
 - device adapters replaceable (SIM, legacy PLC, future protocols)
 - logging and regression testing straightforward
 
+Axis FSM (controller-side)
+
+Each axis has a controller-side FSM that governs mode, safety gating, and recovery.
+
+The FSM is implemented using the transitions library.
+
+It consumes events derived from:
+
+operator intents (enable/disable, request recover)
+
+safety/estop status from uplink
+
+watchdog / comm health
+
+It outputs “allowed actions” and state, which downstream code uses to:
+
+accept or reject commands
+
+force safe command defaults (e.g., zero velocity)
+
+trigger recover procedures
+
+Why this exists
+
+Legacy PLC protocol is order-sensitive and permissive.
+
+Without an explicit FSM, safety & recover logic leaks into UI and transport.
+
+A test-driven FSM makes the system deterministic and regression-safe.
+
+Key states
+
+IDLE: safe, not driving motion.
+
+ENABLED (or ACTIVE): normal running state (whatever you named it).
+
+ESTOP: safety stop asserted → commands must be gated.
+
+RECOVER: explicit recovery sequence before returning to idle/ready.
+
+Key transitions
+
+enable: IDLE → ENABLED
+
+estop: * → ESTOP
+
+recover_request: ESTOP → RECOVER
+
+recover_done: RECOVER → IDLE
+
+disable: ENABLED → IDLE
+
