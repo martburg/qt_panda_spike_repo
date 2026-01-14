@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Optional, Dict, List
 
 from steuerung3d.core.command_frame import CommandFrame
-from steuerung3d.core.telemetry import TelemetrySnapshot, AxisTelemetryLight
+from steuerung3d.core.telemetry import TelemetrySnapshot, AxisTelemetry
 
 from .plc_config import PlcWireSpec
 
@@ -86,7 +86,7 @@ class PlcCodec:
             # Per-axis fields:
             # X_pos;X_vel;X_enabled;X_fault; repeated
             idx = 5
-            axes_out: Dict[str, AxisTelemetryLight] = {}
+            axes_out: Dict[str, AxisTelemetry] = {}
             for axis_id in self.spec.axis_ids:
                 if idx + 4 > len(parts):
                     return None
@@ -94,7 +94,7 @@ class PlcCodec:
                 vel = float(parts[idx + 1])
                 enabled = (parts[idx + 2] == self.spec.true_token)
                 ax_fault = (parts[idx + 3] == self.spec.true_token)
-                axes_out[axis_id] = AxisTelemetryLight(
+                axes_out[axis_id] = AxisTelemetry(
                     pos=pos,
                     vel=vel,
                     enabled=enabled,

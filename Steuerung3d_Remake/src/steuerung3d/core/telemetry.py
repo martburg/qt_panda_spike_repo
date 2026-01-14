@@ -7,7 +7,7 @@ from steuerung3d.core.state import MachineState, AxisState
 
 
 @dataclass(frozen=True)
-class AxisTelemetryLight:
+class AxisTelemetry:
     pos: float
     vel: float
     enabled: bool
@@ -21,12 +21,12 @@ class TelemetrySnapshot:
     mode: str
     estop: bool
     fault: bool
-    axes: Dict[str, AxisTelemetryLight]
+    axes: Dict[str, AxisTelemetry]
 
     @staticmethod
     def from_state(state: MachineState) -> "TelemetrySnapshot":
-        axes: Dict[str, AxisTelemetryLight] = {
-            axis_id: AxisTelemetryLight(
+        axes: Dict[str, AxisTelemetry] = {
+            axis_id: AxisTelemetry(
                 pos=ax.pos,
                 vel=ax.vel,
                 enabled=ax.enabled,

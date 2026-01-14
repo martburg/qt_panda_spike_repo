@@ -1,6 +1,6 @@
 from steuerung3d.protocol.transport import InMemTransport
 from steuerung3d.core.intents import SetEstop
-from steuerung3d.core.telemetry import TelemetrySnapshot, AxisTelemetryLight
+from steuerung3d.core.telemetry import TelemetrySnapshot, AxisTelemetry
 
 
 def test_inmem_transport_roundtrip():
@@ -16,7 +16,7 @@ def test_inmem_transport_roundtrip():
         mode="IDLE",
         estop=True,
         fault=False,
-        axes={"X": AxisTelemetryLight(pos=0.0, vel=0.0, enabled=False, fault=False)},
+        axes={"X": AxisTelemetry(pos=0.0, vel=0.0, enabled=False, fault=False)},
     )
     tr.publish_telemetry(snap)
     snaps = tr.drain_telemetry()

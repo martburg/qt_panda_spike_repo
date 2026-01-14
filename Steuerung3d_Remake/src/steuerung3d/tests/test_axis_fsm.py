@@ -1,4 +1,4 @@
-from steuerung3d.core.controllers.legacy_twincat_fsm import LegacyTwinCATAxisFSM, LegacyTwinCATFsmConfig, ST_IDLE, ST_ESTOP, ST_RECOVER
+from steuerung3d.core.axis_fsm import AxisFSM, AxisFsmConfig, ST_IDLE, ST_ESTOP, ST_RECOVER
 from steuerung3d.core.axis_types import AxisTelemetry, AxisRequest
 
 
@@ -20,7 +20,7 @@ def tel_ok(**kw):
 
 
 def test_estop_forces_safe_and_enters_estop():
-    fsm = LegacyTwinCATAxisFSM(LegacyTwinCATFsmConfig(controller_pid="4711"))
+    fsm = AxisFSM(AxisFsmConfig(controller_pid="4711"))
     req = AxisRequest(want_enable=True, want_motion=True, cmd_speed=1.0, cmd_pos=10.0)
 
     cmd = fsm.step(tel_ok(estop_active=True, estop_status_dword=1), req)
@@ -31,7 +31,7 @@ def test_estop_forces_safe_and_enters_estop():
 
 
 def test_estop_clear_enters_recover():
-    fsm = LegacyTwinCATAxisFSM(LegacyTwinCATFsmConfig(controller_pid="4711"))
+    fsm = AxisFSM(AxisFsmConfig(controller_pid="4711"))
 
     # drive into estop
     fsm.step(tel_ok(estop_active=True, estop_status_dword=1), AxisRequest())
@@ -43,7 +43,7 @@ def test_estop_clear_enters_recover():
 
 
 def test_claim_ack_by_pid_echo():
-    fsm = LegacyTwinCATAxisFSM(LegacyTwinCATFsmConfig(controller_pid="4711"))
+    fsm = AxisFSM(AxisFsmConfig(controller_pid="4711"))
 
     # link up -> idle
     fsm.step(tel_ok(), AxisRequest(want_claim=False))

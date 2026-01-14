@@ -10,7 +10,7 @@ from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.core.state_machine import enforce_mode_actions
 
 from steuerung3d.core.command_frame import CommandFrame
-from steuerung3d.core.executor import drive_legacy_axis_fsms, build_command_frame
+from steuerung3d.core.executor import build_command_frame
 
 StepHook = Callable[[MachineState, float], None]
 IntentDrainHook = Callable[[], Sequence[Intent]]
@@ -46,9 +46,6 @@ class CoreEngine:
         # 3) deterministic tick time forward
         self.state.tick += 1
         self.state.t_s = self.state.tick * dt
-
-        # 4) drive legacy per-axis FSMs into state.axis_cmd (enable/vel) before building the frame
-        drive_legacy_axis_fsms(self.state)
 
         # 4) build command frame and step device (SIM or real adapter)
         cmd_frame = build_command_frame(self.state)
