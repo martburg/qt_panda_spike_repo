@@ -1,0 +1,74 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ui version="4.0">
+ <class>pageDiagnosticsInner</class>
+ <widget class="QWidget" name="pageDiagnosticsInner">
+  <attribute name="title">
+   <string>Diagnostics</string>
+  </attribute>
+  <layout class="QVBoxLayout" name="layoutDiagnostics">
+   <property name="spacing">
+    <number>8</number>
+   </property>
+   <property name="leftMargin">
+    <number>8</number>
+   </property>
+   <property name="topMargin">
+    <number>8</number>
+   </property>
+   <property name="rightMargin">
+    <number>8</number>
+   </property>
+   <property name="bottomMargin">
+    <number>8</number>
+   </property>
+   <item>
+    <widget class="QTabWidget" name="tabsDiagnostics">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+       <horstretch>1</horstretch>
+       <verstretch>1</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="currentIndex">
+      <number>2</number>
+     </property>
+     <widget class="QWidget" name="pageDiagCommsTiming">
+      <property name="whatsThis">
+       <string>__PART__:pageDiagCommsTiming</string>
+      </property>
+     </widget>
+     <widget class="QWidget" name="pageDiagLastFrames">
+      <property name="whatsThis">
+       <string>__PART__:pageDiagLastFrames</string>
+      </property>
+     </widget>
+     <widget class="QWidget" name="pageDiagInjection">
+      <property name="whatsThis">
+       <string>__PART__:pageDiagInjection</string>
+      </property>
+     </widget>
+     <widget class="QWidget" name="pageDiagEvents">
+      <property name="whatsThis">
+       <string>__PART__:pageDiagEvents</string>
+      </property>
+     </widget>
+     <widget class="QWidget" name="pageDiagLogging">
+      <property name="whatsThis">
+       <string>__PART__:pageDiagLogging</string>
+      </property>
+     </widget>
+     <widget class="QWidget" name="pageParametersSet">
+      <property name="whatsThis">
+       <string>__PART__:pageParametersSet</string>
+      </property>
+     </widget>
+     <widget class="QWidget" name="pageEStopAll">
+      <property name="whatsThis">
+       <string>__PART__:pageEStopAll</string>
+      </property>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+</ui>

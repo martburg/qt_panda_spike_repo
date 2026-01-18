@@ -1,0 +1,111 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ui version="4.0">
+ <class>pageEStopAllPart</class>
+ <widget class="QWidget" name="pageEStopAllInner">
+  <attribute name="title">
+   <string>E-Stop</string>
+  </attribute>
+  <layout class="QVBoxLayout" name="layoutEStopAll">
+   <item>
+    <widget class="QLabel" name="lblEStopAllHint">
+     <property name="text">
+      <string>Set or clear all E-Stop input bits (HMI / simulation override). This is intended for testing and commissioning.</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="layoutEStopAllButtons">
+     <item>
+      <widget class="QPushButton" name="btnEStopAllSet">
+       <property name="text">
+        <string>Set ALL</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btnEStopAllClear">
+       <property name="text">
+        <string>Clear ALL</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="gbEStopBits">
+     <property name="title">
+      <string>Bits (readback)</string>
+     </property>
+     <layout class="QGridLayout" name="gridEStopBits">
+      <item row="0" column="0">
+       <widget class="QCheckBox" name="chkEStopMaster">
+        <property name="text">
+         <string>Master</string>
+        </property>
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QCheckBox" name="chkEStopGuider">
+        <property name="text">
+         <string>Guider</string>
+        </property>
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="2">
+       <widget class="QCheckBox" name="chkEStopNetwork">
+        <property name="text">
+         <string>Network</string>
+        </property>
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QCheckBox" name="chkEStop1">
+        <property name="text">
+         <string>E-Stop 1</string>
+        </property>
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QCheckBox" name="chkEStop2">
+        <property name="text">
+         <string>E-Stop 2</string>
+        </property>
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <spacer name="verticalSpacerEStopBits">
+        <property name="orientation">
+         <enum>Qt::Orientation::Vertical</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>40</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+</ui>

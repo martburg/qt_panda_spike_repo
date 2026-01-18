@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <ui version="4.0">
  <class>winYellowAxis</class>
  <widget class="QMainWindow" name="winYellowAxis">
@@ -448,7 +448,7 @@
            <number>0</number>
           </property>
           <item>
-           <widget class="QLineEdit" name="txtHeaderTitle"/>
+           <widget class="QLineEdit" name="txtHeaderTitle" />
           </item>
           <item>
            <spacer name="horizontalSpacer">
@@ -481,7 +481,7 @@
              <number>0</number>
             </property>
             <item>
-             <widget class="QFrame" name="ledHdrFbtDot"/>
+             <widget class="QFrame" name="ledHdrFbtDot" />
             </item>
             <item>
              <widget class="QLabel" name="lblHdrFbt">
@@ -523,7 +523,7 @@
              <number>0</number>
             </property>
             <item>
-             <widget class="QFrame" name="ledHdrReadyDot"/>
+             <widget class="QFrame" name="ledHdrReadyDot" />
             </item>
             <item>
              <widget class="QLabel" name="lblHdrReady">
@@ -565,7 +565,7 @@
              <number>0</number>
             </property>
             <item>
-             <widget class="QFrame" name="ledHdrOnlineDot"/>
+             <widget class="QFrame" name="ledHdrOnlineDot" />
             </item>
             <item>
              <widget class="QLabel" name="lblHdrOnline">
@@ -607,7 +607,7 @@
              <number>0</number>
             </property>
             <item>
-             <widget class="QFrame" name="ledHdrBrk1Dot"/>
+             <widget class="QFrame" name="ledHdrBrk1Dot" />
             </item>
             <item>
              <widget class="QLabel" name="lblHdrBrk1">
@@ -649,7 +649,7 @@
              <number>0</number>
             </property>
             <item>
-             <widget class="QFrame" name="ledHdrBrk2Dot"/>
+             <widget class="QFrame" name="ledHdrBrk2Dot" />
             </item>
             <item>
              <widget class="QLabel" name="lblHdrBrk2">
@@ -687,7 +687,7 @@
            </spacer>
           </item>
           <item>
-           <widget class="QLineEdit" name="txtHeaderSpacer"/>
+           <widget class="QLineEdit" name="txtHeaderSpacer" />
           </item>
          </layout>
         </widget>
@@ -790,7 +790,7 @@
               </size>
              </property>
              <property name="text">
-              <string/>
+              <string />
              </property>
              <property name="readOnly">
               <bool>true</bool>
@@ -936,7 +936,7 @@
          <item>
           <widget class="QGroupBox" name="gbStatusFlags">
            <property name="title">
-            <string/>
+            <string />
            </property>
            <layout class="QVBoxLayout" name="layoutEStopTop">
             <property name="spacing">
@@ -960,7 +960,7 @@
                <number>6</number>
               </property>
               <item>
-               <widget class="QFrame" name="dotMaster"/>
+               <widget class="QFrame" name="dotMaster" />
               </item>
               <item>
                <widget class="QLabel" name="lblMaster">
@@ -977,7 +977,7 @@
                <number>6</number>
               </property>
               <item>
-               <widget class="QFrame" name="dotGuider"/>
+               <widget class="QFrame" name="dotGuider" />
               </item>
               <item>
                <widget class="QLabel" name="lblGuider">
@@ -994,7 +994,7 @@
                <number>6</number>
               </property>
               <item>
-               <widget class="QFrame" name="dotNetwork"/>
+               <widget class="QFrame" name="dotNetwork" />
               </item>
               <item>
                <widget class="QLabel" name="lblNetwork">
@@ -1019,15 +1019,12 @@
            <property name="text">
             <string>Reset</string>
            </property>
-           <property name="kind" stdset="0">
-            <string>danger</string>
-           </property>
           </widget>
          </item>
          <item>
           <widget class="QGroupBox" name="gbSafetyFlags">
            <property name="title">
-            <string/>
+            <string />
            </property>
            <layout class="QGridLayout" name="gridLayout">
             <property name="topMargin">
@@ -1045,7 +1042,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="dotPosWin"/>
+               <widget class="QFrame" name="dotPosWin" />
               </item>
               <item>
                <spacer name="horizontalSpacer_17">
@@ -1075,7 +1072,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="dot05kw"/>
+               <widget class="QFrame" name="dot05kw" />
               </item>
               <item>
                <spacer name="horizontalSpacer_10">
@@ -1105,7 +1102,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="dot30kw"/>
+               <widget class="QFrame" name="dot30kw" />
               </item>
               <item>
                <spacer name="horizontalSpacer_9">
@@ -1135,7 +1132,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="dotBRK2"/>
+               <widget class="QFrame" name="dotBRK2" />
               </item>
               <item>
                <spacer name="horizontalSpacer_12">
@@ -1165,7 +1162,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="dotBRK1"/>
+               <widget class="QFrame" name="dotBRK1" />
               </item>
               <item>
                <spacer name="horizontalSpacer_11">
@@ -1195,7 +1192,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="dotBRK2KB"/>
+               <widget class="QFrame" name="dotBRK2KB" />
               </item>
               <item>
                <spacer name="horizontalSpacer_13">
@@ -1225,7 +1222,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="dotSPS"/>
+               <widget class="QFrame" name="dotSPS" />
               </item>
               <item>
                <spacer name="horizontalSpacer_14">
@@ -1255,7 +1252,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="dotRed"/>
+               <widget class="QFrame" name="dotRed" />
               </item>
               <item>
                <spacer name="horizontalSpacer_15">
@@ -1285,7 +1282,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="dotENC"/>
+               <widget class="QFrame" name="dotENC" />
               </item>
               <item>
                <spacer name="horizontalSpacer_16">
@@ -1315,7 +1312,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="dotVelWin"/>
+               <widget class="QFrame" name="dotVelWin" />
               </item>
               <item>
                <spacer name="horizontalSpacer_18">
@@ -1345,7 +1342,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="dotEndlage"/>
+               <widget class="QFrame" name="dotEndlage" />
               </item>
               <item>
                <spacer name="horizontalSpacer_19">
@@ -1375,7 +1372,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="dotEStop1"/>
+               <widget class="QFrame" name="dotEStop1" />
               </item>
               <item>
                <spacer name="horizontalSpacer_7">
@@ -1405,7 +1402,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="dotEStop2"/>
+               <widget class="QFrame" name="dotEStop2" />
               </item>
               <item>
                <spacer name="horizontalSpacer_8">
@@ -1435,7 +1432,7 @@
          <item>
           <widget class="QGroupBox" name="gbTwinSafeFlags">
            <property name="title">
-            <string/>
+            <string />
            </property>
            <layout class="QGridLayout" name="gridLayout_2">
             <property name="topMargin">
@@ -1453,7 +1450,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g1_com_dot"/>
+               <widget class="QFrame" name="g1_com_dot" />
               </item>
               <item>
                <spacer name="horizontalSpacer_20">
@@ -1483,7 +1480,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g2_com_dot"/>
+               <widget class="QFrame" name="g2_com_dot" />
               </item>
               <item>
                <spacer name="horizontalSpacer_23">
@@ -1513,7 +1510,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g3_com_dot"/>
+               <widget class="QFrame" name="g3_com_dot" />
               </item>
               <item>
                <spacer name="horizontalSpacer_26">
@@ -1543,7 +1540,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g1_out_dot"/>
+               <widget class="QFrame" name="g1_out_dot" />
               </item>
               <item>
                <spacer name="horizontalSpacer_21">
@@ -1573,7 +1570,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g2_out_dot"/>
+               <widget class="QFrame" name="g2_out_dot" />
               </item>
               <item>
                <spacer name="horizontalSpacer_24">
@@ -1603,7 +1600,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g3_out_dot"/>
+               <widget class="QFrame" name="g3_out_dot" />
               </item>
               <item>
                <spacer name="horizontalSpacer_27">
@@ -1633,7 +1630,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g1_fb_dot"/>
+               <widget class="QFrame" name="g1_fb_dot" />
               </item>
               <item>
                <spacer name="horizontalSpacer_22">
@@ -1663,7 +1660,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g2_fb_dot"/>
+               <widget class="QFrame" name="g2_fb_dot" />
               </item>
               <item>
                <spacer name="horizontalSpacer_25">
@@ -1693,7 +1690,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g3_fb_dot"/>
+               <widget class="QFrame" name="g3_fb_dot" />
               </item>
               <item>
                <spacer name="horizontalSpacer_28">
@@ -1736,8 +1733,11 @@
       <layout class="QHBoxLayout" name="horizontalLayout_30">
        <item>
         <widget class="QPushButton" name="btnSetupToggle">
+         <property name="toolTip">
+          <string>Open/close the Setup panel (advanced parameters and diagnostics).</string>
+         </property>
          <property name="text">
-          <string>&gt;&gt;&gt;&gt;</string>
+          <string>Open Setup ▶</string>
          </property>
         </widget>
        </item>
@@ -1874,7 +1874,7 @@
                  <number>-9</number>
                 </property>
                 <property name="title">
-                 <string/>
+                 <string />
                 </property>
                 <layout class="QVBoxLayout" name="verticalLayout">
                  <property name="spacing">
@@ -1922,7 +1922,7 @@
                        <number>0</number>
                       </property>
                       <item>
-                       <widget class="QFrame" name="ledGuiderReadyDot"/>
+                       <widget class="QFrame" name="ledGuiderReadyDot" />
                       </item>
                       <item>
                        <widget class="QLabel" name="lblGuiderReady">
@@ -1964,7 +1964,7 @@
                        <number>0</number>
                       </property>
                       <item>
-                       <widget class="QFrame" name="ledGuiderOnlineDot"/>
+                       <widget class="QFrame" name="ledGuiderOnlineDot" />
                       </item>
                       <item>
                        <widget class="QLabel" name="lblGuiderOnline">
@@ -3229,7 +3229,7 @@
                   </sizepolicy>
                  </property>
                  <property name="title">
-                  <string/>
+                  <string />
                  </property>
                  <layout class="QGridLayout" name="gridLayout_4">
                   <property name="topMargin">
@@ -3431,7 +3431,7 @@
                   </size>
                  </property>
                  <property name="title">
-                  <string/>
+                  <string />
                  </property>
                  <layout class="QVBoxLayout" name="layoutDiagFrames">
                   <property name="spacing">
@@ -3637,7 +3637,7 @@
                 </size>
                </property>
                <property name="title">
-                <string/>
+                <string />
                </property>
                <layout class="QGridLayout" name="layoutDiagInjection">
                 <property name="leftMargin">
@@ -3820,7 +3820,7 @@
                   </size>
                  </property>
                  <property name="title">
-                  <string/>
+                  <string />
                  </property>
                  <layout class="QVBoxLayout" name="layoutDiagEvents">
                   <property name="spacing">
@@ -3941,7 +3941,7 @@
                   </size>
                  </property>
                  <property name="title">
-                  <string/>
+                  <string />
                  </property>
                  <layout class="QGridLayout" name="layoutDiagLogging">
                   <property name="leftMargin">
@@ -4035,6 +4035,1050 @@
                </item>
               </layout>
              </widget>
+             <widget class="QWidget" name="pageParametersSet">
+              <attribute name="title">
+               <string>Parameters Set</string>
+              </attribute>
+              <layout class="QHBoxLayout" name="layoutPageParameters_set">
+               <property name="spacing">
+                <number>10</number>
+               </property>
+               <property name="leftMargin">
+                <number>0</number>
+               </property>
+               <property name="topMargin">
+                <number>0</number>
+               </property>
+               <property name="rightMargin">
+                <number>0</number>
+               </property>
+               <property name="bottomMargin">
+                <number>0</number>
+               </property>
+               <item>
+                <widget class="QFrame" name="frameParamPositions_set">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+                   <horstretch>0</horstretch>
+                   <verstretch>1</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>170</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="frameShape">
+                  <enum>QFrame::Shape::StyledPanel</enum>
+                 </property>
+                 <property name="frameShadow">
+                  <enum>QFrame::Shadow::Raised</enum>
+                 </property>
+                 <layout class="QVBoxLayout" name="layout_frameParamPositions_set">
+                  <property name="spacing">
+                   <number>0</number>
+                  </property>
+                  <property name="leftMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="topMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="rightMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="bottomMargin">
+                   <number>0</number>
+                  </property>
+                  <item>
+                   <widget class="QGroupBox" name="gbPositions_set">
+                    <property name="maximumSize">
+                     <size>
+                      <width>170</width>
+                      <height>16777215</height>
+                     </size>
+                    </property>
+                    <property name="title">
+                     <string>Positions</string>
+                    </property>
+                    <layout class="QGridLayout" name="layoutPositions_2_set">
+                     <property name="horizontalSpacing">
+                      <number>8</number>
+                     </property>
+                     <property name="verticalSpacing">
+                      <number>6</number>
+                     </property>
+                     <item row="7" column="1">
+                      <spacer name="verticalSpacer_set">
+                       <property name="orientation">
+                        <enum>Qt::Orientation::Vertical</enum>
+                       </property>
+                       <property name="sizeHint" stdset="0">
+                        <size>
+                         <width>20</width>
+                         <height>40</height>
+                        </size>
+                       </property>
+                      </spacer>
+                     </item>
+                     <item row="4" column="1">
+                      <widget class="QLineEdit" name="txtUserMin_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>-10.0</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="4" column="0">
+                      <widget class="QLabel" name="lblUserMin_2_set">
+                       <property name="text">
+                        <string>User Min</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="6" column="0">
+                      <widget class="QLabel" name="lblPosWin2_2_set">
+                       <property name="text">
+                        <string>Pos Win</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="8" column="1">
+                      <widget class="QPushButton" name="btnPosCancel_set">
+                       <property name="visible">
+                        <bool>false</bool>
+                       </property>
+                       <property name="text">
+                        <string>Cancel</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="3" column="0">
+                      <widget class="QLabel" name="lblActPos_2_set">
+                       <property name="text">
+                        <string>Act Pos</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="5" column="0">
+                      <widget class="QLabel" name="lblHardMin_2_set">
+                       <property name="text">
+                        <string>Hard Min</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="5" column="1">
+                      <widget class="QLineEdit" name="txtHardMin_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>-10.0</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="3" column="1">
+                      <widget class="QLineEdit" name="txtActPos_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>0</string>
+                       </property>
+                       <property name="readOnly">
+                        <bool>true</bool>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="1">
+                      <widget class="QLineEdit" name="txtHardMax_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>300.0</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="8" column="0">
+                      <widget class="QPushButton" name="btnPosSet_set">
+                       <property name="text">
+                        <string>Set</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="1">
+                      <widget class="QLineEdit" name="txtUserMax_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>300.0</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="0">
+                      <widget class="QLabel" name="lblHardMax_2_set">
+                       <property name="text">
+                        <string>Hard Max</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="0">
+                      <widget class="QLabel" name="lblUserMax_2_set">
+                       <property name="text">
+                        <string>User Max</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="6" column="1">
+                      <widget class="QLineEdit" name="txtPosWin_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>0.01</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="0">
+                      <widget class="QPushButton" name="btnPosEdit_set">
+                       <property name="visible">
+                        <bool>false</bool>
+                       </property>
+                       <property name="sizePolicy">
+                        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                         <horstretch>0</horstretch>
+                         <verstretch>0</verstretch>
+                        </sizepolicy>
+                       </property>
+                       <property name="text">
+                        <string>Edit</string>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </widget>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+               <item>
+                <widget class="QFrame" name="frameParamVelAccAmp_set">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+                   <horstretch>0</horstretch>
+                   <verstretch>1</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>170</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="frameShape">
+                  <enum>QFrame::Shape::StyledPanel</enum>
+                 </property>
+                 <property name="frameShadow">
+                  <enum>QFrame::Shadow::Raised</enum>
+                 </property>
+                 <layout class="QVBoxLayout" name="layout_frameParamVelAccAmp_set">
+                  <property name="spacing">
+                   <number>0</number>
+                  </property>
+                  <property name="leftMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="topMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="rightMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="bottomMargin">
+                   <number>0</number>
+                  </property>
+                  <item>
+                   <widget class="QGroupBox" name="gbVelAccAmp_set">
+                    <property name="maximumSize">
+                     <size>
+                      <width>170</width>
+                      <height>16777215</height>
+                     </size>
+                    </property>
+                    <property name="title">
+                     <string>Vel / Acc / Amp</string>
+                    </property>
+                    <layout class="QGridLayout" name="layoutVelAccAmp_3_set">
+                     <property name="horizontalSpacing">
+                      <number>8</number>
+                     </property>
+                     <property name="verticalSpacing">
+                      <number>6</number>
+                     </property>
+                     <item row="2" column="1">
+                      <widget class="QLineEdit" name="txtVelMax_3_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>6.0</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="6" column="1">
+                      <widget class="QLineEdit" name="txtMaxAmp_3_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>0</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="0">
+                      <widget class="QLabel" name="lblVelMaxMot_3_set">
+                       <property name="text">
+                        <string>VelMaxMot</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="5" column="1">
+                      <widget class="QLineEdit" name="txtAccMove_3_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>5.00</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="4" column="1">
+                      <widget class="QLineEdit" name="txtDccMax_3_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>1.5</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="7" column="0">
+                      <widget class="QLabel" name="lblVelWin2_3_set">
+                       <property name="text">
+                        <string>Vel Win</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="5" column="0">
+                      <widget class="QLabel" name="lblAccMove_3_set">
+                       <property name="text">
+                        <string>Acc Move</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="3" column="0">
+                      <widget class="QLabel" name="lblAccMax_3_set">
+                       <property name="text">
+                        <string>Acc Max</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="0">
+                      <widget class="QLabel" name="lblVelMax_3_set">
+                       <property name="text">
+                        <string>Vel Max</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="7" column="1">
+                      <widget class="QLineEdit" name="txtVelWin_3_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>0.01</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="8" column="1">
+                      <widget class="QPushButton" name="btnVelCancel_3_set">
+                       <property name="visible">
+                        <bool>false</bool>
+                       </property>
+                       <property name="text">
+                        <string>Cancel</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="1">
+                      <widget class="QLineEdit" name="txtVelMaxMot_3_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>0</string>
+                       </property>
+                       <property name="readOnly">
+                        <bool>true</bool>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="8" column="0">
+                      <widget class="QPushButton" name="btnVelSet_3_set">
+                       <property name="text">
+                        <string>Set</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="4" column="0">
+                      <widget class="QLabel" name="lblDccMax_3_set">
+                       <property name="text">
+                        <string>Dcc Max</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="3" column="1">
+                      <widget class="QLineEdit" name="txtAccMax_3_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>1.5</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="6" column="0">
+                      <widget class="QLabel" name="lblMaxAmp_3_set">
+                       <property name="text">
+                        <string>Max Amp</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="0">
+                      <widget class="QPushButton" name="btnVelEdit_3_set">
+                       <property name="visible">
+                        <bool>false</bool>
+                       </property>
+                       <property name="sizePolicy">
+                        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                         <horstretch>0</horstretch>
+                         <verstretch>0</verstretch>
+                        </sizepolicy>
+                       </property>
+                       <property name="text">
+                        <string>Edit</string>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </widget>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+               <item>
+                <widget class="QFrame" name="frameParamFilter_set">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+                   <horstretch>0</horstretch>
+                   <verstretch>1</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>170</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="frameShape">
+                  <enum>QFrame::Shape::StyledPanel</enum>
+                 </property>
+                 <property name="frameShadow">
+                  <enum>QFrame::Shadow::Raised</enum>
+                 </property>
+                 <layout class="QVBoxLayout" name="layout_frameParamFilter_set">
+                  <property name="spacing">
+                   <number>0</number>
+                  </property>
+                  <property name="leftMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="topMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="rightMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="bottomMargin">
+                   <number>0</number>
+                  </property>
+                  <item>
+                   <widget class="QGroupBox" name="gbFilter_set">
+                    <property name="maximumSize">
+                     <size>
+                      <width>170</width>
+                      <height>16777215</height>
+                     </size>
+                    </property>
+                    <property name="title">
+                     <string>Filter</string>
+                    </property>
+                    <layout class="QGridLayout" name="layoutFilter_2_set">
+                     <property name="horizontalSpacing">
+                      <number>8</number>
+                     </property>
+                     <property name="verticalSpacing">
+                      <number>6</number>
+                     </property>
+                     <item row="5" column="0">
+                      <widget class="QLabel" name="lblIL_2_set">
+                       <property name="text">
+                        <string>Int. Lim.</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="4" column="0">
+                      <widget class="QLabel" name="lblD_2_set">
+                       <property name="text">
+                        <string>Derivate</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="1">
+                      <widget class="QLineEdit" name="txtP_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>0</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="6" column="0">
+                      <widget class="QLabel" name="lblRamp_2_set">
+                       <property name="text">
+                        <string>Rampform</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="1">
+                      <widget class="QLineEdit" name="txtLagError_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>0</string>
+                       </property>
+                       <property name="readOnly">
+                        <bool>true</bool>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="4" column="1">
+                      <widget class="QLineEdit" name="txtD_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>0</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="5" column="1">
+                      <widget class="QLineEdit" name="txtIL_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>0</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="0">
+                      <widget class="QPushButton" name="btnFilterEdit_set">
+                       <property name="visible">
+                        <bool>false</bool>
+                       </property>
+                       <property name="sizePolicy">
+                        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                         <horstretch>0</horstretch>
+                         <verstretch>0</verstretch>
+                        </sizepolicy>
+                       </property>
+                       <property name="text">
+                        <string>Edit</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="3" column="1">
+                      <widget class="QLineEdit" name="txtI_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>0</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="0">
+                      <widget class="QLabel" name="lblLagError_2_set">
+                       <property name="text">
+                        <string>Lag Error</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="3" column="0">
+                      <widget class="QLabel" name="lblI_2_set">
+                       <property name="text">
+                        <string>Integral</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="9" column="0">
+                      <widget class="QPushButton" name="btnFilterSet_set">
+                       <property name="text">
+                        <string>Set</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="6" column="1">
+                      <widget class="QLineEdit" name="txtRamp_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>0</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="9" column="1">
+                      <widget class="QPushButton" name="btnFilterCancel_set">
+                       <property name="visible">
+                        <bool>false</bool>
+                       </property>
+                       <property name="text">
+                        <string>Cancel</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="0">
+                      <widget class="QLabel" name="lblP_2_set">
+                       <property name="text">
+                        <string>Prop.</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="7" column="0">
+                      <spacer name="verticalSpacer_2_set">
+                       <property name="orientation">
+                        <enum>Qt::Orientation::Vertical</enum>
+                       </property>
+                       <property name="sizeHint" stdset="0">
+                        <size>
+                         <width>20</width>
+                         <height>40</height>
+                        </size>
+                       </property>
+                      </spacer>
+                     </item>
+                    </layout>
+                   </widget>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+               <item>
+                <widget class="QFrame" name="frameParamRope_set">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+                   <horstretch>0</horstretch>
+                   <verstretch>1</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>170</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="frameShape">
+                  <enum>QFrame::Shape::StyledPanel</enum>
+                 </property>
+                 <property name="frameShadow">
+                  <enum>QFrame::Shadow::Raised</enum>
+                 </property>
+                 <layout class="QVBoxLayout" name="layout_frameParamRope_set">
+                  <property name="spacing">
+                   <number>0</number>
+                  </property>
+                  <property name="leftMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="topMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="rightMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="bottomMargin">
+                   <number>0</number>
+                  </property>
+                  <item>
+                   <widget class="QGroupBox" name="gbRope_set">
+                    <property name="maximumSize">
+                     <size>
+                      <width>170</width>
+                      <height>16777215</height>
+                     </size>
+                    </property>
+                    <property name="title">
+                     <string>Rope</string>
+                    </property>
+                    <layout class="QGridLayout" name="layoutRope_2_set">
+                     <property name="horizontalSpacing">
+                      <number>8</number>
+                     </property>
+                     <property name="verticalSpacing">
+                      <number>6</number>
+                     </property>
+                     <item row="5" column="1">
+                      <widget class="QLineEdit" name="txtLength_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>0</string>
+                       </property>
+                       <property name="readOnly">
+                        <bool>true</bool>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="0">
+                      <widget class="QLabel" name="lblDia_2_set">
+                       <property name="text">
+                        <string>Diameter</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="1">
+                      <widget class="QLineEdit" name="txtSWLL_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>0</string>
+                       </property>
+                       <property name="readOnly">
+                        <bool>true</bool>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="5" column="0">
+                      <widget class="QLabel" name="lblLength_2_set">
+                       <property name="text">
+                        <string>Length</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="0">
+                      <widget class="QLabel" name="lblSWLL_2_set">
+                       <property name="text">
+                        <string>SWLL</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="8" column="0">
+                      <widget class="QPushButton" name="btnRopeSet_set">
+                       <property name="text">
+                        <string>Set</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="3" column="0">
+                      <widget class="QLabel" name="lblType_2_set">
+                       <property name="text">
+                        <string>Type</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="4" column="0">
+                      <widget class="QLabel" name="lblNumber_2_set">
+                       <property name="text">
+                        <string>Number</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="4" column="1">
+                      <widget class="QLineEdit" name="txtNumber_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>0</string>
+                       </property>
+                       <property name="readOnly">
+                        <bool>true</bool>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="0">
+                      <widget class="QPushButton" name="btnRopeInfo_set">
+                       <property name="visible">
+                        <bool>false</bool>
+                       </property>
+                       <property name="sizePolicy">
+                        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                         <horstretch>0</horstretch>
+                         <verstretch>0</verstretch>
+                        </sizepolicy>
+                       </property>
+                       <property name="text">
+                        <string>Info Only</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="3" column="1">
+                      <widget class="QLineEdit" name="txtType_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>0</string>
+                       </property>
+                       <property name="readOnly">
+                        <bool>true</bool>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="1">
+                      <widget class="QLineEdit" name="txtDia_2_set">
+                       <property name="maximumSize">
+                        <size>
+                         <width>65</width>
+                         <height>16777215</height>
+                        </size>
+                       </property>
+                       <property name="text">
+                        <string>0</string>
+                       </property>
+                       <property name="readOnly">
+                        <bool>true</bool>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="8" column="1">
+                      <widget class="QPushButton" name="btnRopeCancel_set">
+                       <property name="visible">
+                        <bool>false</bool>
+                       </property>
+                       <property name="text">
+                        <string>Cancel</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="6" column="0">
+                      <spacer name="verticalSpacer_3_set">
+                       <property name="orientation">
+                        <enum>Qt::Orientation::Vertical</enum>
+                       </property>
+                       <property name="sizeHint" stdset="0">
+                        <size>
+                         <width>20</width>
+                         <height>40</height>
+                        </size>
+                       </property>
+                      </spacer>
+                     </item>
+                    </layout>
+                   </widget>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+             <widget class="QWidget" name="pageEStopAll">
+              <attribute name="title">
+               <string>E-Stop</string>
+              </attribute>
+              <layout class="QVBoxLayout" name="layoutEStopAll">
+               <item>
+                <widget class="QLabel" name="lblEStopAllHint">
+                 <property name="text">
+                  <string>Set or clear all E-Stop input bits (HMI / simulation override). This is intended for testing and commissioning.</string>
+                 </property>
+                 <property name="wordWrap">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="layoutEStopAllButtons">
+                 <item>
+                  <widget class="QPushButton" name="btnEStopAllSet">
+                   <property name="text">
+                    <string>Set ALL</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QPushButton" name="btnEStopAllClear">
+                   <property name="text">
+                    <string>Clear ALL</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item>
+                <widget class="QGroupBox" name="gbEStopBits">
+                 <property name="title">
+                  <string>Bits (readback)</string>
+                 </property>
+                 <layout class="QGridLayout" name="gridEStopBits">
+                  <item row="0" column="0">
+                   <widget class="QCheckBox" name="chkEStopMaster">
+                    <property name="text">
+                     <string>Master</string>
+                    </property>
+                    <property name="enabled">
+                     <bool>false</bool>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="0" column="1">
+                   <widget class="QCheckBox" name="chkEStopGuider">
+                    <property name="text">
+                     <string>Guider</string>
+                    </property>
+                    <property name="enabled">
+                     <bool>false</bool>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="0" column="2">
+                   <widget class="QCheckBox" name="chkEStopNetwork">
+                    <property name="text">
+                     <string>Network</string>
+                    </property>
+                    <property name="enabled">
+                     <bool>false</bool>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="1" column="0">
+                   <widget class="QCheckBox" name="chkEStop1">
+                    <property name="text">
+                     <string>E-Stop 1</string>
+                    </property>
+                    <property name="enabled">
+                     <bool>false</bool>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="1" column="1">
+                   <widget class="QCheckBox" name="chkEStop2">
+                    <property name="text">
+                     <string>E-Stop 2</string>
+                    </property>
+                    <property name="enabled">
+                     <bool>false</bool>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="2" column="0">
+                   <spacer name="verticalSpacerEStopBits">
+                    <property name="orientation">
+                     <enum>Qt::Orientation::Vertical</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>20</width>
+                      <height>40</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+              </layout>
+             </widget>
             </widget>
            </item>
           </layout>
@@ -4047,6 +5091,6 @@
    </layout>
   </widget>
  </widget>
- <resources/>
- <connections/>
+ <resources />
+ <connections />
 </ui>

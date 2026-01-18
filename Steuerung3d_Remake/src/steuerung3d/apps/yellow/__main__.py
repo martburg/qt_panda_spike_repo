@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import argparse
 from pathlib import Path
 
 from PySide6.QtCore import QFile, QTimer
@@ -8,6 +9,8 @@ from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import QLayout
 from PySide6.QtWidgets import QApplication, QWidget, QPushButton
 from PySide6.QtWidgets import QFrame, QLabel
+from PySide6.QtWidgets import QAbstractButton, QLineEdit, QComboBox, QAbstractSlider
+from PySide6.QtWidgets import QSpinBox, QDoubleSpinBox, QCheckBox
 
 QSS = r"""
 /* ===== palette tuned to legacy ===== */
@@ -79,13 +82,107 @@ QLineEdit {
 }
 QLineEdit#txtVelMaxMot, QLineEdit#txtLagError { color: #c00000; font-weight: bold; }
 
-QPushButton {
-    background: #efefef;
-    border: 1px solid #555;
-    border-radius: 6px;
-    padding: 5px 10px;
+QPushButton, QToolButton {
+    background: #e2e2e2;
+    color: #111;
+
+    /* strong outline */
+    border-style: solid;
+    border-width: 2px;
+
+    /* faux double-border / bevel */
+    border-top-color: #ffffff;
+    border-left-color: #ffffff;
+    border-right-color: #2b2b2b;
+    border-bottom-color: #2b2b2b;
+
+    border-radius: 1px;
+    padding: 6px 12px;
+    margin: 4px;
 }
-QPushButton:pressed { background: #dcdcdc; }
+
+/* Hover: brighter + slightly lighter bevel */
+QPushButton:hover, QToolButton:hover {
+    background: #ededed;  
+    border-top-color: #ffffff;
+    border-left-color: #ffffff;
+    border-right-color: #1a1a1a;
+    border-bottom-color: #1a1a1a;
+}
+
+/* Pressed: invert bevel to look "pushed in" */
+QPushButton:pressed, QToolButton:pressed {
+    background: #d0d0d0; 
+
+    border-top-color: #2b2b2b;
+    border-left-color: #2b2b2b;
+    border-right-color: #ffffff;
+    border-bottom-color: #ffffff;
+
+    /* tiny "press" effect */
+    padding-top: 7px;
+    padding-left: 13px;
+}
+
+/* Disabled: clearly disabled */
+QPushButton:disabled, QToolButton:disabled {
+    background:#dcdcdc;
+    color: #888;
+    border-top-color: #f5f5f5;
+    border-left-color: #f5f5f5;
+    border-right-color: #bdbdbd;
+    border-bottom-color: #bdbdbd;
+}
+
+/* Danger: muted dark red, industrial (not candy, not black) */
+QPushButton[kind="danger"], QToolButton[kind="danger"] {
+    background: #c9a2a2;           /* desaturated warm red-grey */
+    color: #111;
+
+    border-style: solid;
+    border-width: 2px;
+
+    /* bevel (raised) */
+    border-top-color: #f2e8e8;
+    border-left-color: #f2e8e8;
+    border-right-color: #3a1a1a;
+    border-bottom-color: #3a1a1a;
+
+    border-radius: 1px;
+    padding: 6px 12px;
+    margin: 4px;
+
+    /* subtle red ring */
+    outline: none;
+}
+
+QPushButton[kind="danger"]:hover, QToolButton[kind="danger"]:hover {
+    background: #b10000;
+    color: #f2f2f2;
+    border-right-color: #220c0c;
+    border-bottom-color: #220c0c;
+}
+
+QPushButton[kind="danger"]:pressed, QToolButton[kind="danger"]:pressed {
+    background: #b99f9f;
+
+    /* pressed bevel inversion */
+    border-top-color: #3a1a1a;
+    border-left-color: #3a1a1a;
+    border-right-color: #f2e8e8;
+    border-bottom-color: #f2e8e8;
+
+    padding-top: 7px;
+    padding-left: 13px;
+}
+
+QPushButton[kind="danger"]:disabled, QToolButton[kind="danger"]:disabled {
+    background: #cfc7c7;
+    color: #777;
+    border-right-color: #8a7a7a;
+    border-bottom-color: #8a7a7a;
+}
+
 
 QComboBox {
     background: #efefef;
@@ -169,6 +266,32 @@ QSS_HDR_LED = r"""
 }
 """
 
+# Role-specific canvas tint (ONLY centralwidget background)
+IP_BG  = "#E6F2FF"  # light sky blue
+CFC_BG = "#E8FFF1"  # light mint
+
+QSS_ROLE_IP = r"""
+/* IP (HMI) background: deep blue */
+QMainWindow[appRole="ip"],
+QMainWindow[appRole="ip"] QWidget#centralwidget {
+    background: #1f3550;
+}
+"""
+
+QSS_ROLE_CFC = r"""
+/* CFC (Sim) background: deep purple */
+QMainWindow[appRole="cfc"],
+QMainWindow[appRole="cfc"] QWidget#centralwidget {
+    background: CFC_BG;
+}
+"""
+
+def parse_role(argv: list[str]) -> str:
+    p = argparse.ArgumentParser(add_help=False)
+    p.add_argument("--role", choices=("ip", "cfc"), default="ip")
+    args, _rest = p.parse_known_args(argv[1:])
+    return args.role
+
 def _refit_window_height_only(win: QWidget) -> None:
     w = win.window() or win
     cw = getattr(w, "centralWidget", None)
@@ -193,11 +316,106 @@ def load_ui(path: Path):
         raise RuntimeError(f"QUiLoader failed to load: {path}")
     return w
 
+
+def _pretty_name(obj_name: str) -> str:
+    """Make a readable label from an objectName (best-effort)."""
+    s = obj_name
+    # strip common prefixes
+    for prefix in (
+        "btn",
+        "txt",
+        "chk",
+        "cb",
+        "cmb",
+        "sld",
+        "spin",
+        "dbl",
+        "gb",
+        "frm",
+        "frame",
+        "lbl",
+    ):
+        if s.startswith(prefix) and len(s) > len(prefix):
+            s = s[len(prefix) :]
+            break
+    # split camelCase-ish and underscores
+    out = []
+    buf = ""
+    for ch in s:
+        if ch == "_":
+            if buf:
+                out.append(buf)
+                buf = ""
+            continue
+        if ch.isupper() and buf:
+            out.append(buf)
+            buf = ch
+        else:
+            buf += ch
+    if buf:
+        out.append(buf)
+    return " ".join(w.capitalize() for w in out if w)
+
+
+def apply_tooltips(win: QWidget) -> None:
+    """Attach tooltips everywhere (high-quality where we know, sensible fallback elsewhere)."""
+
+    # High-value explicit tooltips (kept short, action-oriented).
+    explicit: dict[str, str] = {
+        "btnSetupToggle": "Show/hide the Setup panel (advanced parameters and diagnostics).",
+        "btnEStopAllSet": "Set ALL simulated E-Stop bits (forces E-Stop active in the simulator).",
+        "btnEStopAllClear": "Clear ALL simulated E-Stop bits (release E-Stop in the simulator).",
+        "btnPosSet_set": "Apply the position setpoint (Set).",
+        "btnVelSet_3_set": "Apply velocity/acceleration limits (Set).",
+        "btnFilterSet_set": "Apply filter parameters (Set).",
+        "btnRopeSet_set": "Apply rope parameters (Set).",
+    }
+
+    # First pass: explicit mapping
+    for name, tip in explicit.items():
+        w = win.findChild(QWidget, name)
+        if w is not None:
+            w.setToolTip(tip)
+
+    # Second pass: fill in missing tooltips with sensible defaults
+    for w in win.findChildren(QWidget):
+        if w.toolTip():
+            continue
+        name = w.objectName() or ""
+        if not name:
+            continue
+        pretty = _pretty_name(name)
+
+        # Avoid spamming containers/frames with generic tooltips
+        if isinstance(w, (QFrame, QLabel)):
+            continue
+
+        if isinstance(w, QPushButton):
+            w.setToolTip(f"Action: {pretty}.")
+        elif isinstance(w, QCheckBox):
+            w.setToolTip(f"Toggle: {pretty}.")
+        elif isinstance(w, QLineEdit):
+            w.setToolTip(f"Input: {pretty}.")
+        elif isinstance(w, QComboBox):
+            w.setToolTip(f"Select: {pretty}.")
+        elif isinstance(w, (QSpinBox, QDoubleSpinBox)):
+            w.setToolTip(f"Set value: {pretty}.")
+        elif isinstance(w, QAbstractSlider):
+            w.setToolTip(f"Adjust: {pretty}.")
+        elif isinstance(w, QAbstractButton):
+            # tool buttons, radio buttons, etc.
+            w.setToolTip(f"Control: {pretty}.")
+
 def main() -> int:
+    role = parse_role(sys.argv)
     app = QApplication(sys.argv)
     ui_path = Path(__file__).with_name("yellow3.ui")
     win = load_ui(ui_path)
-    win.setStyleSheet(QSS)
+    win.setProperty("appRole", role)
+    # Title
+    title = "HMI – Intent Producer (IP)" if role == "ip" else "SIM – CommandFrame Consumer (CFC)"
+    win.setWindowTitle(title)
+
 
     # --- Setup toggle via button ---
     btn = win.findChild(QPushButton, "btnSetupToggle")
@@ -211,7 +429,8 @@ def main() -> int:
     panel.setVisible(False)
 
     def update_button_text():
-        btn.setText("Setup ▼" if panel.isVisible() else "Setup ▶")
+        # Make it explicit what will happen when clicked.
+        btn.setText("Close Setup ▲" if panel.isVisible() else "Open Setup ▼")
 
     def toggle_setup():
         panel.setVisible(not panel.isVisible())
@@ -222,8 +441,21 @@ def main() -> int:
     update_button_text()
     # --- end toggle ---
 
+    apply_tooltips(win)
+
     win.setMinimumSize(0, 0)
-    win.setStyleSheet(QSS + QSS_HDR_LED)
+
+    bg = IP_BG if role == "ip" else CFC_BG
+
+    role_qss = f"""
+    QMainWindow[appRole="{role}"] QWidget#centralwidget {{
+        background: {bg};
+    }}
+    """
+    win.setStyleSheet(QSS + QSS_HDR_LED + role_qss)
+
+
+    win.setStyleSheet(QSS + QSS_HDR_LED + role_qss)
     win.show()
     QTimer.singleShot(0, lambda: _refit_window_height_only(win))
     return app.exec()
