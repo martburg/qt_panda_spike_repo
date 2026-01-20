@@ -25,4 +25,5 @@ def slice_command_frame(cmd: CommandFrame, axis_ids: Iterable[str]) -> CommandFr
         fault=cmd.fault,
         mode=cmd.mode,
         axes=sliced_axes,
+        estop_reset=src.estop_reset
     )

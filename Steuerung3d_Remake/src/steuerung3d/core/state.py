@@ -38,6 +38,8 @@ class MachineState:
     # high-level health/safety flags (v0.1)
     estop: bool = False
     fault: bool = False
+    estop_reset_req: bool = False
+
 
     def ensure_axis(self, axis_id: str) -> AxisState:
         if axis_id not in self.axes:

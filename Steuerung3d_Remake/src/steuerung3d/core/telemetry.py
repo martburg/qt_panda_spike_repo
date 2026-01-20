@@ -5,6 +5,8 @@ from typing import Dict
 
 from steuerung3d.core.state import MachineState, AxisState
 
+from steuerung3d.core.mode import Mode
+
 
 @dataclass(frozen=True)
 class AxisTelemetry:
@@ -42,3 +44,15 @@ class TelemetrySnapshot:
             fault=state.fault,
             axes=axes,
         )
+    
+def apply_measured_snapshot(state: MachineState, snap: TelemetrySnapshot) -> None:
+    state.estop = bool(snap.estop)
+    state.fault = bool(snap.fault)
+    state.mode = Mode(snap.mode) if isinstance(snap.mode, str) else snap.mode  # depending on your snapshot
+
+    for axis_id, ax_t in snap.axes.items():
+        ax = state.ensure_axis(axis_id)
+        ax.pos = ax_t.pos
+        ax.vel = ax_t.vel
+        ax.enabled = ax_t.enabled
+        ax.fault = ax_t.fault

@@ -7,6 +7,7 @@ from steuerung3d.core.intents import (
     EnableAxis,
     JogAxis,
     SetEstop,
+    RequestEstopReset,
     Intent,
 )
 from steuerung3d.core.mode import Mode
@@ -15,73 +16,89 @@ from steuerung3d.core.state_machine import enforce_mode_actions, normalize_mode
 
 
 def apply_intent(state: MachineState, intent: Intent) -> None:
-    """Apply an intent to MachineState.
+    """
+    Apply an intent to MachineState.
 
-    v0.1 policy:
-      - Safety/mode intents always apply.
+    Policy (now, with latched ESTOP):
+      - ESTOP state is device-authoritative (measured via telemetry).
+      - Operator can request a reset (pulse) via RequestEstopReset.
+      - Fault clear is still a core-side request (later also device-verified).
       - Motion/control intents only apply in LIVE.
-      - Commands are stored in `state.axis_cmd` (commanded), while `state.axes` is measured.
-
-    Later this becomes: Intent -> Planner -> Safety -> CommandFrame.
     """
 
-    # --- global intents: can always be applied ---
-    if isinstance(intent, SetEstop):
-        state.estop = bool(intent.estop)
-        normalize_mode(state)
-        enforce_mode_actions(state)
+    match intent:
+        # --- SAFETY / GLOBAL REQUESTS ---
+        case RequestEstopReset():
+            # one-tick pulse; CoreEngine should clear it after building/sending command frame
+            state.estop_reset_req = True
+            # do NOT change state.estop here (device owns it)
+            normalize_mode(state)
+            enforce_mode_actions(state)
+            return
 
-        # UX nicety: when ESTOP engages, immediately clamp measured motion too.
-        # (In the real system the device would report this on the next telemetry update.)
-        if state.mode == Mode.ESTOP:
+        case SetEstop(estop=val):
+            # IMPORTANT: with latched estop, SetEstop should *not* directly force state.estop.
+            # For now: treat "SetEstop(True)" as a *mode clamp request* only (or ignore).
+            # If you still want a UX effect, you can clamp commanded outputs immediately:
+            if bool(val):
+                # optional: clamp commanded motion immediately
+                for cmd in state.axis_cmd.values():
+                    cmd.enable = False
+                    cmd.vel = 0.0
+            normalize_mode(state)
+            enforce_mode_actions(state)
+            return
+
+        case ClearFault():
+            # still okay as a core-side request; later: device-side fault latch too
+            state.fault = False
             for ax in state.axes.values():
-                ax.enabled = False
-                ax.vel = 0.0
-        return
+                ax.fault = False
+            normalize_mode(state)
+            enforce_mode_actions(state)
+            return
 
-    if isinstance(intent, ClearFault):
-        state.fault = False
-        for ax in state.axes.values():
-            ax.fault = False
-        normalize_mode(state)
-        enforce_mode_actions(state)
-        return
+        # --- MODE TRANSITIONS ---
+        case ArmLiveMode():
+            normalize_mode(state)
+            if state.mode == Mode.IDLE and (not state.estop) and (not state.fault):
+                state.mode = Mode.LIVE
+            enforce_mode_actions(state)
+            return
 
-    # --- mode transitions ---
-    if isinstance(intent, ArmLiveMode):
-        normalize_mode(state)
-        if state.mode == Mode.IDLE and (not state.estop) and (not state.fault):
-            state.mode = Mode.LIVE
-        enforce_mode_actions(state)
-        return
+        case DisarmToIdle():
+            normalize_mode(state)
+            if state.mode == Mode.LIVE:
+                state.mode = Mode.IDLE
+            enforce_mode_actions(state)
+            return
 
-    if isinstance(intent, DisarmToIdle):
-        normalize_mode(state)
-        if state.mode == Mode.LIVE:
-            state.mode = Mode.IDLE
-        enforce_mode_actions(state)
-        return
+        # fallthrough to mode-gated below
+        case _:
+            pass
 
-    # --- mode-gated intents ---
+    # --- MODE-GATED INTENTS (LIVE only) ---
     normalize_mode(state)
 
     if state.mode != Mode.LIVE:
-        # In v0.1: only LIVE accepts motion/control intents
         enforce_mode_actions(state)
         return
 
-    # LIVE mode logic
-    if isinstance(intent, EnableAxis):
-        state.ensure_axis(intent.axis_id)
-        cmd = state.ensure_axis_cmd(intent.axis_id)
-        cmd.enable = bool(intent.enable)
-        if not cmd.enable:
-            cmd.vel = 0.0
-        return
+    match intent:
+        case EnableAxis(axis_id=axis_id, enable=enable):
+            state.ensure_axis(axis_id)
+            cmd = state.ensure_axis_cmd(axis_id)
+            cmd.enable = bool(enable)
+            if not cmd.enable:
+                cmd.vel = 0.0
+            return
 
-    if isinstance(intent, JogAxis):
-        state.ensure_axis(intent.axis_id)
-        cmd = state.ensure_axis_cmd(intent.axis_id)
-        if cmd.enable:
-            cmd.vel = float(intent.vel)
-        return
+        case JogAxis(axis_id=axis_id, vel=vel):
+            state.ensure_axis(axis_id)
+            cmd = state.ensure_axis_cmd(axis_id)
+            if cmd.enable:
+                cmd.vel = float(vel)
+            return
+
+        case _:
+            return

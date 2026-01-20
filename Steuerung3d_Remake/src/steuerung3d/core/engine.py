@@ -59,6 +59,9 @@ class CoreEngine:
             # legacy hook fallback
             self.on_step(self.state, dt)
 
+        # ---- NEW: clear one-shot requests after sending once ----
+        self.state.estop_reset_req = False
+
         # 5) emit telemetry snapshot
         if self.on_snapshot is not None:
             self.on_snapshot(TelemetrySnapshot.from_state(self.state))

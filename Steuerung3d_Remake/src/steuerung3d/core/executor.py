@@ -14,8 +14,9 @@ def build_command_frame(state: MachineState) -> CommandFrame:
     return CommandFrame(
         tick=state.tick,
         t_s=state.t_s,
-        estop=state.estop,
+        estop=False,  # <-- important policy change
         fault=state.fault,
         mode=state.mode.value,
         axes=axes,
+        estop_reset=state.estop_reset_req,  # pulse from HI-P intent
     )

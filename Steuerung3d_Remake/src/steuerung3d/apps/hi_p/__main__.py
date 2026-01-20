@@ -3,41 +3,40 @@ from __future__ import annotations
 import argparse
 import sys
 
+import logging
+
 from PySide6.QtWidgets import QApplication
 
 from steuerung3d.apps.yellow.ui_shell import build_yellow_window
-from steuerung3d.apps.yellow.controllers import HiPController
-from steuerung3d.protocol.transport import InMemTransport
+from steuerung3d.apps.yellow.controllers.hip_controller import HiPController
+#from steuerung3d.protocol.transport import InMemTransport
+from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn
+# and import HiPController directly if you changed controllers/__init__.py:
+from steuerung3d.apps.yellow.controllers.hip_controller import HiPController
 
-
-class IntentOutPort:
-    def __init__(self, transport: InMemTransport):
-        self.transport = transport
-
-    def send_intent(self, intent):
-        self.transport.publish_intent(intent)
-
-
-class TelemetryInPort:
-    def __init__(self, transport: InMemTransport):
-        self.transport = transport
-
-    def drain_telemetry(self, limit: int = 1000):
-        return self.transport.drain_telemetry(limit=limit)
-
+log = logging.getLogger("hi_p")
 
 def main() -> int:
-    p = argparse.ArgumentParser()
-    p.add_argument("--replay", action="store_true", help="For now: run with an in-mem transport stub.")
-    args = p.parse_args()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--role", choices=("ip",), default="ip")
+    ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
+    args = ap.parse_args()
+
+    logging.basicConfig(
+        level=getattr(logging, args.log_level.upper()),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    log.info("log level = %s", args.log_level.upper())
+    log.info("HI-P target IntentOut=%s  bind TelemetryIn=%s", ("127.0.0.1", 51001), ("127.0.0.1", 51002))
+
 
     app = QApplication(sys.argv)
     win = build_yellow_window(role="ip")
 
-    # TODO (tomorrow): swap this stub with UDP operator seam
-    transport = InMemTransport()
+    intent_out = UdpIntentOut.connect(("127.0.0.1", 51001))
+    telemetry_in = UdpTelemetryIn.bind(("127.0.0.1", 51002))
 
-    ctl = HiPController(win=win, intent_out=IntentOutPort(transport), telemetry_in=TelemetryInPort(transport))
+    ctl = HiPController(win=win, intent_out=intent_out, telemetry_in=telemetry_in)
     ctl.start_polling(period_ms=50)
 
     win.show()

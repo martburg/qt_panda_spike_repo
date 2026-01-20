@@ -11,7 +11,9 @@ from steuerung3d.core.intents import (
     Intent,
     JogAxis,
     SetEstop,
+    RequestEstopReset,   # NEW
 )
+
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
 
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
@@ -26,6 +28,7 @@ _INTENT_TYPE_MAP = {
     "enable_axis": EnableAxis,
     "jog_axis": JogAxis,
     "set_estop": SetEstop,
+    "estop_reset": RequestEstopReset,   # NEW
     "arm_live_mode": ArmLiveMode,
     "disarm_to_idle": DisarmToIdle,
     "clear_fault": ClearFault,
@@ -86,8 +89,9 @@ def decode_command_frame(payload: Dict[str, Any]) -> CommandFrame:
     return CommandFrame(
         tick=int(payload["tick"]),
         t_s=float(payload["t_s"]),
-        estop=bool(payload["estop"]),
-        fault=bool(payload["fault"]),
-        mode=str(payload["mode"]),
+        estop=bool(payload.get("estop", False)),
+        fault=bool(payload.get("fault", False)),
+        mode=str(payload.get("mode", "")),
         axes=axes_out,
+        estop_reset=bool(payload.get("estop_reset", False)),
     )

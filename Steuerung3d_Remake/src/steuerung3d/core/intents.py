@@ -25,6 +25,11 @@ class SetEstop:
     estop: bool = True
 
 @dataclass(frozen=True)
+class RequestEstopReset:
+    type: Literal["estop_reset"] = "estop_reset"
+
+
+@dataclass(frozen=True)
 class ArmLiveMode:
     type: Literal["arm_live_mode"] = "arm_live_mode"
 
@@ -39,4 +44,12 @@ class ClearFault:
     type: Literal["clear_fault"] = "clear_fault"
 
     
-Intent = Union[EnableAxis, JogAxis, SetEstop, ArmLiveMode, DisarmToIdle, ClearFault]
+Intent = Union[
+    EnableAxis,
+    JogAxis,
+    SetEstop,
+    RequestEstopReset,  # NEW
+    ArmLiveMode,
+    DisarmToIdle,
+    ClearFault,
+]

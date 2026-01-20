@@ -16,9 +16,10 @@ class YellowBindings:
     btn_setup_toggle: QPushButton
     frame_setup: QWidget
 
-    # E-Stop (IP + CFC use these)
+    # E-Stop (CFC uses set/clear, HI-P uses reset)
     btn_estop_all_set: Optional[QPushButton]
     btn_estop_all_clear: Optional[QPushButton]
+    btn_estop_reset: Optional[QPushButton]   # NEW
 
     @classmethod
     def from_window(cls, win: QWidget) -> "YellowBindings":
@@ -30,6 +31,9 @@ class YellowBindings:
         return cls(
             btn_setup_toggle=btn_setup_toggle,
             frame_setup=frame_setup,
+
             btn_estop_all_set=win.findChild(QPushButton, "btnEStopAllSet"),
             btn_estop_all_clear=win.findChild(QPushButton, "btnEStopAllClear"),
+
+            btn_estop_reset=win.findChild(QPushButton, "btnEStopReset"),  # NEW
         )

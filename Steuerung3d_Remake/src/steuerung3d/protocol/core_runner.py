@@ -36,6 +36,9 @@ class CoreRunner:
     def stop(self) -> None:
         self._stop_evt.set()
 
+    def is_alive(self) -> bool:
+        return bool(self._thread and self._thread.is_alive())
+
     def join(self, timeout: Optional[float] = None) -> None:
         if self._thread is not None:
             self._thread.join(timeout=timeout)

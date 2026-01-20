@@ -7,7 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import QFile, QTimer
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import QLayout
-from PySide6.QtWidgets import QApplication, QWidget, QPushButton
+from PySide6.QtWidgets import QTabWidget, QWidget, QPushButton
 from PySide6.QtWidgets import QFrame, QLabel
 from PySide6.QtWidgets import QAbstractButton, QLineEdit, QComboBox, QAbstractSlider
 from PySide6.QtWidgets import QSpinBox, QDoubleSpinBox, QCheckBox
@@ -414,8 +414,19 @@ def build_yellow_window(*, role: str, ui_path=None):
     """
 
     if ui_path is None:
-        ui_path = Path(__file__).with_name("yellow3.ui")
+        ui_path = Path(__file__).with_name("ui_split") / "yellow3_merged.ui"
     win = load_ui(Path(ui_path))
+        # Hide Diagnostics tab in IP role (HMI client)
+    if role == "ip":
+        tabs_main = win.findChild(QTabWidget, "tabsMain")
+        page_diag = win.findChild(QWidget, "pageDiagnostics")
+        if tabs_main is not None and page_diag is not None:
+            idx = tabs_main.indexOf(page_diag)
+            if idx >= 0:
+                if hasattr(tabs_main, "setTabVisible"):
+                    tabs_main.setTabVisible(idx, False)
+                else:
+                    tabs_main.setTabEnabled(idx, False)
     win.setProperty("appRole", role)
     # Title
     title = "HMI – Intent Producer (IP)" if role == "ip" else "SIM – CommandFrame Consumer (CFC)"
