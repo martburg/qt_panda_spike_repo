@@ -1,3 +1,4 @@
+# src/steuerung3d/apps/yellow/controllers/hip_controller.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -5,11 +6,12 @@ from dataclasses import dataclass
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QWidget
 
+from steuerung3d.core.intents import RequestEstopReset
+from steuerung3d.core.telemetry import TelemetrySnapshot
+from steuerung3d.protocol.estop_bits import ESTOP_SPECS, decode_estop_word
 
 from .bindings import YellowBindings
 from .ports import IntentOut, TelemetryIn
-
-from steuerung3d.core.intents import RequestEstopReset  
 
 import logging
 log = logging.getLogger("hi_p")
@@ -17,13 +19,6 @@ log = logging.getLogger("hi_p")
 
 @dataclass
 class HiPController:
-    """Human Intent Parser (HI-P): Yellow UI in --role ip.
-
-    Responsibilities:
-      - translate human interactions -> Intents (IntentOut)
-      - render TelemetrySnapshot -> widgets (TelemetryIn)
-    """
-
     win: QWidget
     intent_out: IntentOut
     telemetry_in: TelemetryIn
@@ -38,11 +33,26 @@ class HiPController:
         else:
             log.warning("btnEStopReset not found in UI")
 
+    def _set_led(self, w: QWidget | None, on: bool) -> None:
+        if w is None:
+            return
+        if w.property("on") == bool(on):
+            return
+        w.setProperty("on", bool(on))
+        w.style().unpolish(w)
+        w.style().polish(w)
+        w.update()
+
+    def _set_led_by_name(self, object_name: str | None, on: bool) -> None:
+        if not object_name:
+            return
+        w = self.win.findChild(QWidget, object_name)
+        self._set_led(w, on)
 
     def _on_estop_reset(self) -> None:
         intent = RequestEstopReset()
         log.info("tx intent: %s", type(intent).__name__)
-        self.intent_out.publish_intent(intent)   # adjust name if your port uses send()/emit()
+        self.intent_out.publish_intent(intent)
 
     def start_polling(self, *, period_ms: int = 50) -> None:
         t = QTimer(self.win)
@@ -64,5 +74,15 @@ class HiPController:
 
         log.debug("rx telemetry: tick=%s estop=%s fault=%s", snap.tick, snap.estop, snap.fault)
 
-        # TODO: render into UI
-        _ = snap
+        self._render_estop(snap)
+
+    def _render_estop(self, snap: TelemetrySnapshot) -> None:
+        word = int(getattr(snap, "estop_status_word", 0))
+        logical = decode_estop_word(word)  # invert already applied per spec
+        log.debug("render estop word=%s logical=%s", hex(word), logical)
+
+        # Drive all dots declared in ESTOP_SPECS (if present in UI)
+        for spec in ESTOP_SPECS.values():
+            if not spec.dot:
+                continue
+            self._set_led_by_name(spec.dot, bool(logical.get(spec.key, False)))

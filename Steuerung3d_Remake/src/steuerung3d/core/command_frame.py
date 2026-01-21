@@ -18,4 +18,4 @@ class CommandFrame:
     fault: bool
     mode: str
     axes: Dict[str, AxisSetpoint]
-    estop_reset: bool    # NEW: momentary request to clear device latch
+    estop_reset: bool  = False  # NEW: momentary request to clear device latch

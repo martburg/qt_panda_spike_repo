@@ -15,9 +15,6 @@ from steuerung3d.apps.yellow.controllers.densi_controller import DenSiController
 log = logging.getLogger("den_si") 
 
 def main() -> int:
-
-   
-
     ap = argparse.ArgumentParser()
     ap.add_argument("--role", choices=("cfc",), default="cfc")   # if you already parse role, keep yours
     ap.add_argument("--axis", action="append", default=["X"])

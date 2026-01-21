@@ -40,6 +40,8 @@ class MachineState:
     fault: bool = False
     estop_reset_req: bool = False
 
+    estop_status_word: int = 0   # NEW: measured bitfield
+
 
     def ensure_axis(self, axis_id: str) -> AxisState:
         if axis_id not in self.axes:

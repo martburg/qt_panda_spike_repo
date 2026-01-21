@@ -1,12 +1,11 @@
+# src/steuerung3d/core/telemetry.py
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Dict
 
-from steuerung3d.core.state import MachineState, AxisState
-
 from steuerung3d.core.mode import Mode
-
+from steuerung3d.core.state import AxisState, MachineState
 
 @dataclass(frozen=True)
 class AxisTelemetry:
@@ -14,7 +13,6 @@ class AxisTelemetry:
     vel: float
     enabled: bool
     fault: bool
-
 
 @dataclass(frozen=True)
 class TelemetrySnapshot:
@@ -25,34 +23,41 @@ class TelemetrySnapshot:
     fault: bool
     axes: Dict[str, AxisTelemetry]
 
-    @staticmethod
-    def from_state(state: MachineState) -> "TelemetrySnapshot":
-        axes: Dict[str, AxisTelemetry] = {
+    # NEW
+    estop_status_word: int = 0
+
+    @classmethod
+    def from_state(cls, state: MachineState) -> "TelemetrySnapshot":
+        axes = {
             axis_id: AxisTelemetry(
-                pos=ax.pos,
-                vel=ax.vel,
-                enabled=ax.enabled,
-                fault=ax.fault,
+                pos=float(ax.pos),
+                vel=float(ax.vel),
+                enabled=bool(ax.enabled),
+                fault=bool(ax.fault),
             )
             for axis_id, ax in state.axes.items()
         }
-        return TelemetrySnapshot(
-            tick=state.tick,
-            t_s=state.t_s,
-            mode=state.mode.value,
-            estop=state.estop,
-            fault=state.fault,
+        return cls(
+            tick=int(state.tick),
+            t_s=float(state.t_s),
+            mode=state.mode.value if hasattr(state.mode, "value") else str(state.mode),
+            estop=bool(state.estop),
+            fault=bool(state.fault),
             axes=axes,
+            estop_status_word=int(getattr(state, "estop_status_word", 0)),
         )
-    
+
 def apply_measured_snapshot(state: MachineState, snap: TelemetrySnapshot) -> None:
+    state.mode = Mode(snap.mode) if isinstance(snap.mode, str) else snap.mode
     state.estop = bool(snap.estop)
     state.fault = bool(snap.fault)
-    state.mode = Mode(snap.mode) if isinstance(snap.mode, str) else snap.mode  # depending on your snapshot
+
+    # NEW: carry the word through the core
+    state.estop_status_word = int(getattr(snap, "estop_status_word", 0))
 
     for axis_id, ax_t in snap.axes.items():
-        ax = state.ensure_axis(axis_id)
-        ax.pos = ax_t.pos
-        ax.vel = ax_t.vel
-        ax.enabled = ax_t.enabled
-        ax.fault = ax_t.fault
+        ax: AxisState = state.ensure_axis(axis_id)
+        ax.pos = float(ax_t.pos)
+        ax.vel = float(ax_t.vel)
+        ax.enabled = bool(ax_t.enabled)
+        ax.fault = bool(ax_t.fault)

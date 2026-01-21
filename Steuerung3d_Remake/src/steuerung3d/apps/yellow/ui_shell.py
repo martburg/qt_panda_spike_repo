@@ -208,6 +208,38 @@ QFrame#g3_com_dot, QFrame#g3_fb_dot, QFrame#g3_out_dot {
     border: 1px solid #000;
 }
 
+/* ===== LED dots: dynamic state via setProperty("on", bool) ===== */
+QFrame#led_fbt_dot[on="false"], QFrame#led_ready_dot[on="false"], QFrame#led_online_dot[on="false"],
+QFrame#led_brk1_dot[on="false"], QFrame#led_brk2_dot[on="false"],
+QFrame#dotMaster[on="false"], QFrame#dotGuider[on="false"], QFrame#dotNetwork[on="false"],
+QFrame#dotEStop1[on="false"], QFrame#dotEStop2[on="false"], QFrame#dot30kw[on="false"], QFrame#dot05kw[on="false"],
+QFrame#dotBRK1[on="false"], QFrame#dotBRK2[on="false"], QFrame#dotBRK2KB[on="false"],
+QFrame#dotSPS[on="false"], QFrame#dotRed[on="false"], QFrame#dotENC[on="false"],
+QFrame#dotPosWin[on="false"], QFrame#dotVelWin[on="false"], QFrame#dotEndlage[on="false"],
+QFrame#g1_com_dot[on="false"], QFrame#g1_fb_dot[on="false"], QFrame#g1_out_dot[on="false"],
+QFrame#g2_com_dot[on="false"], QFrame#g2_fb_dot[on="false"], QFrame#g2_out_dot[on="false"],
+QFrame#g3_com_dot[on="false"], QFrame#g3_fb_dot[on="false"], QFrame#g3_out_dot[on="false"] {
+    background: #444;  /* OFF */
+}
+
+QFrame#led_fbt_dot[on="true"], QFrame#led_ready_dot[on="true"], QFrame#led_online_dot[on="true"],
+QFrame#led_brk1_dot[on="true"], QFrame#led_brk2_dot[on="true"],
+QFrame#dotMaster[on="true"], QFrame#dotGuider[on="true"], QFrame#dotNetwork[on="true"],
+QFrame#dotEStop1[on="true"], QFrame#dotEStop2[on="true"], QFrame#dot30kw[on="true"], QFrame#dot05kw[on="true"],
+QFrame#dotBRK1[on="true"], QFrame#dotBRK2[on="true"], QFrame#dotBRK2KB[on="true"],
+QFrame#dotSPS[on="true"], QFrame#dotRed[on="true"], QFrame#dotENC[on="true"],
+QFrame#dotPosWin[on="true"], QFrame#dotVelWin[on="true"], QFrame#dotEndlage[on="true"],
+QFrame#g1_com_dot[on="true"], QFrame#g1_fb_dot[on="true"], QFrame#g1_out_dot[on="true"],
+QFrame#g2_com_dot[on="true"], QFrame#g2_fb_dot[on="true"], QFrame#g2_out_dot[on="true"],
+QFrame#g3_com_dot[on="true"], QFrame#g3_fb_dot[on="true"], QFrame#g3_out_dot[on="true"] {
+    background: #d33;  /* ON (default = red) */
+}
+
+/* If you also setProperty("kind", "ok"/"warn"/"alarm") you get better semantics */
+QFrame[on="true"][kind="ok"]    { background: #2a2; }
+QFrame[on="true"][kind="warn"]  { background: #ea0; }
+QFrame[on="true"][kind="alarm"] { background: #d33; }
+
 /* ===== Tabs: neutral grey, NO red bleed ===== */
 /* Scope strictly to setup tabs only */
 #frameSetup QTabWidget::pane {
@@ -264,6 +296,16 @@ QSS_HDR_LED = r"""
     background: #444;
     border: 1px solid #000;
 }
+#ledHdrFbtDot[on="true"], #ledHdrReadyDot[on="true"], #ledHdrOnlineDot[on="true"],
+#ledHdrBrk1Dot[on="true"], #ledHdrBrk2Dot[on="true"],
+#ledGuiderReadyDot[on="true"], #ledGuiderOnlineDot[on="true"] {
+    background: #2a2; /* green for OK */
+}
+#ledHdrFbtDot[on="false"], #ledHdrReadyDot[on="false"], #ledHdrOnlineDot[on="false"],
+#ledHdrBrk1Dot[on="false"], #ledHdrBrk2Dot[on="false"],
+#ledGuiderReadyDot[on="false"], #ledGuiderOnlineDot[on="false"] {
+    background: #444;
+}
 """
 
 # Role-specific canvas tint (ONLY centralwidget background)
@@ -283,6 +325,15 @@ QSS_ROLE_CFC = r"""
 QMainWindow[appRole="cfc"],
 QMainWindow[appRole="cfc"] QWidget#centralwidget {
     background: #E8FFF1;
+}
+"""
+
+# in ui_shell.py, append near your LED dot section
+QSS_ESTOPS_ON = r"""
+/* E-Stop dots: red when active */
+#dotMaster[on="true"], #dotGuider[on="true"], #dotNetwork[on="true"],
+#dotEStop1[on="true"], #dotEStop2[on="true"] {
+    background: #b10000;
 }
 """
 
@@ -468,7 +519,7 @@ def build_yellow_window(*, role: str, ui_path=None):
         background: {bg};
     }}
     """
-    win.setStyleSheet(QSS + QSS_HDR_LED + role_qss)
+    win.setStyleSheet(QSS + QSS_HDR_LED+ QSS_ESTOPS_ON + role_qss)
     QTimer.singleShot(0, lambda: _refit_window_height_only(win))
     return win
 

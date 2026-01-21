@@ -37,16 +37,13 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             return
 
         case SetEstop(estop=val):
-            # IMPORTANT: with latched estop, SetEstop should *not* directly force state.estop.
-            # For now: treat "SetEstop(True)" as a *mode clamp request* only (or ignore).
-            # If you still want a UX effect, you can clamp commanded outputs immediately:
-            if bool(val):
-                # optional: clamp commanded motion immediately
-                for cmd in state.axis_cmd.values():
-                    cmd.enable = False
-                    cmd.vel = 0.0
+            state.estop = bool(val)
             normalize_mode(state)
             enforce_mode_actions(state)
+            if state.mode == Mode.ESTOP:
+                for ax in state.axes.values():
+                    ax.enabled = False
+                    ax.vel = 0.0
             return
 
         case ClearFault():

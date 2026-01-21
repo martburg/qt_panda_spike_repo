@@ -60,9 +60,7 @@ def encode_telemetry(snap: TelemetrySnapshot) -> Dict[str, Any]:
 
 def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
     axes_in = payload["axes"]
-    axes_out: Dict[str, AxisTelemetry] = {
-        axis_id: AxisTelemetry(**ax) for axis_id, ax in axes_in.items()
-    }
+    axes_out = {axis_id: AxisTelemetry(**ax) for axis_id, ax in axes_in.items()}
     return TelemetrySnapshot(
         tick=int(payload["tick"]),
         t_s=float(payload["t_s"]),
@@ -70,6 +68,7 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
         estop=bool(payload["estop"]),
         fault=bool(payload["fault"]),
         axes=axes_out,
+        estop_status_word=int(payload.get("estop_status_word", 0)),  # NEW
     )
 
 # ---------------------------
@@ -89,9 +88,9 @@ def decode_command_frame(payload: Dict[str, Any]) -> CommandFrame:
     return CommandFrame(
         tick=int(payload["tick"]),
         t_s=float(payload["t_s"]),
-        estop=bool(payload.get("estop", False)),
-        fault=bool(payload.get("fault", False)),
-        mode=str(payload.get("mode", "")),
+        estop=bool(payload["estop"]),
+        fault=bool(payload["fault"]),
+        mode=str(payload["mode"]),
         axes=axes_out,
-        estop_reset=bool(payload.get("estop_reset", False)),
+        estop_reset=bool(payload.get("estop_reset", False)),  # NEW
     )
