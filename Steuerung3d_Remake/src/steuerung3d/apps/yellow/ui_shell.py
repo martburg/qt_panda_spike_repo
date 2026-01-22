@@ -337,6 +337,35 @@ QSS_ESTOPS_ON = r"""
 }
 """
 
+QSS_LED_BASE = r"""
+/* ===== LED dots: base (OFF) ===== */
+QFrame#led_fbt_dot, QFrame#led_ready_dot, QFrame#led_online_dot,
+QFrame#led_brk1_dot, QFrame#led_brk2_dot,
+QFrame#dotMaster, QFrame#dotGuider, QFrame#dotNetwork,
+QFrame#dotEStop1, QFrame#dotEStop2, QFrame#dot30kw, QFrame#dot05kw,
+QFrame#dotBRK1, QFrame#dotBRK2, QFrame#dotBRK2KB,
+QFrame#dotSPS, QFrame#dotRed, QFrame#dotENC,
+QFrame#dotPosWin, QFrame#dotVelWin, QFrame#dotEndlage,
+QFrame#g1_com_dot, QFrame#g1_fb_dot, QFrame#g1_out_dot,
+QFrame#g2_com_dot, QFrame#g2_fb_dot, QFrame#g2_out_dot,
+QFrame#g3_com_dot, QFrame#g3_fb_dot, QFrame#g3_out_dot,
+#ledHdrFbtDot, #ledHdrReadyDot, #ledHdrOnlineDot, #ledHdrBrk1Dot, #ledHdrBrk2Dot,
+#ledGuiderReadyDot, #ledGuiderOnlineDot
+{
+    min-width: 12px; max-width: 12px;
+    min-height: 12px; max-height: 12px;
+    border-radius: 6px;
+    background: #000;          /* OFF = black */
+    border: 1px solid #000;
+}
+
+/* BAD = red */
+QFrame[state="bad"] { background: #d33; }
+
+/* GOOD = green */
+QFrame[state="good"] { background: #3d3; }
+"""
+
 def parse_role(argv: list[str]) -> str:
     p = argparse.ArgumentParser(add_help=False)
     p.add_argument("--role", choices=("ip", "cfc"), default="ip")
@@ -519,7 +548,7 @@ def build_yellow_window(*, role: str, ui_path=None):
         background: {bg};
     }}
     """
-    win.setStyleSheet(QSS + QSS_HDR_LED+ QSS_ESTOPS_ON + role_qss)
+    win.setStyleSheet(QSS + QSS_HDR_LED+ QSS_ESTOPS_ON +QSS_LED_BASE + role_qss)
     QTimer.singleShot(0, lambda: _refit_window_height_only(win))
     return win
 
