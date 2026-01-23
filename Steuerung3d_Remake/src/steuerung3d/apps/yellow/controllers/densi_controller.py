@@ -15,6 +15,8 @@ from steuerung3d.core.telemetry import TelemetrySnapshot
 
 from steuerung3d.protocol.estop_bits import (
     ESTOP_SPECS,
+    ESTOP_CAUSE_KEYS,
+    ESTOP_OK_KEYS,
     iter_specs,
     decode_estop_word,
     encode_estop_word,
@@ -24,13 +26,9 @@ from .bindings import YellowBindings
 from .ports import CommandIn, TelemetryOut
 
 import logging
+
+
 log = logging.getLogger("den_si")
-
-
-# IMPORTANT:
-# Once the word contains OK/status bits, "word != 0" is NOT an estop trip condition.
-# Keep the trip logic focused on actual estop causes (extend later when we know all semantics).
-ESTOP_CAUSE_KEYS = {"master", "guider", "network", "estop1", "estop2"}
 
 
 @dataclass
@@ -40,6 +38,7 @@ class DenSiController:
     telemetry_out: TelemetryOut
     axis_ids: list[str]
     dt_s: float = 0.01
+
 
     def __post_init__(self) -> None:
         self.ui = YellowBindings.from_window(self.win)
@@ -62,8 +61,16 @@ class DenSiController:
         self._last_cmd: CommandFrame | None = None
 
         # LOGICAL injected bits (invert handled by encode/decode)
-        self._inj_bits: dict[str, bool] = {k: False for k in ESTOP_SPECS.keys()}
-        self._inj_estop_word: int = encode_estop_word(self._inj_bits)
+        self._inj_bits = {k: False for k in ESTOP_SPECS.keys()}
+
+        # safe defaults:
+        for k in ESTOP_OK_KEYS:
+            self._inj_bits[k] = True          # OK chain healthy
+
+        for k in ESTOP_CAUSE_KEYS:
+            self._inj_bits[k] = False         # no trip cause
+
+        self._inj_estop_word = encode_estop_word(self._inj_bits)
 
         self._estop_latched = False
         self._safety_ok = True  # placeholder
@@ -81,16 +88,33 @@ class DenSiController:
         self._render_estop_word_to_ui(self._inj_estop_word)
 
     # ----- UI helpers -----
+    def _apply_go_state(self) -> None:
+        """Set injected bits to a stable 'GO' state (no flash)."""
+        # default everything False
+        for k in self._inj_bits.keys():
+            self._inj_bits[k] = False
 
-    def _set_led_by_name(self, object_name: str | None, on: bool) -> None:
+        # OK keys True (green)
+        for k in ESTOP_OK_KEYS:
+            self._inj_bits[k] = True
+
+        # Cause keys False (green)
+        for k in ESTOP_CAUSE_KEYS:
+            self._inj_bits[k] = False
+
+        self._inj_estop_word = encode_estop_word(self._inj_bits)
+        self._estop_latched = False
+        self._render_estop_word_to_ui(self._inj_estop_word)
+
+    def _set_led_state_by_name(self, object_name: str | None, state: str | None) -> None:
         if not object_name:
             return
         w = self.win.findChild(QWidget, object_name)
         if w is None:
             return
-        if w.property("on") == bool(on):
+        if w.property("state") == state:
             return
-        w.setProperty("on", bool(on))
+        w.setProperty("state", state)
         w.style().unpolish(w)
         w.style().polish(w)
         w.update()
@@ -135,27 +159,43 @@ class DenSiController:
             cb.setChecked(bool(bits.get(spec.key, False)))
             cb.blockSignals(was)
 
-        # sync dots/LEDs
+        # sync dots/LEDs using 'state'
         for spec in iter_specs():
             if not spec.dot:
                 continue
-            self._set_led_by_name(spec.dot, bool(bits.get(spec.key, False)))
+
+            v = bool(bits.get(spec.key, False))
+
+            if spec.key in ESTOP_CAUSE_KEYS:
+                # trip causes: show red when active, otherwise green
+                state = "bad" if v else "good"
+
+            elif spec.key in ESTOP_OK_KEYS:
+                # ok chain: green when ok, red when broken
+                state = "good" if v else "bad"
+
+            else:
+                # other: amber only when asserted, otherwise off
+                state = "warn" if v else None
+
+            self._set_led_state_by_name(spec.dot, state)
 
     # ----- diagnostic actions -----
 
     def _set_inj_estop_all(self) -> None:
-        # Set ALL logical bits true (encode handles invert correctly)
+        # Set ALL logical bits to True
         for k in self._inj_bits.keys():
             self._inj_bits[k] = True
         self._inj_estop_word = encode_estop_word(self._inj_bits)
-        log.info("inject estop ALL set (word=0x%08X)", self._inj_estop_word)
+        log.info("inject: SET ALL bits (word=0x%08X)", self._inj_estop_word)
         self._render_estop_word_to_ui(self._inj_estop_word)
 
     def _clear_inj_estop_all(self) -> None:
+        # Clear ALL logical bits to False
         for k in self._inj_bits.keys():
             self._inj_bits[k] = False
         self._inj_estop_word = encode_estop_word(self._inj_bits)
-        log.info("inject estop ALL clear (word=0x%08X)", self._inj_estop_word)
+        log.info("inject: CLEAR ALL bits (word=0x%08X)", self._inj_estop_word)
         self._render_estop_word_to_ui(self._inj_estop_word)
 
     # ----- runtime -----
@@ -190,15 +230,10 @@ class DenSiController:
                 estop_reset=False,
             )
 
-        # v0.1 convenience: reset clears injected bits immediately (guards later)
+        # Reset => GO state (no flash)
         if bool(getattr(self._last_cmd, "estop_reset", False)):
-            if self._inj_estop_word != 0:
-                log.info("estop_reset received -> clearing injected bits")
-            for k in self._inj_bits.keys():
-                self._inj_bits[k] = False
-            self._inj_estop_word = encode_estop_word(self._inj_bits)
-            self._estop_latched = False
-            self._render_estop_word_to_ui(self._inj_estop_word)
+            log.info("estop_reset received -> GO state (no flash)")
+            self._apply_go_state()
 
         estop_word = int(self._inj_estop_word)
         bits = decode_estop_word(estop_word)

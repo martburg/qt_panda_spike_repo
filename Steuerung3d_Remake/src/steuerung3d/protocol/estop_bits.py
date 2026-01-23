@@ -21,17 +21,17 @@ class EstopBitSpec:
 ESTOP_SPECS: Dict[str, EstopBitSpec] = {
     # --- Guider channel bits (INVERTED in legacy) ---
     # G3
-    "g3_out": EstopBitSpec("g3_out", 0, invert=True, checkbox="chkEsG3Out", dot="g3_out_dot"),
+    "g3_fb":  EstopBitSpec("g3_fb",  0, invert=True, checkbox="chkEsG3Fb",  dot="g3_fb_dot"),
     "g3_com": EstopBitSpec("g3_com", 1, invert=True, checkbox="chkEsG3Com", dot="g3_com_dot"),
-    "g3_fb":  EstopBitSpec("g3_fb",  2, invert=True, checkbox="chkEsG3Fb",  dot="g3_fb_dot"),
+    "g3_out": EstopBitSpec("g3_out", 2, invert=True, checkbox="chkEsG3Out", dot="g3_out_dot"),
     # G2
-    "g2_out": EstopBitSpec("g2_out", 3, invert=True, checkbox="chkEsG2Out", dot="g2_out_dot"),
+    "g2_fb":  EstopBitSpec("g2_fb",  3, invert=True, checkbox="chkEsG2Fb",  dot="g2_fb_dot"),
     "g2_com": EstopBitSpec("g2_com", 4, invert=True, checkbox="chkEsG2Com", dot="g2_com_dot"),
-    "g2_fb":  EstopBitSpec("g2_fb",  5, invert=True, checkbox="chkEsG2Fb",  dot="g2_fb_dot"),
+    "g2_out": EstopBitSpec("g2_out", 5, invert=True, checkbox="chkEsG2Out", dot="g2_out_dot"),
     # G1
-    "g1_out": EstopBitSpec("g1_out", 6, invert=True, checkbox="chkEsG1Out", dot="g1_out_dot"),
+    "g1_fb":  EstopBitSpec("g1_fb",  6, invert=True, checkbox="chkEsG1Fb",  dot="g1_fb_dot"),
     "g1_com": EstopBitSpec("g1_com", 7, invert=True, checkbox="chkEsG1Com", dot="g1_com_dot"),
-    "g1_fb":  EstopBitSpec("g1_fb",  8, invert=True, checkbox="chkEsG1Fb",  dot="g1_fb_dot"),
+    "g1_out": EstopBitSpec("g1_out", 8, invert=True, checkbox="chkEsG1Out", dot="g1_out_dot"),
 
     # --- Core / safety bits (not inverted) ---
     "master":      EstopBitSpec("master",      9,  checkbox="chkEStopMaster",  dot="dotMaster"),
@@ -63,8 +63,20 @@ ESTOP_SPECS: Dict[str, EstopBitSpec] = {
     "schluessel2": EstopBitSpec("schluessel2", 31, checkbox="chkEsKey2",       dot=None),
 }
 
+# Bits that mean "E-Stop is ACTIVE / cause present" (trip sources)
+ESTOP_CAUSE_KEYS = {"master", "guider", "network", "estop1", "estop2"}
+
+# Bits that mean "OK / healthy" when True (status chain)
+ESTOP_OK_KEYS = {
+    k
+    for k, spec in ESTOP_SPECS.items()
+    if spec.invert
+       or k.endswith("_ok")
+       or k in {"pos_win", "vel_win", "reset_able", "steuerwort", "ready"}
+}
+
 # Backwards-compatible: plain bit index map (some code already expects this)
-ESTOP_BITS: Dict[str, int] = {k: spec.bit for k, spec in ESTOP_SPECS.items()}
+#ESTOP_BITS: Dict[str, int] = {k: spec.bit for k, spec in ESTOP_SPECS.items()}
 
 
 def iter_specs() -> Iterable[EstopBitSpec]:

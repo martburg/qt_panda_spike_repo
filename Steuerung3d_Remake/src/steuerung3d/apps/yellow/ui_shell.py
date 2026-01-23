@@ -33,7 +33,7 @@ QMainWindow { background: #7b2a2a; }  /* base behind frames */
     border-radius: 10px;
 }
 
-/* your “yellow strip” blocks that should NOT be red-tinted (you said you fixed by hand) */
+/* “yellow strip” blocks that should NOT be red-tinted */
 #frmMasterGuiderNetwork, #frmGComBlock, #frmYellowLeft, #frmYellowRight,
 #frameStatusLeft, #frameStatusMid, #frameStatusRight, #frameStatusMasterBlock, #frameStatusGBlock {
     background: #d8d2b0;              /* warm grey/khaki */
@@ -82,11 +82,18 @@ QLineEdit {
 }
 QLineEdit#txtVelMaxMot, QLineEdit#txtLagError { color: #c00000; font-weight: bold; }
 
+QComboBox {
+    background: #efefef;
+    border: 1px solid #666;
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+
+/* ===== buttons (bevel + strong outline) ===== */
 QPushButton, QToolButton {
     background: #e2e2e2;
     color: #111;
 
-    /* strong outline */
     border-style: solid;
     border-width: 2px;
 
@@ -100,31 +107,24 @@ QPushButton, QToolButton {
     padding: 6px 12px;
     margin: 4px;
 }
-
-/* Hover: brighter + slightly lighter bevel */
 QPushButton:hover, QToolButton:hover {
-    background: #ededed;  
+    background: #ededed;
     border-top-color: #ffffff;
     border-left-color: #ffffff;
     border-right-color: #1a1a1a;
     border-bottom-color: #1a1a1a;
 }
-
-/* Pressed: invert bevel to look "pushed in" */
 QPushButton:pressed, QToolButton:pressed {
-    background: #d0d0d0; 
+    background: #d0d0d0;
 
     border-top-color: #2b2b2b;
     border-left-color: #2b2b2b;
     border-right-color: #ffffff;
     border-bottom-color: #ffffff;
 
-    /* tiny "press" effect */
     padding-top: 7px;
     padding-left: 13px;
 }
-
-/* Disabled: clearly disabled */
 QPushButton:disabled, QToolButton:disabled {
     background:#dcdcdc;
     color: #888;
@@ -134,7 +134,7 @@ QPushButton:disabled, QToolButton:disabled {
     border-bottom-color: #bdbdbd;
 }
 
-/* Danger: muted dark red, industrial (not candy, not black) */
+/* Danger */
 QPushButton[kind="danger"], QToolButton[kind="danger"] {
     background: #c9a2a2;           /* desaturated warm red-grey */
     color: #111;
@@ -142,7 +142,6 @@ QPushButton[kind="danger"], QToolButton[kind="danger"] {
     border-style: solid;
     border-width: 2px;
 
-    /* bevel (raised) */
     border-top-color: #f2e8e8;
     border-left-color: #f2e8e8;
     border-right-color: #3a1a1a;
@@ -151,22 +150,17 @@ QPushButton[kind="danger"], QToolButton[kind="danger"] {
     border-radius: 1px;
     padding: 6px 12px;
     margin: 4px;
-
-    /* subtle red ring */
     outline: none;
 }
-
 QPushButton[kind="danger"]:hover, QToolButton[kind="danger"]:hover {
     background: #b10000;
     color: #f2f2f2;
     border-right-color: #220c0c;
     border-bottom-color: #220c0c;
 }
-
 QPushButton[kind="danger"]:pressed, QToolButton[kind="danger"]:pressed {
     background: #b99f9f;
 
-    /* pressed bevel inversion */
     border-top-color: #3a1a1a;
     border-left-color: #3a1a1a;
     border-right-color: #f2e8e8;
@@ -175,7 +169,6 @@ QPushButton[kind="danger"]:pressed, QToolButton[kind="danger"]:pressed {
     padding-top: 7px;
     padding-left: 13px;
 }
-
 QPushButton[kind="danger"]:disabled, QToolButton[kind="danger"]:disabled {
     background: #cfc7c7;
     color: #777;
@@ -183,16 +176,9 @@ QPushButton[kind="danger"]:disabled, QToolButton[kind="danger"]:disabled {
     border-bottom-color: #8a7a7a;
 }
 
-
-QComboBox {
-    background: #efefef;
-    border: 1px solid #666;
-    border-radius: 6px;
-    padding: 4px 8px;
-}
-
-/* ===== LED dots: keep visible always ===== */
-QFrame#led_fbt_dot, QFrame#led_ready_dot, QFrame#led_online_dot, QFrame#led_brk1_dot, QFrame#led_brk2_dot,
+/* ===== LED dots: geometry only (NO color here) ===== */
+QFrame#led_fbt_dot, QFrame#led_ready_dot, QFrame#led_online_dot,
+QFrame#led_brk1_dot, QFrame#led_brk2_dot,
 QFrame#dotMaster, QFrame#dotGuider, QFrame#dotNetwork,
 QFrame#dotEStop1, QFrame#dotEStop2, QFrame#dot30kw, QFrame#dot05kw,
 QFrame#dotBRK1, QFrame#dotBRK2, QFrame#dotBRK2KB,
@@ -200,48 +186,26 @@ QFrame#dotSPS, QFrame#dotRed, QFrame#dotENC,
 QFrame#dotPosWin, QFrame#dotVelWin, QFrame#dotEndlage,
 QFrame#g1_com_dot, QFrame#g1_fb_dot, QFrame#g1_out_dot,
 QFrame#g2_com_dot, QFrame#g2_fb_dot, QFrame#g2_out_dot,
-QFrame#g3_com_dot, QFrame#g3_fb_dot, QFrame#g3_out_dot {
+QFrame#g3_com_dot, QFrame#g3_fb_dot, QFrame#g3_out_dot,
+QFrame#ledHdrFbtDot, QFrame#ledHdrReadyDot, QFrame#ledHdrOnlineDot,
+QFrame#ledHdrBrk1Dot, QFrame#ledHdrBrk2Dot,
+QFrame#ledGuiderReadyDot, QFrame#ledGuiderOnlineDot
+{
     min-width: 12px; max-width: 12px;
     min-height: 12px; max-height: 12px;
     border-radius: 6px;
-    background: #444;
     border: 1px solid #000;
 }
 
-/* ===== LED dots: dynamic state via setProperty("on", bool) ===== */
-QFrame#led_fbt_dot[on="false"], QFrame#led_ready_dot[on="false"], QFrame#led_online_dot[on="false"],
-QFrame#led_brk1_dot[on="false"], QFrame#led_brk2_dot[on="false"],
-QFrame#dotMaster[on="false"], QFrame#dotGuider[on="false"], QFrame#dotNetwork[on="false"],
-QFrame#dotEStop1[on="false"], QFrame#dotEStop2[on="false"], QFrame#dot30kw[on="false"], QFrame#dot05kw[on="false"],
-QFrame#dotBRK1[on="false"], QFrame#dotBRK2[on="false"], QFrame#dotBRK2KB[on="false"],
-QFrame#dotSPS[on="false"], QFrame#dotRed[on="false"], QFrame#dotENC[on="false"],
-QFrame#dotPosWin[on="false"], QFrame#dotVelWin[on="false"], QFrame#dotEndlage[on="false"],
-QFrame#g1_com_dot[on="false"], QFrame#g1_fb_dot[on="false"], QFrame#g1_out_dot[on="false"],
-QFrame#g2_com_dot[on="false"], QFrame#g2_fb_dot[on="false"], QFrame#g2_out_dot[on="false"],
-QFrame#g3_com_dot[on="false"], QFrame#g3_fb_dot[on="false"], QFrame#g3_out_dot[on="false"] {
-    background: #444;  /* OFF */
-}
+/* Default for any LED that has a state set (covers warn/good/bad/off etc.) */
+QFrame[state] { background: #000; }  /* default = black */
 
-QFrame#led_fbt_dot[on="true"], QFrame#led_ready_dot[on="true"], QFrame#led_online_dot[on="true"],
-QFrame#led_brk1_dot[on="true"], QFrame#led_brk2_dot[on="true"],
-QFrame#dotMaster[on="true"], QFrame#dotGuider[on="true"], QFrame#dotNetwork[on="true"],
-QFrame#dotEStop1[on="true"], QFrame#dotEStop2[on="true"], QFrame#dot30kw[on="true"], QFrame#dot05kw[on="true"],
-QFrame#dotBRK1[on="true"], QFrame#dotBRK2[on="true"], QFrame#dotBRK2KB[on="true"],
-QFrame#dotSPS[on="true"], QFrame#dotRed[on="true"], QFrame#dotENC[on="true"],
-QFrame#dotPosWin[on="true"], QFrame#dotVelWin[on="true"], QFrame#dotEndlage[on="true"],
-QFrame#g1_com_dot[on="true"], QFrame#g1_fb_dot[on="true"], QFrame#g1_out_dot[on="true"],
-QFrame#g2_com_dot[on="true"], QFrame#g2_fb_dot[on="true"], QFrame#g2_out_dot[on="true"],
-QFrame#g3_com_dot[on="true"], QFrame#g3_fb_dot[on="true"], QFrame#g3_out_dot[on="true"] {
-    background: #d33;  /* ON (default = red) */
-}
-
-/* If you also setProperty("kind", "ok"/"warn"/"alarm") you get better semantics */
-QFrame[on="true"][kind="ok"]    { background: #2a2; }
-QFrame[on="true"][kind="warn"]  { background: #ea0; }
-QFrame[on="true"][kind="alarm"] { background: #d33; }
+/* State overrides */
+QFrame[state="bad"]  { background: #d33; }  /* red */
+QFrame[state="good"] { background: #3d3; }  /* green */
+QFrame[state="warn"] { background: #ea0; }  /* amber */
 
 /* ===== Tabs: neutral grey, NO red bleed ===== */
-/* Scope strictly to setup tabs only */
 #frameSetup QTabWidget::pane {
     border: 1px solid #000;
     border-radius: 10px;
@@ -258,7 +222,8 @@ QFrame[on="true"][kind="alarm"] { background: #d33; }
 #frameSetup QTabWidget QWidget#pageFaultInject,
 #frameSetup QTabWidget QWidget#pageEventsFaults,
 #frameSetup QTabWidget QWidget#pageLogging {
-    background: #e0e0e0}
+    background: #e0e0e0;
+}
 
 /* Tab buttons (subtle grey, rounded) */
 #frameSetup QTabBar::tab {
@@ -284,30 +249,14 @@ QFrame[on="true"][kind="alarm"] { background: #d33; }
     border-top-right-radius: 8px;
     padding: 4px 10px;
 }
-"""
-
-QSS_HDR_LED = r"""
-/* Header LED dots (FBT/Ready/Online/Brake1/Brake2) */
-#ledHdrFbtDot, #ledHdrReadyDot, #ledHdrOnlineDot, #ledHdrBrk1Dot,
-#ledGuiderReadyDot, #ledGuiderOnlineDot,  #ledHdrBrk2Dot {
-    min-width: 12px; max-width: 12px;
-    min-height: 12px; max-height: 12px;
-    border-radius: 6px;
-    background: #444;
-    border: 1px solid #000;
-}
-#ledHdrFbtDot[on="true"], #ledHdrReadyDot[on="true"], #ledHdrOnlineDot[on="true"],
-#ledHdrBrk1Dot[on="true"], #ledHdrBrk2Dot[on="true"],
-#ledGuiderReadyDot[on="true"], #ledGuiderOnlineDot[on="true"] {
-    background: #2a2; /* green for OK */
-}
-#ledHdrFbtDot[on="false"], #ledHdrReadyDot[on="false"], #ledHdrOnlineDot[on="false"],
-#ledHdrBrk1Dot[on="false"], #ledHdrBrk2Dot[on="false"],
-#ledGuiderReadyDot[on="false"], #ledGuiderOnlineDot[on="false"] {
-    background: #444;
+/* Make only the E-Stop ALL buttons taller */
+QPushButton#btnEStopAllSet,
+QPushButton#btnEStopAllClear {
+    min-height: 25px;     /* bump until it matches your visual row */
+    padding-top: 0px;
+    padding-bottom: 0px;
 }
 """
-
 # Role-specific canvas tint (ONLY centralwidget background)
 IP_BG  = "#E6F2FF"  # light sky blue
 CFC_BG = "#E8FFF1"  # light mint
@@ -327,45 +276,6 @@ QMainWindow[appRole="cfc"] QWidget#centralwidget {
     background: #E8FFF1;
 }
 """
-
-# in ui_shell.py, append near your LED dot section
-QSS_ESTOPS_ON = r"""
-/* E-Stop dots: red when active */
-#dotMaster[on="true"], #dotGuider[on="true"], #dotNetwork[on="true"],
-#dotEStop1[on="true"], #dotEStop2[on="true"] {
-    background: #b10000;
-}
-"""
-
-QSS_LED_BASE = r"""
-/* ===== LED dots: base (OFF) ===== */
-QFrame#led_fbt_dot, QFrame#led_ready_dot, QFrame#led_online_dot,
-QFrame#led_brk1_dot, QFrame#led_brk2_dot,
-QFrame#dotMaster, QFrame#dotGuider, QFrame#dotNetwork,
-QFrame#dotEStop1, QFrame#dotEStop2, QFrame#dot30kw, QFrame#dot05kw,
-QFrame#dotBRK1, QFrame#dotBRK2, QFrame#dotBRK2KB,
-QFrame#dotSPS, QFrame#dotRed, QFrame#dotENC,
-QFrame#dotPosWin, QFrame#dotVelWin, QFrame#dotEndlage,
-QFrame#g1_com_dot, QFrame#g1_fb_dot, QFrame#g1_out_dot,
-QFrame#g2_com_dot, QFrame#g2_fb_dot, QFrame#g2_out_dot,
-QFrame#g3_com_dot, QFrame#g3_fb_dot, QFrame#g3_out_dot,
-#ledHdrFbtDot, #ledHdrReadyDot, #ledHdrOnlineDot, #ledHdrBrk1Dot, #ledHdrBrk2Dot,
-#ledGuiderReadyDot, #ledGuiderOnlineDot
-{
-    min-width: 12px; max-width: 12px;
-    min-height: 12px; max-height: 12px;
-    border-radius: 6px;
-    background: #000;          /* OFF = black */
-    border: 1px solid #000;
-}
-
-/* BAD = red */
-QFrame[state="bad"] { background: #d33; }
-
-/* GOOD = green */
-QFrame[state="good"] { background: #3d3; }
-"""
-
 def parse_role(argv: list[str]) -> str:
     p = argparse.ArgumentParser(add_help=False)
     p.add_argument("--role", choices=("ip", "cfc"), default="ip")
@@ -548,7 +458,7 @@ def build_yellow_window(*, role: str, ui_path=None):
         background: {bg};
     }}
     """
-    win.setStyleSheet(QSS + QSS_HDR_LED+ QSS_ESTOPS_ON +QSS_LED_BASE + role_qss)
+    win.setStyleSheet(QSS + role_qss )
     QTimer.singleShot(0, lambda: _refit_window_height_only(win))
     return win
 

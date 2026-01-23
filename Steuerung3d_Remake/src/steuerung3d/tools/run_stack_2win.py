@@ -9,7 +9,7 @@ from datetime import datetime
 # ---- edit these as needed ----
 AXIS_ID = "X"
 DEN_SI_DT = "0.1"
-LOG_LEVEL = "debug"
+LOG_LEVEL = "info"
 
 CORE_CMD = f"python -m steuerung3d.apps.core_udp_service --log-level {LOG_LEVEL}"
 DEN_SI_CMD = f"python -m steuerung3d.apps.den_si --axis {AXIS_ID} --dt {DEN_SI_DT} --log-level {LOG_LEVEL}"
