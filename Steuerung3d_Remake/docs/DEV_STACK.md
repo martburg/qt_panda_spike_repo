@@ -23,6 +23,43 @@ If you run from `src/` you must adjust the path:
 ```powershell
 python -m steuerung3d.apps.dev_stack --config ..\configs\dev_plc.toml
 ```
+
+## UDP HiP ↔ Core ↔ DenSi demo (parameter editing)
+
+For the HiP/DenSi split UI ("Yellow"), run three processes (three terminals):
+
+1) Core UDP service
+
+```powershell
+python -m steuerung3d.apps.core_udp_service --dt 0.1
+```
+
+2) DenSi (device endpoint simulator)
+
+```powershell
+python -m steuerung3d.apps.den_si
+```
+
+3) HiP (operator UI)
+
+```powershell
+python -m steuerung3d.apps.hi_p
+```
+
+### What to try
+
+In HiP:
+
+- Click **Pos Edit** → fields unlock (white) for that group.
+- Enter new values → click **Pos Write** (sends a commit via the command frame).
+- Click **Pos Cancel** to abort the edit session.
+
+Notes:
+
+- DenSi starts in a **stopped / not-OK** state by default.
+- DenSi's Edit/Write/Cancel controls are disabled (device-side); edit happens only from HiP.
+- While editing, HiP does not overwrite the active fields with incoming telemetry.
+
 ## PLC TwinCAT Legacy (Fleet) vs UDP SIM fallback
 
 When running with `plc_twincat_legacy_fleet` on a machine that does **not** have the configured controller IP

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Literal, Union
+from dataclasses import dataclass, field
+from typing import Dict, Literal, Union
 
 
 # Keep "type" as an explicit discriminant: easy for codecs + pattern matching.
@@ -43,6 +43,33 @@ class DisarmToIdle:
 class ClearFault:
     type: Literal["clear_fault"] = "clear_fault"
 
+
+# -------- Parameters (axis-agnostic, v0.1) --------
+
+ParamGroup = Literal["pos", "vel", "filter"]
+
+
+@dataclass(frozen=True)
+class ParamEditBegin:
+    """Prime the device to accept parameter writes for a parameter group."""
+    type: Literal["param_edit_begin"] = "param_edit_begin"
+    group: ParamGroup = "pos"
+
+
+@dataclass(frozen=True)
+class ParamWrite:
+    """Write one or more parameters (key->float) within a group."""
+    type: Literal["param_write"] = "param_write"
+    group: ParamGroup = "pos"
+    values: Dict[str, float] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ParamCancel:
+    """Cancel an in-progress edit session for a parameter group."""
+    type: Literal["param_cancel"] = "param_cancel"
+    group: ParamGroup = "pos"
+
     
 Intent = Union[
     EnableAxis,
@@ -52,4 +79,7 @@ Intent = Union[
     ArmLiveMode,
     DisarmToIdle,
     ClearFault,
+    ParamEditBegin,
+    ParamWrite,
+    ParamCancel,
 ]

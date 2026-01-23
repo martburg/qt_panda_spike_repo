@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Any
 
+from steuerung3d.core.command_frame import ParamOp
+
 from steuerung3d.core.mode import Mode
 
 
@@ -41,6 +43,15 @@ class MachineState:
     estop_reset_req: bool = False
 
     estop_status_word: int = 0   # NEW: measured bitfield
+
+    # --- parameters (axis-agnostic v0.1) ---
+    # Measured/confirmed by device (via telemetry):
+    param_edit_active: bool = False
+    param_edit_group: str = ""
+    params: Dict[str, float] = field(default_factory=dict)
+
+    # Pending ops to be sent on the next command frame (core-side only):
+    pending_param_ops: list[ParamOp] = field(default_factory=list)
 
 
     def ensure_axis(self, axis_id: str) -> AxisState:

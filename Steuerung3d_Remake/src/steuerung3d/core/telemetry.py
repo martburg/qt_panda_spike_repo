@@ -1,7 +1,7 @@
 # src/steuerung3d/core/telemetry.py
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict
 
 from steuerung3d.core.mode import Mode
@@ -26,6 +26,11 @@ class TelemetrySnapshot:
     # NEW
     estop_status_word: int = 0
 
+    # Parameters (axis-agnostic v0.1)
+    param_edit_active: bool = False
+    param_edit_group: str = ""
+    params: Dict[str, float] = field(default_factory=dict)
+
     @classmethod
     def from_state(cls, state: MachineState) -> "TelemetrySnapshot":
         axes = {
@@ -45,6 +50,9 @@ class TelemetrySnapshot:
             fault=bool(state.fault),
             axes=axes,
             estop_status_word=int(getattr(state, "estop_status_word", 0)),
+            param_edit_active=bool(getattr(state, "param_edit_active", False)),
+            param_edit_group=str(getattr(state, "param_edit_group", "")),
+            params=dict(getattr(state, "params", {})),
         )
 
 def apply_measured_snapshot(state: MachineState, snap: TelemetrySnapshot) -> None:
@@ -54,6 +62,11 @@ def apply_measured_snapshot(state: MachineState, snap: TelemetrySnapshot) -> Non
 
     # NEW: carry the word through the core
     state.estop_status_word = int(getattr(snap, "estop_status_word", 0))
+
+    # parameters (optional on the wire)
+    state.param_edit_active = bool(getattr(snap, "param_edit_active", False))
+    state.param_edit_group = str(getattr(snap, "param_edit_group", ""))
+    state.params = dict(getattr(snap, "params", {}))
 
     for axis_id, ax_t in snap.axes.items():
         ax: AxisState = state.ensure_axis(axis_id)

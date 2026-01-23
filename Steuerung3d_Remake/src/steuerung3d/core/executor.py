@@ -19,4 +19,5 @@ def build_command_frame(state: MachineState) -> CommandFrame:
         mode=state.mode.value,
         axes=axes,
         estop_reset=state.estop_reset_req,  # pulse from HI-P intent
+        param_ops=list(getattr(state, "pending_param_ops", [])),
     )

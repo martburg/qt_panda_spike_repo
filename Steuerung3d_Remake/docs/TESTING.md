@@ -18,6 +18,18 @@ pytest -q
 - TwinCAT legacy UDP devices:
   - lifetick is sent every frame
   - Windows-safe socket behavior (`WinError 10054` treated as dropped packet)
+- Regression guards for command-frame structure/sequence (hash-based)
+
+## Recent additions worth testing
+
+Parameter editing is carried through the **same command frame seam** as motion commands.
+
+Recommended tests:
+
+- Intent → command frame: `BeginParamEdit / CommitParamEdit / CancelParamEdit` produce the expected
+  `param_ops` payload.
+- Ack handling: once acks are observed in telemetry, the core stops resending the corresponding op.
+- Validation guards (UI and/or core): numeric-only input and min/max ordering constraints.
 
 ## Writing new tests
 

@@ -12,11 +12,14 @@ from steuerung3d.core.intents import (
     JogAxis,
     SetEstop,
     RequestEstopReset,   # NEW
+    ParamEditBegin,
+    ParamWrite,
+    ParamCancel,
 )
 
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
 
-from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
+from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamOp, decode_param_ops
 
 
 
@@ -32,6 +35,10 @@ _INTENT_TYPE_MAP = {
     "arm_live_mode": ArmLiveMode,
     "disarm_to_idle": DisarmToIdle,
     "clear_fault": ClearFault,
+    # parameters (axis-agnostic)
+    "param_edit_begin": ParamEditBegin,
+    "param_write": ParamWrite,
+    "param_cancel": ParamCancel,
 }
 
 
@@ -69,6 +76,10 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
         fault=bool(payload["fault"]),
         axes=axes_out,
         estop_status_word=int(payload.get("estop_status_word", 0)),  # NEW
+        # parameters (optional)
+        param_edit_active=bool(payload.get("param_edit_active", False)),
+        param_edit_group=str(payload.get("param_edit_group", "")),
+        params={k: float(v) for k, v in dict(payload.get("params", {})).items()},
     )
 
 # ---------------------------
@@ -93,4 +104,5 @@ def decode_command_frame(payload: Dict[str, Any]) -> CommandFrame:
         mode=str(payload["mode"]),
         axes=axes_out,
         estop_reset=bool(payload.get("estop_reset", False)),  # NEW
+        param_ops=decode_param_ops(payload.get("param_ops", [])),
     )

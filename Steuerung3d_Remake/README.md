@@ -48,6 +48,25 @@ pip install pytest
 pytest -q
 ```
 
+### Run the HiP ↔ Core ↔ DenSi UDP demo (Yellow UI)
+
+Open three terminals:
+
+```powershell
+python -m steuerung3d.apps.core_udp_service --dt 0.1
+```
+
+```powershell
+python -m steuerung3d.apps.den_si
+```
+
+```powershell
+python -m steuerung3d.apps.hi_p
+```
+
+This demo exercises the intent/telemetry seam over UDP and supports axis-agnostic parameter editing
+(Edit → Write → Cancel) from HiP.
+
 ### Run the dev stack
 
 From the **repo root**:

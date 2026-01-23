@@ -63,6 +63,65 @@ The core produces a `CommandFrame` that is independent of transport and device d
 - device adapters replaceable (SIM, legacy PLC, future protocols)
 - logging and regression testing straightforward
 
+## HiP ↔ DenSi parameter editing (axis-agnostic)
+
+In addition to motion / mode intents, the system supports an **axis-agnostic parameter edit flow**
+between:
+
+- **HiP** (Human Intent Parser / operator UI)
+- **DenSi** (Device Endpoint Simulator)
+
+The flow is deliberately simple and mirrors the UI buttons:
+
+- **Edit** → prime DenSi to accept new values for a parameter group
+- **Write** → commit new values to DenSi
+- **Cancel** → abort the edit session (no changes applied)
+
+This is modeled as a small state machine per edit group (e.g. `pos`, `vel`, `filter`, `guider`).
+
+### Intents
+
+HiP emits intents (over UDP or in-memory transport):
+
+- `BeginParamEdit(group)`
+- `CommitParamEdit(group, values)`
+- `CancelParamEdit(group)`
+
+The **core** applies these to `MachineState` and emits the corresponding operations in the
+next `CommandFrame`.
+
+### CommandFrame
+
+`CommandFrame` carries a list of parameter operations (axis-agnostic):
+
+- `param_ops: [ {op: begin|commit|cancel, group, values?, session_id?, req_id?} ... ]`
+
+This keeps parameter traffic on the same deterministic “frame seam” as motion commands.
+
+### Telemetry
+
+DenSi reports parameter edit state and applied values in telemetry so HiP can:
+
+- enable/disable fields and buttons correctly
+- show the effective values after a write
+
+Important UI detail:
+
+- While a group is in **active edit mode**, HiP must **not** overwrite in-progress user typing
+  with periodic telemetry refresh. Only non-active groups should be refreshed.
+
+### UI gating policy
+
+- **HiP**: parameter text fields are disabled (grey) until Edit is pressed; active fields become
+  enabled (white). Write/Cancel are enabled only while editing.
+- **DenSi**: Edit/Write/Cancel controls are disabled (greyed). DenSi acts as a “device endpoint”,
+  not an operator.
+
+### Safety / startup
+
+DenSi starts in a **stopped / not-OK** state by default so the safe state is visible immediately.
+Diagnostic buttons “Set All” / “Clear All” remain purely diagnostic and keep their semantics.
+
 Axis FSM (controller-side)
 
 Each axis has a controller-side FSM that governs mode, safety gating, and recovery.

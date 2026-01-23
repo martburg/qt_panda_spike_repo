@@ -8,12 +8,45 @@ from steuerung3d.core.intents import (
     JogAxis,
     SetEstop,
     RequestEstopReset,
+    ParamEditBegin,
+    ParamWrite,
+    ParamCancel,
     Intent,
 )
 from steuerung3d.core.mode import Mode
 from steuerung3d.core.state import MachineState
+from steuerung3d.core.command_frame import ParamEditBeginOp, ParamWriteOp, ParamCancelOp
 from steuerung3d.core.state_machine import enforce_mode_actions, normalize_mode
 
+
+
+
+def _enforce_pos_chain(vals: dict[str, float]) -> dict[str, float]:
+    """Enforce HardMax>=UserMax>=UserMin>=HardMin."""
+    keys = ('HardMax','UserMax','UserMin','HardMin')
+    if not all(k in vals for k in keys):
+        return vals
+    hard_max = float(vals['HardMax']); hard_min = float(vals['HardMin'])
+    user_max = float(vals['UserMax']); user_min = float(vals['UserMin'])
+    if hard_max < hard_min:
+        hard_max, hard_min = hard_min, hard_max
+    user_max = max(hard_min, min(hard_max, user_max))
+    user_min = max(hard_min, min(user_max, user_min))
+    vals['HardMax']=hard_max; vals['HardMin']=hard_min; vals['UserMax']=user_max; vals['UserMin']=user_min
+    return vals
+
+
+def _enforce_guider_minmax(vals: dict[str, float]) -> dict[str, float]:
+    """Enforce PosMin < PosMax."""
+    if 'PosMin' not in vals or 'PosMax' not in vals:
+        return vals
+    mn = float(vals['PosMin']); mx = float(vals['PosMax'])
+    if mn > mx:
+        mn, mx = mx, mn
+    if mn == mx:
+        mx = mn + max(1e-6, abs(mn)*1e-6)
+    vals['PosMin']=mn; vals['PosMax']=mx
+    return vals
 
 def apply_intent(state: MachineState, intent: Intent) -> None:
     """
@@ -53,6 +86,26 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
                 ax.fault = False
             normalize_mode(state)
             enforce_mode_actions(state)
+            return
+
+        # --- PARAMETERS (axis-agnostic v0.1) ---
+        # These are intentionally NOT mode-gated yet.
+        # The device can decide to accept/reject, and will reflect status in telemetry.
+        case ParamEditBegin(group=grp):
+            state.pending_param_ops.append(ParamEditBeginOp(group=grp))
+            return
+
+        case ParamWrite(group=grp, values=vals):
+            cleaned = {str(k): float(v) for k, v in dict(vals).items()}
+            if grp == "pos":
+                cleaned = _enforce_pos_chain(cleaned)
+            elif grp == "guider":
+                cleaned = _enforce_guider_minmax(cleaned)
+            state.pending_param_ops.append(ParamWriteOp(group=grp, values=cleaned))
+            return
+
+        case ParamCancel(group=grp):
+            state.pending_param_ops.append(ParamCancelOp(group=grp))
             return
 
         # --- MODE TRANSITIONS ---

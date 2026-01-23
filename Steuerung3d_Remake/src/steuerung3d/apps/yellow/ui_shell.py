@@ -82,6 +82,18 @@ QLineEdit {
 }
 QLineEdit#txtVelMaxMot, QLineEdit#txtLagError { color: #c00000; font-weight: bold; }
 
+/* Parameter input fields: white when enabled (editing on HiP). */
+QLineEdit[paramField="true"]:enabled {
+    background: #ffffff;
+}
+
+/* Disabled line edits should appear clearly locked (used in HiP until Edit). */
+QLineEdit:disabled {
+    background: #e3e3e3;
+    color: #666;
+    border: 1px solid #777;
+}
+
 QComboBox {
     background: #efefef;
     border: 1px solid #666;

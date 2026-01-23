@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QCheckBox, QWidget
+from PySide6.QtWidgets import QCheckBox, QWidget, QLineEdit
 
 from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
 from steuerung3d.adapters.sim.device import SimDevice
@@ -29,6 +29,37 @@ import logging
 
 
 log = logging.getLogger("den_si")
+
+
+# v0.1 axis-agnostic parameter wiring (UI widget names -> param keys)
+_PARAM_WIDGETS: dict[str, dict[str, str]] = {
+    "pos": {
+        "HardMax": "txtHardMax_2",
+        "UserMax": "txtUserMax_2",
+        "UserMin": "txtUserMin_2",
+        "HardMin": "txtHardMin_2",
+        "PosWin": "txtPosWin_2",
+    },
+    "vel": {
+        "VelMax": "txtVelMax_3",
+        "VelWin": "txtVelWin_3",
+        "AccMax": "txtAccMax_3",
+        "AccMove": "txtAccMove_3",
+        "DccMax": "txtDccMax_3",
+        "MaxAmp": "txtMaxAmp_3",
+        "VelMaxMot": "txtVelMaxMot_3",
+    },
+    "filter": {
+        "P": "txtP_2",
+        "I": "txtI_2",
+        "D": "txtD_2",
+        "IL": "txtIL_2",
+        "RampForm": "txtRamp_2",    },
+    "guider": {
+        "PosMax": "txtGPosMax_2",
+        "PosMin": "txtGPosMin_2",
+    },
+}
 
 
 @dataclass
@@ -57,6 +88,9 @@ class DenSiController:
         for a in self.axis_ids:
             self.state.ensure_axis(a)
 
+        # initialize parameter bank from current UI text (if present)
+        self._seed_params_from_ui()
+
         self.device = SimDevice(plant=SimAxisPlant())
         self._last_cmd: CommandFrame | None = None
 
@@ -65,7 +99,7 @@ class DenSiController:
 
         # safe defaults:
         for k in ESTOP_OK_KEYS:
-            self._inj_bits[k] = True          # OK chain healthy
+            self._inj_bits[k] = False          # OK chain healthy
 
         for k in ESTOP_CAUSE_KEYS:
             self._inj_bits[k] = False         # no trip cause
@@ -86,6 +120,103 @@ class DenSiController:
 
         # initial paint
         self._render_estop_word_to_ui(self._inj_estop_word)
+
+        # DenSi is the remote endpoint: parameter edit/write/cancel is driven from HiP
+        self._disable_param_edit_buttons()
+        self._disable_param_fields()
+
+    def _seed_params_from_ui(self) -> None:
+        for _grp, mapping in _PARAM_WIDGETS.items():
+            for key, wname in mapping.items():
+                w = self.win.findChild(QLineEdit, wname)
+                if w is None:
+                    continue
+                try:
+                    self.state.params[key] = float(w.text())
+                except Exception:
+                    # keep missing/invalid as-is
+                    continue
+
+    def _ui_set_param(self, key: str, value: float) -> None:
+        # Update UI field if we know its widget name.
+        for _grp, mapping in _PARAM_WIDGETS.items():
+            wname = mapping.get(key)
+            if not wname:
+                continue
+            w = self.win.findChild(QLineEdit, wname)
+            if w is None:
+                continue
+            # avoid unnecessary signal churn
+            txt = f"{value:g}"
+            if w.text() == txt:
+                return
+            was = w.blockSignals(True)
+            w.setText(txt)
+            w.blockSignals(was)
+            return
+
+    def _disable_param_edit_buttons(self) -> None:
+        """Disable parameter Edit/Write/Cancel buttons on DenSi UI.
+
+        DenSi is the device side; operators should not change parameters locally.
+        """
+        from PySide6.QtWidgets import QPushButton
+
+        btn_names = [
+            'btnPosEdit','btnPosWrite','btnPosCancel',
+            'btnVelEdit','btnVelWrite','btnVelCancel',
+            'btnFilterEdit','btnFilterWrite','btnFilterCancel',
+            'btnGuiderEdit','btnGuiderWrite','btnGuiderCancel',
+        ]
+        for name in btn_names:
+            b = self.win.findChild(QPushButton, name)
+            if b is not None:
+                b.setEnabled(False)
+
+    def _disable_param_fields(self) -> None:
+        """Disable parameter line edits on DenSi UI (device side).
+
+        They remain updated programmatically, but appear grey/locked.
+        """
+        for _grp, mapping in _PARAM_WIDGETS.items():
+            for _key, wname in mapping.items():
+                le = self.win.findChild(QLineEdit, wname)
+                if le is None:
+                    continue
+                # Mark for QSS (even though we disable them)
+                if le.property('paramField') is None:
+                    le.setProperty('paramField', True)
+                    le.style().unpolish(le)
+                    le.style().polish(le)
+                le.setEnabled(False)
+
+    def _enforce_pos_chain(self, vals: dict[str, float]) -> dict[str, float]:
+        """Enforce HardMax>=UserMax>=UserMin>=HardMin."""
+        v = dict(vals)
+        need = ('HardMax','UserMax','UserMin','HardMin')
+        if not all(k in v for k in need):
+            return v
+        hard_max = float(v['HardMax']); hard_min = float(v['HardMin'])
+        user_max = float(v['UserMax']); user_min = float(v['UserMin'])
+        if hard_max < hard_min:
+            hard_max, hard_min = hard_min, hard_max
+        user_max = max(hard_min, min(hard_max, user_max))
+        user_min = max(hard_min, min(user_max, user_min))
+        v['HardMax']=hard_max; v['HardMin']=hard_min; v['UserMax']=user_max; v['UserMin']=user_min
+        return v
+
+    def _enforce_guider_minmax(self, vals: dict[str, float]) -> dict[str, float]:
+        """Enforce PosMin < PosMax."""
+        v = dict(vals)
+        if 'PosMin' not in v or 'PosMax' not in v:
+            return v
+        pos_min = float(v['PosMin']); pos_max = float(v['PosMax'])
+        if pos_min > pos_max:
+            pos_min, pos_max = pos_max, pos_min
+        if pos_min == pos_max:
+            pos_max = pos_min + (1e-6 * (abs(pos_min) + 1.0))
+        v['PosMin']=pos_min; v['PosMax']=pos_max
+        return v
 
     # ----- UI helpers -----
     def _apply_go_state(self) -> None:
@@ -118,6 +249,76 @@ class DenSiController:
         w.style().unpolish(w)
         w.style().polish(w)
         w.update()
+
+    # ----- parameter helpers -----
+    def _find_line_edit(self, object_name: str) -> QLineEdit | None:
+        w = self.win.findChild(QLineEdit, object_name)
+        return w if isinstance(w, QLineEdit) else None
+
+    def _seed_params_from_ui(self) -> None:
+        """Populate state.params from UI fields if available.
+
+        This makes DenSi a useful echo-target for HiP parameter writes.
+        """
+        params: dict[str, float] = {}
+        for _grp, mapping in _PARAM_WIDGETS.items():
+            for key, obj_name in mapping.items():
+                le = self._find_line_edit(obj_name)
+                if le is None:
+                    continue
+                try:
+                    params[key] = float(le.text().strip() or "0")
+                except ValueError:
+                    continue
+        self.state.params = params
+
+    def _apply_param_values_to_ui(self, values: dict[str, float]) -> None:
+        # Push updated values to any known widgets.
+        for _grp, mapping in _PARAM_WIDGETS.items():
+            for key, obj_name in mapping.items():
+                if key not in values:
+                    continue
+                le = self._find_line_edit(obj_name)
+                if le is None:
+                    continue
+                le.setText(str(values[key]))
+
+    def _normalize_pos_chain(self, values: dict[str, float]) -> dict[str, float]:
+        v = dict(values)
+        keys = ('HardMax', 'UserMax', 'UserMin', 'HardMin')
+        if not all(k in v for k in keys):
+            return v
+
+        hard_max = float(v['HardMax'])
+        user_max = float(v['UserMax'])
+        user_min = float(v['UserMin'])
+        hard_min = float(v['HardMin'])
+
+        if hard_max < hard_min:
+            hard_max, hard_min = hard_min, hard_max
+
+        user_max = max(hard_min, min(hard_max, user_max))
+        user_min = max(hard_min, min(user_max, user_min))
+
+        v['HardMax'] = hard_max
+        v['HardMin'] = hard_min
+        v['UserMax'] = user_max
+        v['UserMin'] = user_min
+        return v
+
+    def _normalize_guider_range(self, values: dict[str, float]) -> dict[str, float]:
+        v = dict(values)
+        if 'PosMin' not in v or 'PosMax' not in v:
+            return v
+        pos_min = float(v['PosMin'])
+        pos_max = float(v['PosMax'])
+        if pos_min > pos_max:
+            pos_min, pos_max = pos_max, pos_min
+        if pos_min == pos_max:
+            pos_max = pos_min + (1e-6 * (abs(pos_min) + 1.0))
+        v['PosMin'] = pos_min
+        v['PosMax'] = pos_max
+        return v
 
     def _wire_all_estop_bit_checkboxes(self) -> None:
         for spec in iter_specs():
@@ -234,6 +435,58 @@ class DenSiController:
         if bool(getattr(self._last_cmd, "estop_reset", False)):
             log.info("estop_reset received -> GO state (no flash)")
             self._apply_go_state()
+
+        # ----- parameter ops (axis-agnostic v0.1) -----
+        for op in list(getattr(self._last_cmd, "param_ops", []) or []):
+            try:
+                op_type = getattr(op, "type", None) or (op.get("type") if isinstance(op, dict) else None)
+            except Exception:
+                op_type = None
+
+            if op_type == "param_edit_begin":
+                grp = getattr(op, "group", "") or (op.get("group") if isinstance(op, dict) else "")
+                self.state.param_edit_active = True
+                self.state.param_edit_group = str(grp)
+                log.info("param_edit_begin: group=%s", grp)
+
+            elif op_type == "param_cancel":
+                grp = getattr(op, "group", "") or (op.get("group") if isinstance(op, dict) else "")
+                if (not grp) or (str(grp) == self.state.param_edit_group):
+                    self.state.param_edit_active = False
+                    self.state.param_edit_group = ""
+                log.info("param_cancel: group=%s", grp)
+
+            elif op_type == "param_write":
+                grp = getattr(op, "group", "") or (op.get("group") if isinstance(op, dict) else "")
+                vals = getattr(op, "values", None) or (op.get("values") if isinstance(op, dict) else {})
+                vals = {str(k): float(v) for k, v in dict(vals).items()}
+
+                # Simple policy: only accept if group matches current edit group.
+
+                # enforce minimal device-side guards too
+                if str(grp) == 'pos':
+                    vals = self._normalize_pos_chain(vals)
+                elif str(grp) == 'guider':
+                    vals = self._normalize_guider_range(vals)
+                if (not self.state.param_edit_active) or (str(grp) != self.state.param_edit_group):
+                    log.warning(
+                        "param_write rejected: group=%s active=%s active_group=%s",
+                        grp,
+                        self.state.param_edit_active,
+                        self.state.param_edit_group,
+                    )
+                else:
+                    if str(grp) == 'pos':
+                        vals = self._enforce_pos_chain(vals)
+                    elif str(grp) == 'guider':
+                        vals = self._enforce_guider_minmax(vals)
+
+                    self.state.params.update(vals)
+                    self._apply_param_values_to_ui(vals)
+                    # end edit session after a successful write
+                    self.state.param_edit_active = False
+                    self.state.param_edit_group = ""
+                    log.info("param_write accepted: group=%s keys=%s", grp, sorted(vals.keys()))
 
         estop_word = int(self._inj_estop_word)
         bits = decode_estop_word(estop_word)

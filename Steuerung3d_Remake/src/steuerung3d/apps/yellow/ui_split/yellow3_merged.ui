@@ -1807,7 +1807,7 @@
           </size>
          </property>
          <property name="currentIndex">
-          <number>2</number>
+          <number>0</number>
          </property>
          <widget class="QWidget" name="pageGuider">
           <attribute name="title">
@@ -2167,7 +2167,7 @@
                      </widget>
                     </item>
                     <item row="1" column="2">
-                     <widget class="QLineEdit" name="txtGPosMax_2">
+                     <widget class="QLineEdit" name="txtGPosMin_3">
                       <property name="maximumSize">
                        <size>
                         <width>65</width>
@@ -2192,15 +2192,8 @@
                       </property>
                      </widget>
                     </item>
-                    <item row="8" column="2">
-                     <widget class="QPushButton" name="btnGuiderWrite">
-                      <property name="text">
-                       <string>Write</string>
-                      </property>
-                     </widget>
-                    </item>
                     <item row="2" column="2">
-                     <widget class="QLineEdit" name="txtGPosMin_2">
+                     <widget class="QLineEdit" name="txtGPosMax_2">
                       <property name="maximumSize">
                        <size>
                         <width>65</width>
@@ -2225,13 +2218,6 @@
                       </property>
                      </spacer>
                     </item>
-                    <item row="8" column="1">
-                     <widget class="QPushButton" name="btnGuiderCancel">
-                      <property name="text">
-                       <string>Cancel</string>
-                      </property>
-                     </widget>
-                    </item>
                     <item row="1" column="0">
                      <spacer name="horizontalSpacer_30">
                       <property name="orientation">
@@ -2244,6 +2230,20 @@
                        </size>
                       </property>
                      </spacer>
+                    </item>
+                    <item row="8" column="1">
+                     <widget class="QPushButton" name="btnGuiderWrite">
+                      <property name="text">
+                       <string>Write</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="8" column="2">
+                     <widget class="QPushButton" name="btnGuiderCancel">
+                      <property name="text">
+                       <string>Cancel</string>
+                      </property>
+                     </widget>
                     </item>
                    </layout>
                   </widget>
@@ -2654,7 +2654,7 @@
                   </widget>
                  </item>
                  <item row="8" column="1">
-                  <widget class="QPushButton" name="btnVelCancel_3">
+                  <widget class="QPushButton" name="btnVelCancel">
                    <property name="text">
                     <string>Cancel</string>
                    </property>
@@ -2677,7 +2677,7 @@
                   </widget>
                  </item>
                  <item row="8" column="0">
-                  <widget class="QPushButton" name="btnVelWrite_3">
+                  <widget class="QPushButton" name="btnVelWrite">
                    <property name="text">
                     <string>Write</string>
                    </property>
@@ -2711,7 +2711,7 @@
                   </widget>
                  </item>
                  <item row="0" column="0">
-                  <widget class="QPushButton" name="btnVelEdit_3">
+                  <widget class="QPushButton" name="btnVelEdit">
                    <property name="sizePolicy">
                     <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
                      <horstretch>0</horstretch>

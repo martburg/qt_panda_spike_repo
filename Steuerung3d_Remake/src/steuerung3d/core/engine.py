@@ -61,6 +61,8 @@ class CoreEngine:
 
         # ---- NEW: clear one-shot requests after sending once ----
         self.state.estop_reset_req = False
+        # parameter ops are also one-shot (they can be re-issued by the UI if needed)
+        self.state.pending_param_ops.clear()
 
         # 5) emit telemetry snapshot
         if self.on_snapshot is not None:
