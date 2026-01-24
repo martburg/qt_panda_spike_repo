@@ -73,6 +73,19 @@ class HiPController:
         self._last_rx_ns: int | None = None
         self._timer: QTimer | None = None
 
+
+        # HIP<->Core transactional param intents (best-effort reliability)
+        self._req_seq: int = 0
+        self._session_by_group: dict[str, str] = {}
+        # req_id -> dict(intent=..., group=..., sent_ns=..., retries=...)
+        self._pending_txn: dict[str, dict] = {}
+        self._resend_after_ms: int = 250
+        self._max_retries: int = 8
+
+        # Local UI-driven edit state (do not depend on DenSi telemetry for gating)
+        self._local_edit_group: str = ""
+        self._local_edit_active: bool = False
+
         if self.ui.btn_estop_reset is not None:
             self.ui.btn_estop_reset.clicked.connect(self._on_estop_reset)
             log.info("wired: btnEStopReset -> RequestEstopReset intent")
@@ -268,14 +281,24 @@ class HiPController:
                 log.debug("button not found: %s", b_cancel)
 
     def _tx_param_edit(self, group: str) -> None:
-        intent = ParamEditBegin(group=group)
-        log.info("tx intent: %s group=%s", type(intent).__name__, group)
-        self.intent_out.publish_intent(intent)
+        # Local gating first: unlock immediately
+        self._local_edit_active = True
+        self._local_edit_group = group
+        self._apply_param_ui_state(edit_active=True, edit_group=group)
+
+        # new edit session per press
+        session_id = f"sess-{group}-{int(time.monotonic()*1000)}"
+        self._session_by_group[group] = session_id
+        req_id = self._next_req_id()
+
+        intent = ParamEditBegin(group=group, req_id=req_id, session_id=session_id)
+        log.info("tx intent: %s group=%s req_id=%s session=%s", type(intent).__name__, group, req_id, session_id)
+        self._send_txn_intent(intent, group=group)
 
     def _tx_param_write(self, group: str) -> None:
+        # Normalize locally so HIP fields reflect what is actually sent.
         vals = self._read_param_values(group)
 
-        # Guard constraints for known groups
         fixed = dict(vals)
         if group == "pos":
             fixed = self._normalize_pos_chain(fixed)
@@ -283,18 +306,101 @@ class HiPController:
             fixed = self._normalize_guider_range(fixed)
 
         if fixed != vals:
-            log.info("param guards adjusted %s values", group)
+            log.info("param guards adjusted %s values (writing back to UI)", group)
             self._write_back_values(group, fixed)
 
-        intent = ParamWrite(group=group, values=fixed)
-        log.info("tx intent: %s group=%s keys=%s", type(intent).__name__, group, sorted(fixed.keys()))
-        self.intent_out.publish_intent(intent)
+        session_id = self._ensure_session(group)
+        req_id = self._next_req_id()
+        intent = ParamWrite(group=group, values=fixed, req_id=req_id, session_id=session_id)
+        log.info(
+            "tx intent: %s group=%s req_id=%s session=%s keys=%s",
+            type(intent).__name__,
+            group,
+            req_id,
+            session_id,
+            sorted(fixed.keys()),
+        )
+        self._send_txn_intent(intent, group=group)
+
+        # End local edit session immediately
+        self._local_edit_active = False
+        self._local_edit_group = ""
+        self._apply_param_ui_state(edit_active=False, edit_group="")
 
     def _tx_param_cancel(self, group: str) -> None:
-        intent = ParamCancel(group=group)
-        log.info("tx intent: %s group=%s", type(intent).__name__, group)
+        session_id = self._ensure_session(group)
+        req_id = self._next_req_id()
+        intent = ParamCancel(group=group, req_id=req_id, session_id=session_id)
+        log.info("tx intent: %s group=%s req_id=%s session=%s", type(intent).__name__, group, req_id, session_id)
+        self._send_txn_intent(intent, group=group)
+
+        # End local edit session immediately
+        self._local_edit_active = False
+        self._local_edit_group = ""
+        self._apply_param_ui_state(edit_active=False, edit_group="")
+
+
+
+    # ---------- HIP<->Core transactional helpers ----------
+
+    def _next_req_id(self) -> str:
+        self._req_seq += 1
+        return f"hip-{self._req_seq:06d}"
+
+    def _ensure_session(self, group: str) -> str:
+        sid = self._session_by_group.get(group)
+        if not sid:
+            sid = f"sess-{group}-{int(time.monotonic()*1000)}"
+            self._session_by_group[group] = sid
+        return sid
+
+    def _send_txn_intent(self, intent, *, group: str) -> None:
+        """Publish intent and remember it until core acks it via telemetry.core_acks."""
+        req_id = getattr(intent, "req_id", "")
+        if req_id:
+            self._pending_txn[req_id] = {
+                "intent": intent,
+                "group": group,
+                "sent_ns": time.monotonic_ns(),
+                "retries": 0,
+            }
         self.intent_out.publish_intent(intent)
 
+    def _handle_core_acks(self, snap: TelemetrySnapshot) -> None:
+        acks = getattr(snap, "core_acks", []) or []
+        for rid in list(acks):
+            if rid in self._pending_txn:
+                self._pending_txn.pop(rid, None)
+                log.info("core ack: %s", rid)
+
+        # refresh UI state (enables edit again once busy clears)
+        self._apply_param_ui_state(edit_active=self._local_edit_active, edit_group=self._local_edit_group)
+
+    def _retry_pending(self, now_ns: int) -> None:
+        if not self._pending_txn:
+            return
+        resend_after_ns = int(self._resend_after_ms) * 1_000_000
+        for rid, info in list(self._pending_txn.items()):
+            sent_ns = int(info.get("sent_ns", 0))
+            retries = int(info.get("retries", 0))
+            if now_ns - sent_ns < resend_after_ns:
+                continue
+            if retries >= self._max_retries:
+                log.error("txn give up: %s after %s retries (%s)", rid, retries, type(info.get("intent")).__name__)
+                self._pending_txn.pop(rid, None)
+                continue
+            intent = info.get("intent")
+            info["retries"] = retries + 1
+            info["sent_ns"] = now_ns
+            log.warning("txn resend: %s retry=%s %s", rid, info["retries"], type(intent).__name__ if intent else "<?>")
+            if intent is not None:
+                self.intent_out.publish_intent(intent)
+
+    def _is_group_busy(self, group: str) -> bool:
+        for info in self._pending_txn.values():
+            if info.get("group") == group:
+                return True
+        return False
     # ----- parameters: UI state reflection (axis-agnostic v0.1) -----
 
     def _set_param_group_enabled(self, group: str, enabled: bool) -> None:
@@ -306,7 +412,7 @@ class HiPController:
                 continue
             le.setEnabled(bool(enabled))
 
-    def _set_param_button_state(self, group: str, *, editing: bool) -> None:
+    def _set_param_button_state(self, group: str, *, editing: bool, busy: bool) -> None:
         wiring = {
             "pos": ("btnPosEdit", "btnPosWrite", "btnPosCancel"),
             "vel": ("btnVelEdit", "btnVelWrite", "btnVelCancel"),
@@ -318,6 +424,15 @@ class HiPController:
         bw = self._find_button(b_write)
         bc = self._find_button(b_cancel)
 
+        if busy:
+            if be is not None:
+                be.setEnabled(False)
+            if bw is not None:
+                bw.setEnabled(False)
+            if bc is not None:
+                bc.setEnabled(False)
+            return
+
         if be is not None:
             be.setEnabled(not editing)
         if bw is not None:
@@ -326,36 +441,34 @@ class HiPController:
             bc.setEnabled(editing)
 
     def _apply_param_ui_state(self, *, edit_active: bool, edit_group: str) -> None:
-        """Reflect DenSi edit state onto HiP widget enable/disable."""
+        """Reflect edit state onto HiP widget enable/disable.
+
+        - Fields are editable only when their group's Edit was pressed (or DenSi reports edit mode).
+        - While a transactional request for a group is pending, that group is 'busy' and all 3 buttons
+          are disabled to avoid session races.
+        """
         groups = ("pos", "vel", "filter", "guider")
-        if not edit_active:
-            for g in groups:
-                self._set_param_group_enabled(g, False)
-                self._set_param_button_state(g, editing=False)
-            return
 
         for g in groups:
-            is_edit = (g == edit_group)
-            self._set_param_group_enabled(g, is_edit)
-            self._set_param_button_state(g, editing=is_edit)
+            busy = self._is_group_busy(g)
+            is_edit = bool(edit_active and (g == edit_group))
+            self._set_param_group_enabled(g, bool(is_edit and not busy))
+            self._set_param_button_state(g, editing=is_edit, busy=busy)
 
-    def _render_params_from_telemetry(
-        self,
-        snap: TelemetrySnapshot,
-        *,
-        skip_group: str | None = None,
-    ) -> None:
+    def _render_params_from_telemetry(self, snap: TelemetrySnapshot) -> None:
         """Update parameter text fields from telemetry.
 
-        UX rule: while DenSi is in edit mode for a group, we MUST NOT overwrite
-        the user's in-progress edits with stale telemetry values.
+        Important: do NOT overwrite the group currently being edited locally, and never overwrite
+        the field that currently has focus.
         """
         params = getattr(snap, "params", None)
         if not isinstance(params, dict) or not params:
             return
 
+        freeze_group = self._local_edit_group if self._local_edit_active else ""
+
         for grp, mapping in _PARAM_WIDGETS.items():
-            if skip_group and grp == skip_group:
+            if freeze_group and grp == freeze_group:
                 continue
 
             for key, obj_name in mapping.items():
@@ -364,11 +477,8 @@ class HiPController:
                 le = self._find_line_edit(obj_name)
                 if le is None:
                     continue
-
-                # Never overwrite a field the user is actively typing into.
                 if le.hasFocus():
                     continue
-
                 val = params[key]
                 txt = f"{val:g}" if isinstance(val, (int, float)) else str(val)
                 if le.text() == txt:
@@ -378,12 +488,16 @@ class HiPController:
                 le.blockSignals(was)
 
     def _render_params_and_edit_state(self, snap: TelemetrySnapshot) -> None:
+        self._render_params_from_telemetry(snap)
+
+        # Local edit state has priority (UI should not depend on DenSi telemetry timing).
+        if self._local_edit_active:
+            self._apply_param_ui_state(edit_active=True, edit_group=self._local_edit_group)
+            return
+
         edit_active = bool(getattr(snap, "param_edit_active", False))
         edit_group = str(getattr(snap, "param_edit_group", "") or "")
-
-        # First reflect edit enable/disable, then update values for all *other* groups.
         self._apply_param_ui_state(edit_active=edit_active, edit_group=edit_group)
-        self._render_params_from_telemetry(snap, skip_group=(edit_group if edit_active else None))
 
     # ---------- polling ----------
 
@@ -396,8 +510,10 @@ class HiPController:
 
     def poll_once(self) -> None:
         snaps = self.telemetry_in.drain_telemetry(limit=50)
-
         now_ns = time.monotonic_ns()
+
+        # drive transactional resends even if telemetry is quiet
+        self._retry_pending(now_ns)
 
         if not snaps:
             if self._last_rx_ns is not None:
@@ -409,6 +525,9 @@ class HiPController:
 
         snap = snaps[-1]
         self._last_rx_ns = now_ns
+
+        # consume any core acks for transactional param intents
+        self._handle_core_acks(snap)
 
         if not self._seen_first_telem:
             log.info(

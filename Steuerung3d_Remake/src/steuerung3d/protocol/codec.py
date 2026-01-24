@@ -80,6 +80,7 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
         param_edit_active=bool(payload.get("param_edit_active", False)),
         param_edit_group=str(payload.get("param_edit_group", "")),
         params={k: float(v) for k, v in dict(payload.get("params", {})).items()},
+        core_acks=[str(x) for x in list(payload.get("core_acks", []))],
     )
 
 # ---------------------------

@@ -31,6 +31,9 @@ class TelemetrySnapshot:
     param_edit_group: str = ""
     params: Dict[str, float] = field(default_factory=dict)
 
+    # HIP<->Core transactional acks (one-shot)
+    core_acks: list[str] = field(default_factory=list)
+
     @classmethod
     def from_state(cls, state: MachineState) -> "TelemetrySnapshot":
         axes = {
@@ -53,6 +56,7 @@ class TelemetrySnapshot:
             param_edit_active=bool(getattr(state, "param_edit_active", False)),
             param_edit_group=str(getattr(state, "param_edit_group", "")),
             params=dict(getattr(state, "params", {})),
+            core_acks=list(getattr(state, "core_acks", [])),
         )
 
 def apply_measured_snapshot(state: MachineState, snap: TelemetrySnapshot) -> None:

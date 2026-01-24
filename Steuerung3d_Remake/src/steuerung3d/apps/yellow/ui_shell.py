@@ -80,19 +80,12 @@ QLineEdit {
     padding: 2px 6px;
     color: #111;
 }
+
+/* Parameter fields: HiP should turn white when active, light grey when disabled */
+QLineEdit[paramField="true"]:enabled { background: #ffffff; }
+QLineEdit[paramField="true"]:disabled { background: #d8d8d8; color: #555; }
+
 QLineEdit#txtVelMaxMot, QLineEdit#txtLagError { color: #c00000; font-weight: bold; }
-
-/* Parameter input fields: white when enabled (editing on HiP). */
-QLineEdit[paramField="true"]:enabled {
-    background: #ffffff;
-}
-
-/* Disabled line edits should appear clearly locked (used in HiP until Edit). */
-QLineEdit:disabled {
-    background: #e3e3e3;
-    color: #666;
-    border: 1px solid #777;
-}
 
 QComboBox {
     background: #efefef;

@@ -1807,7 +1807,7 @@
           </size>
          </property>
          <property name="currentIndex">
-          <number>0</number>
+          <number>1</number>
          </property>
          <widget class="QWidget" name="pageGuider">
           <attribute name="title">
@@ -3105,7 +3105,7 @@
                     </sizepolicy>
                    </property>
                    <property name="text">
-                    <string>Info Only</string>
+                    <string>Info</string>
                    </property>
                   </widget>
                  </item>

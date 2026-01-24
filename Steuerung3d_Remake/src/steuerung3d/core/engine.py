@@ -67,7 +67,10 @@ class CoreEngine:
         # 5) emit telemetry snapshot
         if self.on_snapshot is not None:
             self.on_snapshot(TelemetrySnapshot.from_state(self.state))
-    
+
+        # one-shot transactional acks (HIP<->Core)
+        self.state.core_acks.clear()
+
     def run_for_ticks(self, n: int) -> None:
         if n < 0:
             raise ValueError("n must be >= 0")

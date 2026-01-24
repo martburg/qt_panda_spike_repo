@@ -54,6 +54,10 @@ class ParamEditBegin:
     """Prime the device to accept parameter writes for a parameter group."""
     type: Literal["param_edit_begin"] = "param_edit_begin"
     group: ParamGroup = "pos"
+    # HIP<->Core transaction correlation (optional)
+    req_id: str = ""
+    session_id: str = ""
+
 
 
 @dataclass(frozen=True)
@@ -62,6 +66,10 @@ class ParamWrite:
     type: Literal["param_write"] = "param_write"
     group: ParamGroup = "pos"
     values: Dict[str, float] = field(default_factory=dict)
+    # HIP<->Core transaction correlation (optional)
+    req_id: str = ""
+    session_id: str = ""
+
 
 
 @dataclass(frozen=True)
@@ -69,6 +77,10 @@ class ParamCancel:
     """Cancel an in-progress edit session for a parameter group."""
     type: Literal["param_cancel"] = "param_cancel"
     group: ParamGroup = "pos"
+    # HIP<->Core transaction correlation (optional)
+    req_id: str = ""
+    session_id: str = ""
+
 
     
 Intent = Union[

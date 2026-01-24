@@ -54,6 +54,14 @@ class MachineState:
     pending_param_ops: list[ParamOp] = field(default_factory=list)
 
 
+    # --- HIP<->Core transactional acks (axis-agnostic parameter ops) ---
+    # One-shot ack list emitted in TelemetrySnapshot, then cleared after publish.
+    core_acks: list[str] = field(default_factory=list)
+
+    # Deduplication of transactional intents: req_id -> last_seen_tick
+    seen_req_ids: Dict[str, int] = field(default_factory=dict)
+
+
     def ensure_axis(self, axis_id: str) -> AxisState:
         if axis_id not in self.axes:
             self.axes[axis_id] = AxisState()
