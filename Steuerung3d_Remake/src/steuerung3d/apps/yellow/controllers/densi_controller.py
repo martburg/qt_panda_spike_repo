@@ -57,7 +57,8 @@ _PARAM_WIDGETS: dict[str, dict[str, str]] = {
         "RampForm": "txtRamp_2",    },
     "guider": {
         "PosMax": "txtGPosMax_2",
-        "PosMin": "txtGPosMin_2",
+        "PosMin": "txtGPosMin_3",
+        "Pitch": "txtPitch_2",
     },
 }
 
@@ -185,7 +186,8 @@ class DenSiController:
                     continue
                 # Mark for QSS (even though we disable them)
                 if le.property('paramField') is None:
-                    le.setProperty('paramField', True)
+                    # QSS selector uses string: paramField="true"
+                    le.setProperty('paramField', 'true')
                     le.style().unpolish(le)
                     le.style().polish(le)
                 le.setEnabled(False)

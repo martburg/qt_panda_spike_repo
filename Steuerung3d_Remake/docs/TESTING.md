@@ -26,10 +26,14 @@ Parameter editing is carried through the **same command frame seam** as motion c
 
 Recommended tests:
 
-- Intent → command frame: `BeginParamEdit / CommitParamEdit / CancelParamEdit` produce the expected
-  `param_ops` payload.
-- Ack handling: once acks are observed in telemetry, the core stops resending the corresponding op.
-- Validation guards (UI and/or core): numeric-only input and min/max ordering constraints.
+- Intent → command frame: `BeginParamEdit / CommitParamEdit / CancelParamEdit` produce the expected `param_ops` payload.
+- HiP↔Core guarding: `req_id` acks dedupe retries (no duplicate pending ops when the same intent is resent).
+- Observed confirmation: after `ParamWrite`, Core marks `param_commit_status=pending` and transitions to
+  `applied` when DenSi telemetry `params` match the requested values (or `timeout` after a bounded wait).
+- Validation guards: numeric-only input and ordering constraints (e.g. `HardMax ≥ UserMax ≥ UserMin ≥ HardMin`,
+  `Guider.PosMin < Guider.PosMax`) are enforced before emitting writes.
+- UI gating (HiP): editing is modal (no tab switching / no other group edits until Write/Cancel).
+
 
 ## Writing new tests
 

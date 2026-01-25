@@ -99,6 +99,16 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             if _txn_seen_or_mark(state, req_id):
                 return
             cleaned = {str(k): float(v) for k, v in dict(vals).items()}
+
+            # Begin an "observed" commit: we cannot rely on PLC ACKs, so we
+            # consider the write applied once telemetry.params matches these values.
+            state.param_commit_req_id = str(req_id or "")
+            state.param_commit_group = str(grp or "")
+            state.param_commit_desired = dict(cleaned)
+            state.param_commit_start_tick = int(state.tick)
+            state.param_commit_status = "pending"
+            state.param_commit_unmatched = list(sorted(cleaned.keys()))
+
             state.pending_param_ops.append(ParamWriteOp(group=grp, values=cleaned))
             return
 
@@ -106,6 +116,14 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             _txn_ack(state, req_id)
             if _txn_seen_or_mark(state, req_id):
                 return
+
+            # Cancel pending observed commit for this group (if any)
+            if str(getattr(state, "param_commit_status", "idle")) == "pending" and str(
+                getattr(state, "param_commit_group", "")
+            ) == str(grp):
+                state.param_commit_status = "cancelled"
+                state.param_commit_unmatched = []
+
             state.pending_param_ops.append(ParamCancelOp(group=grp))
             return
 

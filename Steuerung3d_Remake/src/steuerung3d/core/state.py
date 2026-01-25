@@ -61,6 +61,19 @@ class MachineState:
     # Deduplication of transactional intents: req_id -> last_seen_tick
     seen_req_ids: Dict[str, int] = field(default_factory=dict)
 
+    # --- Observed parameter commit status (Core->DenSi is not transactional) ---
+    # DenSi/PLC is considered "semi-frozen": we cannot rely on ACKs.
+    # Instead, we treat a parameter write as "applied" once the device's
+    # telemetry reports params matching the requested values (within tolerance).
+    param_commit_req_id: str = ""
+    param_commit_group: str = ""
+    param_commit_status: str = "idle"  # idle|pending|applied|timeout|cancelled
+    param_commit_start_tick: int = 0
+    param_commit_desired: Dict[str, float] = field(default_factory=dict)
+    param_commit_unmatched: list[str] = field(default_factory=list)
+    # Default: ~2s at 50ms/tick (CoreEngine default polling). Adjust as needed.
+    param_commit_timeout_ticks: int = 40
+
 
     def ensure_axis(self, axis_id: str) -> AxisState:
         if axis_id not in self.axes:

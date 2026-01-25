@@ -81,6 +81,12 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
         param_edit_group=str(payload.get("param_edit_group", "")),
         params={k: float(v) for k, v in dict(payload.get("params", {})).items()},
         core_acks=[str(x) for x in list(payload.get("core_acks", []))],
+        # observed param commit status (optional)
+        param_commit_req_id=str(payload.get("param_commit_req_id", "")),
+        param_commit_group=str(payload.get("param_commit_group", "")),
+        param_commit_status=str(payload.get("param_commit_status", "idle")),
+        param_commit_age_ticks=int(payload.get("param_commit_age_ticks", 0)),
+        param_commit_unmatched=[str(x) for x in list(payload.get("param_commit_unmatched", []))],
     )
 
 # ---------------------------

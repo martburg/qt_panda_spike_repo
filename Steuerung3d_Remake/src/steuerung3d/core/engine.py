@@ -19,6 +19,7 @@ SnapshotHook = Callable[[TelemetrySnapshot], None]
 DeviceStepHook = Callable[[MachineState, CommandFrame, float], None]
 CommandFrameHook = Callable[[CommandFrame], None]
 
+
 @dataclass
 class CoreEngine:
     timebase: Timebase
@@ -58,6 +59,14 @@ class CoreEngine:
         elif self.on_step is not None:
             # legacy hook fallback
             self.on_step(self.state, dt)
+
+        # ---- observed device param commit timeout ----
+        # If we sent a ParamWrite, we wait for telemetry to confirm the device
+        # is actually using those values. If that never happens, surface a
+        # timeout (treated as rejection) to HiP via telemetry.
+        if hasattr(self.state, "update_param_commit_timeout"):
+            max_age_ticks = max(5, int(1.5 / dt)) if dt > 0 else 50
+            self.state.update_param_commit_timeout(max_age_ticks=max_age_ticks)
 
         # ---- NEW: clear one-shot requests after sending once ----
         self.state.estop_reset_req = False

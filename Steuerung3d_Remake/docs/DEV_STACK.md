@@ -57,8 +57,12 @@ In HiP:
 Notes:
 
 - DenSi starts in a **stopped / not-OK** state by default.
-- DenSi's Edit/Write/Cancel controls are disabled (device-side); edit happens only from HiP.
+- DenSi’s Edit/Write/Cancel controls are disabled (device-side); editing happens only from HiP.
+- Editing is **modal** in HiP: after pressing Edit for a group, other Edit buttons and tab switching are disabled until Write/Cancel.
+- HiP↔Core delivery is guarded with `req_id` acks; device-side acceptance is confirmed by observing DenSi’s `params` in telemetry.
 - While editing, HiP does not overwrite the active fields with incoming telemetry.
+- After Write, HiP shows a **modal dialog** once the device is observed as applied (or after a timeout).
+
 
 ## PLC TwinCAT Legacy (Fleet) vs UDP SIM fallback
 

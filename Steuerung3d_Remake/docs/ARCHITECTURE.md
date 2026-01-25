@@ -105,6 +105,13 @@ DenSi reports parameter edit state and applied values in telemetry so HiP can:
 - enable/disable fields and buttons correctly
 - show the effective values after a write
 
+In practice the DenSi/PLC side is treated as semi-frozen: we avoid adding new protocol obligations there.
+So the system uses a two-layer guarantee:
+
+- **HiP ↔ Core**: guarded delivery via `req_id` acks (dedupe + retry).
+- **Core ↔ DenSi**: *observed confirmation* by comparing the requested values to DenSi’s reported `params` in telemetry.
+  Core publishes `param_commit_status` (`pending/applied/timeout`) so the UI can present a clear result.
+
 Important UI detail:
 
 - While a group is in **active edit mode**, HiP must **not** overwrite in-progress user typing
@@ -112,10 +119,10 @@ Important UI detail:
 
 ### UI gating policy
 
-- **HiP**: parameter text fields are disabled (grey) until Edit is pressed; active fields become
-  enabled (white). Write/Cancel are enabled only while editing.
-- **DenSi**: Edit/Write/Cancel controls are disabled (greyed). DenSi acts as a “device endpoint”,
-  not an operator.
+- **HiP**: parameter text fields are disabled (grey) until Edit is pressed; active fields become enabled (white).
+  Editing is **modal**: once a group is in edit mode, other Edit buttons and tab switching are disabled until Write/Cancel.
+  After Write, HiP shows a **modal dialog** once Core observes the device as applied (or a timeout if not confirmed).
+- **DenSi**: Edit/Write/Cancel controls are disabled (greyed). DenSi acts as a “device endpoint”, not an operator.
 
 ### Safety / startup
 

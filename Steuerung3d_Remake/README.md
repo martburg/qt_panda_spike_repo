@@ -67,6 +67,12 @@ python -m steuerung3d.apps.hi_p
 This demo exercises the intent/telemetry seam over UDP and supports axis-agnostic parameter editing
 (Edit → Write → Cancel) from HiP.
 
+Notes:
+
+- Editing is **modal** in HiP: once you press Edit for a group, other Edit buttons and tab switching are disabled until Write/Cancel.
+- HiP↔Core delivery is guarded with `req_id` acks; device-side acceptance is confirmed by observing DenSi’s reported `params` in telemetry.
+- After Write, HiP shows a **modal dialog** once the device is observed as applied (or after a timeout if not confirmed).
+
 ### Run the dev stack
 
 From the **repo root**:

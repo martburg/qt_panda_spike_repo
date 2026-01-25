@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import QLocale, QTimer
 from PySide6.QtGui import QDoubleValidator
-from PySide6.QtWidgets import QLineEdit, QPushButton, QWidget
+from PySide6.QtWidgets import QLineEdit, QPushButton, QWidget, QMessageBox, QTabWidget
 
 from steuerung3d.core.intents import ParamCancel, ParamEditBegin, ParamWrite, RequestEstopReset
 from steuerung3d.core.telemetry import TelemetrySnapshot
@@ -51,8 +51,9 @@ _PARAM_WIDGETS: dict[str, dict[str, str]] = {
         "RampForm": "txtRamp_2",
     },
     "guider": {
-        "PosMin": "txtGPosMin_2",
+        "PosMin": "txtGPosMin_3",
         "PosMax": "txtGPosMax_2",
+        "Pitch": "txtPitch_2",
     },
 }
 
@@ -73,6 +74,20 @@ class HiPController:
         self._last_rx_ns: int | None = None
         self._timer: QTimer | None = None
 
+        # Modal param edit lock bookkeeping
+        self._modal_locked: bool = False
+        self._modal_prev_enabled: dict[QWidget, bool] = {}
+        self._modal_prev_tabbar_enabled: bool | None = None
+
+        # After write/cancel, ignore remote edit flags briefly to avoid UI flicker
+        self._ignore_remote_edit_until_ns: int = 0
+
+        # Param commit observation dialog (Option A: show only after applied/timeout)
+        self._pending_commit_req_id: str = ""
+        self._pending_commit_group: str = ""
+        self._pending_commit_values: dict[str, float] = {}
+        self._commit_dialog_shown_for: set[str] = set()
+
 
         # HIP<->Core transactional param intents (best-effort reliability)
         self._req_seq: int = 0
@@ -85,6 +100,8 @@ class HiPController:
         # Local UI-driven edit state (do not depend on DenSi telemetry for gating)
         self._local_edit_group: str = ""
         self._local_edit_active: bool = False
+
+        # (intentionally no duplicate state here)
 
         if self.ui.btn_estop_reset is not None:
             self.ui.btn_estop_reset.clicked.connect(self._on_estop_reset)
@@ -163,12 +180,18 @@ class HiPController:
                 if le is None:
                     continue
                 # For QSS: enabled param fields should turn white on HiP.
-                le.setProperty("paramField", True)
+                # NOTE: QSS selector uses string: paramField="true"
+                le.setProperty("paramField", "true")
                 # Numeric-only entry; parent the validator to the field so it stays alive.
                 val = QDoubleValidator(-1.0e12, 1.0e12, 6, le)
                 val.setLocale(loc)
                 val.setNotation(QDoubleValidator.Notation.StandardNotation)
                 le.setValidator(val)
+
+                # Force initial polish so the style reacts immediately.
+                le.style().unpolish(le)
+                le.style().polish(le)
+                le.update()
 
     def _parse_float(self, s: str) -> float:
         s = (s or "").strip()
@@ -293,7 +316,7 @@ class HiPController:
 
         intent = ParamEditBegin(group=group, req_id=req_id, session_id=session_id)
         log.info("tx intent: %s group=%s req_id=%s session=%s", type(intent).__name__, group, req_id, session_id)
-        self._send_txn_intent(intent, group=group)
+        self._send_txn_intent(intent, group=group, kind="begin")
 
     def _tx_param_write(self, group: str) -> None:
         # Normalize locally so HIP fields reflect what is actually sent.
@@ -320,11 +343,17 @@ class HiPController:
             session_id,
             sorted(fixed.keys()),
         )
-        self._send_txn_intent(intent, group=group)
+        self._send_txn_intent(intent, group=group, kind="write")
 
-        # End local edit session immediately
+        # Remember this commit for modal dialog feedback once core observes applied/timeout
+        self._pending_commit_req_id = req_id
+        self._pending_commit_group = group
+        self._pending_commit_values = dict(fixed)
+
+        # End local edit session immediately (operator finished the group)
         self._local_edit_active = False
         self._local_edit_group = ""
+        self._ignore_remote_edit_until_ns = time.monotonic_ns() + 800_000_000
         self._apply_param_ui_state(edit_active=False, edit_group="")
 
     def _tx_param_cancel(self, group: str) -> None:
@@ -332,11 +361,12 @@ class HiPController:
         req_id = self._next_req_id()
         intent = ParamCancel(group=group, req_id=req_id, session_id=session_id)
         log.info("tx intent: %s group=%s req_id=%s session=%s", type(intent).__name__, group, req_id, session_id)
-        self._send_txn_intent(intent, group=group)
+        self._send_txn_intent(intent, group=group, kind="cancel")
 
         # End local edit session immediately
         self._local_edit_active = False
         self._local_edit_group = ""
+        self._ignore_remote_edit_until_ns = time.monotonic_ns() + 800_000_000
         self._apply_param_ui_state(edit_active=False, edit_group="")
 
 
@@ -354,13 +384,14 @@ class HiPController:
             self._session_by_group[group] = sid
         return sid
 
-    def _send_txn_intent(self, intent, *, group: str) -> None:
+    def _send_txn_intent(self, intent, *, group: str, kind: str = "") -> None:
         """Publish intent and remember it until core acks it via telemetry.core_acks."""
         req_id = getattr(intent, "req_id", "")
         if req_id:
             self._pending_txn[req_id] = {
                 "intent": intent,
                 "group": group,
+                "kind": kind,
                 "sent_ns": time.monotonic_ns(),
                 "retries": 0,
             }
@@ -398,9 +429,91 @@ class HiPController:
 
     def _is_group_busy(self, group: str) -> bool:
         for info in self._pending_txn.values():
-            if info.get("group") == group:
+            if info.get("group") != group:
+                continue
+            # Only treat write/cancel as "busy" for UI disabling.
+            if str(info.get("kind") or "") in ("write", "cancel"):
                 return True
         return False
+
+    # ----- modal lock helpers -----
+
+    def _set_modal_param_lock(self, *, active: bool, group: str) -> None:
+        """Lock the UI while editing one param group.
+
+        Requirement: while editing a group, operator must not:
+          - start editing another group
+          - switch tabs
+          - click other actions
+        They can only finish the edit via Write or Cancel.
+        """
+
+        tabs = self.win.findChild(QTabWidget, "tabsMain")
+
+        if active and not self._modal_locked:
+            self._modal_prev_enabled = {}
+
+            # Disable tab switching (but don't disable the whole QTabWidget, or it would
+            # also disable the allowed children).
+            if tabs is not None:
+                self._modal_prev_tabbar_enabled = bool(tabs.tabBar().isEnabled())
+                tabs.tabBar().setEnabled(False)
+
+            # Disable all buttons + line edits first.
+            for w in self.win.findChildren(QWidget):
+                if isinstance(w, (QPushButton, QLineEdit)):
+                    self._modal_prev_enabled[w] = bool(w.isEnabled())
+                    w.setEnabled(False)
+
+            # Re-enable only the active group's line edits and Write/Cancel.
+            allow: list[QWidget] = []
+            for _k, obj_name in _PARAM_WIDGETS.get(group, {}).items():
+                le = self._find_line_edit(obj_name)
+                if le is not None:
+                    allow.append(le)
+            wiring = {
+                "pos": ("btnPosWrite", "btnPosCancel"),
+                "vel": ("btnVelWrite", "btnVelCancel"),
+                "filter": ("btnFilterWrite", "btnFilterCancel"),
+                "guider": ("btnGuiderWrite", "btnGuiderCancel"),
+            }
+            if group in wiring:
+                bw = self._find_button(wiring[group][0])
+                bc = self._find_button(wiring[group][1])
+                if bw is not None:
+                    allow.append(bw)
+                if bc is not None:
+                    allow.append(bc)
+
+            for w in allow:
+                w.setEnabled(True)
+                if isinstance(w, QLineEdit):
+                    w.style().unpolish(w)
+                    w.style().polish(w)
+                    w.update()
+
+            self._modal_locked = True
+            return
+
+        if (not active) and self._modal_locked:
+            # Restore previous enabled states
+            for w, was_enabled in list(self._modal_prev_enabled.items()):
+                try:
+                    w.setEnabled(bool(was_enabled))
+                    if isinstance(w, QLineEdit):
+                        w.style().unpolish(w)
+                        w.style().polish(w)
+                        w.update()
+                except RuntimeError:
+                    # Widget already deleted
+                    pass
+            self._modal_prev_enabled.clear()
+
+            if tabs is not None and self._modal_prev_tabbar_enabled is not None:
+                tabs.tabBar().setEnabled(bool(self._modal_prev_tabbar_enabled))
+            self._modal_prev_tabbar_enabled = None
+
+            self._modal_locked = False
     # ----- parameters: UI state reflection (axis-agnostic v0.1) -----
 
     def _set_param_group_enabled(self, group: str, enabled: bool) -> None:
@@ -411,6 +524,10 @@ class HiPController:
             if le is None:
                 continue
             le.setEnabled(bool(enabled))
+            # Re-polish to ensure QSS (white/gray) applies immediately.
+            le.style().unpolish(le)
+            le.style().polish(le)
+            le.update()
 
     def _set_param_button_state(self, group: str, *, editing: bool, busy: bool) -> None:
         wiring = {
@@ -449,11 +566,27 @@ class HiPController:
         """
         groups = ("pos", "vel", "filter", "guider")
 
+        # Enforce "one group at a time" editing as a modal lock.
+        self._set_modal_param_lock(active=bool(edit_active), group=str(edit_group or ""))
+
+        if edit_active:
+            # While editing one group, keep all other controls disabled.
+            for g in groups:
+                if g == edit_group:
+                    busy = self._is_group_busy(g)
+                    is_edit = True
+                    self._set_param_group_enabled(g, bool(not busy))
+                    self._set_param_button_state(g, editing=is_edit, busy=busy)
+                else:
+                    self._set_param_group_enabled(g, False)
+                    # Force other groups disabled (prevents re-enabling after modal lock).
+                    self._set_param_button_state(g, editing=False, busy=True)
+            return
+
         for g in groups:
             busy = self._is_group_busy(g)
-            is_edit = bool(edit_active and (g == edit_group))
-            self._set_param_group_enabled(g, bool(is_edit and not busy))
-            self._set_param_button_state(g, editing=is_edit, busy=busy)
+            self._set_param_group_enabled(g, False)
+            self._set_param_button_state(g, editing=False, busy=busy)
 
     def _render_params_from_telemetry(self, snap: TelemetrySnapshot) -> None:
         """Update parameter text fields from telemetry.
@@ -490,14 +623,62 @@ class HiPController:
     def _render_params_and_edit_state(self, snap: TelemetrySnapshot) -> None:
         self._render_params_from_telemetry(snap)
 
+        # --- Option A: modal dialog once core observes applied/timeout ---
+        self._maybe_show_param_commit_dialog(snap)
+
         # Local edit state has priority (UI should not depend on DenSi telemetry timing).
         if self._local_edit_active:
             self._apply_param_ui_state(edit_active=True, edit_group=self._local_edit_group)
             return
 
-        edit_active = bool(getattr(snap, "param_edit_active", False))
-        edit_group = str(getattr(snap, "param_edit_group", "") or "")
+        now_ns = time.monotonic_ns()
+        if now_ns < int(self._ignore_remote_edit_until_ns or 0):
+            edit_active = False
+            edit_group = ""
+        else:
+            edit_active = bool(getattr(snap, "param_edit_active", False))
+            edit_group = str(getattr(snap, "param_edit_group", "") or "")
         self._apply_param_ui_state(edit_active=edit_active, edit_group=edit_group)
+
+    def _maybe_show_param_commit_dialog(self, snap: TelemetrySnapshot) -> None:
+        rid = str(getattr(snap, "param_commit_req_id", "") or "")
+        status = str(getattr(snap, "param_commit_status", "idle") or "idle")
+        group = str(getattr(snap, "param_commit_group", "") or "")
+        if not rid or rid != self._pending_commit_req_id:
+            return
+        if rid in self._commit_dialog_shown_for:
+            return
+        if status not in ("applied", "timeout"):
+            return
+
+        self._commit_dialog_shown_for.add(rid)
+
+        if status == "applied":
+            QMessageBox.information(
+                self.win,
+                "Parameters applied",
+                f"{group} parameters were applied (observed in telemetry).",
+            )
+        else:
+            unmatched = list(getattr(snap, "param_commit_unmatched", []) or [])
+            params = dict(getattr(snap, "params", {}) or {})
+            want = dict(self._pending_commit_values or {})
+
+            lines = [f"{group} parameters were not confirmed (timeout).", "", "Mismatches:"]
+            for k in unmatched:
+                w = want.get(k, "?")
+                g = params.get(k, "<missing>")
+                lines.append(f"- {k}: want {w}  got {g}")
+            QMessageBox.warning(
+                self.win,
+                "Parameters not confirmed",
+                "\n".join(lines),
+            )
+
+        # Clear pending commit so the next write can create a new one.
+        self._pending_commit_req_id = ""
+        self._pending_commit_group = ""
+        self._pending_commit_values = {}
 
     # ---------- polling ----------
 
