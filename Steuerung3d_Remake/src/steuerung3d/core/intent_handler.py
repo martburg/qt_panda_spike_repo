@@ -17,7 +17,7 @@ from steuerung3d.core.mode import Mode
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.command_frame import ParamEditBeginOp, ParamWriteOp, ParamCancelOp
 from steuerung3d.core.state_machine import enforce_mode_actions, normalize_mode
-
+from steuerung3d.core.param_registry import normalize_group_values
 
 
 def _txn_ack(state: MachineState, req_id: str) -> None:
@@ -99,6 +99,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             if _txn_seen_or_mark(state, req_id):
                 return
             cleaned = {str(k): float(v) for k, v in dict(vals).items()}
+            cleaned, _warnings = normalize_group_values(str(grp), cleaned)
 
             # Begin an "observed" commit: we cannot rely on PLC ACKs, so we
             # consider the write applied once telemetry.params matches these values.
@@ -108,6 +109,9 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             state.param_commit_start_tick = int(state.tick)
             state.param_commit_status = "pending"
             state.param_commit_unmatched = list(sorted(cleaned.keys()))
+            state.param_commit_last_device_tick = -1
+            state.param_commit_observed_ticks = 0
+            state.param_commit_match_streak = 0
 
             state.pending_param_ops.append(ParamWriteOp(group=grp, values=cleaned))
             return

@@ -6,6 +6,7 @@ from typing import Dict
 
 from steuerung3d.core.mode import Mode
 from steuerung3d.core.state import AxisState, MachineState
+from steuerung3d.core.param_registry import eps_for_param
 
 @dataclass(frozen=True)
 class AxisTelemetry:
@@ -67,50 +68,61 @@ class TelemetrySnapshot:
             param_commit_req_id=str(getattr(state, "param_commit_req_id", "")),
             param_commit_group=str(getattr(state, "param_commit_group", "")),
             param_commit_status=str(getattr(state, "param_commit_status", "idle")),
-            param_commit_age_ticks=int(
-                int(getattr(state, "tick", 0)) - int(getattr(state, "param_commit_start_tick", 0))
-                if str(getattr(state, "param_commit_status", "idle")) in ("pending", "timeout")
-                else 0
-            ),
+            param_commit_age_ticks=int(getattr(state, "param_commit_observed_ticks", 0) if str(getattr(state, "param_commit_status", "idle")) in ("pending", "timeout") else 0),
             param_commit_unmatched=list(getattr(state, "param_commit_unmatched", [])),
         )
 
 
-def _update_param_commit_observation(state: MachineState) -> None:
-    """Advance state.param_commit_status based on currently measured state.params."""
+def _update_param_commit_observation(state: MachineState, device_tick: int) -> None:
+    """Update observed param commit state using device telemetry params.
+
+    We treat a ParamWrite as applied once telemetry.params matches desired values for
+    2 consecutive *new* device telemetry ticks.
+
+    Timeout advances only on new device ticks (if telemetry tick stalls, timeout pauses).
+    """
     if state.param_commit_status != "pending":
         return
+
+    dtick = int(device_tick)
+    last = int(getattr(state, "param_commit_last_device_tick", -1))
+    if dtick == last:
+        return
+    state.param_commit_last_device_tick = dtick
+    state.param_commit_observed_ticks = int(getattr(state, "param_commit_observed_ticks", 0)) + 1
+
     desired = dict(getattr(state, "param_commit_desired", {}))
     if not desired:
-        # nothing to validate
         state.param_commit_status = "applied"
         state.param_commit_unmatched = []
         return
 
     params = dict(getattr(state, "params", {}))
-    eps = 1e-6
-
     unmatched: list[str] = []
     for k, want in desired.items():
         if k not in params:
             unmatched.append(k)
             continue
-        got = params[k]
         try:
-            if abs(float(got) - float(want)) > eps:
+            eps = eps_for_param(k, 1e-6)
+            if abs(float(params[k]) - float(want)) > eps:
                 unmatched.append(k)
         except Exception:
-            # type mismatch: treat as unmatched
             unmatched.append(k)
 
     state.param_commit_unmatched = unmatched
-    if not unmatched:
-        state.param_commit_status = "applied"
-        return
 
-    age = int(state.tick) - int(state.param_commit_start_tick)
-    if age >= int(getattr(state, "param_commit_timeout_ticks", 40)):
+    if not unmatched:
+        state.param_commit_match_streak = int(getattr(state, "param_commit_match_streak", 0)) + 1
+        if state.param_commit_match_streak >= 2:
+            state.param_commit_status = "applied"
+            return
+    else:
+        state.param_commit_match_streak = 0
+
+    if int(getattr(state, "param_commit_observed_ticks", 0)) >= int(getattr(state, "param_commit_timeout_ticks", 40)):
         state.param_commit_status = "timeout"
+
 
 def apply_measured_snapshot(state: MachineState, snap: TelemetrySnapshot) -> None:
     state.mode = Mode(snap.mode) if isinstance(snap.mode, str) else snap.mode
@@ -126,7 +138,7 @@ def apply_measured_snapshot(state: MachineState, snap: TelemetrySnapshot) -> Non
     state.params = dict(getattr(snap, "params", {}))
 
     # Observe parameter commit acceptance by comparing requested values to measured params.
-    _update_param_commit_observation(state)
+    _update_param_commit_observation(state, int(getattr(snap, "tick", 0)))
 
     for axis_id, ax_t in snap.axes.items():
         ax: AxisState = state.ensure_axis(axis_id)

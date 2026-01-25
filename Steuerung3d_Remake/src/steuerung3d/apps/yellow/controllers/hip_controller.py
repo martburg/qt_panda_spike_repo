@@ -255,7 +255,7 @@ class HiPController:
         return v
 
     def _normalize_guider_range(self, values: dict[str, float]) -> dict[str, float]:
-        """Enforce PosMin < PosMax for guider group."""
+        """Enforce PosMin <= PosMax for guider group (clamp; do not swap)."""
         v = dict(values)
         if "PosMin" not in v or "PosMax" not in v:
             return v
@@ -263,14 +263,14 @@ class HiPController:
         pos_min = float(v["PosMin"])
         pos_max = float(v["PosMax"])
 
+        # Clamp so that PosMin <= PosMax without swapping (avoid surprising jumps).
         if pos_min > pos_max:
-            pos_min, pos_max = pos_max, pos_min
-        if pos_min == pos_max:
-            pos_max = pos_min + (1e-6 * (abs(pos_min) + 1.0))
+            pos_min = pos_max
 
         v["PosMin"] = pos_min
         v["PosMax"] = pos_max
         return v
+
 
     def _wire_param_buttons(self) -> None:
         wiring = {
@@ -331,6 +331,21 @@ class HiPController:
         if fixed != vals:
             log.info("param guards adjusted %s values (writing back to UI)", group)
             self._write_back_values(group, fixed)
+
+            if group == "pos":
+                def _fmt(x: float) -> str:
+                    return f"{float(x):g}"
+                lines = []
+                for k in ("HardMax", "UserMax", "UserMin", "HardMin"):
+                    if k in vals and k in fixed and float(vals[k]) != float(fixed[k]):
+                        lines.append(f"{k}: {_fmt(vals[k])} → {_fmt(fixed[k])}")
+                if lines:
+                    QMessageBox.information(
+                        self.win,
+                        "Position limits adjusted",
+                        "The rule HardMax ≥ UserMax ≥ UserMin ≥ HardMin was enforced.\n\n"
+                        + "\n".join(lines),
+                    )
 
         session_id = self._ensure_session(group)
         req_id = self._next_req_id()

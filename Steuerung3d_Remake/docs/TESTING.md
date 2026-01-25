@@ -31,8 +31,9 @@ Recommended tests:
 - Observed confirmation: after `ParamWrite`, Core marks `param_commit_status=pending` and transitions to
   `applied` when DenSi telemetry `params` match the requested values (or `timeout` after a bounded wait).
 - Validation guards: numeric-only input and ordering constraints (e.g. `HardMax ≥ UserMax ≥ UserMin ≥ HardMin`,
-  `Guider.PosMin < Guider.PosMax`) are enforced before emitting writes.
+  `Guider.PosMin ≤ Guider.PosMax` (clamp; no swap)) are enforced before emitting writes.
 - UI gating (HiP): editing is modal (no tab switching / no other group edits until Write/Cancel).
+- Parameter registry: group definitions, tolerances, and normalization rules are unit-tested in `test_param_registry_and_observed_commit.py`.
 
 
 ## Writing new tests

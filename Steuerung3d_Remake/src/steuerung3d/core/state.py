@@ -71,6 +71,10 @@ class MachineState:
     param_commit_start_tick: int = 0
     param_commit_desired: Dict[str, float] = field(default_factory=dict)
     param_commit_unmatched: list[str] = field(default_factory=list)
+    # Observation bookkeeping (device tick based):
+    param_commit_last_device_tick: int = -1
+    param_commit_observed_ticks: int = 0
+    param_commit_match_streak: int = 0
     # Default: ~2s at 50ms/tick (CoreEngine default polling). Adjust as needed.
     param_commit_timeout_ticks: int = 40
 

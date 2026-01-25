@@ -62,6 +62,8 @@ Notes:
 - HiP↔Core delivery is guarded with `req_id` acks; device-side acceptance is confirmed by observing DenSi’s `params` in telemetry.
 - While editing, HiP does not overwrite the active fields with incoming telemetry.
 - After Write, HiP shows a **modal dialog** once the device is observed as applied (or after a timeout).
+- If HiP must auto-adjust **pos limits** to satisfy `HardMax ≥ UserMax ≥ UserMin ≥ HardMin`, it shows an info dialog with the corrections before sending.
+- Guider `PosMin/PosMax` are enforced by **clamping** to `PosMin ≤ PosMax` (no swapping).
 
 
 ## PLC TwinCAT Legacy (Fleet) vs UDP SIM fallback

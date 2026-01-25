@@ -18,6 +18,9 @@ visible early.
   - `AxisState`: measured state (pos/vel/enabled/fault)
   - `AxisCommandState`: commanded state (enable/vel) stored separately
 
+- `steuerung3d/core/param_registry.py`
+  - Canonical parameter registry (groups, tolerances, normalization)
+
 - `steuerung3d/core/command_frame.py`
   - `CommandFrame`: one “frame” of commanded values produced by the core
 
@@ -122,6 +125,7 @@ Important UI detail:
 - **HiP**: parameter text fields are disabled (grey) until Edit is pressed; active fields become enabled (white).
   Editing is **modal**: once a group is in edit mode, other Edit buttons and tab switching are disabled until Write/Cancel.
   After Write, HiP shows a **modal dialog** once Core observes the device as applied (or a timeout if not confirmed).
+  If HiP auto-adjusts **pos** limits to satisfy `HardMax ≥ UserMax ≥ UserMin ≥ HardMin`, it shows an info dialog listing the adjustments before sending.
 - **DenSi**: Edit/Write/Cancel controls are disabled (greyed). DenSi acts as a “device endpoint”, not an operator.
 
 ### Safety / startup
