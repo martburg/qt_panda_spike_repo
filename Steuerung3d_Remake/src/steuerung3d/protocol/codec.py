@@ -10,22 +10,27 @@ from steuerung3d.core.intents import (
     EnableAxis,
     Intent,
     JogAxis,
-    JogCartesian,
-    JogWinch,
-    SetControlMode,
-    SmoothStop,
     SetEstop,
     RequestEstopReset,   # NEW
     ParamEditBegin,
     ParamWrite,
     ParamCancel,
+    # rig workflow
+    SetRigMode,
+    ClaimDensi,
+    ReleaseDensi,
+    SetDensiParticipating,
+    SetDensiAnchor,
+    ArmSync,
+    EnterSync,
+    DisarmToSetup,
+    RecoverToLastGood,
+    ResyncNow,
 )
 
-from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
+from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
 
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamOp, decode_param_ops
-
-from steuerung3d.protocol.raw_controls import RawControls
 
 
 
@@ -36,10 +41,6 @@ from steuerung3d.protocol.raw_controls import RawControls
 _INTENT_TYPE_MAP = {
     "enable_axis": EnableAxis,
     "jog_axis": JogAxis,
-    "jog_cartesian": JogCartesian,
-    "jog_winch": JogWinch,
-    "set_control_mode": SetControlMode,
-    "smooth_stop": SmoothStop,
     "set_estop": SetEstop,
     "estop_reset": RequestEstopReset,   # NEW
     "arm_live_mode": ArmLiveMode,
@@ -49,6 +50,18 @@ _INTENT_TYPE_MAP = {
     "param_edit_begin": ParamEditBegin,
     "param_write": ParamWrite,
     "param_cancel": ParamCancel,
+
+    # rig workflow
+    "set_rig_mode": SetRigMode,
+    "claim_densi": ClaimDensi,
+    "release_densi": ReleaseDensi,
+    "set_densi_participating": SetDensiParticipating,
+    "set_densi_anchor": SetDensiAnchor,
+    "arm_sync": ArmSync,
+    "enter_sync": EnterSync,
+    "disarm_to_setup": DisarmToSetup,
+    "recover_to_last_good": RecoverToLastGood,
+    "resync_now": ResyncNow,
 }
 
 
@@ -65,23 +78,6 @@ def decode_intent(payload: Dict[str, Any]) -> Intent:
         raise ValueError(f"unknown intent type: {t}")
     # dataclass ctor matches keys (including 'type')
     return cls(**payload)
-
-# ---------------------------
-# RawControls (human input seam)
-# ---------------------------
-
-def encode_raw_controls(rc: RawControls) -> Dict[str, Any]:
-    return asdict(rc)
-
-def decode_raw_controls(payload: Dict[str, Any]) -> RawControls:
-    # tolerate missing fields for forward/backward compatibility
-    return RawControls(
-        t_ns=int(payload.get("t_ns", 0)),
-        src=str(payload.get("src", "")),
-        axes=list(payload.get("axes", []) or []),
-        buttons=list(payload.get("buttons", []) or []),
-    )
-
 
 
 # ---------------------------
@@ -102,6 +98,8 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
         estop=bool(payload["estop"]),
         fault=bool(payload["fault"]),
         axes=axes_out,
+        rig_mode=str(payload.get("rig_mode", "DISCOVERY")),
+        densis={str(k): DensiTelemetry(**v) for k, v in dict(payload.get("densis", {})).items()},
         estop_status_word=int(payload.get("estop_status_word", 0)),  # NEW
         # parameters (optional)
         param_edit_active=bool(payload.get("param_edit_active", False)),

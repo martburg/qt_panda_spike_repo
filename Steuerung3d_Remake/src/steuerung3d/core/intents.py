@@ -44,46 +44,6 @@ class ClearFault:
     type: Literal["clear_fault"] = "clear_fault"
 
 
-
-# -------- Live control modes (rigging vs synchronized) --------
-
-ControlMode = Literal["setup_manual", "sync_live"]
-
-
-@dataclass(frozen=True)
-class SetControlMode:
-    type: Literal["set_control_mode"] = "set_control_mode"
-    mode: ControlMode = "setup_manual"
-
-
-# -------- Motion intents (rig space vs direct winch) --------
-
-@dataclass(frozen=True)
-class JogCartesian:
-    """Cartesian rate command in rig coordinates (m/s)."""
-    type: Literal["jog_cartesian"] = "jog_cartesian"
-    vx: float = 0.0
-    vy: float = 0.0
-    vz: float = 0.0
-
-
-@dataclass(frozen=True)
-class JogWinch:
-    """Direct rope-length rate command for a specific winch (m/s).
-
-    Sign convention should be documented in rig config; typical:
-      +rate = pay out (longer rope), -rate = reel in (shorter rope)
-    """
-    type: Literal["jog_winch"] = "jog_winch"
-    winch_id: str = ""
-    rate: float = 0.0
-
-
-@dataclass(frozen=True)
-class SmoothStop:
-    """Request a controlled ramp-to-zero stop (operator convenience)."""
-    type: Literal["smooth_stop"] = "smooth_stop"
-
 # -------- Parameters (axis-agnostic, v0.1) --------
 
 ParamGroup = Literal["pos", "vel", "filter"]
@@ -123,13 +83,79 @@ class ParamCancel:
 
 
     
+
+
+# -------- Rig workflow (DenSi pairing + sync + recovery) --------
+
+RigModeName = Literal["DISCOVERY", "SETUP_MANUAL", "ARMED_SYNC", "SYNC_ACTIVE", "SYNC_RECOVER", "FAULT_SYNC"]
+
+
+@dataclass(frozen=True)
+class SetRigMode:
+    type: Literal["set_rig_mode"] = "set_rig_mode"
+    rig_mode: RigModeName = "DISCOVERY"
+
+
+@dataclass(frozen=True)
+class ClaimDensi:
+    type: Literal["claim_densi"] = "claim_densi"
+    device_id: str = ""
+    hip_id: str = ""
+    req_id: str = ""
+
+
+@dataclass(frozen=True)
+class ReleaseDensi:
+    type: Literal["release_densi"] = 'release_densi'
+    device_id: str = ""
+    hip_id: str = ""
+    req_id: str = ""
+
+
+@dataclass(frozen=True)
+class SetDensiParticipating:
+    type: Literal["set_densi_participating"] = "set_densi_participating"
+    device_id: str = ""
+    participating: bool = True
+
+
+@dataclass(frozen=True)
+class SetDensiAnchor:
+    type: Literal["set_densi_anchor"] = "set_densi_anchor"
+    device_id: str = ""
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
+
+
+@dataclass(frozen=True)
+class ArmSync:
+    type: Literal["arm_sync"] = "arm_sync"
+
+
+@dataclass(frozen=True)
+class EnterSync:
+    type: Literal["enter_sync"] = "enter_sync"
+
+
+@dataclass(frozen=True)
+class DisarmToSetup:
+    type: Literal["disarm_to_setup"] = "disarm_to_setup"
+
+
+@dataclass(frozen=True)
+class RecoverToLastGood:
+    type: Literal["recover_to_last_good"] = "recover_to_last_good"
+
+
+@dataclass(frozen=True)
+class ResyncNow:
+    type: Literal["resync_now"] = "resync_now"
+
+
 Intent = Union[
     EnableAxis,
     JogAxis,
-    JogCartesian,
-    JogWinch,
-    SetControlMode,
-    SmoothStop,
     SetEstop,
     RequestEstopReset,  # NEW
     ArmLiveMode,
@@ -138,4 +164,14 @@ Intent = Union[
     ParamEditBegin,
     ParamWrite,
     ParamCancel,
+    SetRigMode,
+    ClaimDensi,
+    ReleaseDensi,
+    SetDensiParticipating,
+    SetDensiAnchor,
+    ArmSync,
+    EnterSync,
+    DisarmToSetup,
+    RecoverToLastGood,
+    ResyncNow,
 ]

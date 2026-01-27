@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 from typing import Dict, Any
 
 from steuerung3d.core.command_frame import ParamOp
-
 from steuerung3d.core.mode import Mode
+from steuerung3d.core.rig_types import RigMode, DensiRuntime, RigSyncConfig, RecoverPlan
 
 
 @dataclass
@@ -16,6 +16,7 @@ class AxisState:
     enabled: bool = False
     fault: bool = False
     meta: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class AxisCommandState:
@@ -53,7 +54,6 @@ class MachineState:
     # Pending ops to be sent on the next command frame (core-side only):
     pending_param_ops: list[ParamOp] = field(default_factory=list)
 
-
     # --- HIP<->Core transactional acks (axis-agnostic parameter ops) ---
     # One-shot ack list emitted in TelemetrySnapshot, then cleared after publish.
     core_acks: list[str] = field(default_factory=list)
@@ -78,6 +78,21 @@ class MachineState:
     # Default: ~2s at 50ms/tick (CoreEngine default polling). Adjust as needed.
     param_commit_timeout_ticks: int = 40
 
+    # --- Rig workflow (DenSi pairing + sync + recovery) ---
+    rig_mode: RigMode = RigMode.DISCOVERY
+
+    # Runtime registry: device_id -> DenSi runtime info (online/claim/anchors)
+    densi_registry: Dict[str, DensiRuntime] = field(default_factory=dict)
+    # Consider a DenSi offline if not seen for this many core ticks
+    densi_offline_after_ticks: int = 40
+
+    # Frozen config snapshot (valid from ARMED_SYNC onwards)
+    rig_sync_config: RigSyncConfig = field(default_factory=RigSyncConfig)
+
+    # Recovery bookkeeping
+    rig_last_good_lengths: Dict[str, float] = field(default_factory=dict)
+    rig_last_good_tick: int = -1
+    rig_recover_plan: RecoverPlan = field(default_factory=RecoverPlan)
 
     def ensure_axis(self, axis_id: str) -> AxisState:
         if axis_id not in self.axes:

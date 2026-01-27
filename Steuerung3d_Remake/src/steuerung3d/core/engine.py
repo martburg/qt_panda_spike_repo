@@ -8,6 +8,7 @@ from steuerung3d.core.intents import Intent
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.core.state_machine import enforce_mode_actions
+from steuerung3d.core.rig_logic import enforce_rig_invariants
 
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.executor import build_command_frame
@@ -41,7 +42,8 @@ class CoreEngine:
             for intent in self.drain_intents():
                 self.handle_intent(self.state, intent)
 
-        # 2) per-tick invariants (mode/safety clamp commands)
+        # 2) per-tick invariants (rig workflow + mode/safety clamp commands)
+        enforce_rig_invariants(self.state)
         enforce_mode_actions(self.state)
 
         # 3) deterministic tick time forward

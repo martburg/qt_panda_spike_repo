@@ -6,6 +6,7 @@ from typing import Dict, Optional
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import TelemetrySnapshot
+from steuerung3d.core.rig_logic import note_densi_seen
 
 from .plc_endpoint import PlcEndpoint
 
@@ -60,6 +61,7 @@ class MultiPlcDevice:
         for snap in latest_by_ep.values():
             for axis_id, ax_t in snap.axes.items():
                 ax = state.ensure_axis(axis_id)
+                note_densi_seen(state, axis_id, device_tick=int(getattr(snap, "tick", 0)))
                 ax.pos = ax_t.pos
                 ax.vel = ax_t.vel
                 ax.enabled = ax_t.enabled

@@ -15,6 +15,17 @@ class AxisTelemetry:
     enabled: bool
     fault: bool
 
+
+
+@dataclass(frozen=True)
+class DensiTelemetry:
+    device_id: str
+    online: bool
+    claimed_by_hip: str = ""
+    participating: bool = False
+    anchor_xyz: tuple[float, float, float] | None = None
+    last_seen_age_ticks: int = 0
+
 @dataclass(frozen=True)
 class TelemetrySnapshot:
     tick: int
@@ -23,6 +34,10 @@ class TelemetrySnapshot:
     estop: bool
     fault: bool
     axes: Dict[str, AxisTelemetry]
+
+    # Rig workflow
+    rig_mode: str = "DISCOVERY"
+    densis: Dict[str, DensiTelemetry] = field(default_factory=dict)
 
     # NEW
     estop_status_word: int = 0
@@ -53,6 +68,24 @@ class TelemetrySnapshot:
             )
             for axis_id, ax in state.axes.items()
         }
+
+        densis = {}
+        try:
+            offline_after = int(getattr(state, "densi_offline_after_ticks", 40))
+            for dev_id, d in dict(getattr(state, "densi_registry", {})).items():
+                age = int(state.tick) - int(getattr(d, "last_seen_core_tick", -10**9))
+                online = age <= offline_after
+                densis[str(dev_id)] = DensiTelemetry(
+                    device_id=str(dev_id),
+                    online=bool(online),
+                    claimed_by_hip=str(getattr(d, "claimed_by_hip", "")),
+                    participating=bool(getattr(d, "participating", False)),
+                    anchor_xyz=getattr(d, "anchor_xyz", None),
+                    last_seen_age_ticks=int(age),
+                )
+        except Exception:
+            densis = {}
+
         return cls(
             tick=int(state.tick),
             t_s=float(state.t_s),
@@ -60,6 +93,8 @@ class TelemetrySnapshot:
             estop=bool(state.estop),
             fault=bool(state.fault),
             axes=axes,
+            rig_mode=str(getattr(state, "rig_mode", "DISCOVERY")),
+            densis=densis,
             estop_status_word=int(getattr(state, "estop_status_word", 0)),
             param_edit_active=bool(getattr(state, "param_edit_active", False)),
             param_edit_group=str(getattr(state, "param_edit_group", "")),

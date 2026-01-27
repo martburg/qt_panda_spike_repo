@@ -11,6 +11,17 @@ from steuerung3d.core.intents import (
     ParamEditBegin,
     ParamWrite,
     ParamCancel,
+    # rig workflow
+    SetRigMode,
+    ClaimDensi,
+    ReleaseDensi,
+    SetDensiParticipating,
+    SetDensiAnchor,
+    ArmSync,
+    EnterSync,
+    DisarmToSetup,
+    RecoverToLastGood,
+    ResyncNow,
     Intent,
 )
 from steuerung3d.core.mode import Mode
@@ -18,6 +29,16 @@ from steuerung3d.core.state import MachineState
 from steuerung3d.core.command_frame import ParamEditBeginOp, ParamWriteOp, ParamCancelOp
 from steuerung3d.core.state_machine import enforce_mode_actions, normalize_mode
 from steuerung3d.core.param_registry import normalize_group_values
+from steuerung3d.core.rig_types import RigMode
+from steuerung3d.core.rig_logic import (
+    ensure_densi,
+    freeze_config,
+    unfreeze_config,
+    validate_can_freeze,
+    capture_last_good,
+    start_recover_to_last_good,
+    stop_recover,
+)
 
 
 def _txn_ack(state: MachineState, req_id: str) -> None:
@@ -129,6 +150,119 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
                 state.param_commit_unmatched = []
 
             state.pending_param_ops.append(ParamCancelOp(group=grp))
+            return
+
+
+
+        # --- RIG WORKFLOW (pairing + sync + recovery) ---
+        case SetRigMode(rig_mode=rm):
+            # Changing rig mode is only allowed while config is not frozen.
+            if getattr(state, 'rig_mode', RigMode.DISCOVERY) in (RigMode.ARMED_SYNC, RigMode.SYNC_ACTIVE, RigMode.SYNC_RECOVER, RigMode.FAULT_SYNC):
+                return
+            try:
+                state.rig_mode = RigMode(str(rm))
+            except Exception:
+                state.rig_mode = RigMode.DISCOVERY
+            return
+
+        case ClaimDensi(device_id=dev, hip_id=hip, req_id=req_id):
+            _txn_ack(state, req_id)
+            if _txn_seen_or_mark(state, req_id):
+                return
+            # Frozen config: claims/pairings are locked.
+            if getattr(state, 'rig_mode', RigMode.DISCOVERY) in (RigMode.ARMED_SYNC, RigMode.SYNC_ACTIVE, RigMode.SYNC_RECOVER, RigMode.FAULT_SYNC):
+                return
+            if not dev:
+                return
+            ensure_densi(state, dev)
+            d = state.densi_registry[dev]
+            if d.claimed_by_hip and d.claimed_by_hip != str(hip):
+                return
+            d.claimed_by_hip = str(hip or '')
+            return
+
+        case ReleaseDensi(device_id=dev, hip_id=hip, req_id=req_id):
+            _txn_ack(state, req_id)
+            if _txn_seen_or_mark(state, req_id):
+                return
+            if getattr(state, 'rig_mode', RigMode.DISCOVERY) in (RigMode.ARMED_SYNC, RigMode.SYNC_ACTIVE, RigMode.SYNC_RECOVER, RigMode.FAULT_SYNC):
+                return
+            if not dev:
+                return
+            ensure_densi(state, dev)
+            d = state.densi_registry[dev]
+            if d.claimed_by_hip == str(hip or ''):
+                d.claimed_by_hip = ''
+            return
+
+        case SetDensiParticipating(device_id=dev, participating=part):
+            if getattr(state, 'rig_mode', RigMode.DISCOVERY) in (RigMode.ARMED_SYNC, RigMode.SYNC_ACTIVE, RigMode.SYNC_RECOVER, RigMode.FAULT_SYNC):
+                return
+            if not dev:
+                return
+            ensure_densi(state, dev)
+            state.densi_registry[dev].participating = bool(part)
+            return
+
+        case SetDensiAnchor(device_id=dev, x=x, y=y, z=z):
+            if getattr(state, 'rig_mode', RigMode.DISCOVERY) in (RigMode.ARMED_SYNC, RigMode.SYNC_ACTIVE, RigMode.SYNC_RECOVER, RigMode.FAULT_SYNC):
+                return
+            if not dev:
+                return
+            ensure_densi(state, dev)
+            state.densi_registry[dev].anchor_xyz = (float(x), float(y), float(z))
+            return
+
+        case ArmSync():
+            ok, why = validate_can_freeze(state)
+            if not ok:
+                # stash reason for UI (simple string)
+                state.axes.setdefault('_rig', state.ensure_axis('_rig')).meta['arm_sync_error'] = why
+                return
+            freeze_config(state)
+            state.rig_mode = RigMode.ARMED_SYNC
+            # freeze: command velocities zeroed
+            for cmd in state.axis_cmd.values():
+                cmd.vel = 0.0
+            return
+
+        case EnterSync():
+            if getattr(state, 'rig_mode', RigMode.DISCOVERY) != RigMode.ARMED_SYNC:
+                return
+            if state.estop or state.fault:
+                return
+            state.rig_mode = RigMode.SYNC_ACTIVE
+            capture_last_good(state)
+            return
+
+        case DisarmToSetup():
+            # exit any frozen/sync workflow back to setup
+            state.rig_mode = RigMode.SETUP_MANUAL
+            unfreeze_config(state)
+            stop_recover(state)
+            for cmd in state.axis_cmd.values():
+                cmd.vel = 0.0
+            return
+
+        case RecoverToLastGood():
+            if getattr(state, 'rig_mode', RigMode.DISCOVERY) != RigMode.SYNC_RECOVER:
+                return
+            if state.estop or state.fault:
+                return
+            # allow recovery to arm LIVE automatically
+            if state.mode == Mode.IDLE:
+                state.mode = Mode.LIVE
+            start_recover_to_last_good(state)
+            return
+
+        case ResyncNow():
+            if getattr(state, 'rig_mode', RigMode.DISCOVERY) != RigMode.SYNC_RECOVER:
+                return
+            if state.estop or state.fault:
+                return
+            capture_last_good(state)
+            stop_recover(state)
+            state.rig_mode = RigMode.ARMED_SYNC
             return
 
         # --- MODE TRANSITIONS ---

@@ -1,31 +1,20 @@
-# src / steuerung3d / config
+# config
 
 ## Purpose
 
-Typed configuration loaders and dataclasses for each app; includes TOML loader utilities.
+Quick-start TOML configs used during development (legacy location). Prefer `configs/` unless a script explicitly points here.
 
 ## Files
 
-- `__init__.py`
-- `cli_client_config.py`
-- `core_service_config.py`
 - `dev_plc.toml`
-- `dev_stack_config.py`
-- `log_viewer_config.py`
-- `plc_stack_config.py`
-- `replay_player_config.py`
-- `toml_loader.py`
+- `dev_sim.toml`
+- `dev_udp_toy.toml`
 
 ## Key entry points
 
-- `__init__.py`
-- `cli_client_config.py`
-- `core_service_config.py`
-- `dev_stack_config.py`
-- `log_viewer_config.py`
-- `plc_stack_config.py`
-- `replay_player_config.py`
-- `toml_loader.py`
+- `dev_plc.toml`
+- `dev_sim.toml`
+- `dev_udp_toy.toml`
 
 ## Notes
 
