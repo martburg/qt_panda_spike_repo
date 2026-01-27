@@ -10,6 +10,10 @@ from steuerung3d.core.intents import (
     EnableAxis,
     Intent,
     JogAxis,
+    JogCartesian,
+    JogWinch,
+    SetControlMode,
+    SmoothStop,
     SetEstop,
     RequestEstopReset,   # NEW
     ParamEditBegin,
@@ -21,6 +25,8 @@ from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
 
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamOp, decode_param_ops
 
+from steuerung3d.protocol.raw_controls import RawControls
+
 
 
 # ---------------------------
@@ -30,6 +36,10 @@ from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamOp, 
 _INTENT_TYPE_MAP = {
     "enable_axis": EnableAxis,
     "jog_axis": JogAxis,
+    "jog_cartesian": JogCartesian,
+    "jog_winch": JogWinch,
+    "set_control_mode": SetControlMode,
+    "smooth_stop": SmoothStop,
     "set_estop": SetEstop,
     "estop_reset": RequestEstopReset,   # NEW
     "arm_live_mode": ArmLiveMode,
@@ -55,6 +65,23 @@ def decode_intent(payload: Dict[str, Any]) -> Intent:
         raise ValueError(f"unknown intent type: {t}")
     # dataclass ctor matches keys (including 'type')
     return cls(**payload)
+
+# ---------------------------
+# RawControls (human input seam)
+# ---------------------------
+
+def encode_raw_controls(rc: RawControls) -> Dict[str, Any]:
+    return asdict(rc)
+
+def decode_raw_controls(payload: Dict[str, Any]) -> RawControls:
+    # tolerate missing fields for forward/backward compatibility
+    return RawControls(
+        t_ns=int(payload.get("t_ns", 0)),
+        src=str(payload.get("src", "")),
+        axes=list(payload.get("axes", []) or []),
+        buttons=list(payload.get("buttons", []) or []),
+    )
+
 
 
 # ---------------------------

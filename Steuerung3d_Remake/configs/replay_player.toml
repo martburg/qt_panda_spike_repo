@@ -1,6 +1,0 @@
-[app]
-dt_s = 0.01
-
-[replay]
-eps = 1e-9
-compare_command_frames = true

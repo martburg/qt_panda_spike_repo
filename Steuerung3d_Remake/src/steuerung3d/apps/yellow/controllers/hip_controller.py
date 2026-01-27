@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import QLocale, QTimer
 from PySide6.QtGui import QDoubleValidator
-from PySide6.QtWidgets import QLineEdit, QPushButton, QWidget, QMessageBox, QTabWidget
+from PySide6.QtWidgets import QLineEdit, QPushButton, QWidget, QMessageBox, QTabWidget, QSlider
 
 from steuerung3d.core.intents import ParamCancel, ParamEditBegin, ParamWrite, RequestEstopReset
 from steuerung3d.core.telemetry import TelemetrySnapshot
@@ -63,9 +63,92 @@ class HiPController:
     win: QWidget
     intent_out: IntentOut
     telemetry_in: TelemetryIn
+    axis_id: str = "X"   # v0.1: which axis we show in the UI
 
     # If we stop receiving telemetry for this long, we go back to UNKNOWN
     stale_after_ms: int = 500
+
+    def _ui_set_lineedit(self, name: str, text: str, *, freeze_if_focus: bool = True) -> None:
+        le = self.win.findChild(QLineEdit, name)
+        if le is None:
+            return
+        if freeze_if_focus and le.hasFocus():
+            return
+        if le.text() == text:
+            return
+        was = le.blockSignals(True)
+        le.setText(text)
+        le.blockSignals(was)
+
+    def _ui_set_slider(self, name: str, value: int, *, vmin: int = 0, vmax: int = 1000) -> None:
+        sld = self.win.findChild(QSlider, name)
+        if sld is None:
+            return
+        if sld.minimum() != vmin or sld.maximum() != vmax:
+            sld.setRange(vmin, vmax)
+        value = max(vmin, min(vmax, int(value)))
+        if sld.value() != value:
+            sld.setValue(value)
+
+    def _fmt(self, x: float, decimals: int = 2, unit: str | None = None) -> str:
+        # Use decimal comma if you like; simplest for now:
+        s = f"{x:.{decimals}f}".replace(".", ",")
+        return f"{s} {unit}" if unit else s
+
+    def _render_header_readouts(self, snap: TelemetrySnapshot) -> None:
+        # tick + title
+        self._ui_set_lineedit("txt_tick", str(int(getattr(snap, "tick", 0))))
+        self._ui_set_lineedit("txtHeaderTitle", f"{self.axis_id}  |  {getattr(snap, 'mode', '')}", freeze_if_focus=False)
+
+        # temp placeholder (until telemetry provides it)
+        self._ui_set_lineedit("txt_temp", "—°", freeze_if_focus=False)
+
+        # axis snapshot
+        ax = None
+        axes = getattr(snap, "axes", {}) or {}
+        if self.axis_id in axes:
+            ax = axes[self.axis_id]
+        elif axes:
+            # fallback: first available axis
+            self.axis_id = next(iter(axes.keys()))
+            ax = axes[self.axis_id]
+
+        if ax is not None:
+            self._ui_set_lineedit("txtActPos_2", self._fmt(float(ax.pos), 3), freeze_if_focus=False)
+
+            # status string (v0.1)
+            estop = bool(getattr(snap, "estop", False))
+            fault = bool(getattr(snap, "fault", False)) or bool(getattr(ax, "fault", False))
+            enabled = bool(getattr(ax, "enabled", False))
+
+            if estop:
+                st = "ESTOP"
+            elif fault:
+                st = "FAULT"
+            else:
+                st = "EN" if enabled else "DIS"
+            self._ui_set_lineedit("txt_status", st, freeze_if_focus=False)
+
+        # limits from params
+        params = dict(getattr(snap, "params", {}) or {})
+        hard_min = params.get("HardMin")
+        user_min = params.get("UserMin")
+        user_max = params.get("UserMax")
+        hard_max = params.get("HardMax")
+
+        if hard_min is not None: self._ui_set_lineedit("txtLimitHardMin", self._fmt(float(hard_min), 2, "m"), freeze_if_focus=False)
+        if user_min is not None: self._ui_set_lineedit("txtLimitUserMin", self._fmt(float(user_min), 2, "m"), freeze_if_focus=False)
+        if user_max is not None: self._ui_set_lineedit("txtLimitUserMax", self._fmt(float(user_max), 2, "m"), freeze_if_focus=False)
+        if hard_max is not None: self._ui_set_lineedit("txtLimitHardMax", self._fmt(float(hard_max), 2, "m"), freeze_if_focus=False)
+
+        # slider indicator (normalize within user min/max)
+        if ax is not None and user_min is not None and user_max is not None:
+            lo = float(user_min); hi = float(user_max)
+            pos = float(ax.pos)
+            if hi > lo:
+                frac = (pos - lo) / (hi - lo)
+                frac = 0.0 if frac < 0.0 else (1.0 if frac > 1.0 else frac)
+                self._ui_set_slider("sldLimitRange", int(frac * 1000))
 
     def __post_init__(self) -> None:
         self.ui = YellowBindings.from_window(self.win)
@@ -743,6 +826,13 @@ class HiPController:
 
         self._render_estop(snap)
         self._render_params_and_edit_state(snap)
+        self._render_header_readouts(snap)
+
+        # placeholders for bottom strip until implemented:
+        self._ui_set_lineedit("txt_cut_pos", "—", freeze_if_focus=False)
+        self._ui_set_lineedit("txt_cut_vel", "—", freeze_if_focus=False)
+        self._ui_set_lineedit("txt_cut_time", "—", freeze_if_focus=False)
+        self._ui_set_lineedit("txt_posdiff", "—", freeze_if_focus=False)
 
     # ---------- render logic ----------
 

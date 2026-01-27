@@ -1,7 +1,0 @@
-[app]
-dt_s = 0.01
-realtime = true
-
-[core]
-axis_ids = ["X", "Y"]
-ticks = 500

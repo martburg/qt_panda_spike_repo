@@ -6,10 +6,12 @@ from typing import Callable, Generic, List, Tuple, TypeVar
 
 from steuerung3d.adapters.links.udp_link import UdpLink
 from steuerung3d.core.intents import Intent
+from steuerung3d.protocol.raw_controls import RawControls
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.protocol.codec import (
     encode_intent, decode_intent,
+    encode_raw_controls, decode_raw_controls,
     encode_telemetry, decode_telemetry,
     encode_command_frame, decode_command_frame,
 )
@@ -44,6 +46,33 @@ class _UdpJsonTx(Generic[T]):
         payload = self.encode(obj)
         raw = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         self.link.send(raw)
+
+
+# ---------- Human input seam ----------
+@dataclass
+class UdpRawControlsIn:
+    rx: _UdpJsonRx[RawControls]
+
+    @staticmethod
+    def bind(addr: Tuple[str, int]) -> "UdpRawControlsIn":
+        link = UdpLink(bind=addr, target=addr)
+        return UdpRawControlsIn(rx=_UdpJsonRx(link=link, decode=decode_raw_controls))
+
+    def drain_raw_controls(self, limit: int = 1000) -> List[RawControls]:
+        return self.rx.drain(limit=limit)
+
+
+@dataclass
+class UdpRawControlsOut:
+    tx: _UdpJsonTx[RawControls]
+
+    @staticmethod
+    def connect(target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)) -> "UdpRawControlsOut":
+        link = UdpLink(bind=bind, target=target)
+        return UdpRawControlsOut(tx=_UdpJsonTx(link=link, encode=encode_raw_controls))
+
+    def publish_raw_controls(self, rc: RawControls) -> None:
+        self.tx.send(rc)
 
 
 # ---------- Operator seam ----------

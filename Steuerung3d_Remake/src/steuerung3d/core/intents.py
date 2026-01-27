@@ -44,6 +44,46 @@ class ClearFault:
     type: Literal["clear_fault"] = "clear_fault"
 
 
+
+# -------- Live control modes (rigging vs synchronized) --------
+
+ControlMode = Literal["setup_manual", "sync_live"]
+
+
+@dataclass(frozen=True)
+class SetControlMode:
+    type: Literal["set_control_mode"] = "set_control_mode"
+    mode: ControlMode = "setup_manual"
+
+
+# -------- Motion intents (rig space vs direct winch) --------
+
+@dataclass(frozen=True)
+class JogCartesian:
+    """Cartesian rate command in rig coordinates (m/s)."""
+    type: Literal["jog_cartesian"] = "jog_cartesian"
+    vx: float = 0.0
+    vy: float = 0.0
+    vz: float = 0.0
+
+
+@dataclass(frozen=True)
+class JogWinch:
+    """Direct rope-length rate command for a specific winch (m/s).
+
+    Sign convention should be documented in rig config; typical:
+      +rate = pay out (longer rope), -rate = reel in (shorter rope)
+    """
+    type: Literal["jog_winch"] = "jog_winch"
+    winch_id: str = ""
+    rate: float = 0.0
+
+
+@dataclass(frozen=True)
+class SmoothStop:
+    """Request a controlled ramp-to-zero stop (operator convenience)."""
+    type: Literal["smooth_stop"] = "smooth_stop"
+
 # -------- Parameters (axis-agnostic, v0.1) --------
 
 ParamGroup = Literal["pos", "vel", "filter"]
@@ -86,6 +126,10 @@ class ParamCancel:
 Intent = Union[
     EnableAxis,
     JogAxis,
+    JogCartesian,
+    JogWinch,
+    SetControlMode,
+    SmoothStop,
     SetEstop,
     RequestEstopReset,  # NEW
     ArmLiveMode,

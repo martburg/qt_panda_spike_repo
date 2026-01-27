@@ -1,6 +1,0 @@
-[app]
-dt_s = 0.01
-realtime = true
-
-[client]
-axis_ids = ["X"]
