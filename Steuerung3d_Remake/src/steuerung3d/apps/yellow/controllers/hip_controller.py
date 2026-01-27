@@ -3,11 +3,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import uuid
+
 from PySide6.QtCore import QLocale, QTimer
 from PySide6.QtGui import QDoubleValidator
-from PySide6.QtWidgets import QLineEdit, QPushButton, QWidget, QMessageBox, QTabWidget, QSlider
+from PySide6.QtWidgets import QLineEdit, QPushButton, QWidget, QMessageBox, QTabWidget, QComboBox
 
-from steuerung3d.core.intents import ParamCancel, ParamEditBegin, ParamWrite, RequestEstopReset
+from steuerung3d.core.intents import ParamCancel, ParamEditBegin, ParamWrite, RequestEstopReset, ClaimAxis, ReleaseAxis
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import (
     ESTOP_CAUSE_KEYS,
@@ -63,92 +65,9 @@ class HiPController:
     win: QWidget
     intent_out: IntentOut
     telemetry_in: TelemetryIn
-    axis_id: str = "X"   # v0.1: which axis we show in the UI
 
     # If we stop receiving telemetry for this long, we go back to UNKNOWN
     stale_after_ms: int = 500
-
-    def _ui_set_lineedit(self, name: str, text: str, *, freeze_if_focus: bool = True) -> None:
-        le = self.win.findChild(QLineEdit, name)
-        if le is None:
-            return
-        if freeze_if_focus and le.hasFocus():
-            return
-        if le.text() == text:
-            return
-        was = le.blockSignals(True)
-        le.setText(text)
-        le.blockSignals(was)
-
-    def _ui_set_slider(self, name: str, value: int, *, vmin: int = 0, vmax: int = 1000) -> None:
-        sld = self.win.findChild(QSlider, name)
-        if sld is None:
-            return
-        if sld.minimum() != vmin or sld.maximum() != vmax:
-            sld.setRange(vmin, vmax)
-        value = max(vmin, min(vmax, int(value)))
-        if sld.value() != value:
-            sld.setValue(value)
-
-    def _fmt(self, x: float, decimals: int = 2, unit: str | None = None) -> str:
-        # Use decimal comma if you like; simplest for now:
-        s = f"{x:.{decimals}f}".replace(".", ",")
-        return f"{s} {unit}" if unit else s
-
-    def _render_header_readouts(self, snap: TelemetrySnapshot) -> None:
-        # tick + title
-        self._ui_set_lineedit("txt_tick", str(int(getattr(snap, "tick", 0))))
-        self._ui_set_lineedit("txtHeaderTitle", f"{self.axis_id}  |  {getattr(snap, 'mode', '')}", freeze_if_focus=False)
-
-        # temp placeholder (until telemetry provides it)
-        self._ui_set_lineedit("txt_temp", "—°", freeze_if_focus=False)
-
-        # axis snapshot
-        ax = None
-        axes = getattr(snap, "axes", {}) or {}
-        if self.axis_id in axes:
-            ax = axes[self.axis_id]
-        elif axes:
-            # fallback: first available axis
-            self.axis_id = next(iter(axes.keys()))
-            ax = axes[self.axis_id]
-
-        if ax is not None:
-            self._ui_set_lineedit("txtActPos_2", self._fmt(float(ax.pos), 3), freeze_if_focus=False)
-
-            # status string (v0.1)
-            estop = bool(getattr(snap, "estop", False))
-            fault = bool(getattr(snap, "fault", False)) or bool(getattr(ax, "fault", False))
-            enabled = bool(getattr(ax, "enabled", False))
-
-            if estop:
-                st = "ESTOP"
-            elif fault:
-                st = "FAULT"
-            else:
-                st = "EN" if enabled else "DIS"
-            self._ui_set_lineedit("txt_status", st, freeze_if_focus=False)
-
-        # limits from params
-        params = dict(getattr(snap, "params", {}) or {})
-        hard_min = params.get("HardMin")
-        user_min = params.get("UserMin")
-        user_max = params.get("UserMax")
-        hard_max = params.get("HardMax")
-
-        if hard_min is not None: self._ui_set_lineedit("txtLimitHardMin", self._fmt(float(hard_min), 2, "m"), freeze_if_focus=False)
-        if user_min is not None: self._ui_set_lineedit("txtLimitUserMin", self._fmt(float(user_min), 2, "m"), freeze_if_focus=False)
-        if user_max is not None: self._ui_set_lineedit("txtLimitUserMax", self._fmt(float(user_max), 2, "m"), freeze_if_focus=False)
-        if hard_max is not None: self._ui_set_lineedit("txtLimitHardMax", self._fmt(float(hard_max), 2, "m"), freeze_if_focus=False)
-
-        # slider indicator (normalize within user min/max)
-        if ax is not None and user_min is not None and user_max is not None:
-            lo = float(user_min); hi = float(user_max)
-            pos = float(ax.pos)
-            if hi > lo:
-                frac = (pos - lo) / (hi - lo)
-                frac = 0.0 if frac < 0.0 else (1.0 if frac > 1.0 else frac)
-                self._ui_set_slider("sldLimitRange", int(frac * 1000))
 
     def __post_init__(self) -> None:
         self.ui = YellowBindings.from_window(self.win)
@@ -156,6 +75,13 @@ class HiPController:
         self._seen_first_telem = False
         self._last_rx_ns: int | None = None
         self._timer: QTimer | None = None
+
+        # HiP identity and current axis selection
+        self._hip_id: str = f"hip-{uuid.uuid4().hex[:8]}"
+        self._cmb_axis: QComboBox | None = self.win.findChild(QComboBox, "cmb_axis")
+        self._selected_axis: str = ""
+        if self._cmb_axis is not None:
+            self._cmb_axis.currentTextChanged.connect(self._on_axis_selected)
 
         # Modal param edit lock bookkeeping
         self._modal_locked: bool = False
@@ -808,6 +734,9 @@ class HiPController:
         # consume any core acks for transactional param intents
         self._handle_core_acks(snap)
 
+        # Populate axis selection (discovery) and auto-claim on selection.
+        self._update_axis_combo(snap)
+
         if not self._seen_first_telem:
             log.info(
                 "rx first telemetry: tick=%s estop=%s fault=%s",
@@ -826,13 +755,6 @@ class HiPController:
 
         self._render_estop(snap)
         self._render_params_and_edit_state(snap)
-        self._render_header_readouts(snap)
-
-        # placeholders for bottom strip until implemented:
-        self._ui_set_lineedit("txt_cut_pos", "—", freeze_if_focus=False)
-        self._ui_set_lineedit("txt_cut_vel", "—", freeze_if_focus=False)
-        self._ui_set_lineedit("txt_cut_time", "—", freeze_if_focus=False)
-        self._ui_set_lineedit("txt_posdiff", "—", freeze_if_focus=False)
 
     # ---------- render logic ----------
 
@@ -858,3 +780,50 @@ class HiPController:
                 state = "warn" if v else None
 
             self._set_led_by_name(spec.dot, state=state)
+
+    # ---------- axis selection / claims ----------
+
+    def _update_axis_combo(self, snap: TelemetrySnapshot) -> None:
+        """Populate cmb_axis with discovered axes and keep selection stable."""
+        if self._cmb_axis is None:
+            return
+        axis_ids = sorted(list(getattr(snap, "axes", {}).keys()))
+        if not axis_ids:
+            return
+
+        # Avoid recursive signal storms by blocking signals during rebuild
+        cur = self._cmb_axis.currentText().strip()
+        existing = [self._cmb_axis.itemText(i) for i in range(self._cmb_axis.count())]
+        if existing == axis_ids:
+            # Still ensure we have a selection
+            if not cur and axis_ids:
+                self._cmb_axis.setCurrentText(axis_ids[0])
+            return
+
+        self._cmb_axis.blockSignals(True)
+        try:
+            self._cmb_axis.clear()
+            self._cmb_axis.addItems(axis_ids)
+            # restore selection if possible
+            if cur and cur in axis_ids:
+                self._cmb_axis.setCurrentText(cur)
+            else:
+                self._cmb_axis.setCurrentText(axis_ids[0])
+        finally:
+            self._cmb_axis.blockSignals(False)
+
+    def _on_axis_selected(self, axis_id: str) -> None:
+        axis_id = (axis_id or "").strip()
+        if not axis_id:
+            return
+
+        # Release old claim (best effort)
+        if self._selected_axis and self._selected_axis != axis_id:
+            self.intent_out.send_intent(
+                ReleaseAxis(axis_id=self._selected_axis, hip_id=self._hip_id)
+            )
+
+        # Claim new
+        self.intent_out.send_intent(ClaimAxis(axis_id=axis_id, hip_id=self._hip_id))
+        self._selected_axis = axis_id
+

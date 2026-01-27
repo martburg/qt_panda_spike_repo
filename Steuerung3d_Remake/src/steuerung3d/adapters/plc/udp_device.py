@@ -87,9 +87,12 @@ class UdpPlcDevice:
                 continue
             tx = self.codec.decode_tx(ln)
             axis = tx.get("axis")
-            if not axis or axis not in state.axes:
+            if not axis:
                 continue
-            ax = state.axes[axis]
+            # Discovery: create axes on first sight so HiPs can select them.
+            ax = state.ensure_axis(str(axis))
+            # Record last-seen (core tick) for UI/health decisions.
+            ax.meta["last_seen_tick"] = int(state.tick)
             ax.enabled = bool(parse_bool(tx.get("enabled", "0")))
             ax.vel = float(parse_float(tx.get("vel", "0")))
             ax.pos = float(parse_float(tx.get("pos", "0")))

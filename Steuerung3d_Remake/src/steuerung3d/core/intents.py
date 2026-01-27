@@ -10,6 +10,8 @@ class EnableAxis:
     type: Literal["enable_axis"] = "enable_axis"
     axis_id: str = ""
     enable: bool = True
+    # Optional: the HiP identity sending this command (used for claim enforcement)
+    hip_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -17,6 +19,27 @@ class JogAxis:
     type: Literal["jog_axis"] = "jog_axis"
     axis_id: str = ""
     vel: float = 0.0  # units/s (placeholder)
+    # Optional: the HiP identity sending this command (used for claim enforcement)
+    hip_id: str = ""
+
+
+@dataclass(frozen=True)
+class ClaimAxis:
+    """Claim exclusive control of an axis (auto-claimed by HiP on selection)."""
+    type: Literal["claim_axis"] = "claim_axis"
+    axis_id: str = ""
+    hip_id: str = ""
+    # Optional correlation
+    req_id: str = ""
+
+
+@dataclass(frozen=True)
+class ReleaseAxis:
+    """Release a previously claimed axis."""
+    type: Literal["release_axis"] = "release_axis"
+    axis_id: str = ""
+    hip_id: str = ""
+    req_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -83,79 +106,11 @@ class ParamCancel:
 
 
     
-
-
-# -------- Rig workflow (DenSi pairing + sync + recovery) --------
-
-RigModeName = Literal["DISCOVERY", "SETUP_MANUAL", "ARMED_SYNC", "SYNC_ACTIVE", "SYNC_RECOVER", "FAULT_SYNC"]
-
-
-@dataclass(frozen=True)
-class SetRigMode:
-    type: Literal["set_rig_mode"] = "set_rig_mode"
-    rig_mode: RigModeName = "DISCOVERY"
-
-
-@dataclass(frozen=True)
-class ClaimDensi:
-    type: Literal["claim_densi"] = "claim_densi"
-    device_id: str = ""
-    hip_id: str = ""
-    req_id: str = ""
-
-
-@dataclass(frozen=True)
-class ReleaseDensi:
-    type: Literal["release_densi"] = 'release_densi'
-    device_id: str = ""
-    hip_id: str = ""
-    req_id: str = ""
-
-
-@dataclass(frozen=True)
-class SetDensiParticipating:
-    type: Literal["set_densi_participating"] = "set_densi_participating"
-    device_id: str = ""
-    participating: bool = True
-
-
-@dataclass(frozen=True)
-class SetDensiAnchor:
-    type: Literal["set_densi_anchor"] = "set_densi_anchor"
-    device_id: str = ""
-    x: float = 0.0
-    y: float = 0.0
-    z: float = 0.0
-
-
-@dataclass(frozen=True)
-class ArmSync:
-    type: Literal["arm_sync"] = "arm_sync"
-
-
-@dataclass(frozen=True)
-class EnterSync:
-    type: Literal["enter_sync"] = "enter_sync"
-
-
-@dataclass(frozen=True)
-class DisarmToSetup:
-    type: Literal["disarm_to_setup"] = "disarm_to_setup"
-
-
-@dataclass(frozen=True)
-class RecoverToLastGood:
-    type: Literal["recover_to_last_good"] = "recover_to_last_good"
-
-
-@dataclass(frozen=True)
-class ResyncNow:
-    type: Literal["resync_now"] = "resync_now"
-
-
 Intent = Union[
     EnableAxis,
     JogAxis,
+    ClaimAxis,
+    ReleaseAxis,
     SetEstop,
     RequestEstopReset,  # NEW
     ArmLiveMode,
@@ -164,14 +119,4 @@ Intent = Union[
     ParamEditBegin,
     ParamWrite,
     ParamCancel,
-    SetRigMode,
-    ClaimDensi,
-    ReleaseDensi,
-    SetDensiParticipating,
-    SetDensiAnchor,
-    ArmSync,
-    EnterSync,
-    DisarmToSetup,
-    RecoverToLastGood,
-    ResyncNow,
 ]
