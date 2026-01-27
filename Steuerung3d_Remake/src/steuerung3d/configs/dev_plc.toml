@@ -1,0 +1,21 @@
+# Local dev config for TwinCAT legacy UDP SIM fleet tests.
+# Used by: src/steuerung3d/tests/test_plc_twincat_legacy_fleet_from_toml.py
+
+[device.plc_twincat_legacy_fleet.defaults]
+remote_port = 15001
+
+[[device.plc_twincat_legacy_fleet.axes]]
+axis_id = "Anton"
+local_port = 51001
+
+[[device.plc_twincat_legacy_fleet.axes]]
+axis_id = "Burt"
+local_port = 51002
+
+[[device.plc_twincat_legacy_fleet.axes]]
+axis_id = "Cecil"
+local_port = 51003
+
+[[device.plc_twincat_legacy_fleet.axes]]
+axis_id = "Debby"
+local_port = 51004

@@ -35,7 +35,14 @@ def test_udp_device_discovers_unknown_axis_from_telemetry():
     st.tick = 1
 
     # We must send at least one axis in cmd, or UdpPlcDevice.step() returns early.
-    cmd = CommandFrame(axes={"X": AxisSetpoint(enable=True, vel=0.0)})
+    cmd = CommandFrame(
+            tick=1,
+            t_s=0.0,
+            estop=False,
+            fault=False,
+            mode='LIVE',
+            axes={'X': AxisSetpoint(enable=True, vel=0.0)},
+        )
 
     dev.step(st, cmd, dt=0.01)
 
