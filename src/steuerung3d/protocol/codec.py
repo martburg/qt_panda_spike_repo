@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any, Dict, Union
 
+from steuerung3d.protocol.raw_controls import RawControls
+
 from steuerung3d.core.intents import (
     ArmLiveMode,
     ClearFault,
@@ -91,6 +93,28 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
         param_commit_status=str(payload.get("param_commit_status", "idle")),
         param_commit_age_ticks=int(payload.get("param_commit_age_ticks", 0)),
         param_commit_unmatched=[str(x) for x in list(payload.get("param_commit_unmatched", []))],
+    )
+
+
+
+# ---------------------------
+# RawControls (human input seam)
+# ---------------------------
+
+def encode_raw_controls(rc: RawControls) -> Dict[str, Any]:
+    return asdict(rc)
+
+
+def decode_raw_controls(payload: Dict[str, Any]) -> RawControls:
+    # keep decoding resilient (older logs / missing keys)
+    axes_in = payload.get("axes", [])
+    buttons_in = payload.get("buttons", [])
+    return RawControls(
+        type=str(payload.get("type", "raw_controls")),
+        t_ns=int(payload.get("t_ns", 0)),
+        src=str(payload.get("src", "")),
+        axes=[float(x) for x in list(axes_in)],
+        buttons=[int(x) for x in list(buttons_in)],
     )
 
 # ---------------------------

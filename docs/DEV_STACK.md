@@ -28,6 +28,18 @@ python -m steuerung3d.apps.dev_stack --config ..\configs\dev_plc.toml
 
 For the HiP/DenSi split UI ("Yellow"), run three processes (three terminals):
 
+**Windows Terminal tip (recommended):**
+- Open a terminal in the repo root (Explorer address bar → type `wt` → Enter)
+- Split into 3 panes (`Alt+Shift+D` twice)
+- In each pane, activate your environment and ensure you're in the repo root.
+
+Also make sure you run the modules as `python -m steuerung3d...` (not `src.steuerung3d...`). If needed, do:
+
+```powershell
+python -m pip install -e .
+```
+
+
 1) Core UDP service
 
 ```powershell

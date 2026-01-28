@@ -1,5 +1,6 @@
 # Docs index
 
+- `docs/MANUAL_TESTING.md` — manual runbook (what to run and what to observe)
 - `docs/transport.md` — transport abstraction, recording, deep debugging hooks (CommandFrame logging)
 - `docs/config.md` — TOML config overview and per-stack schemas
 - `docs/plc_stack.md` — PLC stack architecture, builder surface, testing strategy
@@ -14,8 +15,8 @@ Quick start:
 python -m steuerung3d.apps.plc_stack --config configs/plc_stack.toml
 
 # Dev stack (SIM-first)
-python -m steuerung3d.apps.dev_stack --config configs/dev_stack.toml
+python -m steuerung3d.apps.dev_stack --config configs/dev_plc.toml
 
 # View logs (commanded vs measured)
-python -m steuerung3d.apps.log_viewer logs/session.jsonl --config configs/log_viewer.toml
+python -m steuerung3d.apps.log_viewer logs/session.jsonl --show-intents
 ```

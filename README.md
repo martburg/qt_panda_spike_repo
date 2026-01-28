@@ -48,9 +48,15 @@ pip install pytest
 pytest -q
 ```
 
+Manual runbook:
+
+- `docs/MANUAL_TESTING.md` (recommended after `pytest -q` stays green)
+
 ### Run the HiP ↔ Core ↔ DenSi UDP demo (Yellow UI)
 
 Open three terminals:
+
+**Windows Terminal tip:** open in repo folder (`wt`), then split panes (`Alt+Shift+D`) to get 3 terminals in the right folder.
 
 ```powershell
 python -m steuerung3d.apps.core_udp_service --dt 0.1

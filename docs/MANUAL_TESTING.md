@@ -1,0 +1,149 @@
+# Manual testing runbook
+
+This runbook complements the automated pytest suite with a **repeatable, observable** manual routine.
+
+## Preflight (always)
+
+From repo root (env active):
+
+```powershell
+pytest -q
+```
+
+Optional: clear previous logs
+
+```powershell
+if (Test-Path .\logs) { Remove-Item .\logs\* -Force }
+```
+
+## Environment sanity (Windows)
+
+The apps are meant to be imported as `steuerung3d.*` (not `src.steuerung3d.*`).
+
+From repo root, do an editable install once per environment:
+
+```powershell
+python -m pip install -e .
+```
+
+Quick check:
+
+```powershell
+python -c "import importlib.util as u; print(u.find_spec('steuerung3d'))"
+```
+
+## Test A — Core + SIM via CLI client (fast sanity)
+
+Run:
+
+```powershell
+python -m steuerung3d.apps.cli_client
+```
+
+Suggested interaction:
+
+```
+show
+live
+enable X on
+jog X 0.6
+show
+estop on
+show
+estop off
+clearfault
+idle
+quit
+```
+
+What to look for:
+- after `live` + `enable` + `jog`, X telemetry should show motion
+- after `estop on`, commanded motion stops and state reflects ESTOP
+- `idle` leaves LIVE mode cleanly
+
+## Test B — Dev stack end-to-end + JSONL log
+
+Run:
+
+```powershell
+python -m steuerung3d.apps.dev_stack --config configs\dev_plc.toml
+```
+
+What to look for:
+- periodic status lines (tick/t/mode/estop)
+- if not on the PLC network, a message about **UDP SIM fallback** is expected
+
+Then inspect the run:
+
+```powershell
+python -m steuerung3d.apps.log_viewer .\logs\session.jsonl --show-intents
+```
+
+## Test C — Yellow UDP seam: HiP ↔ Core ↔ DenSi (3 processes)
+
+### Open 3 terminals in the repo root
+
+**Windows Terminal**
+- Open in repo folder (Explorer address bar → type `wt` → Enter)
+- Split panes: `Alt+Shift+D` twice (3 panes)
+- In each pane:
+
+```powershell
+conda activate steuerung3d
+cd C:\Users\Martin\Documents\Steuerung3d_Remake\dev
+```
+
+(Or use your venv activation instead of conda.)
+
+### Start the three processes
+
+Pane 1 (Core UDP service):
+
+```powershell
+python -m steuerung3d.apps.core_udp_service --dt 0.1 --log-level debug
+```
+
+Pane 2 (DenSi):
+
+```powershell
+python -m steuerung3d.apps.den_si
+```
+
+Pane 3 (HiP):
+
+```powershell
+python -m steuerung3d.apps.hi_p
+```
+
+### What to try in HiP
+
+**C1 — Edit / Cancel**
+- Press **Pos Edit** (fields unlock; other edits/tabs lock = modal edit)
+- Change a value
+- Press **Pos Cancel** (revert and exit edit mode)
+
+**C2 — Edit / Write**
+- Press **Pos Edit**, change values, press **Pos Write**
+- Expect: HiP waits for confirmation (by observing DenSi telemetry) and shows an “applied” dialog
+
+**C3 — Constraints**
+- Enter invalid limit combinations
+- Expect: HiP auto-adjusts to satisfy:
+  - `HardMax ≥ UserMax ≥ UserMin ≥ HardMin`
+  - Guider clamps to ensure `PosMin ≤ PosMax`
+- HiP shows an info dialog listing corrections before sending
+
+## Test D — PLC legacy fleet wiring (real vs UDP SIM fallback)
+
+Run the dev stack with `device.kind = "plc_twincat_legacy_fleet"`.
+
+- Off-network: it should automatically use loopback UDP PLC simulators.
+- On-network: it should bind to the configured `controller_ip` and use the real adapter.
+
+## Regression guard added (why Test C won’t silently break again)
+
+`udp_channels.py` imports helpers from `protocol.codec`. A refactor can accidentally remove them and only break the apps at runtime.
+
+We keep a small pytest tripwire:
+
+- `tests/test_protocol_imports.py` imports `udp_channels` and round-trips `RawControls`.

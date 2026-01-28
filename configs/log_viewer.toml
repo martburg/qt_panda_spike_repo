@@ -1,0 +1,24 @@
+# Log viewer defaults (CLI can override anything here)
+#
+# Usage:
+#   python -m steuerung3d.apps.log_viewer .\logs\session.jsonl
+#   python -m steuerung3d.apps.log_viewer .\logs\session.jsonl --show-intents
+#
+# You can also override:
+#   --from-tick / --to-tick / --every / --axes / --no-pos
+#
+[view]
+# Show ticks starting at this tick (inclusive); omit for "from beginning"
+#from_tick = 0
+
+# Show ticks up to this tick (inclusive); omit for "to end"
+#to_tick = 500
+
+# Only show every Nth tick (after filtering). Useful for long runs.
+#every = 10
+
+# Optional fixed axis list. If omitted, viewer derives axes from the log.
+#axes = ["Anton", "Burt", "Cecil", "Debby"]
+
+# Include measured position columns in table output.
+show_pos = true
