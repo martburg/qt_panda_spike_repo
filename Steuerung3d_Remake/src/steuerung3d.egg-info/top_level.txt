@@ -1,2 +1,0 @@
-logs
-steuerung3d

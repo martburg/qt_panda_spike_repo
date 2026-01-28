@@ -1,0 +1,23 @@
+[project]
+name = "steuerung3d"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["transitions>=0.9"]
+
+[project.optional-dependencies]
+input = ["pygame>=2.0"]
+dev = ["pytest>=7", "pytest-cov"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+# Tests live at repo root.
+testpaths = ["tests"]

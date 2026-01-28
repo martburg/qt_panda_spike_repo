@@ -1,0 +1,67 @@
+# configs/plc_stack.toml
+#
+# PLC stack configuration (UDP). This file is now the authoritative wiring description.
+#
+# Notes:
+# - Multiple PLC endpoints are supported via [[plc_endpoints]].
+# - Each endpoint owns 1..N axes (axis_ids). Axis ownership must be unique across endpoints.
+# - The PLC wire format is assumed to be semicolon-delimited, order-sensitive.
+
+[app]
+dt_s = 0.01
+realtime = true
+log_path = "logs/session_plc.jsonl"
+
+# --- Example: one PLC per axis (Anton/Burt/Cecil/Debby) ---
+
+[[plc_endpoints]]
+name = "Anton"
+bind_host = "0.0.0.0"
+bind_port = 51001
+target_host = "172.16.17.1"
+target_port = 50001
+axis_ids = ["X"]
+delimiter = ";"
+encoding = "ascii"
+float_fmt = "{:.6f}"
+true_token = "1"
+false_token = "0"
+
+[[plc_endpoints]]
+name = "Burt"
+bind_host = "0.0.0.0"
+bind_port = 51002
+target_host = "172.16.17.2"
+target_port = 50001
+axis_ids = ["Y"]
+delimiter = ";"
+encoding = "ascii"
+float_fmt = "{:.6f}"
+true_token = "1"
+false_token = "0"
+
+[[plc_endpoints]]
+name = "Cecil"
+bind_host = "0.0.0.0"
+bind_port = 51003
+target_host = "172.16.17.3"
+target_port = 50001
+axis_ids = ["Z"]
+delimiter = ";"
+encoding = "ascii"
+float_fmt = "{:.6f}"
+true_token = "1"
+false_token = "0"
+
+[[plc_endpoints]]
+name = "Debby"
+bind_host = "0.0.0.0"
+bind_port = 51004
+target_host = "172.16.17.4"
+target_port = 50001
+axis_ids = ["W"]
+delimiter = ";"
+encoding = "ascii"
+float_fmt = "{:.6f}"
+true_token = "1"
+false_token = "0"

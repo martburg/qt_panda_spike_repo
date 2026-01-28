@@ -1,0 +1,101 @@
+diff --git a/src/steuerung3d/apps/yellow/controllers/hip_controller.py b/src/steuerung3d/apps/yellow/controllers/hip_controller.py
+index 1111111..2222222 100644
+--- a/src/steuerung3d/apps/yellow/controllers/hip_controller.py
++++ b/src/steuerung3d/apps/yellow/controllers/hip_controller.py
+@@ -1,6 +1,6 @@
+ # src/steuerung3d/apps/yellow/controllers/hip_controller.py
+ from __future__ import annotations
+
+@@
+     def _normalize_guider_range(self, values: dict[str, float]) -> dict[str, float]:
+-        """Enforce PosMin < PosMax for guider group."""
++        """Enforce PosMin <= PosMax for guider group (clamp; do not swap)."""
+         v = dict(values)
+         if "PosMin" not in v or "PosMax" not in v:
+             return v
+
+         pos_min = float(v["PosMin"])
+         pos_max = float(v["PosMax"])
+
+-        if pos_min > pos_max:
+-            pos_min, pos_max = pos_max, pos_min
+-        if pos_min == pos_max:
+-            pos_max = pos_min + (1e-6 * (abs(pos_min) + 1.0))
++        # Clamp so that min <= max without swapping (avoid surprising jumps).
++        if pos_min > pos_max:
++            pos_min = pos_max
+
+         v["PosMin"] = pos_min
+         v["PosMax"] = pos_max
+         return v
+
+@@
+     def _tx_param_write(self, group: str) -> None:
+         # Normalize locally so HIP fields reflect what is actually sent.
+         vals = self._read_param_values(group)
+
+         fixed = dict(vals)
+         if group == "pos":
+             fixed = self._normalize_pos_chain(fixed)
+         elif group == "guider":
+             fixed = self._normalize_guider_range(fixed)
+
+         if fixed != vals:
+             log.info("param guards adjusted %s values (writing back to UI)", group)
+             self._write_back_values(group, fixed)
++
++            # Inform operator when the position-chain rule was enforced.
++            if group == "pos":
++                def _fmt(x: float) -> str:
++                    return f"{float(x):g}"
++                lines: list[str] = []
++                for k in ("HardMax", "UserMax", "UserMin", "HardMin"):
++                    if k in vals and k in fixed and float(vals[k]) != float(fixed[k]):
++                        lines.append(f"{k}: {_fmt(vals[k])} → {_fmt(fixed[k])}")
++                if lines:
++                    QMessageBox.information(
++                        self.win,
++                        "Position limits adjusted",
++                        "The rule HardMax ≥ UserMax ≥ UserMin ≥ HardMin was enforced.\n\n"
++                        + "\n".join(lines),
++                    )
+
+         session_id = self._ensure_session(group)
+         req_id = self._next_req_id()
+         intent = ParamWrite(group=group, values=fixed, req_id=req_id, session_id=session_id)
+diff --git a/src/steuerung3d/core/param_registry.py b/src/steuerung3d/core/param_registry.py
+index 3333333..4444444 100644
+--- a/src/steuerung3d/core/param_registry.py
++++ b/src/steuerung3d/core/param_registry.py
+@@
+     if g == "guider":
+         if "PosMin" in v and "PosMax" in v:
+             lo = float(v["PosMin"])
+             hi = float(v["PosMax"])
+-            if hi < lo:
+-                lo, hi = hi, lo
+-                warnings.append("guider: swapped PosMin/PosMax")
+-            if hi == lo:
+-                hi = lo + 1e-6
+-                warnings.append("guider: nudged PosMax (PosMin==PosMax)")
++            # Clamp so that PosMin <= PosMax without swapping.
++            if lo > hi:
++                lo = hi
++                warnings.append("guider: clamped PosMin to PosMax")
+             v["PosMin"] = lo
+             v["PosMax"] = hi
+
+     return v, warnings
+diff --git a/src/steuerung3d/tests/unit/test_param_registry_and_observed_commit.py b/src/steuerung3d/tests/unit/test_param_registry_and_observed_commit.py
+index 5555555..6666666 100644
+--- a/src/steuerung3d/tests/unit/test_param_registry_and_observed_commit.py
++++ b/src/steuerung3d/tests/unit/test_param_registry_and_observed_commit.py
+@@
+ def test_normalize_guider_posmin_posmax() -> None:
+     vals, warnings = normalize_group_values("guider", {"PosMin": 7, "PosMax": 3, "Pitch": 1})
+-    assert vals["PosMin"] == 3.0
+-    assert vals["PosMax"] == 7.0
++    # Clamp (no swapping): PosMin is clamped down to PosMax so that PosMin <= PosMax.
++    assert vals["PosMin"] == 3.0
++    assert vals["PosMax"] == 3.0
+     assert warnings
