@@ -24,6 +24,28 @@ def decode_datagram(data: bytes, encoding: str = "utf-8") -> DecodedDatagram:
         return DecodedDatagram(text=text, json_obj=None)
 
 
+def listen_once(
+    host: str,
+    port: int,
+    *,
+    timeout_s: float = 1.0,
+    bufsize: int = 65535,
+    encoding: str = "utf-8",
+) -> Tuple[DecodedDatagram, Tuple[str, int]]:
+    """Receive a single UDP datagram and decode it.
+
+    This helper exists primarily for tests and quick scripts.
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.bind((host, port))
+        sock.settimeout(timeout_s)
+        data, addr = sock.recvfrom(bufsize)
+        return decode_datagram(data, encoding=encoding), addr
+    finally:
+        sock.close()
+
+
 def _fmt_float(x: Any) -> str:
     try:
         return f"{float(x): .3f}".strip()

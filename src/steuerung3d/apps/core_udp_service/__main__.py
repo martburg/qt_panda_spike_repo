@@ -5,6 +5,7 @@ import logging
 
 import argparse
 import signal
+from typing import Tuple, List
 
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.engine import CoreEngine
@@ -20,6 +21,17 @@ from steuerung3d.protocol.udp_channels import (
 log = logging.getLogger("core_udp_service")
 
 
+def _parse_hostport(s: str, default_host: str = "127.0.0.1") -> Tuple[str, int]:
+    s = (s or "").strip()
+    if not s:
+        raise ValueError("empty host:port")
+    if s.count(":") == 0:
+        return (default_host, int(s))
+    host, port_s = s.rsplit(":", 1)
+    host = host.strip() or default_host
+    return (host, int(port_s))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
@@ -29,6 +41,50 @@ def main() -> int:
         action="append",
         default=["X"],
         help="Axis ids to initialize in core state (repeatable). Example: --axis Anton --axis Debby",
+    )
+    ap.add_argument(
+        "--dev-cmd-target",
+        action="append",
+        default=[],
+        help=(
+            "Device CommandOut target(s) as host:port. Repeatable. "
+            "If not provided, defaults to 127.0.0.1:52001. "
+            "Use this to broadcast command frames to multiple DenSi instances."
+        ),
+    )
+    ap.add_argument(
+        "--dev-cmd-base",
+        default=None,
+        help="Convenience: base port for Device CommandOut broadcast (e.g. 52001).",
+    )
+    ap.add_argument(
+        "--dev-cmd-count",
+        type=int,
+        default=0,
+        help="Convenience: number of Device CommandOut targets to generate from base port.",
+    )
+
+    # UI telemetry broadcast targets (multiple HiP windows)
+    ap.add_argument(
+        "--ui-telem-target",
+        action="append",
+        default=[],
+        help=(
+            "UI TelemetryOut target(s) as host:port. Repeatable. "
+            "If not provided, defaults to 127.0.0.1:51002. "
+            "Use this to broadcast telemetry to multiple HiP instances."
+        ),
+    )
+    ap.add_argument(
+        "--ui-telem-base",
+        default=None,
+        help="Convenience: base port for UI TelemetryOut broadcast (e.g. 51002).",
+    )
+    ap.add_argument(
+        "--ui-telem-count",
+        type=int,
+        default=0,
+        help="Convenience: number of UI TelemetryOut targets to generate from base port.",
     )
     args = ap.parse_args()
 
@@ -40,10 +96,35 @@ def main() -> int:
 
     # --- UDP endpoints ---
     op_intent_in = UdpIntentIn.bind(("127.0.0.1", 51001))
-    op_telem_out = UdpTelemetryOut.connect(("127.0.0.1", 51002))
+
+    # UI telemetry broadcast targets
+    ui_telem_targets: List[Tuple[str, int]] = []
+    for s in args.ui_telem_target:
+        ui_telem_targets.append(_parse_hostport(s))
+    if args.ui_telem_base is not None and int(args.ui_telem_count) > 0:
+        base = int(str(args.ui_telem_base).strip())
+        for i in range(int(args.ui_telem_count)):
+            ui_telem_targets.append(("127.0.0.1", base + i))
+    if not ui_telem_targets:
+        ui_telem_targets = [("127.0.0.1", 51002)]
+    op_telem_outs = [UdpTelemetryOut.connect(t) for t in ui_telem_targets]
 
     dev_telem_in = UdpTelemetryIn.bind(("127.0.0.1", 52002))
-    dev_cmd_out  = UdpCommandOut.connect(("127.0.0.1", 52001))
+
+    # Device command broadcast targets (N DenSi apps each binding a unique command port)
+    dev_cmd_targets: List[Tuple[str, int]] = []
+    for s in args.dev_cmd_target:
+        dev_cmd_targets.append(_parse_hostport(s))
+
+    if args.dev_cmd_base is not None and int(args.dev_cmd_count) > 0:
+        base = int(str(args.dev_cmd_base).strip())
+        for i in range(int(args.dev_cmd_count)):
+            dev_cmd_targets.append(("127.0.0.1", base + i))
+
+    if not dev_cmd_targets:
+        dev_cmd_targets = [("127.0.0.1", 52001)]
+
+    dev_cmd_outs = [UdpCommandOut.connect(t) for t in dev_cmd_targets]
 
     stats = {
         "intents_in": 0,
@@ -62,8 +143,14 @@ def main() -> int:
 
     log.info("=== core_udp_service starting ===")
     log.info("Operator: IntentIn  bind=%s", ("127.0.0.1", 51001))
-    log.info("Operator: TelemetryOut target=%s", ("127.0.0.1", 51002))
-    log.info("Device:   CommandOut target=%s", ("127.0.0.1", 52001))
+    if len(ui_telem_targets) == 1:
+        log.info("Operator: TelemetryOut target=%s", ui_telem_targets[0])
+    else:
+        log.info("Operator: TelemetryOut broadcast targets=%s", ui_telem_targets)
+    if len(dev_cmd_targets) == 1:
+        log.info("Device:   CommandOut target=%s", dev_cmd_targets[0])
+    else:
+        log.info("Device:   CommandOut broadcast targets=%s", dev_cmd_targets)
     log.info("Device:   TelemetryIn bind=%s", ("127.0.0.1", 52002))
 
     # --- core state ---
@@ -89,7 +176,9 @@ def main() -> int:
     def device_step(state, cmd_frame, dt):
         nonlocal t_last_report
 
-        dev_cmd_out.publish_command_frame(cmd_frame)
+        # Broadcast command frame to all device endpoints.
+        for tx in dev_cmd_outs:
+            tx.publish_command_frame(cmd_frame)
         stats["cmd_out"] += 1
         last_seen["cmd_ts"] = time.monotonic()
 
@@ -126,7 +215,8 @@ def main() -> int:
             t_last_report = now
 
     def on_snapshot(snap: TelemetrySnapshot):
-        op_telem_out.publish_telemetry(snap)
+        for tx in op_telem_outs:
+            tx.publish_telemetry(snap)
         stats["ui_telem_out"] += 1
         last_seen["ui_telem_ts"] = time.monotonic()
 

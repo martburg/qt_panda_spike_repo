@@ -40,11 +40,18 @@ z = 2
 # Typical Xbox layout: A=0, B=1, X=2, Y=3, LB=4, RB=5, Back=6, Start=7
 # Adjust as needed.
 deadman = 5
-fine = 4
-winch_prev = 6
-winch_next = 7
-mode_toggle = 3
-stop = 1
+# setup_manual: momentary multi-select winches (hold to select)
+select_0 = 0
+select_1 = 1
+select_2 = 2
+select_3 = 3
+
+# fine mode (user muscle memory)
+fine = 7
+
+# optional extras (uncomment + adjust if you want them)
+# mode_toggle = 6
+# smooth_stop = 7
 
 [filters]
 # Deadzone and expo are applied after reading axes.

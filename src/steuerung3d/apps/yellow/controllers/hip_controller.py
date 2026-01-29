@@ -80,6 +80,10 @@ class HiPController:
         self._hip_id: str = f"hip-{uuid.uuid4().hex[:8]}"
         self._cmb_axis: QComboBox | None = self.win.findChild(QComboBox, "cmb_axis")
         self._selected_axis: str = ""
+        # Optional: pin this HiP instance to a single axis (useful for one-window-per-axis setup)
+        self._fixed_axis: str = ""
+        self._lock_axis_combo: bool = False
+        self._fixed_axis_applied: bool = False
         if self._cmb_axis is not None:
             self._cmb_axis.currentTextChanged.connect(self._on_axis_selected)
 
@@ -132,6 +136,23 @@ class HiPController:
 
         # paint all known dots as "unknown"
         self._set_all_estop_unknown()
+
+    # ---------- public helpers ----------
+
+    def set_fixed_axis(self, axis_id: str, *, lock_combo: bool = True) -> None:
+        """Pin this HiP to a specific axis.
+
+        The combo box will auto-select this axis once telemetry discovery populates it.
+        Optionally disables the combo to avoid accidental re-targeting.
+        """
+        self._fixed_axis = (axis_id or "").strip()
+        self._lock_axis_combo = bool(lock_combo)
+        self._fixed_axis_applied = False
+        if self._fixed_axis:
+            try:
+                self.win.setWindowTitle(f"HMI – HiP ({self._fixed_axis})")
+            except Exception:
+                pass
 
     # ---------- LED helpers ----------
 
@@ -804,8 +825,14 @@ class HiPController:
         try:
             self._cmb_axis.clear()
             self._cmb_axis.addItems(axis_ids)
-            # restore selection if possible
-            if cur and cur in axis_ids:
+            # Prefer pinned axis if configured
+            if self._fixed_axis and (self._fixed_axis in axis_ids):
+                self._cmb_axis.setCurrentText(self._fixed_axis)
+                self._fixed_axis_applied = True
+                if self._lock_axis_combo:
+                    self._cmb_axis.setEnabled(False)
+            # otherwise restore selection if possible
+            elif cur and cur in axis_ids:
                 self._cmb_axis.setCurrentText(cur)
             else:
                 self._cmb_axis.setCurrentText(axis_ids[0])

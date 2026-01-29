@@ -114,13 +114,41 @@ def synthesize_intents(
         if fine:
             rate *= float(lim.fine_scale)
 
-        if deadman:
-            wid = rig.winches[st.selected_winch_idx] if rig.winches else "WINCH"
-            out.append(JogWinch(winch_id=wid, rate=float(rate)))
-        elif st.prev_deadman:
-            # deadman released => hard stop once
-            wid = rig.winches[st.selected_winch_idx] if rig.winches else "WINCH"
-            out.append(JogWinch(winch_id=wid, rate=0.0))
+        # --- Setup selection semantics ---
+        # Prefer momentary multi-select via buttons select_0..select_3 (or more), mapping to rig.winches[i].
+        # If no select_* keys exist, fall back to legacy next/prev single selection.
+        select_keys = [k for k in bind.buttons.keys() if k.startswith("select_")]
+        selected_idxs: List[int] = []
+        if select_keys and rig.winches:
+            # Determine max index present in config
+            max_i = -1
+            for k in select_keys:
+                try:
+                    i = int(k.split("_", 1)[1])
+                    max_i = max(max_i, i)
+                except Exception:
+                    pass
+            for i in range(0, min(len(rig.winches), max_i + 1)):
+                if _get_btn(rc, bind.buttons.get(f"select_{i}")):
+                    selected_idxs.append(i)
+        else:
+            # Legacy single-selected winch.
+            if deadman and rig.winches:
+                selected_idxs = [st.selected_winch_idx]
+
+        active_idxs = set(selected_idxs) if deadman else set()
+
+        # Emit hard-stops for winches that were active last tick but are no longer active.
+        for idx in sorted(st.prev_active_winch_idxs - active_idxs):
+            if 0 <= idx < len(rig.winches):
+                out.append(JogWinch(winch_id=rig.winches[idx], rate=0.0))
+
+        # Emit jog for all currently active winches.
+        for idx in sorted(active_idxs):
+            if 0 <= idx < len(rig.winches):
+                out.append(JogWinch(winch_id=rig.winches[idx], rate=float(rate)))
+
+        st.prev_active_winch_idxs = active_idxs
 
     else:  # sync_live
         vx = _get_axis(rc, bind.axes.get("x"))

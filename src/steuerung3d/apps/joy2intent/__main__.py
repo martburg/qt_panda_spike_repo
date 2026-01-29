@@ -77,9 +77,16 @@ def main() -> int:
                 if age_ms > cfg.stale_after_ms and not sent_stale_zero:
                     # Emit stop for both domains; core will ignore the one that doesn't match current mode
                     intent_out.publish_intent(JogCartesian(vx=0.0, vy=0.0, vz=0.0))  # type: ignore[name-defined]
-                    # Can't know selected winch reliably without new samples; pick current
-                    wid = rig.winches[st.selected_winch_idx] if rig.winches else "WINCH"
-                    intent_out.publish_intent(JogWinch(winch_id=wid, rate=0.0))      # type: ignore[name-defined]
+                    # Stop any winches that were actively driven last tick.
+                    if rig.winches and st.prev_active_winch_idxs:
+                        for idx in sorted(st.prev_active_winch_idxs):
+                            if 0 <= idx < len(rig.winches):
+                                intent_out.publish_intent(JogWinch(winch_id=rig.winches[idx], rate=0.0))  # type: ignore[name-defined]
+                        st.prev_active_winch_idxs.clear()
+                    else:
+                        # Fallback (legacy single-select)
+                        wid = rig.winches[st.selected_winch_idx] if rig.winches else "WINCH"
+                        intent_out.publish_intent(JogWinch(winch_id=wid, rate=0.0))      # type: ignore[name-defined]
                     sent_stale_zero = True
 
         next_t += dt

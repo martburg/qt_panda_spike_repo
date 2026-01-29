@@ -6,7 +6,6 @@ from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.intents import ClaimAxis, ReleaseAxis, EnableAxis, JogAxis, ArmLiveMode
 from steuerung3d.core.state import MachineState
 
-
 def test_claim_axis_idempotent_and_exclusive():
     st = MachineState()
     apply_intent(st, ClaimAxis(axis_id="Anton", hip_id="hipA", req_id="r1"))
