@@ -23,7 +23,13 @@ log = logging.getLogger("core_udp_service")
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
-    ap.add_argument("--dt", type=float, default=0.1)
+    ap.add_argument("--dt", type=float, default=0.02, help="Core tick (s)")
+    ap.add_argument(
+        "--axis",
+        action="append",
+        default=["X"],
+        help="Axis ids to initialize in core state (repeatable). Example: --axis Anton --axis Debby",
+    )
     args = ap.parse_args()
 
     logging.basicConfig(
@@ -65,8 +71,12 @@ def main() -> int:
     log.info("timebase dt = %.4fs", tb.dt_s)
 
     st = MachineState()
-    st.ensure_axis("X")  # start small
-    st.ensure_axis_cmd("X")
+    axis_ids = [a.strip() for a in args.axis if a and a.strip()]
+    if not axis_ids:
+        axis_ids = ["X"]
+    for a in axis_ids:
+        st.ensure_axis(a)
+        st.ensure_axis_cmd(a)
 
     def drain_intents():
         ints = op_intent_in.drain_intents(limit=200)

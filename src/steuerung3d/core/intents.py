@@ -67,6 +67,64 @@ class ClearFault:
     type: Literal["clear_fault"] = "clear_fault"
 
 
+# -------- Joystick / operator motion intents (v0.1) --------
+
+
+ControlMode = Literal["setup_manual", "sync_live"]
+
+
+@dataclass(frozen=True)
+class SetControlMode:
+    """Select a joystick control sub-mode.
+
+    Note: This is distinct from the core safety/machine Mode (IDLE/LIVE/ESTOP).
+    It's an operator-side mode that influences how joystick samples are
+    interpreted (e.g. manual winch jog vs cartesian jog).
+    """
+
+    type: Literal["set_control_mode"] = "set_control_mode"
+    mode: ControlMode = "setup_manual"
+
+
+@dataclass(frozen=True)
+class JogWinch:
+    """Jog a named winch/axis at a signed rate (units/s).
+
+    In the current architecture, winches are represented as axes, so this intent
+    is a semantic alias for JogAxis with axis_id==winch_id.
+    """
+
+    type: Literal["jog_winch"] = "jog_winch"
+    winch_id: str = ""
+    rate: float = 0.0
+    hip_id: str = ""
+
+
+@dataclass(frozen=True)
+class JogCartesian:
+    """Jog in cartesian space (vx, vy, vz).
+
+    v0.1: the core does not yet contain rig kinematics. If axes named X/Y/Z exist,
+    the core may map this intent directly to those axes; otherwise it is ignored.
+    """
+
+    type: Literal["jog_cartesian"] = "jog_cartesian"
+    vx: float = 0.0
+    vy: float = 0.0
+    vz: float = 0.0
+    hip_id: str = ""
+
+
+@dataclass(frozen=True)
+class SmoothStop:
+    """Request a gentle stop (policy/trajectory layer can interpret this).
+
+    v0.1: implemented as an immediate velocity zero on all enabled axes.
+    """
+
+    type: Literal["smooth_stop"] = "smooth_stop"
+
+
 # -------- Parameters (axis-agnostic, v0.1) --------
 
 ParamGroup = Literal["pos", "vel", "filter"]
@@ -109,6 +167,10 @@ class ParamCancel:
 Intent = Union[
     EnableAxis,
     JogAxis,
+    JogWinch,
+    JogCartesian,
+    SetControlMode,
+    SmoothStop,
     ClaimAxis,
     ReleaseAxis,
     SetEstop,

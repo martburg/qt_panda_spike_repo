@@ -6,7 +6,10 @@ Package-level defaults / embedded example configs shipped with the library.
 
 ## Files
 
-- `__init__.py`
+- `dev_plc.toml`
+- `inputd_gamepad.toml`
+- `joy2intent_gamepad.toml`
+- `log_viewer.toml`
 - `plc_stack.toml`
 
 ## Key entry points

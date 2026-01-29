@@ -8,6 +8,10 @@ from steuerung3d.core.intents import (
     ClaimAxis,
     ReleaseAxis,
     JogAxis,
+    JogWinch,
+    JogCartesian,
+    SetControlMode,
+    SmoothStop,
     SetEstop,
     RequestEstopReset,
     ParamEditBegin,
@@ -58,6 +62,19 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
     """
 
     match intent:
+
+        # --- OPERATOR CONTROL SUB-MODE (non-safety) ---
+        case SetControlMode(mode=cmode):
+            # v0.1: store if present; higher layers may display it.
+            # Keep this decoupled from core safety Mode (IDLE/LIVE/ESTOP).
+            setattr(state, "control_mode", str(cmode))
+            return
+
+        case SmoothStop():
+            # v0.1: immediate zero velocity on all commanded axes.
+            for cmd in state.axis_cmd.values():
+                cmd.vel = 0.0
+            return
 
         # --- CLAIMS (exclusive control) ---
         case ClaimAxis(axis_id=axis_id, hip_id=hip_id, req_id=req_id):
@@ -210,6 +227,35 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             cmd = state.ensure_axis_cmd(axis_id)
             if cmd.enable:
                 cmd.vel = float(vel)
+            return
+
+        case JogWinch(winch_id=winch_id, rate=rate, hip_id=hip_id):
+            # Semantic alias: winches are axes at this layer.
+            axis_id = str(winch_id)
+            state.ensure_axis(axis_id)
+            claim = state.axis_claims.get(axis_id, "")
+            if claim and hip_id and claim != hip_id:
+                return
+            if claim and not hip_id:
+                return
+            cmd = state.ensure_axis_cmd(axis_id)
+            if cmd.enable:
+                cmd.vel = float(rate)
+            return
+
+        case JogCartesian(vx=vx, vy=vy, vz=vz, hip_id=hip_id):
+            # v0.1: if the system has axes named X/Y/Z, map directly to JogAxis.
+            # Otherwise ignore (kinematics layer not implemented yet).
+            for axis_id, vel in (("X", vx), ("Y", vy), ("Z", vz)):
+                if axis_id in state.axes or axis_id in state.axis_cmd:
+                    claim = state.axis_claims.get(axis_id, "")
+                    if claim and hip_id and claim != hip_id:
+                        continue
+                    if claim and not hip_id:
+                        continue
+                    cmd = state.ensure_axis_cmd(axis_id)
+                    if cmd.enable:
+                        cmd.vel = float(vel)
             return
 
         case _:
