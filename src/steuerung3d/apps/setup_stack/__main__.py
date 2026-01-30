@@ -54,9 +54,19 @@ def main() -> int:
     ap.add_argument("--cmd-base", type=int, default=52001, help="Base UDP port for DenSi CommandIn.")
     ap.add_argument("--ui-telem-base", type=int, default=51002, help="Base UDP port for HiP TelemetryIn bind.")
     ap.add_argument(
+        "--dev-telem-in",
+        default=None,
+        help=(
+            "Core Device TelemetryIn bind host:port. DenSi instances will send telemetry to this address. "
+            "If omitted, defaults to 127.0.0.1:52002 unless that overlaps the DenSi cmd port range, in which case "
+            "it will auto-shift to cmd_base+100."
+        ),
+    )
+    # Backward-compat alias (older wrapper called it --dev-telem-out)
+    ap.add_argument(
         "--dev-telem-out",
-        default="127.0.0.1:52002",
-        help="TelemetryOut target for all DenSi instances (default 127.0.0.1:52002).",
+        default=None,
+        help=argparse.SUPPRESS,
     )
     ap.add_argument("--densi-dt", type=float, default=0.01, help="DenSi sim timestep (s).")
     ap.add_argument("--core-dt", type=float, default=0.02, help="Core tick (s).")
@@ -83,7 +93,15 @@ def main() -> int:
 
     joy_cfg = Path(args.joy2intent)
     axes = _axes_from_joy2intent(joy_cfg)
-    dev_telem_out = _parse_hostport(args.dev_telem_out)
+    dev_telem_s = args.dev_telem_in or args.dev_telem_out or "127.0.0.1:52002"
+    dev_telem_bind = _parse_hostport(dev_telem_s)
+
+    # Avoid overlap: cmd ports are cmd_base..cmd_base+len(axes)-1
+    cmd_lo = int(args.cmd_base)
+    cmd_hi = cmd_lo + len(axes) - 1
+    if args.dev_telem_in is None and args.dev_telem_out is None:
+        if dev_telem_bind[0] == "127.0.0.1" and dev_telem_bind[1] in range(cmd_lo, cmd_hi + 1):
+            dev_telem_bind = ("127.0.0.1", cmd_lo + 100)
 
     procs: List[subprocess.Popen] = []
     try:
@@ -97,6 +115,8 @@ def main() -> int:
                 str(args.core_dt),
                 "--log-level",
                 args.log_level,
+                "--dev-telem-in",
+                f"{dev_telem_bind[0]}:{dev_telem_bind[1]}",
                 "--dev-cmd-base",
                 str(args.cmd_base),
                 "--dev-cmd-count",
@@ -126,7 +146,7 @@ def main() -> int:
                     "--cmd-in",
                     f"127.0.0.1:{cmd_in_port}",
                     "--telem-out",
-                    f"{dev_telem_out[0]}:{dev_telem_out[1]}",
+                f"{dev_telem_bind[0]}:{dev_telem_bind[1]}",
                     "--log-level",
                     args.log_level,
                 ]
@@ -195,8 +215,8 @@ def main() -> int:
         print(
             "\n=== setup_stack running ===\n"
             f"axes={axes}\n"
-            f"core_udp_service: intents in 51001, ui telem out 51002, dev cmd out {args.cmd_base}..{args.cmd_base + len(axes) - 1}, dev telem in 52002\n"
-            f"DenSi telemetry out -> {dev_telem_out[0]}:{dev_telem_out[1]}\n"
+            f"core_udp_service: intents in 51001, ui telem out {args.ui_telem_base}.., dev cmd out {args.cmd_base}..{args.cmd_base + len(axes) - 1}, dev telem in {dev_telem_bind[0]}:{dev_telem_bind[1]}\n"
+            f"DenSi telemetry out -> {dev_telem_bind[0]}:{dev_telem_bind[1]}\n"
             f"joy2intent config: {joy_cfg}\n"
             f"inputd config: {args.inputd}\n"
             "Ctrl+C to stop.\n",

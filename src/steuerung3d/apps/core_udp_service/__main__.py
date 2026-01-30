@@ -64,6 +64,15 @@ def main() -> int:
         help="Convenience: number of Device CommandOut targets to generate from base port.",
     )
 
+    ap.add_argument(
+        "--dev-telem-in",
+        default="127.0.0.1:52002",
+        help=(
+            "Device TelemetryIn bind host:port (default 127.0.0.1:52002). "
+            "Tip: choose a port that does not overlap your --dev-cmd-base..range."
+        ),
+    )
+
     # UI telemetry broadcast targets (multiple HiP windows)
     ap.add_argument(
         "--ui-telem-target",
@@ -109,7 +118,8 @@ def main() -> int:
         ui_telem_targets = [("127.0.0.1", 51002)]
     op_telem_outs = [UdpTelemetryOut.connect(t) for t in ui_telem_targets]
 
-    dev_telem_in = UdpTelemetryIn.bind(("127.0.0.1", 52002))
+    dev_telem_bind = _parse_hostport(args.dev_telem_in)
+    dev_telem_in = UdpTelemetryIn.bind(dev_telem_bind)
 
     # Device command broadcast targets (N DenSi apps each binding a unique command port)
     dev_cmd_targets: List[Tuple[str, int]] = []
@@ -120,6 +130,13 @@ def main() -> int:
         base = int(str(args.dev_cmd_base).strip())
         for i in range(int(args.dev_cmd_count)):
             dev_cmd_targets.append(("127.0.0.1", base + i))
+
+        # Guard against accidental port overlap (common on Windows).
+        if dev_telem_bind[0] == "127.0.0.1" and dev_telem_bind[1] in range(base, base + int(args.dev_cmd_count)):
+            raise SystemExit(
+                f"dev telemetry bind port {dev_telem_bind[1]} overlaps dev-cmd ports {base}..{base + int(args.dev_cmd_count) - 1}. "
+                f"Pick a different --dev-telem-in (e.g. 127.0.0.1:{base + 100}) or shift --dev-cmd-base."
+            )
 
     if not dev_cmd_targets:
         dev_cmd_targets = [("127.0.0.1", 52001)]
@@ -151,7 +168,7 @@ def main() -> int:
         log.info("Device:   CommandOut target=%s", dev_cmd_targets[0])
     else:
         log.info("Device:   CommandOut broadcast targets=%s", dev_cmd_targets)
-    log.info("Device:   TelemetryIn bind=%s", ("127.0.0.1", 52002))
+    log.info("Device:   TelemetryIn bind=%s", dev_telem_bind)
 
     # --- core state ---
     tb = Timebase(dt_s=args.dt)

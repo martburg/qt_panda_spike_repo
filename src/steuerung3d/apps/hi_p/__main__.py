@@ -59,12 +59,16 @@ def main() -> int:
     telemetry_in = UdpTelemetryIn.bind(telem_in_addr)
 
     ctl = HiPController(win=win, intent_out=intent_out, telemetry_in=telemetry_in)
+    axis_label = (str(args.axis).strip() or "*")
     if str(args.axis).strip():
         ctl.set_fixed_axis(str(args.axis).strip(), lock_combo=True)
-        try:
-            win.setWindowTitle(f"HMI – HiP ({str(args.axis).strip()})")
-        except Exception:
-            pass
+    # Make the window self-identifying (axis + ports) to reduce integration confusion.
+    try:
+        win.setWindowTitle(
+            f"HMI – HiP ({axis_label})  telem-in={telem_in_addr[0]}:{telem_in_addr[1]}  intent->{intent_out_addr[0]}:{intent_out_addr[1]}"
+        )
+    except Exception:
+        pass
     ctl.start_polling(period_ms=50)
 
     win.show()

@@ -59,6 +59,16 @@ def main() -> int:
     app = QApplication(sys.argv)
     win = build_yellow_window(role="cfc")
 
+    # Make the window self-identifying (axis + ports) to reduce integration confusion.
+    axis_ids = [a.strip() for a in args.axis if a.strip()]
+    axis_label = ",".join(axis_ids) if axis_ids else "?"
+    try:
+        win.setWindowTitle(
+            f"HMI – DenSi ({axis_label})  cmd-in={cmd_in_addr[0]}:{cmd_in_addr[1]}  telem->{telem_out_addr[0]}:{telem_out_addr[1]}"
+        )
+    except Exception:
+        pass
+
     command_in = UdpCommandIn.bind(cmd_in_addr)
     telemetry_out = UdpTelemetryOut.connect(telem_out_addr)
 
@@ -66,7 +76,7 @@ def main() -> int:
         win=win,
         command_in=command_in,
         telemetry_out=telemetry_out,
-        axis_ids=[a.strip() for a in args.axis if a.strip()],
+        axis_ids=axis_ids,
         dt_s=args.dt,
     )
     ctl.start()

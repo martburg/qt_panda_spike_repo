@@ -6,7 +6,6 @@ from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.intents import ClaimAxis, ReleaseAxis, EnableAxis, JogAxis, ArmLiveMode
 from steuerung3d.core.state import MachineState
 
-
 def test_claim_axis_idempotent_and_exclusive():
     st = MachineState()
     apply_intent(st, ClaimAxis(axis_id="Anton", hip_id="hipA", req_id="r1"))
@@ -29,7 +28,7 @@ def test_release_axis_only_by_owner():
     apply_intent(st, ClaimAxis(axis_id="Anton", hip_id="hipA", req_id="r1"))
     assert st.axis_claims["Anton"] == "hipA"
 
-    # Non-owner release: no-op (but may emit ack/noop depending on implementation)
+    # Non-owner release: should not clear
     apply_intent(st, ReleaseAxis(axis_id="Anton", hip_id="hipB", req_id="r2"))
     assert st.axis_claims["Anton"] == "hipA"
 
@@ -41,9 +40,14 @@ def test_release_axis_only_by_owner():
 
 def test_claim_enforces_enable_and_jog():
     st = MachineState()
+
+    # Enable/Jog are LIVE-gated: arm LIVE first
+    apply_intent(st, ArmLiveMode())
+    assert getattr(st, "mode", None) is not None
+
     apply_intent(st, ClaimAxis(axis_id="Anton", hip_id="hipA", req_id="r1"))
 
-    # Wrong HIP cannot enable
+    # Wrong HIP cannot enable (claim exists)
     apply_intent(st, EnableAxis(axis_id="Anton", enable=True, hip_id="hipB"))
     assert "Anton" not in st.axis_cmd  # should not create/set command
 

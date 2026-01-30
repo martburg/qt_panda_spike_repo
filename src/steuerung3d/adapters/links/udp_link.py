@@ -20,7 +20,12 @@ class UdpLink:
 
     def __post_init__(self) -> None:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind(self.bind)
+        # IMPORTANT (Windows): binding port 0 eagerly allocates a *real* local port.
+        # If we do this for pure-TX channels, the OS may pick a port we want to
+        # reserve for receivers (e.g. core dev-telemetry-in or DenSi command-in).
+        # For TX links we pass bind=(host, 0); in that case do not bind at all.
+        if self.bind[1] != 0:
+            self.sock.bind(self.bind)
         self.sock.setblocking(False)
 
     def send(self, payload: bytes) -> None:

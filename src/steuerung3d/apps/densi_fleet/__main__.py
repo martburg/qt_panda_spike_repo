@@ -119,6 +119,8 @@ def main() -> int:
                 str(args.core_dt),
                 "--log-level",
                 args.log_level,
+                "--dev-telem-in",
+                f"{telem_out[0]}:{telem_out[1]}",
                 "--dev-cmd-base",
                 str(args.cmd_base),
                 "--dev-cmd-count",
