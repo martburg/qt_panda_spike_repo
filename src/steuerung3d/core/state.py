@@ -43,7 +43,9 @@ class MachineState:
     # high-level health/safety flags (v0.1)
     estop: bool = False
     fault: bool = False
-    estop_reset_req: bool = False
+    estop_reset_req: bool = False  # legacy/global (single-axis)
+    # NEW: per-axis one-shot request (preferred for multi-axis)
+    estop_reset_req_by_axis: Dict[str, bool] = field(default_factory=dict)
 
     estop_status_word: int = 0   # NEW: measured bitfield
 
@@ -54,7 +56,9 @@ class MachineState:
     params: Dict[str, float] = field(default_factory=dict)
 
     # Pending ops to be sent on the next command frame (core-side only):
-    pending_param_ops: list[ParamOp] = field(default_factory=list)
+    pending_param_ops: list[ParamOp] = field(default_factory=list)  # legacy/global
+    # NEW: per-axis pending ops (preferred for multi-axis)
+    pending_param_ops_by_axis: Dict[str, list[ParamOp]] = field(default_factory=dict)
 
 
     # --- HIP<->Core transactional acks (axis-agnostic parameter ops) ---

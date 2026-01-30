@@ -102,47 +102,53 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
                     state.core_acks.append(f"{req_id}:noop")
             return
         # --- SAFETY / GLOBAL REQUESTS ---
-        case RequestEstopReset():
-            # one-tick pulse; CoreEngine should clear it after building/sending command frame
-            state.estop_reset_req = True
-            # do NOT change state.estop here (device owns it)
+        case RequestEstopReset(axis_id=axis_id, hip_id=hip_id):
+            # Historical name: RequestEstopReset. In v0.1 this acts as per-axis "clear fault / drive reset".
+            axis_id = str(axis_id or "")
+            hip_id = str(hip_id or "")
+
+            if axis_id:
+                owner = state.axis_claims.get(axis_id, "")
+                if owner and hip_id and owner != hip_id:
+                    return
+                if hasattr(state, "estop_reset_req_by_axis"):
+                    state.estop_reset_req_by_axis[axis_id] = True
+                else:
+                    state.estop_reset_req = True
+            else:
+                # Backward-compat (single-axis): allow global pulse.
+                state.estop_reset_req = True
+
             normalize_mode(state)
             enforce_mode_actions(state)
             return
 
-        case SetEstop(estop=val):
-            state.estop = bool(val)
-            normalize_mode(state)
-            enforce_mode_actions(state)
-            if state.mode == Mode.ESTOP:
-                for ax in state.axes.values():
-                    ax.enabled = False
-                    ax.vel = 0.0
-            return
-
-        case ClearFault():
-            # still okay as a core-side request; later: device-side fault latch too
-            state.fault = False
-            for ax in state.axes.values():
-                ax.fault = False
-            normalize_mode(state)
-            enforce_mode_actions(state)
-            return
-
-        # --- PARAMETERS (axis-agnostic v0.1) ---
-        # These are intentionally NOT mode-gated yet.
-        # The device can decide to accept/reject, and will reflect status in telemetry.
-        case ParamEditBegin(group=grp, req_id=req_id, session_id=session_id):
+        case ParamEditBegin(axis_id=axis_id, hip_id=hip_id, group=grp, req_id=req_id, session_id=session_id):
             _txn_ack(state, req_id)
             if _txn_seen_or_mark(state, req_id):
                 return
-            state.pending_param_ops.append(ParamEditBeginOp(group=grp))
+
+            axis_id = str(axis_id or "")
+            hip_id = str(hip_id or "")
+            op = ParamEditBeginOp(group=grp)
+
+            if axis_id and hasattr(state, "pending_param_ops_by_axis"):
+                owner = state.axis_claims.get(axis_id, "")
+                if owner and hip_id and owner != hip_id:
+                    return
+                state.pending_param_ops_by_axis.setdefault(axis_id, []).append(op)
+            else:
+                state.pending_param_ops.append(op)
             return
 
-        case ParamWrite(group=grp, values=vals, req_id=req_id, session_id=session_id):
+        case ParamWrite(axis_id=axis_id, hip_id=hip_id, group=grp, values=vals, req_id=req_id, session_id=session_id):
             _txn_ack(state, req_id)
             if _txn_seen_or_mark(state, req_id):
                 return
+
+            axis_id = str(axis_id or "")
+            hip_id = str(hip_id or "")
+
             cleaned = {str(k): float(v) for k, v in dict(vals).items()}
             cleaned, _warnings = normalize_group_values(str(grp), cleaned)
 
@@ -158,13 +164,24 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             state.param_commit_observed_ticks = 0
             state.param_commit_match_streak = 0
 
-            state.pending_param_ops.append(ParamWriteOp(group=grp, values=cleaned))
+            op = ParamWriteOp(group=grp, values=cleaned)
+
+            if axis_id and hasattr(state, "pending_param_ops_by_axis"):
+                owner = state.axis_claims.get(axis_id, "")
+                if owner and hip_id and owner != hip_id:
+                    return
+                state.pending_param_ops_by_axis.setdefault(axis_id, []).append(op)
+            else:
+                state.pending_param_ops.append(op)
             return
 
-        case ParamCancel(group=grp, req_id=req_id, session_id=session_id):
+        case ParamCancel(axis_id=axis_id, hip_id=hip_id, group=grp, req_id=req_id, session_id=session_id):
             _txn_ack(state, req_id)
             if _txn_seen_or_mark(state, req_id):
                 return
+
+            axis_id = str(axis_id or "")
+            hip_id = str(hip_id or "")
 
             # Cancel pending observed commit for this group (if any)
             if str(getattr(state, "param_commit_status", "idle")) == "pending" and str(
@@ -173,10 +190,16 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
                 state.param_commit_status = "cancelled"
                 state.param_commit_unmatched = []
 
-            state.pending_param_ops.append(ParamCancelOp(group=grp))
-            return
+            op = ParamCancelOp(group=grp)
 
-        # --- MODE TRANSITIONS ---
+            if axis_id and hasattr(state, "pending_param_ops_by_axis"):
+                owner = state.axis_claims.get(axis_id, "")
+                if owner and hip_id and owner != hip_id:
+                    return
+                state.pending_param_ops_by_axis.setdefault(axis_id, []).append(op)
+            else:
+                state.pending_param_ops.append(op)
+            return
         case ArmLiveMode():
             normalize_mode(state)
             if state.mode == Mode.IDLE and (not state.estop) and (not state.fault):

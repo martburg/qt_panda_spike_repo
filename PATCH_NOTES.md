@@ -7,3 +7,6 @@ Fixes the last 2 failing tests in a robust way (works even if you accidentally u
    - If repo-root configs/dev_plc.toml is missing, generate a temporary config in tmp_path.
 
 Also ships configs/dev_plc.toml (and a copy in src/steuerung3d/configs/) for convenience.
+
+
+- Docs: updated DEV_STACK/ARCHITECTURE/decisions/milestones with setup_stack + joystick integration notes.

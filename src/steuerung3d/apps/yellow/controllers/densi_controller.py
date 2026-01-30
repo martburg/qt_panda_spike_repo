@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QCheckBox, QWidget, QLineEdit
+from PySide6.QtWidgets import QCheckBox, QWidget, QLineEdit, QComboBox
 
 from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
 from steuerung3d.adapters.sim.device import SimDevice
@@ -62,6 +62,14 @@ _PARAM_WIDGETS: dict[str, dict[str, str]] = {
     },
 }
 
+# Limit display fields in the header bar (meters)
+_LIMIT_WIDGETS: dict[str, str] = {
+    "HardMin": "txtLimitHardMin",
+    "UserMin": "txtLimitUserMin",
+    "UserMax": "txtLimitUserMax",
+    "HardMax": "txtLimitHardMax",
+}
+
 
 @dataclass
 class DenSiController:
@@ -74,6 +82,21 @@ class DenSiController:
 
     def __post_init__(self) -> None:
         self.ui = YellowBindings.from_window(self.win)
+
+        # DenSi is normally bound to exactly one axis. To reduce confusion during
+        # multi-window integration, show the axis name directly in cmb_axis.
+        cmb = self.win.findChild(QComboBox, "cmb_axis")
+        if cmb is not None:
+            label = self.axis_ids[0] if self.axis_ids else "?"
+            try:
+                was = cmb.blockSignals(True)
+                cmb.clear()
+                cmb.addItems([label])
+                cmb.setCurrentText(label)
+                cmb.setEnabled(False)
+                cmb.blockSignals(was)
+            except Exception:
+                pass
 
         # DEBUG: list which estop checkboxes are actually found
         from steuerung3d.protocol.estop_bits import iter_specs
@@ -91,6 +114,9 @@ class DenSiController:
 
         # initialize parameter bank from current UI text (if present)
         self._seed_params_from_ui()
+
+        # Render limit header fields (txtLimit*) from seeded params.
+        self._render_limit_fields_from_params(self.state.params)
 
         self.device = SimDevice(plant=SimAxisPlant())
         self._last_cmd: CommandFrame | None = None
@@ -284,6 +310,38 @@ class DenSiController:
                 if le is None:
                     continue
                 le.setText(str(values[key]))
+
+        # Also update the compact header limit fields if those values are present.
+        self._render_limit_fields_from_params(values)
+
+    def _fmt_m(self, v: float) -> str:
+        """Format a length in meters for the compact limit fields."""
+        try:
+            s = f"{float(v):0.2f} m"
+        except Exception:
+            s = ""
+        # Use comma as decimal separator (more natural for our locale).
+        return s.replace(".", ",")
+
+    def _render_limit_fields_from_params(self, values: dict[str, float]) -> None:
+        """Update txtLimitHardMin/UserMin/UserMax/HardMax from parameter values."""
+        for key, obj_name in _LIMIT_WIDGETS.items():
+            if key not in values:
+                continue
+            le = self._find_line_edit(obj_name)
+            if le is None:
+                continue
+            txt = self._fmt_m(values[key])
+            if le.text() == txt:
+                continue
+            was = le.blockSignals(True)
+            le.setText(txt)
+            le.blockSignals(was)
+            # Ensure these are display-only on DenSi.
+            try:
+                le.setEnabled(False)
+            except Exception:
+                pass
 
     def _normalize_pos_chain(self, values: dict[str, float]) -> dict[str, float]:
         v = dict(values)

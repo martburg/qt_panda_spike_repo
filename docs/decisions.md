@@ -50,3 +50,19 @@ Think of them as lightweight ADRs (Architecture Decision Records).
 **Decision:** Maintain a stable fingerprint (hash) of the command-frame sequence for a deterministic scenario.
 
 **Reason:** quickly detects accidental behavioral drift across refactors.
+
+
+## 2026-01-30: No broadcast to PLC endpoints (strict per-axis routing)
+
+**Decision:** Device command traffic is strictly **one datagram per axis per tick**, routed to a unique target per axis.
+Broadcast fallback is removed.
+
+**Rationale:**
+- PLC code is frozen; it cannot implement “ignore unrelated fields/axes”.
+- Broadcast hides configuration mistakes and creates dangerous cross-talk (resets/params applied to multiple axes).
+- Per-axis routing matches the final network topology (PLCs at 172.16.17.x).
+
+**Implementation notes:**
+- Launchers enforce `len(axes) == len(dev_cmd_targets)` in multi-axis mode.
+- Guard against port overlap between DenSi `cmd-in` range and Core `dev_telem_in`.
+- UI telemetry is sliced per axis so each HiP sees only its axis state/params/commit status.

@@ -59,6 +59,14 @@ _PARAM_WIDGETS: dict[str, dict[str, str]] = {
     },
 }
 
+# Compact limit display fields in the header bar (meters)
+_LIMIT_WIDGETS: dict[str, str] = {
+    "HardMin": "txtLimitHardMin",
+    "UserMin": "txtLimitUserMin",
+    "UserMax": "txtLimitUserMax",
+    "HardMax": "txtLimitHardMax",
+}
+
 
 @dataclass
 class HiPController:
@@ -187,7 +195,7 @@ class HiPController:
     # ---------- intents ----------
 
     def _on_estop_reset(self) -> None:
-        intent = RequestEstopReset()
+        intent = RequestEstopReset(axis_id=(self._selected_axis or self._fixed_axis), hip_id=self._hip_id)
         log.info("tx intent: %s", type(intent).__name__)
         self.intent_out.publish_intent(intent)
 
@@ -259,6 +267,37 @@ class HiPController:
             le.setText(txt)
             le.blockSignals(was)
 
+        # Keep the compact limit widgets in sync with the position limits.
+        if group == "pos":
+            self._render_limit_fields(values)
+
+    def _fmt_m(self, v: float) -> str:
+        try:
+            s = f"{float(v):0.2f} m"
+        except Exception:
+            s = ""
+        return s.replace(".", ",")
+
+    def _render_limit_fields(self, values: dict[str, float]) -> None:
+        """Update txtLimitHardMin/UserMin/UserMax/HardMax from given values."""
+        for key, obj_name in _LIMIT_WIDGETS.items():
+            if key not in values:
+                continue
+            le = self._find_line_edit(obj_name)
+            if le is None:
+                continue
+            txt = self._fmt_m(values[key])
+            if le.text() == txt:
+                continue
+            was = le.blockSignals(True)
+            le.setText(txt)
+            le.blockSignals(was)
+            # display-only
+            try:
+                le.setEnabled(False)
+            except Exception:
+                pass
+
     def _normalize_pos_chain(self, values: dict[str, float]) -> dict[str, float]:
         """Enforce HardMax>=UserMax>=UserMin>=HardMin."""
         v = dict(values)
@@ -317,19 +356,19 @@ class HiPController:
 
             if be is not None:
                 be.clicked.connect(lambda _=False, g=grp: self._tx_param_edit(g))
-                log.info("wired: %s -> ParamEditBegin(group=%s)", b_edit, grp)
+                log.info("wired: %s -> ParamEditBegin(axis_id=(self._selected_axis or self._fixed_axis), hip_id=self._hip_id, group=%s)", b_edit, grp)
             else:
                 log.debug("button not found: %s", b_edit)
 
             if bw is not None:
                 bw.clicked.connect(lambda _=False, g=grp: self._tx_param_write(g))
-                log.info("wired: %s -> ParamWrite(group=%s)", b_write, grp)
+                log.info("wired: %s -> ParamWrite(axis_id=(self._selected_axis or self._fixed_axis), hip_id=self._hip_id, group=%s)", b_write, grp)
             else:
                 log.debug("button not found: %s", b_write)
 
             if bc is not None:
                 bc.clicked.connect(lambda _=False, g=grp: self._tx_param_cancel(g))
-                log.info("wired: %s -> ParamCancel(group=%s)", b_cancel, grp)
+                log.info("wired: %s -> ParamCancel(axis_id=(self._selected_axis or self._fixed_axis), hip_id=self._hip_id, group=%s)", b_cancel, grp)
             else:
                 log.debug("button not found: %s", b_cancel)
 
@@ -344,7 +383,7 @@ class HiPController:
         self._session_by_group[group] = session_id
         req_id = self._next_req_id()
 
-        intent = ParamEditBegin(group=group, req_id=req_id, session_id=session_id)
+        intent = ParamEditBegin(axis_id=(self._selected_axis or self._fixed_axis), hip_id=self._hip_id, group=group, req_id=req_id, session_id=session_id)
         log.info("tx intent: %s group=%s req_id=%s session=%s", type(intent).__name__, group, req_id, session_id)
         self._send_txn_intent(intent, group=group, kind="begin")
 
@@ -379,7 +418,7 @@ class HiPController:
 
         session_id = self._ensure_session(group)
         req_id = self._next_req_id()
-        intent = ParamWrite(group=group, values=fixed, req_id=req_id, session_id=session_id)
+        intent = ParamWrite(axis_id=(self._selected_axis or self._fixed_axis), hip_id=self._hip_id, group=group, values=fixed, req_id=req_id, session_id=session_id)
         log.info(
             "tx intent: %s group=%s req_id=%s session=%s keys=%s",
             type(intent).__name__,
@@ -404,7 +443,7 @@ class HiPController:
     def _tx_param_cancel(self, group: str) -> None:
         session_id = self._ensure_session(group)
         req_id = self._next_req_id()
-        intent = ParamCancel(group=group, req_id=req_id, session_id=session_id)
+        intent = ParamCancel(axis_id=(self._selected_axis or self._fixed_axis), hip_id=self._hip_id, group=group, req_id=req_id, session_id=session_id)
         log.info("tx intent: %s group=%s req_id=%s session=%s", type(intent).__name__, group, req_id, session_id)
         self._send_txn_intent(intent, group=group, kind="cancel")
 
@@ -665,6 +704,12 @@ class HiPController:
                 le.setText(txt)
                 le.blockSignals(was)
 
+        # Also update compact limit fields in the header bar.
+        try:
+            self._render_limit_fields({k: float(params[k]) for k in ("HardMin","UserMin","UserMax","HardMax") if k in params})
+        except Exception:
+            pass
+
     def _render_params_and_edit_state(self, snap: TelemetrySnapshot) -> None:
         self._render_params_from_telemetry(snap)
 
@@ -749,11 +794,14 @@ class HiPController:
                     self._mark_disconnected()
             return
 
+        # consume any core acks for transactional param intents
+        # IMPORTANT: acks are one-shot; if we drained multiple snapshots, the last one
+        # might no longer contain the ack. So process acks across all received snaps.
+        for _s in snaps:
+            self._handle_core_acks(_s)
+
         snap = snaps[-1]
         self._last_rx_ns = now_ns
-
-        # consume any core acks for transactional param intents
-        self._handle_core_acks(snap)
 
         # Populate axis selection (discovery) and auto-claim on selection.
         self._update_axis_combo(snap)

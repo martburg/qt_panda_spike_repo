@@ -185,3 +185,38 @@ recover_done: RECOVER → IDLE
 
 disable: ENABLED → IDLE
 
+
+
+## Axis-scoped UDP routing (no broadcast)
+
+For real PLC integration (and to avoid surprising cross-talk in sim), the device command path is **strictly per-axis**:
+
+- Core builds one device command payload **per axis**
+- The UDP service sends it to exactly one target (host:port) for that axis
+- Broadcast fallback is **not allowed** in multi-axis mode
+
+This matches the frozen PLC contract: each PLC endpoint must receive only the data it expects.
+
+### Port overlap guard
+
+A common Windows pitfall is overlapping ports when running local sims:
+
+- DenSi `cmd-in` uses a contiguous range (e.g. `52001..52004`)
+- Core `dev_telem_in` must not be within that range
+
+Launchers enforce this and refuse to start if an overlap is detected.
+
+## Per-axis UI telemetry slicing
+
+Device telemetry arrives multiplexed (all DenSi instances send to a single `dev_telem_in` port).
+The core maintains per-axis caches for device-specific fields and publishes **one telemetry stream per HiP**:
+
+- each HiP receives a snapshot containing only its axis (`axes={Anton: ...}`)
+- per-axis fields such as `params`, `estop_status_word`, and param-commit status are taken from the correct axis cache
+
+This prevents the “last-writer wins” effect where HiPs appear to show the telemetry of different DenSis.
+
+## Transaction acks (HiP)
+
+Ack signals (`core_acks`) are one-shot fields in telemetry snapshots. The receiver may drain multiple snapshots per poll.
+Therefore, the HiP must process acks across **all** drained snapshots before deciding to resend or time out.

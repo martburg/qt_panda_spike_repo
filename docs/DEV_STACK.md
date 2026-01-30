@@ -143,3 +143,60 @@ Logs are written to `logs/session.jsonl` (JSON Lines) via the recorder.
   AxisState.enabled is measured (uplink), derived from Status=4356 and EStopStatus=0
   commanded enable is not the truth (optionally available in ax.meta["cmd_enable"] if you kept it)
 
+
+
+## Setup stack: 4× DenSi + 4× HiP + Core (+ inputd/joy2intent)
+
+`setup_stack` is the current recommended way to spin up the full local demo with clear, per-axis wiring.
+
+It launches:
+
+- **Core** (`core_udp_service`)
+- **DenSi** (one per axis; device-side sim UI)
+- **HiP** (one per axis; operator UI)
+- optionally **inputd** (gamepad reader) and **joy2intent** (maps joystick → intents)
+
+### Recommended port plan (Windows-safe)
+
+With 4 axes and `--cmd-base 52001`, DenSi command ports are:
+
+- `cmd-in`: `52001..52004`
+
+**Do not** use `52002` for device telemetry in that case (it overlaps with Debby's command port).
+
+Pick a device telemetry port outside that range, e.g. `52020`:
+
+- Core binds: `--dev-telem-in 127.0.0.1:52020`
+- DenSi targets: `--telem-out 127.0.0.1:52020`
+
+UI telemetry (Core → HiPs) uses one port per axis, e.g. `--ui-telem-base 51002` → `51002..51005`.
+UI intents (HiPs → Core) use `127.0.0.1:51001` by default.
+
+### Run the full stack
+
+From repo root:
+
+```powershell
+python -m steuerung3d.apps.setup_stack `
+  --joy2intent configs\joy2intent_gamepad.toml `
+  --inputd    configs\inputd_gamepad.toml `
+  --cmd-base  52001 `
+  --ui-telem-base 51002 `
+  --dev-telem-in  127.0.0.1:52020 `
+  --log-level info
+```
+
+If you omit `--dev-telem-in`, the launcher will choose a non-overlapping port automatically (currently `cmd_base + 100`, e.g. `52101`).
+
+### How to verify wiring quickly
+
+- DenSi window title shows: `DenSi(<axis>) cmd-in=<host:port> telem-><host:port>`
+- HiP window title shows: `HiP(<axis>) telem-in=<host:port> intent-><host:port>`
+- Pressing **RequestEstopReset** (historical name; used as drive reset/clear fault in the sim) in one HiP must only affect its corresponding DenSi/axis.
+
+### Parameter editing: why timeouts happened (and the fix)
+
+In multi-axis runs, the HiP transaction layer resends if it does not observe its `req_id` in `core_acks`.
+The telemetry receiver can drain multiple snapshots per poll; if the code only checks the **last** snapshot,
+it can miss the one-shot ack even though the write succeeded. The fix is to process `core_acks` across **all**
+drained snapshots, then render using the last snapshot.

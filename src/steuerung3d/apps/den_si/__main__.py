@@ -31,7 +31,9 @@ def _parse_hostport(s: str) -> Tuple[str, int]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--role", choices=("cfc",), default="cfc")   # if you already parse role, keep yours
-    ap.add_argument("--axis", action="append", default=["X"], help="Axis id(s). Typically exactly one for DenSi.")
+    # IMPORTANT: default must be empty when using action='append'. Otherwise argparse
+    # will append onto the default list and you end up with phantom axes like "X,Debby".
+    ap.add_argument("--axis", action="append", default=[], help="Axis id(s). Typically exactly one for DenSi.")
     ap.add_argument("--dt", type=float, default=0.01)
     ap.add_argument(
         "--cmd-in",
@@ -60,8 +62,11 @@ def main() -> int:
     win = build_yellow_window(role="cfc")
 
     # Make the window self-identifying (axis + ports) to reduce integration confusion.
-    axis_ids = [a.strip() for a in args.axis if a.strip()]
-    axis_label = ",".join(axis_ids) if axis_ids else "?"
+    axis_ids = [a.strip() for a in args.axis if a and a.strip()]
+    if not axis_ids:
+        # Legacy/single-axis convenience: if no axis is provided, fall back to "X".
+        axis_ids = ["X"]
+    axis_label = ",".join(axis_ids)
     try:
         win.setWindowTitle(
             f"HMI – DenSi ({axis_label})  cmd-in={cmd_in_addr[0]}:{cmd_in_addr[1]}  telem->{telem_out_addr[0]}:{telem_out_addr[1]}"

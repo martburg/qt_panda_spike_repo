@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import argparse
 import os
+import shlex
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple
 
@@ -36,11 +38,36 @@ def _axes_from_joy2intent(path: Path) -> List[str]:
     return axes
 
 
+def _sanitize_axis_id(s: str) -> str:
+    """Normalize legacy axis labels.
+
+    Older configs sometimes carried a composite label like "X,Cecil".
+    We only keep the physical axis id (right-most part).
+    """
+    s = (s or "").strip()
+    if "," in s:
+        s = s.split(",")[-1].strip()
+    return s
+
+
 def _popen(cmd: List[str], *, new_console: bool) -> subprocess.Popen:
     if _is_windows() and new_console:
         # CREATE_NEW_CONSOLE = 0x00000010
         return subprocess.Popen(cmd, creationflags=0x00000010)
     return subprocess.Popen(cmd)
+
+
+@dataclass
+class Child:
+    kind: str  # "core" or "densi"
+    axis: str  # axis id for densi, "" for core
+    cmd: List[str]
+    p: subprocess.Popen
+
+
+def _fmt_cmd(cmd: List[str]) -> str:
+    # Pretty-print command lines, including on Windows.
+    return " ".join(shlex.quote(c) for c in cmd)
 
 
 def main() -> int:
@@ -80,7 +107,13 @@ def main() -> int:
     ap.add_argument(
         "--also-core",
         action="store_true",
-        help="Also launch core_udp_service configured to broadcast commands to the DenSi fleet.",
+        help="Also launch core_udp_service configured to route per-axis commands to the DenSi fleet (no broadcast).",
+    )
+    ap.add_argument(
+        "--ui-telem-base",
+        type=int,
+        default=51002,
+        help="When using --also-core, base UDP port for UI telemetry targets (one per axis).",
     )
     ap.add_argument(
         "--core-dt",
@@ -102,12 +135,14 @@ def main() -> int:
     else:
         axes = [a.strip() for a in args.axis if a and a.strip()]
 
+    axes = [_sanitize_axis_id(a) for a in axes if _sanitize_axis_id(a)]
+
     if not axes:
         axes = ["X"]
 
     telem_out = _parse_hostport(args.telem_out)
 
-    procs: List[subprocess.Popen] = []
+    children: List[Child] = []
     try:
         # Optionally start core first so DenSi connects cleanly.
         if args.also_core:
@@ -125,11 +160,17 @@ def main() -> int:
                 str(args.cmd_base),
                 "--dev-cmd-count",
                 str(len(axes)),
+                "--ui-telem-base",
+                str(args.ui_telem_base),
+                "--ui-telem-count",
+                str(len(axes)),
             ]
             for a in axes:
                 core_cmd.extend(["--axis", a])
 
-            procs.append(_popen(core_cmd, new_console=args.new_console))
+            children.append(
+                Child(kind="core", axis="", cmd=core_cmd, p=_popen(core_cmd, new_console=args.new_console))
+            )
             time.sleep(0.2)
 
         # Launch one DenSi per axis, each binding a unique command port.
@@ -150,37 +191,48 @@ def main() -> int:
                 "--log-level",
                 args.log_level,
             ]
-            procs.append(_popen(densi_cmd, new_console=args.new_console))
+            children.append(
+                Child(kind="densi", axis=axis_id, cmd=densi_cmd, p=_popen(densi_cmd, new_console=args.new_console))
+            )
             time.sleep(0.1)
 
         # Keep the launcher alive until Ctrl+C, so child processes die with the parent in most shells.
+        axis_map_lines = ["Axis -> CommandIn:"]
+        for i, a in enumerate(axes):
+            axis_map_lines.append(f"  {a}: 127.0.0.1:{args.cmd_base + i}")
+
         print(
             f"DenSi fleet running for axes={axes}. Command ports {args.cmd_base}..{args.cmd_base+len(axes)-1}.\n"
             f"TelemetryOut -> {telem_out[0]}:{telem_out[1]}\n"
-            f"Ctrl+C to stop.",
+            + "\n".join(axis_map_lines)
+            + "\nCtrl+C to stop.",
             file=sys.stderr,
         )
         while True:
             # If any child exits, report and keep going (useful during dev).
-            for p in list(procs):
-                rc = p.poll()
+            for c in list(children):
+                rc = c.p.poll()
                 if rc is not None:
-                    procs.remove(p)
-                    print(f"[densi_fleet] child exited rc={rc}", file=sys.stderr)
+                    children.remove(c)
+                    label = "core" if c.kind == "core" else f"DenSi[{c.axis}]"
+                    print(
+                        f"[densi_fleet] {label} exited rc={rc} cmd={_fmt_cmd(c.cmd)}",
+                        file=sys.stderr,
+                    )
             time.sleep(0.5)
 
     except KeyboardInterrupt:
         return 0
     finally:
         # Best-effort terminate children.
-        for p in procs:
+        for c in children:
             try:
-                p.terminate()
+                c.p.terminate()
             except Exception:
                 pass
-        for p in procs:
+        for c in children:
             try:
-                p.wait(timeout=1.5)
+                c.p.wait(timeout=1.5)
             except Exception:
                 pass
 
