@@ -38,7 +38,7 @@ def _make_uplink(pos: float, vel: float, *, enabled: bool = True, estop: bool = 
 
 
 
-def test_device_sends_every_frame_and_uses_cmd_tick_for_lifetick():
+def test_device_sends_every_frame_and_echoes_last_uplink_lifetick():
     received = {"lines": []}
     stop = threading.Event()
 
@@ -75,13 +75,14 @@ def test_device_sends_every_frame_and_uses_cmd_tick_for_lifetick():
     st.ensure_axis("Anton")
 
     # Frame 1: axis not present -> must still send lifetick (watchdog)
-    cmd1 = CommandFrame(tick=100, t_s=0.0, estop=False, fault=False, mode="X", axes={})
+    cmd1 = CommandFrame(tick=100, t_s=0.0, estop=False, fault=False, mode="X", axes={}, lifetick_echo={"Anton": 0})
     dev.step(st, cmd1, dt=0.01)
 
     # Frame 2: axis present -> sends again
     cmd2 = CommandFrame(
         tick=101, t_s=0.01, estop=False, fault=False, mode="X",
         axes={"Anton": AxisSetpoint(enable=True, vel=3.0)},
+        lifetick_echo={"Anton": 10},
     )
     dev.step(st, cmd2, dt=0.01)
 
@@ -95,12 +96,13 @@ def test_device_sends_every_frame_and_uses_cmd_tick_for_lifetick():
 
     assert len(received["lines"]) >= 2
 
-    # First field is LifetickUIrx => should match cmd.tick & 0xFFFF
+    # First field is LifetickUIrx => must echo the last LifetickUItx we saw on uplink.
+    # (On first packet we haven't received anything yet, so 0 is valid.)
     first_pkt = received["lines"][0].strip()
-    assert first_pkt.split(";")[0] == "100"
+    assert first_pkt.split(";")[0] == "0"
 
     second_pkt = received["lines"][1].strip()
-    assert second_pkt.split(";")[0] == "101"
+    assert second_pkt.split(";")[0] == "10"
 
 def test_device_rebases_possoll_to_posist_on_enable_edge():
     received = {"lines": []}

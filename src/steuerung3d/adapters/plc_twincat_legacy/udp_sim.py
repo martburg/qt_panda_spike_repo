@@ -46,6 +46,8 @@ class TwinCATLegacyPlcUdpSim:
     # simple plant state
     pos: float = 0.0
     vel: float = 0.0
+    # optional PLC->UI heartbeat (some variants increment this each loop)
+    lifetick_tx: int = 0
 
     def start(self) -> None:
         if self._thread is not None:
@@ -78,6 +80,9 @@ class TwinCATLegacyPlcUdpSim:
 
                 enable = (control_in != 0)
 
+                # advance PLC heartbeat (millisecond granularity)
+                self.lifetick_tx = (int(self.lifetick_tx) + int(self.dt_s * 1000)) & 0xFFFF
+
                 # simple plant: follow vel when enabled
                 self.vel = speed_soll if enable else 0.0
                 self.pos += self.vel * self.dt_s
@@ -86,7 +91,7 @@ class TwinCATLegacyPlcUdpSim:
                     name=self.axis_id,
                     pos=self.pos,
                     vel=self.vel,
-                    lifetick_tx=lifetick,
+                    lifetick_tx=self.lifetick_tx,
                     enabled=enable,
                 ).encode("utf-8")
                 try:

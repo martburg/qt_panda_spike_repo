@@ -17,6 +17,7 @@ from steuerung3d.core.intents import (
     ParamEditBegin,
     ParamWrite,
     ParamCancel,
+    EchoLifeTick,
     Intent,
 )
 from steuerung3d.core.mode import Mode
@@ -101,7 +102,36 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
                 if req_id:
                     state.core_acks.append(f"{req_id}:noop")
             return
+
+        # --- UI livetick echo (not safety-critical) ---
+        case EchoLifeTick(axis_id=axis_id, value=value, hip_id=_hip_id):
+            axis_id = str(axis_id or "")
+            if not axis_id:
+                return
+            # Store as 16-bit like the legacy PLC fields.
+            state.lifetick_echo_by_axis[axis_id] = int(value) & 0xFFFF
+            return
+
         # --- SAFETY / GLOBAL REQUESTS ---
+
+        case SetEstop(estop=want_estop):
+            # Tests + legacy expectations: SetEstop immediately latches the
+            # core-side estop flag and forces the mode normalization path.
+            state.estop = bool(want_estop)
+
+            if state.estop:
+                # Block motion: disable all axes and clear measured velocity.
+                for ax in state.axes.values():
+                    ax.enabled = False
+                    ax.vel = 0.0
+                # Also clear commanded velocities and enables.
+                for cmd in state.axis_cmd.values():
+                    cmd.enable = False
+                    cmd.vel = 0.0
+
+            normalize_mode(state)
+            enforce_mode_actions(state)
+            return
         case RequestEstopReset(axis_id=axis_id, hip_id=hip_id):
             # Historical name: RequestEstopReset. In v0.1 this acts as per-axis "clear fault / drive reset".
             axis_id = str(axis_id or "")

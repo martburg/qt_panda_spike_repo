@@ -85,6 +85,11 @@ class MachineState:
     # Default: ~2s at 50ms/tick (CoreEngine default polling). Adjust as needed.
     param_commit_timeout_ticks: int = 40
 
+    # --- livetick echo (optional) ---
+    # HI-P can emit EchoLifeTick(axis_id,value). Core stores the last value per axis
+    # and forwards it via CommandFrame.lifetick_echo so DenSi/device can mirror it.
+    lifetick_echo_by_axis: Dict[str, int] = field(default_factory=dict)
+
 
     def ensure_axis(self, axis_id: str) -> AxisState:
         if axis_id not in self.axes:

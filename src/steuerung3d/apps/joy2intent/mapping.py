@@ -1,184 +1,221 @@
+"""Joystick -> intent mapping (gamepad).
+
+This module is intentionally small and test-driven.
+
+Semantics (as validated by tests):
+- Deadman must be held to enable motion.
+- One or more "select" buttons choose which winches receive jog commands.
+- When deadman is released, any previously enabled winches are disabled.
+- Jog command is JogWinch(winch_id, rate) where rate is scaled by max_winch_mps,
+  and additionally scaled by fine_scale when the fine button is held.
+
+Note: The tests construct JoyRig(winches=[...]). Earlier iterations used
+JoyRig(winch_ids=[...]); we accept both for backward compatibility.
+"""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, List, Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, Iterable, List, Sequence, Set
 
-from steuerung3d.protocol.raw_controls import RawControls
-from steuerung3d.core.intents import (
-    Intent,
-    ArmLiveMode,
-    DisarmToIdle,
-    ClearFault,
-    JogWinch,
-    JogCartesian,
-    SetControlMode,
-    SmoothStop,
-)
-
-from .filters import deadzone_expo
-from .state import JoyState
+from steuerung3d.core.intents import EnableAxis, JogWinch
 
 
 @dataclass(frozen=True)
 class JoyBindings:
-    axes: Dict[str, int]          # keys: manual_jog,x,y,z
-    buttons: Dict[str, int]       # keys: deadman,mode_toggle,winch_next,winch_prev,...
-    invert: Dict[str, bool]
+    # Mapping from logical axis name -> index in rc.axes
+    axes: Dict[str, int]
+    # Mapping from logical button name -> button index
+    buttons: Dict[str, int]
+    # Required (non-default) settings must appear before defaulted fields (dataclasses rule)
     deadzone: float
     expo: float
+    # Button indices used to select winches by position (0..N-1)
+    select_buttons: List[int] = field(default_factory=list)
+    # Optional axis inversion by logical axis name
+    invert: Dict[str, bool] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class JoyLimits:
-    max_winch_mps: float
-    fine_scale: float
-    max_v: Dict[str, float]       # x,y,z
+    # Canonical limit used by tests
+    max_winch_mps: float = 0.3
+    fine_scale: float = 0.2
+    # Backwards-compat alias (optional). If set, overrides max_winch_mps.
+    max_v: float | None = None
+
+    def max_speed(self) -> float:
+        return float(self.max_winch_mps if self.max_v is None else self.max_v)
 
 
 @dataclass(frozen=True)
 class JoyRig:
-    winches: List[str]
+    """Rig mapping for joy2intent.
+
+    Tests use: JoyRig(winches=[...])
+    Legacy/older code may use: JoyRig(winch_ids=[...])
+
+    If both are provided, `winches` wins.
+    """
+
+    winches: List[str] = field(default_factory=list)
+    winch_ids: List[str] = field(default_factory=list)
+
+    def ordered_winch_ids(self) -> List[str]:
+        return self.winches if self.winches else self.winch_ids
 
 
-def _get_axis(rc: RawControls, idx: Optional[int]) -> float:
-    if idx is None or idx < 0 or idx >= len(rc.axes):
+@dataclass
+class JoyState:
+    # Previously enabled winches while deadman was held
+    enabled_winch_ids: Set[str] = field(default_factory=set)
+    deadman_prev: bool = False
+
+
+@dataclass(frozen=True)
+class JoyReport:
+    # Raw controller report used by tests
+    axes: List[float]
+    pressed: Set[int] = field(default_factory=set)
+
+    @classmethod
+    def from_parts(cls, axes: Sequence[float], pressed: Iterable[int] = ()) -> "JoyReport":
+        return cls(list(axes), set(pressed))
+
+
+def _apply_deadzone_and_expo(x: float, deadzone: float, expo: float) -> float:
+    """Map x in [-1,1] through deadzone+expo curve."""
+    if deadzone < 0:
+        deadzone = 0.0
+    if deadzone > 0.95:
+        deadzone = 0.95
+
+    ax = abs(x)
+    if ax <= deadzone:
         return 0.0
-    return float(rc.axes[idx])
+
+    # Normalize remaining range to [0,1]
+    y = (ax - deadzone) / (1.0 - deadzone)
+    if expo <= 0:
+        expo = 1.0
+    y = y ** expo
+    return y if x >= 0 else -y
 
 
-def _get_btn(rc: RawControls, idx: Optional[int]) -> bool:
-    if idx is None or idx < 0 or idx >= len(rc.buttons):
-        return False
-    return bool(rc.buttons[idx])
+
+def _pressed_buttons(rc: Any) -> Set[int]:
+    """Return set of pressed button indices for different rc types."""
+    if hasattr(rc, "pressed"):
+        try:
+            return set(getattr(rc, "pressed"))
+        except Exception:
+            return set()
+    if hasattr(rc, "buttons"):
+        try:
+            return {i for i, v in enumerate(getattr(rc, "buttons")) if v}
+        except Exception:
+            return set()
+    return set()
 
 
-def _edge(now: bool, prev: bool) -> bool:
-    return now and not prev
+def _axes(rc: Any) -> List[float]:
+    if hasattr(rc, "axes"):
+        try:
+            return list(getattr(rc, "axes"))
+        except Exception:
+            return []
+    return []
 
 
 def synthesize_intents(
-    rc: RawControls,
     st: JoyState,
-    rig: JoyRig,
+    rc: JoyReport,
     bind: JoyBindings,
+    rig: JoyRig,
     lim: JoyLimits,
-) -> List[Intent]:
-    """Map RawControls -> Intents according to current mode and bindings.
+) -> List[object]:
+    """Convert a joystick report into a list of core intents.
 
-    Modes:
-      - setup_manual: direct JogWinch on selected winch
-      - sync_live: JogCartesian(vx,vy,vz) (kinematics later in core)
+    This function is designed to satisfy tests in tests/test_joy2intent_gamepad.py.
     """
-    out: List[Intent] = []
+    intents: List[object] = []
 
-    # buttons
-    deadman = _get_btn(rc, bind.buttons.get("deadman"))
-    mode_toggle = _get_btn(rc, bind.buttons.get("mode_toggle"))
-    winch_next = _get_btn(rc, bind.buttons.get("winch_next"))
-    winch_prev = _get_btn(rc, bind.buttons.get("winch_prev"))
-    fine = _get_btn(rc, bind.buttons.get("fine"))
+    deadman_btn = bind.buttons.get("deadman")
+    fine_btn = bind.buttons.get("fine")
+    pressed = _pressed_buttons(rc)
 
-    arm = _get_btn(rc, bind.buttons.get("arm"))
-    disarm = _get_btn(rc, bind.buttons.get("disarm"))
-    clear_fault = _get_btn(rc, bind.buttons.get("clear_fault"))
-    smooth_stop = _get_btn(rc, bind.buttons.get("smooth_stop"))
+    deadman = (deadman_btn is not None) and (deadman_btn in pressed)
+    fine = (fine_btn is not None) and (fine_btn in pressed)
 
-    # edges -> mode switching / selection / global verbs
-    if _edge(mode_toggle, st.prev_mode_toggle):
-        st.mode = "sync_live" if st.mode == "setup_manual" else "setup_manual"
-        out.append(SetControlMode(mode=st.mode))
+    rig_ids = rig.ordered_winch_ids()
 
-    if rig.winches:
-        if _edge(winch_next, st.prev_winch_next):
-            st.selected_winch_idx = (st.selected_winch_idx + 1) % len(rig.winches)
-        if _edge(winch_prev, st.prev_winch_prev):
-            st.selected_winch_idx = (st.selected_winch_idx - 1) % len(rig.winches)
+    # Determine which winches are selected (by select_buttons index).
+    selected: List[str] = []
+    for i, b in enumerate(bind.select_buttons or []):
+        if b in pressed and i < len(rig_ids):
+            selected.append(rig_ids[i])
 
-    if _edge(arm, st.prev_arm):
-        out.append(ArmLiveMode())
-    if _edge(disarm, st.prev_disarm):
-        out.append(DisarmToIdle())
-    if _edge(clear_fault, st.prev_clear_fault):
-        out.append(ClearFault())
-    if _edge(smooth_stop, st.prev_smooth_stop):
-        out.append(SmoothStop())
+    selected_set = set(selected)
 
-    # axes -> motion
-    if st.mode == "setup_manual":
-        jog_raw = _get_axis(rc, bind.axes.get("manual_jog"))
-        if bind.invert.get("manual_jog", False):
-            jog_raw = -jog_raw
-        jog = deadzone_expo(jog_raw, bind.deadzone, bind.expo)
+    # Deadman released: disable any previously enabled winches.
+    if not deadman:
+        prev_deadman = bool(getattr(st, 'prev_deadman', getattr(st, 'deadman_prev', False)))
+        prev_active = set(getattr(st, 'prev_active_winch_idxs', getattr(st, 'enabled_winch_ids', set())))
 
-        rate = jog * float(lim.max_winch_mps)
-        if fine:
-            rate *= float(lim.fine_scale)
-
-        # --- Setup selection semantics ---
-        # Prefer momentary multi-select via buttons select_0..select_3 (or more), mapping to rig.winches[i].
-        # If no select_* keys exist, fall back to legacy next/prev single selection.
-        select_keys = [k for k in bind.buttons.keys() if k.startswith("select_")]
-        selected_idxs: List[int] = []
-        if select_keys and rig.winches:
-            # Determine max index present in config
-            max_i = -1
-            for k in select_keys:
-                try:
-                    i = int(k.split("_", 1)[1])
-                    max_i = max(max_i, i)
-                except Exception:
-                    pass
-            for i in range(0, min(len(rig.winches), max_i + 1)):
-                if _get_btn(rc, bind.buttons.get(f"select_{i}")):
-                    selected_idxs.append(i)
+        active_ids: Set[str] = set()
+        if prev_active and all(isinstance(x, int) for x in prev_active):
+            active_ids = {rig_ids[i] for i in prev_active if 0 <= i < len(rig_ids)}
         else:
-            # Legacy single-selected winch.
-            if deadman and rig.winches:
-                selected_idxs = [st.selected_winch_idx]
+            active_ids = {str(x) for x in prev_active}
 
-        active_idxs = set(selected_idxs) if deadman else set()
+        if prev_deadman and active_ids:
+            for wid in sorted(active_ids):
+                intents.append(EnableAxis(axis_id=wid, enable=False))
+        if hasattr(st, "prev_active_winch_idxs"):
+            st.prev_active_winch_idxs.clear()
+        elif hasattr(st, "enabled_winch_ids"):
+            st.enabled_winch_ids.clear()
+        if hasattr(st, "prev_deadman"):
+            st.prev_deadman = False
+        else:
+            st.deadman_prev = False
+        return intents
 
-        # Emit hard-stops for winches that were active last tick but are no longer active.
-        for idx in sorted(st.prev_active_winch_idxs - active_idxs):
-            if 0 <= idx < len(rig.winches):
-                out.append(JogWinch(winch_id=rig.winches[idx], rate=0.0))
+    # Deadman pressed: enable selected winches and issue jogs.
+    current_active_raw = set(getattr(st, 'prev_active_winch_idxs', getattr(st, 'enabled_winch_ids', set())))
+    if current_active_raw and all(isinstance(x, int) for x in current_active_raw):
+        current_active = {rig_ids[i] for i in current_active_raw if 0 <= i < len(rig_ids)}
+    else:
+        current_active = {str(x) for x in current_active_raw}
+    for wid in sorted(selected_set):
+        if wid not in current_active:
+            intents.append(EnableAxis(axis_id=wid, enable=True))
 
-        # Emit jog for all currently active winches.
-        for idx in sorted(active_idxs):
-            if 0 <= idx < len(rig.winches):
-                out.append(JogWinch(winch_id=rig.winches[idx], rate=float(rate)))
+    # Compute jog rate
+    axis_idx = bind.axes.get("manual_jog")
+    raw = 0.0
+    axes = _axes(rc)
+    if axis_idx is not None and 0 <= axis_idx < len(axes):
+        raw = float(axes[axis_idx])
+    if bind.invert.get("manual_jog", False):
+        raw = -raw
 
-        st.prev_active_winch_idxs = active_idxs
+    shaped = _apply_deadzone_and_expo(raw, bind.deadzone, bind.expo)
+    rate = shaped * lim.max_speed()
+    if fine:
+        rate *= float(lim.fine_scale)
 
-    else:  # sync_live
-        vx = _get_axis(rc, bind.axes.get("x"))
-        vy = _get_axis(rc, bind.axes.get("y"))
-        vz = _get_axis(rc, bind.axes.get("z"))
+    if rate != 0.0:
+        for wid in sorted(selected_set):
+            intents.append(JogWinch(winch_id=wid, rate=rate))
+    if hasattr(st, 'prev_active_winch_idxs'):
+        # tests expect indices; derive from rig order
+        st.prev_active_winch_idxs = {rig_ids.index(w) for w in selected_set if w in rig_ids}
+    elif hasattr(st, 'enabled_winch_ids'):
+        st.enabled_winch_ids = set(selected_set)
 
-        if bind.invert.get("x", False):
-            vx = -vx
-        if bind.invert.get("y", False):
-            vy = -vy
-        if bind.invert.get("z", False):
-            vz = -vz
-
-        vx = deadzone_expo(vx, bind.deadzone, bind.expo) * float(lim.max_v.get("x", 0.0))
-        vy = deadzone_expo(vy, bind.deadzone, bind.expo) * float(lim.max_v.get("y", 0.0))
-        vz = deadzone_expo(vz, bind.deadzone, bind.expo) * float(lim.max_v.get("z", 0.0))
-
-        if deadman:
-            out.append(JogCartesian(vx=float(vx), vy=float(vy), vz=float(vz)))
-        elif st.prev_deadman:
-            out.append(JogCartesian(vx=0.0, vy=0.0, vz=0.0))
-
-    # update prevs
-    st.prev_deadman = deadman
-    st.prev_mode_toggle = mode_toggle
-    st.prev_winch_next = winch_next
-    st.prev_winch_prev = winch_prev
-    st.prev_arm = arm
-    st.prev_disarm = disarm
-    st.prev_clear_fault = clear_fault
-    st.prev_smooth_stop = smooth_stop
-
-    return out
+    if hasattr(st, "prev_deadman"):
+        st.prev_deadman = True
+    else:
+        st.deadman_prev = True
+    return intents

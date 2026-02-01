@@ -569,6 +569,19 @@ class DenSiController:
         self.state.tick += 1
         self.state.t_s += self.tb.dt_s
 
+        # --- LiveTick semantics (device-origin) ---
+        # tx: incrementing device tick (here: DenSi tick)
+        # rx: echo value received from HiP/Core in last command frame
+        _echo_map = getattr(self._last_cmd, "lifetick_echo", {}) if self._last_cmd is not None else {}
+        for _axis_id, _ax in self.state.axes.items():
+            _ax.meta["lifetick_tx"] = int(self.state.tick)
+            try:
+                _ax.meta["lifetick_rx"] = int(dict(_echo_map).get(_axis_id, 0) or 0)
+            except Exception:
+                _ax.meta["lifetick_rx"] = 0
+            # This is a simple "cycle time" indicator for the UI.
+            _ax.meta["timetick_ms"] = int(round(self.tb.dt_s * 1000.0))
+
         snap = TelemetrySnapshot.from_state(self.state)
         self.telemetry_out.publish_telemetry(snap)
 

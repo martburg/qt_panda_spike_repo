@@ -169,6 +169,24 @@ class ParamCancel:
     session_id: str = ""
 
 
+# -------- LiveTick (UI-originated heartbeat) --------
+
+
+@dataclass(frozen=True)
+class EchoLifeTick:
+    """Carry a UI-originated heartbeat value through Core to be mirrored by DenSi.
+
+    Semantics (legacy-compatible): HI-P periodically emits EchoLifeTick values.
+    Core stores the last value per axis and includes it in CommandFrame.lifetick_echo.
+    DenSi copies it into telemetry and mirrors it back so HI-P can observe continuity.
+    """
+
+    type: Literal["echo_lifetick"] = "echo_lifetick"
+    axis_id: str = ""
+    value: int = 0
+    hip_id: str = ""
+
+
     
 Intent = Union[
     EnableAxis,
@@ -187,4 +205,5 @@ Intent = Union[
     ParamEditBegin,
     ParamWrite,
     ParamCancel,
+    EchoLifeTick,
 ]

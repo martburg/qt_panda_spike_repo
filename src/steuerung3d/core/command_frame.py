@@ -77,3 +77,7 @@ class CommandFrame:
     estop_reset: bool  = False  # NEW: momentary request to clear device latch
     # NEW: parameter editing/writing operations (axis-agnostic v0.1)
     param_ops: List[ParamOp] = field(default_factory=list)
+
+    # NEW (optional): UI-originating livetick echo values by axis.
+    # Keep empty by default so existing regression fingerprints stay stable.
+    lifetick_echo: Dict[str, int] = field(default_factory=dict)

@@ -130,8 +130,13 @@ def decode_raw_controls(payload: Dict[str, Any]) -> RawControls:
 # ---------------------------
 
 def encode_command_frame(frame: CommandFrame) -> Dict[str, Any]:
-    # Keep it consistent with encode_intent / encode_telemetry: dict payload
-    return asdict(frame)
+    # Custom encode to keep regression hashes stable when new optional fields
+    # are empty (e.g. lifetick_echo).
+    d = asdict(frame)
+    # omit empty optional keys
+    if not d.get("lifetick_echo"):
+        d.pop("lifetick_echo", None)
+    return d
 
 
 def decode_command_frame(payload: Dict[str, Any]) -> CommandFrame:
@@ -148,4 +153,5 @@ def decode_command_frame(payload: Dict[str, Any]) -> CommandFrame:
         axes=axes_out,
         estop_reset=bool(payload.get("estop_reset", False)),  # NEW
         param_ops=decode_param_ops(payload.get("param_ops", [])),
+        lifetick_echo={k: int(v) for k, v in dict(payload.get("lifetick_echo", {})).items()},
     )

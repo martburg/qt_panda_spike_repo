@@ -85,7 +85,7 @@ class TwinCATLegacyWinchUdpDevice:
             vel_cmd = float(sp.vel)
 
         # Lifetick must be present EVERY frame; make it deterministic:
-        lifetick = int(getattr(cmd, "tick", 0)) & 0xFFFF
+        lifetick = int(dict(getattr(cmd, 'lifetick_echo', {}) or {}).get(self.axis_id, 0)) & 0xFFFF
 
         # Apply global safety gating AFTER reading the command
         enable = enable_cmd and (not state.estop) and (not state.fault)
@@ -146,6 +146,13 @@ class TwinCATLegacyWinchUdpDevice:
 
         up = self.codec.decode_uplink(txt)
         f = up.fields
+
+        # Capture device-origin live tick and what we echoed back.
+        try:
+            ax.meta['lifetick_tx'] = int(parse_int(f.get('LifetickUItx', '0'), default=0)) & 0xFFFF
+        except Exception:
+            ax.meta['lifetick_tx'] = 0
+        ax.meta['lifetick_rx'] = int(lifetick) & 0xFFFF
 
         pos_ist = float(parse_float(f.get("PosIst", "0"), default=ax.pos))
         vel_ist = float(parse_float(f.get("SpeedIstUI", "0"), default=ax.vel))
