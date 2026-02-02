@@ -1,39 +1,61 @@
-# LiveTick semantics (legacy-compatible)
+# LifeTick (end-to-end health probe)
 
-## Goal
-The legacy system uses a very small "alive" loop to make sure the *operator UI* is still actively participating in the control loop.
+LifeTick is a small, continuous “loopback” signal to verify **end‑to‑end freshness** across the dev stack:
 
-It is **not primarily a latency / RTT measurement** (RTT can be observed, but the control purpose is a watchdog).
+**Core → HiP → Core → DenSi (UI)**
 
-## Fields
-We keep two integer fields per axis:
+We use it to quickly detect:
 
-- `lifetick_tx`  
-  **Device-originated** counter that increments periodically and is sent in telemetry.
+- stalled hops (a process stopped receiving or sending)
+- mixed identities (echo from the wrong child/process)
+- packet reordering or loss that makes the UI feel stale
 
-- `lifetick_rx`  
-  **HiP-originated** echo of the last value of `lifetick_tx` that HiP has seen. This echo is carried back to the device in the next command frame and is mirrored into telemetry so HiP can display it if desired.
+## Signal semantics
 
-## Data flow
-1. **DenSi / device**
-   - Increments `lifetick_tx`.
-     - **TwinCAT legacy device/sim:** increments a 16-bit counter (typically millisecond-ish step, wraps at 65536).
-     - **SIM axis plant:** we emulate the same behavior by incrementing by `int(dt_s*1000)` per tick.
-   - Publishes it in telemetry.
+1. **Core emits a 16‑bit tick** (`0..65535`, wraps) periodically.
+2. Each **HiP instance echoes that tick back** to the core.
+3. The **core forwards the echo** (together with the most recently sent tick) so the UI can judge freshness.
 
-2. **HiP (operator GUI)**
-   - On each telemetry receive, reads `lifetick_tx` for the currently selected axis.
-   - Emits an `EchoLifeTick(axis_id, hip_id, lifetick=lifetick_tx)` intent when the value changes.
+The important part is not the absolute tick value, but the *difference* between “what we sent” and “what came back”.
 
-3. **Core**
-   - Stores the most recent echo request per axis (honoring axis claims).
-   - Adds the stored echo value into the next `CommandFrame.lifetick_echo[axis_id]`.
+## What DenSi shows
 
-4. **DenSi / device**
-   - Reads `CommandFrame.lifetick_echo[axis_id]`.
-   - Copies it into `lifetick_rx` in telemetry (mirroring), so the UI can verify that the echo is being carried.
+In the DenSi panel, `txt_tick` is **not a raw tick counter**.
 
-## Notes
-- With this design, if **HiP stops running or stops receiving telemetry**, it will stop emitting `EchoLifeTick` intents. The echo value in the command frame will stop advancing accordingly.
-- The design is **multi-axis friendly**: the echo is tracked per axis.
-- RTT is not explicitly computed here. If you want a rough RTT later, you can compare when a `lifetick_tx` value first appeared vs when you see the same value in `lifetick_rx`.
+It shows the **LifeTick delta**:
+
+- **Δticks** = (last_sent_tick − last_echo_tick) modulo 65536
+- optionally also shown as **Δms** using the stack timebase
+
+Interpretation:
+
+- **Δticks ≈ 0**: echo is current (best case)
+- **small Δticks**: echo is slightly behind (normal under load)
+- **large / growing Δticks**: echo is not keeping up (investigate)
+
+Wrap-around is handled using modulo arithmetic, so a rollover of the underlying 16‑bit tick does not create a spurious spike.
+
+## Logging policy
+
+LifeTick can generate a lot of traffic, so **LifeTick trace logging is DEBUG-only**.
+
+If you need to debug the LifeTick path, run the stack with debug logging, e.g.:
+
+```bash
+python -m steuerung3d.apps.setup_stack --log-level debug ...
+```
+
+Normal `INFO` output should stay readable and focus on:
+
+- first telemetry reception
+- connection/timeout warnings
+- faults and estop transitions
+
+## Troubleshooting checklist
+
+If Δticks grows steadily:
+
+1. Verify all expected HiP children are running (one per axis) and receiving telemetry.
+2. Confirm that the HiP identity / axis_id routing matches (no axis cross-talk).
+3. Check UDP port wiring (IntentOut / TelemetryIn) for each child.
+4. Temporarily enable debug logging and look for missing LifeTick rx/tx in the chain.

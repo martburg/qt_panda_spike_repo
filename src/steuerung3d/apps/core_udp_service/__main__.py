@@ -471,7 +471,7 @@ def main() -> int:
                 last_s = float(_lt_last_ui_log_s_by_axis.get(axis_id, 0.0))
                 if dev_tick is not None and (now_s - last_s) >= 0.5:
                     _lt_last_ui_log_s_by_axis[axis_id] = now_s
-                    log.info("LIFETICK Core tx UI telem: axis=%s device_tick=%s", axis_id, int(dev_tick))
+                    log.debug("LIFETICK Core tx UI telem: axis=%s device_tick=%s", axis_id, int(dev_tick))
             except Exception:
                 pass
 

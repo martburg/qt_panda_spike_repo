@@ -52,3 +52,17 @@ In tests we also maintain a **CommandFrame sequence regression** check:
 - compare to a baseline hash
 
 If the baseline changes intentionally, update the hash and document why in the commit message.
+
+## High-rate diagnostic traces
+
+Some signals can be very chatty (multiple axes, multiple processes, many times per second). To keep the default developer experience readable, these are **DEBUG** by default:
+
+- **LifeTick** transmit/echo traces (`LIFETICK ...`)
+
+When you need them, start the stack (or the specific app) with:
+
+```bash
+python -m steuerung3d.apps.setup_stack --log-level debug ...
+```
+
+Tip: if you only care about one component, set that process to DEBUG and leave the rest at INFO.

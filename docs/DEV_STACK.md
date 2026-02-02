@@ -112,7 +112,7 @@ When `device.kind = "plc_twincat_legacy_fleet"`, the dev stack checks whether it
 
 This allows you to test:
 
-- lifetick per frame
+- LifeTick loopback (16-bit tick) from Core -> HiP -> Core -> DenSi; DenSi shows delta (now - echoed) in its tick field.
 - encoding/decoding
 - device/fleet wiring
 - telemetry integration

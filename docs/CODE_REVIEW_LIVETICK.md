@@ -51,3 +51,8 @@ feat(livetick): add legacy-compatible livetick echo loop (hip->core->densi)
 - DenSi sets lifetick_tx and mirrors lifetick_rx from last command frame
 - HiP echoes livetick_tx via intent when it changes (restores legacy semantics)
 ```
+
+## Logging note
+
+The per-frame LifeTick traces can be very noisy (especially with multiple axes). They are now emitted at **DEBUG** level (`LIFETICK ...`).
+Use `--log-level debug` when you want to trace the loopback in detail.
