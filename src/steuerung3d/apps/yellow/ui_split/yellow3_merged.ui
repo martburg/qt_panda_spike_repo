@@ -440,7 +440,7 @@
          <property name="frameShadow">
           <enum>QFrame::Shadow::Raised</enum>
          </property>
-         <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="3,0,1,1,1,1,1,0,3">
+         <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="3,0,1,1,1,1,1,0,0,0">
           <property name="topMargin">
            <number>0</number>
           </property>
@@ -674,78 +674,8 @@
            </layout>
           </item>
           <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_livetick">
-            <item>
-             <widget class="QLabel" name="lblLiveTick">
-              <property name="text">
-               <string>LifeTick</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLineEdit" name="txt_lifetick">
-              <property name="minimumSize">
-               <size>
-                <width>90</width>
-                <height>0</height>
-               </size>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>120</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="readOnly">
-               <bool>true</bool>
-              </property>
-              <property name="alignment">
-               <set>Qt::AlignRight|Qt::AlignVCenter</set>
-              </property>
-              <property name="placeholderText">
-               <string>—</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
+           <layout class="QHBoxLayout" name="horizontalLayout_livetick"/>
           </item>
-          <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_timetick">
-            <item>
-             <widget class="QLabel" name="lblTimeTick">
-              <property name="text">
-               <string>TimeTick</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLineEdit" name="txt_timetick">
-              <property name="minimumSize">
-               <size>
-                <width>90</width>
-                <height>0</height>
-               </size>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>120</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="readOnly">
-               <bool>true</bool>
-              </property>
-              <property name="alignment">
-               <set>Qt::AlignRight|Qt::AlignVCenter</set>
-              </property>
-              <property name="placeholderText">
-               <string>—</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-
           <item>
            <spacer name="horizontalSpacer_2">
             <property name="orientation">

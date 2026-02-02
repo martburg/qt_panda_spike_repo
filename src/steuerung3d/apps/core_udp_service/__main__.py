@@ -324,6 +324,19 @@ def main() -> int:
                 # Defensive: axis missing from frame; skip.
                 continue
 
+            # --- Lifetick echo routing ---
+            # Core builds a *multi-axis* CommandFrame that can carry a per-axis lifetick echo
+            # map (axis_id -> uint16). We route one command frame per device, so we must keep
+            # only this device's echo entry. Otherwise DenSi never observes lifetick_rx.
+            echo_val = None
+            try:
+                echo_map = getattr(cmd_frame, "lifetick_echo", {}) or {}
+                if isinstance(echo_map, dict):
+                    echo_val = echo_map.get(axis_id)
+            except Exception:
+                echo_val = None
+            lifetick_echo_axis = {axis_id: (int(echo_val) & 0xFFFF)} if echo_val is not None else {}
+
             frame_axis = CommandFrame(
                 tick=cmd_frame.tick,
                 t_s=cmd_frame.t_s,
@@ -331,6 +344,7 @@ def main() -> int:
                 fault=cmd_frame.fault,
                 mode=cmd_frame.mode,
                 axes={axis_id: sp},
+                lifetick_echo=lifetick_echo_axis,
                 estop_reset=(
                     bool(getattr(state, "estop_reset_req_by_axis", {}).get(axis_id, False))
                     if multi_axis
