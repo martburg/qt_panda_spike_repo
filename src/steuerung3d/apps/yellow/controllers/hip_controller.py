@@ -9,7 +9,15 @@ from PySide6.QtCore import QLocale, QTimer
 from PySide6.QtGui import QDoubleValidator
 from PySide6.QtWidgets import QLineEdit, QPushButton, QWidget, QMessageBox, QTabWidget, QComboBox
 
-from steuerung3d.core.intents import ParamCancel, ParamEditBegin, ParamWrite, RequestEstopReset, ClaimAxis, ReleaseAxis
+from steuerung3d.core.intents import (
+    ParamCancel,
+    ParamEditBegin,
+    ParamWrite,
+    RequestEstopReset,
+    ClaimAxis,
+    ReleaseAxis,
+    EchoLifeTick,
+)
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.util.tick import compute_time_tick
 from steuerung3d.protocol.estop_bits import (
@@ -92,6 +100,9 @@ class HiPController:
         # Legacy TimeTick display (ticks elapsed between telemetry updates)
         self._txt_tick: QLineEdit | None = self.win.findChild(QLineEdit, "txt_tick")
         self._prev_device_tick: int | None = None
+
+        # Last EchoLifeTick sent per axis (avoid spamming duplicates)
+        self._last_lifetick_echo_sent: dict[str, int] = {}
 
         self._selected_axis: str = ""
         # Optional: pin this HiP instance to a single axis (useful for one-window-per-axis setup)
@@ -839,8 +850,34 @@ class HiPController:
         self._render_tick_delta(snap)
         self._render_estop(snap)
         self._render_params_and_edit_state(snap)
+        self._tx_lifetick_echo(snap)
 
     # ---------- render logic ----------
+
+    def _tx_lifetick_echo(self, snap: TelemetrySnapshot) -> None:
+        """Echo the last device-origin lifetick back to Core (legacy semantics).
+
+        Legacy PLC expects LifetickUIrx to mirror the most recently received LifetickUItx.
+        We implement this by sending EchoLifeTick(axis_id, value=device_tick) periodically.
+        Core will forward it to devices via CommandFrame.lifetick_echo.
+        """
+        axes = getattr(snap, "axes", None)
+        if not isinstance(axes, dict) or not axes:
+            return
+
+        for axis_id, ax in axes.items():
+            try:
+                v = int(getattr(ax, "device_tick", 0)) & 0xFFFF
+            except Exception:
+                v = 0
+
+            prev = self._last_lifetick_echo_sent.get(axis_id)
+            if prev is not None and int(prev) == v:
+                continue
+
+            self._last_lifetick_echo_sent[axis_id] = v
+            self.intent_out.publish_intent(EchoLifeTick(axis_id=axis_id, value=v, hip_id=self._hip_id))
+
 
     def _render_tick_delta(self, snap: TelemetrySnapshot) -> None:
         """Render legacy TimeTick into txt_tick.

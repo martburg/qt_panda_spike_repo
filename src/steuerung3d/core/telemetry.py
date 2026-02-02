@@ -183,3 +183,7 @@ def apply_measured_snapshot(state: MachineState, snap: TelemetrySnapshot) -> Non
         ax.vel = float(ax_t.vel)
         ax.enabled = bool(ax_t.enabled)
         ax.fault = bool(ax_t.fault)
+
+        # Carry device-side lifetick through the core (legacy LifetickUItx analogue).
+        # Needed for UI TimeTick (delta between successive received device ticks).
+        ax.meta["device_tick"] = int(getattr(ax_t, "device_tick", 0)) & 0xFFFF
