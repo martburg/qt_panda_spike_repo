@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QLineEdit, QPushButton, QWidget, QMessageBox, QTab
 
 from steuerung3d.core.intents import ParamCancel, ParamEditBegin, ParamWrite, RequestEstopReset, ClaimAxis, ReleaseAxis
 from steuerung3d.core.telemetry import TelemetrySnapshot
+from steuerung3d.util.tick import compute_time_tick
 from steuerung3d.protocol.estop_bits import (
     ESTOP_CAUSE_KEYS,
     ESTOP_OK_KEYS,
@@ -25,6 +26,7 @@ import logging
 import time
 
 log = logging.getLogger("hi_p")
+
 
 
 # v0.1 axis-agnostic parameter wiring (UI widget names -> param keys)
@@ -87,6 +89,10 @@ class HiPController:
         # HiP identity and current axis selection
         self._hip_id: str = f"hip-{uuid.uuid4().hex[:8]}"
         self._cmb_axis: QComboBox | None = self.win.findChild(QComboBox, "cmb_axis")
+        # Legacy TimeTick display (ticks elapsed between telemetry updates)
+        self._txt_tick: QLineEdit | None = self.win.findChild(QLineEdit, "txt_tick")
+        self._prev_device_tick: int | None = None
+
         self._selected_axis: str = ""
         # Optional: pin this HiP instance to a single axis (useful for one-window-per-axis setup)
         self._fixed_axis: str = ""
@@ -108,11 +114,6 @@ class HiPController:
         self._pending_commit_group: str = ""
         self._pending_commit_values: dict[str, float] = {}
         self._commit_dialog_shown_for: set[str] = set()
-
-        # Comms timing UI (we compute a "TimeTick" locally as the wall-time
-        # between *changes* of LifeTick from the device.)
-        self._last_lifetick_seen: dict[str, int] = {}
-        self._last_lifetick_wall_ns: dict[str, int] = {}
 
 
         # HIP<->Core transactional param intents (best-effort reliability)
@@ -149,6 +150,10 @@ class HiPController:
 
         # paint all known dots as "unknown"
         self._set_all_estop_unknown()
+        # Reset legacy TimeTick display
+        if self._txt_tick is not None:
+            self._txt_tick.setText("--")
+        self._prev_device_tick = None
 
     # ---------- public helpers ----------
 
@@ -196,6 +201,10 @@ class HiPController:
         if self.ui.btn_estop_reset:
             self.ui.btn_estop_reset.setEnabled(False)
         self._set_all_estop_unknown()
+        # Reset legacy TimeTick display
+        if self._txt_tick is not None:
+            self._txt_tick.setText("--")
+        self._prev_device_tick = None
 
     # ---------- intents ----------
 
@@ -775,49 +784,6 @@ class HiPController:
         self._pending_commit_group = ""
         self._pending_commit_values = {}
 
-    def _render_comms_timing(self, snap: TelemetrySnapshot) -> None:
-        """Populate optional LifeTick/TimeTick fields if they exist in the UI.
-
-        We keep this deliberately *soft*: if the widgets are not present (or renamed),
-        nothing breaks.
-        """
-        try:
-            axis_id = str(self.ui.cmbAxis.currentText() or "").strip()
-        except Exception:
-            axis_id = ""
-
-        ax = (snap.axes or {}).get(axis_id) if axis_id else None
-        lifetick: int | None = getattr(ax, "lifetick_tx", None) if ax is not None else None
-        timetick: int | None = getattr(ax, "timetick_ms", None) if ax is not None else None
-
-        # If TimeTick isn't provided by the device, compute a wall-time delta between
-        # LifeTick changes as a useful operator hint.
-        if axis_id and lifetick is not None:
-            prev = self._last_lifetick_seen.get(axis_id)
-            now_ns = time.monotonic_ns()
-            if prev is None:
-                self._last_lifetick_seen[axis_id] = int(lifetick)
-                self._last_lifetick_wall_ns[axis_id] = now_ns
-            elif int(lifetick) != prev:
-                last_ns = int(self._last_lifetick_wall_ns.get(axis_id, now_ns))
-                dt_ms = int((now_ns - last_ns) / 1_000_000.0)
-                self._last_lifetick_seen[axis_id] = int(lifetick)
-                self._last_lifetick_wall_ns[axis_id] = now_ns
-                if timetick is None:
-                    timetick = dt_ms
-
-        self._set_lineedits_by_substr("lifetick", "--" if lifetick is None else str(int(lifetick)))
-        self._set_lineedits_by_substr("timetick", "--" if timetick is None else str(int(timetick)))
-
-    def _set_lineedits_by_substr(self, substr: str, text: str) -> None:
-        substr = substr.lower()
-        for w in self.win.findChildren(QLineEdit):
-            try:
-                if substr in (w.objectName() or "").lower():
-                    w.setText(text)
-            except Exception:
-                continue
-
     # ---------- polling ----------
 
     def start_polling(self, *, period_ms: int = 50) -> None:
@@ -870,11 +836,38 @@ class HiPController:
             getattr(snap, "fault", None),
         )
 
+        self._render_tick_delta(snap)
         self._render_estop(snap)
         self._render_params_and_edit_state(snap)
-        self._render_comms_timing(snap)
 
     # ---------- render logic ----------
+
+def _render_tick_delta(self, snap: TelemetrySnapshot) -> None:
+    """Render legacy TimeTick into txt_tick.
+
+    Legacy semantics: delta of device-side lifetick between two GUI updates.
+    (This is *not* RTT.)
+    """
+    if self._txt_tick is None:
+        return
+
+    axis_id = self._selected_axis or self._fixed_axis
+    if not axis_id:
+        self._txt_tick.setText("--")
+        self._prev_device_tick = None
+        return
+
+    ax = getattr(snap, "axes", {}).get(axis_id)
+    if ax is None:
+        self._txt_tick.setText("--")
+        self._prev_device_tick = None
+        return
+
+    cur = int(getattr(ax, "device_tick", 0))
+    delta, new_prev = compute_time_tick(self._prev_device_tick, cur)
+    self._txt_tick.setText(str(delta))
+    self._prev_device_tick = new_prev
+
 
     def _render_estop(self, snap: TelemetrySnapshot) -> None:
         word = int(getattr(snap, "estop_status_word", 0))

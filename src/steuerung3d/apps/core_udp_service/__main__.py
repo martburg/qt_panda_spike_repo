@@ -375,10 +375,19 @@ def main() -> int:
                         last_dev_param_commit_unmatched_by_axis[k] = list(getattr(s, "param_commit_unmatched", []) or [])
                 except Exception:
                     pass
-            # Keep existing core measured-state application (axes/pos/vel/enabled/fault).
-            apply_measured_snapshot(state, snaps[-1])
-            log.debug("rx dev telem: %d (estop=%s fault=%s tick=%s)",
-                      len(snaps), snaps[-1].estop, snaps[-1].fault, snaps[-1].tick)
+            # Device-side measured telemetry can arrive from multiple sources
+            # (e.g. one DenSi process per axis). Apply *all* snapshots so each
+            # axis' measured/meta fields get updated, instead of only the most
+            # recent datagram.
+            for snap in snaps:
+                apply_measured_snapshot(state, snap)
+            log.debug(
+                "rx dev telem: %d (last estop=%s fault=%s tick=%s)",
+                len(snaps),
+                snaps[-1].estop,
+                snaps[-1].fault,
+                snaps[-1].tick,
+            )
         else:
             log.debug("rx dev telem: 0")
 

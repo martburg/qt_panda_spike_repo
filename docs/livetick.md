@@ -16,7 +16,9 @@ We keep two integer fields per axis:
 
 ## Data flow
 1. **DenSi / device**
-   - Increments `lifetick_tx` (in this repo: we set it to the current DenSi tick per axis).
+   - Increments `lifetick_tx`.
+     - **TwinCAT legacy device/sim:** increments a 16-bit counter (typically millisecond-ish step, wraps at 65536).
+     - **SIM axis plant:** we emulate the same behavior by incrementing by `int(dt_s*1000)` per tick.
    - Publishes it in telemetry.
 
 2. **HiP (operator GUI)**

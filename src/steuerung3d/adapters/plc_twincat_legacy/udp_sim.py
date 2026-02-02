@@ -10,7 +10,15 @@ from typing import Dict, Optional, Tuple
 from steuerung3d.adapters.plc_twincat_legacy.codec import WINCH_UP_FIELDS
 
 
-def _uplink_line(*, name: str, pos: float, vel: float, lifetick_tx: int = 0, enabled: bool = False) -> str:
+def _uplink_line(
+    *,
+    name: str,
+    pos: float,
+    vel: float,
+    lifetick_tx: int = 0,
+    enabled: bool = False,
+    system_time_ms: int = 0,
+) -> str:
     """Build a minimal valid uplink line: 38 prefix fields + EOD + tail."""
     prefix = ["0"] * len(WINCH_UP_FIELDS)  # should be 38
 
@@ -29,7 +37,9 @@ def _uplink_line(*, name: str, pos: float, vel: float, lifetick_tx: int = 0, ena
     setf("Name", name)
     setf("EStopStatus", "0")
 
-    tail = ["SIM_TIME", "0", "0", "0", "0", "0", "0"]  # 7 tail fields
+    # Tail fields (after EOD) used by the legacy PLC. The first one is SystemTime.
+    # Use a monotonic ms counter so UIs can show a meaningful time tick.
+    tail = [str(int(system_time_ms)), "0", "0", "0", "0", "0", "0"]  # 7 tail fields
     return ";".join(prefix + ["EOD"] + tail) + ";"
 
 @dataclass
@@ -48,6 +58,7 @@ class TwinCATLegacyPlcUdpSim:
     vel: float = 0.0
     # optional PLC->UI heartbeat (some variants increment this each loop)
     lifetick_tx: int = 0
+    _t0: float = field(default_factory=time.time, repr=False)
 
     def start(self) -> None:
         if self._thread is not None:
@@ -87,12 +98,14 @@ class TwinCATLegacyPlcUdpSim:
                 self.vel = speed_soll if enable else 0.0
                 self.pos += self.vel * self.dt_s
 
+                system_time_ms = int((time.time() - self._t0) * 1000.0)
                 reply = _uplink_line(
                     name=self.axis_id,
                     pos=self.pos,
                     vel=self.vel,
                     lifetick_tx=self.lifetick_tx,
                     enabled=enable,
+                    system_time_ms=system_time_ms,
                 ).encode("utf-8")
                 try:
                     self._sock.sendto(reply, addr)

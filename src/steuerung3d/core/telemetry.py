@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Dict
 
 from steuerung3d.core.mode import Mode
 from steuerung3d.core.state import AxisState, MachineState
@@ -14,12 +14,7 @@ class AxisTelemetry:
     vel: float
     enabled: bool
     fault: bool
-
-    # PLC watchdog / comms timing (optional).
-    # These are carried through telemetry so UIs can show link health.
-    lifetick_tx: Optional[int] = None
-    lifetick_rx: Optional[int] = None
-    timetick_ms: Optional[int] = None
+    device_tick: int = 0  # PLC/device lifetick (legacy LifetickUItx)
 
 
 
@@ -71,21 +66,7 @@ class TelemetrySnapshot:
                 vel=float(ax.vel),
                 enabled=bool(ax.enabled),
                 fault=bool(ax.fault),
-                lifetick_tx=(
-                    int(ax.meta.get("lifetick_tx"))
-                    if isinstance(getattr(ax, "meta", None), dict) and "lifetick_tx" in ax.meta
-                    else None
-                ),
-                lifetick_rx=(
-                    int(ax.meta.get("lifetick_rx"))
-                    if isinstance(getattr(ax, "meta", None), dict) and "lifetick_rx" in ax.meta
-                    else None
-                ),
-                timetick_ms=(
-                    int(ax.meta.get("timetick_ms"))
-                    if isinstance(getattr(ax, "meta", None), dict) and "timetick_ms" in ax.meta
-                    else None
-                ),
+                device_tick=int(getattr(ax, 'meta', {}).get('device_tick', 0)),
             )
             for axis_id, ax in state.axes.items()
         }

@@ -37,7 +37,29 @@ class SimAxisPlant:
     default: AxisPlantParams = field(default_factory=AxisPlantParams)
 
     def step(self, state: MachineState, cmd: CommandFrame, dt: float) -> None:
+        # Even in SIM mode, we emulate the legacy "livetick"/"timetick" fields so that
+        # the UI can display device liveness consistently.
+        #
+        # Semantics (SIM approximation):
+        #   - lifetick_tx: a 16-bit, monotonically increasing counter in milliseconds
+        #   - lifetick_rx: last lifetick value observed from the downlink (echoed back)
+        #   - timetick_ms: same as lifetick_tx (legacy UI used it mostly as a liveness hint)
+        step_ms = int(dt * 1000.0)
+        if step_ms <= 0:
+            step_ms = 1
+
         for axis_id, ax in state.axes.items():
+            # --- device-side liveness bookkeeping (independent of motion setpoints) ---
+            meta = ax.meta
+            lt = int(meta.get("lifetick_tx", 0))
+            lt = (lt + step_ms) & 0xFFFF
+            meta["lifetick_tx"] = lt
+            meta["timetick_ms"] = lt
+
+            if hasattr(cmd, "lifetick_echo") and isinstance(cmd.lifetick_echo, dict):
+                if axis_id in cmd.lifetick_echo:
+                    meta["lifetick_rx"] = int(cmd.lifetick_echo[axis_id]) & 0xFFFF
+
             p = self.params.get(axis_id, self.default)
 
             sp = cmd.axes.get(axis_id)
