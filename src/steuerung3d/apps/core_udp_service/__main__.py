@@ -438,6 +438,9 @@ def main() -> int:
             param_commit_unmatched=list(last_dev_param_commit_unmatched_by_axis.get(axis_id, list(getattr(snap, "param_commit_unmatched", [])) or [])),
         )
 
+    # Lifetick tracing: log Core->UI device tick at most every 0.5s per axis.
+    _lt_last_ui_log_s_by_axis: dict[str, float] = {}
+
     def on_snapshot(snap: TelemetrySnapshot):
         # One HiP per axis: send a *sliced* snapshot to each UI target.
         for axis_id in axis_ids:
@@ -445,6 +448,18 @@ def main() -> int:
             if tx is None:
                 continue
             tx.publish_telemetry(_slice_for_axis(snap, axis_id))
+
+            # LIFETICK trace: Core -> HiP (TelemetrySnapshot.axes[axis].device_tick)
+            try:
+                ax = dict(getattr(snap, "axes", {}) or {}).get(axis_id)
+                dev_tick = getattr(ax, "device_tick", None)
+                now_s = time.monotonic()
+                last_s = float(_lt_last_ui_log_s_by_axis.get(axis_id, 0.0))
+                if dev_tick is not None and (now_s - last_s) >= 0.5:
+                    _lt_last_ui_log_s_by_axis[axis_id] = now_s
+                    log.info("LIFETICK Core tx UI telem: axis=%s device_tick=%s", axis_id, int(dev_tick))
+            except Exception:
+                pass
 
         stats["ui_telem_out"] += max(1, len(axis_ids))
         last_seen["ui_telem_ts"] = time.monotonic()

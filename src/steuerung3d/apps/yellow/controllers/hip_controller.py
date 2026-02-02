@@ -881,7 +881,13 @@ class HiPController:
             last = getattr(self, "_last_lifetick_echo_log_s", 0.0)
             if now - last > 0.5:
                 self._last_lifetick_echo_log_s = now
-                log.debug("HiP tx EchoLifeTick: axis=%s value=%d", axis_id, v)
+                # INFO so it shows up with default log level, but throttled.
+                log.info(
+                    "LIFETICK HiP tx EchoLifeTick: axis=%s value=%d hip_id=%s",
+                    axis_id,
+                    v,
+                    self._hip_id,
+                )
 
             self.intent_out.publish_intent(EchoLifeTick(axis_id=axis_id, value=v, hip_id=self._hip_id))
 

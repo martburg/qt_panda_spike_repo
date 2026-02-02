@@ -112,8 +112,9 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             if not axis_id:
                 return
             # Store as 16-bit like the legacy PLC fields.
-            state.lifetick_echo_by_axis[axis_id] = int(value) & 0xFFFF
-            log.info("core rx EchoLifeTick: axis=%s value=%d", axis_id, int(value) & 0xFFFF)
+            v16 = int(value) & 0xFFFF
+            state.lifetick_echo_by_axis[axis_id] = v16
+            log.info("LIFETICK Core rx EchoLifeTick: axis=%s value=%d hip_id=%s", axis_id, v16, str(_hip_id or ""))
             return
 
         # --- SAFETY / GLOBAL REQUESTS ---

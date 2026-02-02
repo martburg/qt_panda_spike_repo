@@ -31,6 +31,14 @@ import logging
 
 log = logging.getLogger("den_si")
 
+# --- Lifetick tracing (DenSi -> Core -> HiP -> Core -> DenSi) ---
+# Keep logging useful (avoid per-tick spam): throttle to at most once per 0.5s.
+_LT_LOG_EVERY_S = 0.5
+
+
+def _lt_should_log(now_s: float, last_s: float) -> bool:
+    return (now_s - last_s) >= _LT_LOG_EVERY_S
+
 
 # v0.1 axis-agnostic parameter wiring (UI widget names -> param keys)
 _PARAM_WIDGETS: dict[str, dict[str, str]] = {
@@ -125,6 +133,12 @@ class DenSiController:
 
         self.device = SimDevice(plant=SimAxisPlant())
         self._last_cmd: CommandFrame | None = None
+
+        # Lifetick tracing / log throttling
+        self._lt_last_telem_log_s: float = 0.0
+        self._lt_last_cmd_log_s: float = 0.0
+        # last echoed lifetick seen in cmd frames (per axis)
+        self._lt_last_echo_by_axis: dict[str, int | None] = {}
 
         # LOGICAL injected bits (invert handled by encode/decode)
         self._inj_bits = {k: False for k in ESTOP_SPECS.keys()}
@@ -581,17 +595,37 @@ class DenSiController:
         # --- LiveTick semantics (device-origin) ---
         # tx: incrementing device tick (DenSi sim, ms-based 16-bit counter)
         # rx: echo value received from HiP/Core in last command frame
+        now_s = time.monotonic()
         _echo_map = getattr(self._last_cmd, "lifetick_echo", {}) if self._last_cmd is not None else {}
-        if self._last_cmd is not None:
-            log.info(
-            "DenSi rx cmd: tick=%s lifetick_echo[%s]=%s (map=%s)",
-            getattr(self._last_cmd, "tick", None),
-            self.axis_ids[0] if self.axis_ids else "?",
-            (dict(_echo_map).get(self.axis_ids[0], None) if self.axis_ids else None),
-            _echo_map,
-        )
+
+        # LIFETICK (core -> DenSi): log echo changes immediately; otherwise throttle.
+        if self._last_cmd is not None and self.axis_ids:
+            for axis_id in self.axis_ids:
+                echo_val = dict(_echo_map).get(axis_id, None)
+                prev = self._lt_last_echo_by_axis.get(axis_id)
+                if prev != echo_val:
+                    self._lt_last_echo_by_axis[axis_id] = echo_val
+                    log.info(
+                        "LIFETICK DenSi rx cmd echo: axis=%s value=%s cmd_tick=%s",
+                        axis_id,
+                        echo_val,
+                        getattr(self._last_cmd, "tick", None),
+                    )
+
+            if _lt_should_log(now_s, self._lt_last_cmd_log_s):
+                axis0 = self.axis_ids[0]
+                log.debug(
+                    "DenSi rx cmd: tick=%s lifetick_echo[%s]=%s (map=%s)",
+                    getattr(self._last_cmd, "tick", None),
+                    axis0,
+                    dict(_echo_map).get(axis0, None),
+                    _echo_map,
+                )
+                self._lt_last_cmd_log_s = now_s
         else:
-            log.info("DenSi rx cmd: <no cmd yet>")
+            if _lt_should_log(now_s, self._lt_last_cmd_log_s):
+                log.debug("DenSi rx cmd: <no cmd yet>")
+                self._lt_last_cmd_log_s = now_s
 
         inc_ms = max(1, int(round(self.tb.dt_s * 1000.0)))
         for _axis_id, _ax in self.state.axes.items():
@@ -615,16 +649,20 @@ class DenSiController:
             rx = int(_ax.meta.get("lifetick_rx", 0)) & 0xFFFF
             diff = (tx - rx) & 0xFFFF
 
-            # throttle to avoid log spam
-            now = time.monotonic()
-            if now - _ax.meta.get("_last_log_tick_s", 0.0) > 0.5:
-                _ax.meta["_last_log_tick_s"] = now
-                log.info("DenSi tick %s: tx=%5d rx=%5d diff=%5d", _axis_id, tx, rx, diff)
+            # LIFETICK trace (throttled): DenSi -> Core (tx) and Core/HiP -> DenSi (rx echo)
+            if self.axis_ids and _axis_id == self.axis_ids[0] and _lt_should_log(now_s, self._lt_last_telem_log_s):
+                self._lt_last_telem_log_s = now_s
+                log.info(
+                    "LIFETICK DenSi device: axis=%s tx=%d rx=%d diff=%d",
+                    _axis_id,
+                    tx,
+                    rx,
+                    diff,
+                )
 
         # Render device-side tick staleness like PLC does:
         # diff = LifetickUItx - LifetickUIrx (WORD wrap)
         if self._txt_tick is not None and self.axis_ids:
-            log.info("DenSi UI txt_tick=%s", self._txt_tick.text())
             axis_id = self.axis_ids[0]
             ax = self.state.axes.get(axis_id)
             if ax is not None:
