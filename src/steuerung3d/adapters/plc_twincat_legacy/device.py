@@ -85,7 +85,11 @@ class TwinCATLegacyWinchUdpDevice:
             vel_cmd = float(sp.vel)
 
         # Lifetick must be present EVERY frame; make it deterministic:
-        lifetick = int(getattr(cmd, "tick", 0)) & 0xFFFF
+        echo_map = getattr(cmd, "lifetick_echo", None)
+        if isinstance(echo_map, dict):
+            lifetick = int(echo_map.get(self.axis_id, 0)) & 0xFFFF
+        else:
+            lifetick = int(getattr(cmd, "tick", 0)) & 0xFFFF
 
         # Apply global safety gating AFTER reading the command
         enable = enable_cmd and (not state.estop) and (not state.fault)

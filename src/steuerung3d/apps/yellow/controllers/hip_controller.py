@@ -842,31 +842,31 @@ class HiPController:
 
     # ---------- render logic ----------
 
-def _render_tick_delta(self, snap: TelemetrySnapshot) -> None:
-    """Render legacy TimeTick into txt_tick.
+    def _render_tick_delta(self, snap: TelemetrySnapshot) -> None:
+        """Render legacy TimeTick into txt_tick.
 
-    Legacy semantics: delta of device-side lifetick between two GUI updates.
-    (This is *not* RTT.)
-    """
-    if self._txt_tick is None:
-        return
+        Legacy semantics: delta of device-side lifetick between two GUI updates.
+        (This is *not* RTT.)
+        """
+        if self._txt_tick is None:
+            return
 
-    axis_id = self._selected_axis or self._fixed_axis
-    if not axis_id:
-        self._txt_tick.setText("--")
-        self._prev_device_tick = None
-        return
+        axis_id = self._selected_axis or self._fixed_axis
+        if not axis_id:
+            self._txt_tick.setText("--")
+            self._prev_device_tick = None
+            return
 
-    ax = getattr(snap, "axes", {}).get(axis_id)
-    if ax is None:
-        self._txt_tick.setText("--")
-        self._prev_device_tick = None
-        return
+        ax = getattr(snap, "axes", {}).get(axis_id)
+        if ax is None:
+            self._txt_tick.setText("--")
+            self._prev_device_tick = None
+            return
 
-    cur = int(getattr(ax, "device_tick", 0))
-    delta, new_prev = compute_time_tick(self._prev_device_tick, cur)
-    self._txt_tick.setText(str(delta))
-    self._prev_device_tick = new_prev
+        cur = int(getattr(ax, "device_tick", 0))
+        delta, new_prev = compute_time_tick(self._prev_device_tick, cur)
+        self._txt_tick.setText(str(delta))
+        self._prev_device_tick = new_prev
 
 
     def _render_estop(self, snap: TelemetrySnapshot) -> None:
