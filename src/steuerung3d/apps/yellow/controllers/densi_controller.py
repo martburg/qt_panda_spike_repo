@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import time
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QCheckBox, QWidget, QLineEdit, QComboBox
@@ -83,6 +84,10 @@ class DenSiController:
     def __post_init__(self) -> None:
         self.ui = YellowBindings.from_window(self.win)
 
+        # Legacy TimeTick display on device side:
+        # show (lifetick_tx - lifetick_rx) in milliseconds (WORD wrap).
+        self._txt_tick: QLineEdit | None = self.win.findChild(QLineEdit, "txt_tick")
+
         # DenSi is normally bound to exactly one axis. To reduce confusion during
         # multi-window integration, show the axis name directly in cmb_axis.
         cmb = self.win.findChild(QComboBox, "cmb_axis")
@@ -151,6 +156,10 @@ class DenSiController:
         # DenSi is the remote endpoint: parameter edit/write/cancel is driven from HiP
         self._disable_param_edit_buttons()
         self._disable_param_fields()
+
+        # Reset device-side tick display
+        if self._txt_tick is not None:
+            self._txt_tick.setText("--")
 
     def _seed_params_from_ui(self) -> None:
         for _grp, mapping in _PARAM_WIDGETS.items():
@@ -573,6 +582,17 @@ class DenSiController:
         # tx: incrementing device tick (DenSi sim, ms-based 16-bit counter)
         # rx: echo value received from HiP/Core in last command frame
         _echo_map = getattr(self._last_cmd, "lifetick_echo", {}) if self._last_cmd is not None else {}
+        if self._last_cmd is not None:
+            log.info(
+            "DenSi rx cmd: tick=%s lifetick_echo[%s]=%s (map=%s)",
+            getattr(self._last_cmd, "tick", None),
+            self.axis_ids[0] if self.axis_ids else "?",
+            (dict(_echo_map).get(self.axis_ids[0], None) if self.axis_ids else None),
+            _echo_map,
+        )
+        else:
+            log.info("DenSi rx cmd: <no cmd yet>")
+
         inc_ms = max(1, int(round(self.tb.dt_s * 1000.0)))
         for _axis_id, _ax in self.state.axes.items():
             # Legacy PLC analogue: LifetickUItx is a WORD that increments in (roughly) milliseconds.
@@ -589,6 +609,41 @@ class DenSiController:
                 _ax.meta["lifetick_rx"] = 0
             # Cycle time indicator for debugging/UX.
             _ax.meta["timetick_ms"] = inc_ms
+
+            # Debug log the tick values
+            tx = int(_ax.meta.get("lifetick_tx", 0)) & 0xFFFF
+            rx = int(_ax.meta.get("lifetick_rx", 0)) & 0xFFFF
+            diff = (tx - rx) & 0xFFFF
+
+            # throttle to avoid log spam
+            now = time.monotonic()
+            if now - _ax.meta.get("_last_log_tick_s", 0.0) > 0.5:
+                _ax.meta["_last_log_tick_s"] = now
+                log.info("DenSi tick %s: tx=%5d rx=%5d diff=%5d", _axis_id, tx, rx, diff)
+
+        # Render device-side tick staleness like PLC does:
+        # diff = LifetickUItx - LifetickUIrx (WORD wrap)
+        if self._txt_tick is not None and self.axis_ids:
+            log.info("DenSi UI txt_tick=%s", self._txt_tick.text())
+            axis_id = self.axis_ids[0]
+            ax = self.state.axes.get(axis_id)
+            if ax is not None:
+                try:
+                    tx = int(ax.meta.get("lifetick_tx", 0)) & 0xFFFF
+                except Exception:
+                    tx = 0
+                try:
+                    rx = int(ax.meta.get("lifetick_rx", 0)) & 0xFFFF
+                except Exception:
+                    rx = 0
+                diff = (tx - rx) & 0xFFFF
+                # avoid repaint churn
+                s = str(diff)
+                if self._txt_tick.text() != s:
+                    self._txt_tick.setText(s)
+            else:
+                if self._txt_tick.text() != "--":
+                    self._txt_tick.setText("--")
 
         snap = TelemetrySnapshot.from_state(self.state)
         self.telemetry_out.publish_telemetry(snap)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+import logging
 from typing import Callable, Generic, List, Tuple, TypeVar
 
 from steuerung3d.adapters.links.udp_link import UdpLink
@@ -16,6 +17,8 @@ from steuerung3d.protocol.codec import (
     encode_command_frame, decode_command_frame,
 )
 
+log = logging.getLogger("udp")
+
 T = TypeVar("T")
 
 
@@ -27,12 +30,20 @@ class _UdpJsonRx(Generic[T]):
     def drain(self, limit: int = 1000) -> List[T]:
         out: List[T] = []
         for raw in self.link.poll(limit=limit):
+            payload = None
             try:
                 payload = json.loads(raw.decode("utf-8"))
                 if isinstance(payload, dict):
                     out.append(self.decode(payload))
-            except Exception:
-                # keep it robust; later we add stats/logging
+            except Exception as e:
+                # IMPORTANT: don't swallow decode problems silently (breaks debugging)
+                try:
+                    t = payload.get("type") if isinstance(payload, dict) else None
+                except Exception:
+                    t = None
+                # limit raw size to keep logs readable
+                raw_preview = raw[:200] if isinstance(raw, (bytes, bytearray)) else b""
+                log.warning("udp decode failed: type=%r err=%r raw=%r", t, e, raw_preview)
                 continue
         return out
 

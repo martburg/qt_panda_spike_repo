@@ -8,6 +8,8 @@ import uuid
 from PySide6.QtCore import QLocale, QTimer
 from PySide6.QtGui import QDoubleValidator
 from PySide6.QtWidgets import QLineEdit, QPushButton, QWidget, QMessageBox, QTabWidget, QComboBox
+from arrow import now
+from more_itertools import last
 
 from steuerung3d.core.intents import (
     ParamCancel,
@@ -828,29 +830,27 @@ class HiPController:
         snap = snaps[-1]
         self._last_rx_ns = now_ns
 
-        # Populate axis selection (discovery) and auto-claim on selection.
-        self._update_axis_combo(snap)
+        try:
+            # Populate axis selection (discovery) and auto-claim on selection.
+            self._update_axis_combo(snap)
 
-        if not self._seen_first_telem:
-            log.info(
-                "rx first telemetry: tick=%s estop=%s fault=%s",
-                getattr(snap, "tick", None),
-                getattr(snap, "estop", None),
-                getattr(snap, "fault", None),
-            )
-            self._seen_first_telem = True
+            if not self._seen_first_telem:
+                log.info(
+                    "rx first telemetry: tick=%s estop=%s fault=%s",
+                    getattr(snap, "tick", None),
+                    getattr(snap, "estop", None),
+                    getattr(snap, "fault", None),
+                )
+                self._seen_first_telem = True
 
-        log.debug(
-            "rx telemetry: tick=%s estop=%s fault=%s",
-            getattr(snap, "tick", None),
-            getattr(snap, "estop", None),
-            getattr(snap, "fault", None),
-        )
-
-        self._render_tick_delta(snap)
-        self._render_estop(snap)
-        self._render_params_and_edit_state(snap)
-        self._tx_lifetick_echo(snap)
+            self._render_tick_delta(snap)
+            self._render_estop(snap)
+            self._render_params_and_edit_state(snap)
+            self._tx_lifetick_echo(snap)
+        except Exception:
+            # Keep the UI alive; print full traceback once per crash.
+            log.exception("HiP poll_once crashed (continuing).")
+            return
 
     # ---------- render logic ----------
 
@@ -876,6 +876,13 @@ class HiPController:
                 continue
 
             self._last_lifetick_echo_sent[axis_id] = v
+
+            now = time.monotonic()
+            last = getattr(self, "_last_lifetick_echo_log_s", 0.0)
+            if now - last > 0.5:
+                self._last_lifetick_echo_log_s = now
+                log.debug("HiP tx EchoLifeTick: axis=%s value=%d", axis_id, v)
+
             self.intent_out.publish_intent(EchoLifeTick(axis_id=axis_id, value=v, hip_id=self._hip_id))
 
 
@@ -894,13 +901,29 @@ class HiPController:
             self._prev_device_tick = None
             return
 
-        ax = getattr(snap, "axes", {}).get(axis_id)
+
+        axes = getattr(snap, "axes", None)
+        if not isinstance(axes, dict):
+            log.info("HiP tick: snap.axes not dict (%s) -> %r", type(axes).__name__, axes)
+            self._txt_tick.setText("--")
+            self._prev_device_tick = None
+            return
+
+        ax = axes.get(axis_id)
         if ax is None:
             self._txt_tick.setText("--")
             self._prev_device_tick = None
             return
 
-        cur = int(getattr(ax, "device_tick", 0))
+
+        cur_raw = getattr(ax, "device_tick", 0)
+        try:
+            cur = int(cur_raw)
+        except Exception:
+            log.info("HiP tick: axis %s device_tick not int-coercible: %r", axis_id, cur_raw)
+            self._txt_tick.setText("--")
+            self._prev_device_tick = None
+            return
         delta, new_prev = compute_time_tick(self._prev_device_tick, cur)
         self._txt_tick.setText(str(delta))
         self._prev_device_tick = new_prev
@@ -935,9 +958,17 @@ class HiPController:
         """Populate cmb_axis with discovered axes and keep selection stable."""
         if self._cmb_axis is None:
             return
-        axis_ids = sorted(list(getattr(snap, "axes", {}).keys()))
-        if not axis_ids:
+        axes = getattr(snap, "axes", None)
+        if axes is None:
             return
+        if not isinstance(axes, dict):
+            # This is the key diagnostic if the core schema changed.
+            log.info("HiP axis discovery: snap.axes not dict (%s) -> %r", type(axes).__name__, axes)
+            return
+
+        axis_ids = sorted(list(axes.keys()))
+        if not axis_ids:
+             return
 
         # Avoid recursive signal storms by blocking signals during rebuild
         cur = self._cmb_axis.currentText().strip()

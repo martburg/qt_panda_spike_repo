@@ -23,6 +23,7 @@ from steuerung3d.core.intents import (
     ParamEditBegin,
     ParamWrite,
     ParamCancel,
+    EchoLifeTick,
 )
 
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
@@ -53,6 +54,7 @@ _INTENT_TYPE_MAP = {
     "param_edit_begin": ParamEditBegin,
     "param_write": ParamWrite,
     "param_cancel": ParamCancel,
+    "echo_lifetick": EchoLifeTick,
 }
 
 

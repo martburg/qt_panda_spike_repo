@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from typing import Dict
+import logging
+
+log = logging.getLogger("core") 
 
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
 from steuerung3d.core.state import MachineState
@@ -12,6 +15,9 @@ def build_command_frame(state: MachineState) -> CommandFrame:
         for axis_id, cmd in state.axis_cmd.items()
     }
     lifetick_echo = dict(getattr(state, "lifetick_echo_by_axis", {}))
+
+    log.info("core cmd lifetick_echo=%s", state.lifetick_echo_by_axis)
+
     return CommandFrame(
         tick=state.tick,
         t_s=state.t_s,

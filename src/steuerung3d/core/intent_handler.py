@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import logging
+log = logging.getLogger("core")
+
 from steuerung3d.core.intents import (
     ArmLiveMode,
     ClearFault,
@@ -110,6 +113,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
                 return
             # Store as 16-bit like the legacy PLC fields.
             state.lifetick_echo_by_axis[axis_id] = int(value) & 0xFFFF
+            log.info("core rx EchoLifeTick: axis=%s value=%d", axis_id, int(value) & 0xFFFF)
             return
 
         # --- SAFETY / GLOBAL REQUESTS ---
