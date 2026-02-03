@@ -5,10 +5,31 @@ import os
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import tomllib
+
+
+@dataclass
+class ChildProc:
+    """A supervised child process with a stable human name and an associated log file."""
+
+    name: str
+    proc: subprocess.Popen
+    log_path: Optional[Path] = None
+
+
+def _tail_text(path: Path, max_lines: int = 40) -> str:
+    """Return the last N lines of a text file, best-effort."""
+    try:
+        txt = path.read_text(encoding="utf-8", errors="replace")
+        lines = txt.splitlines()
+        tail = lines[-max_lines:]
+        return "\n".join(tail)
+    except Exception:
+        return ""
 
 
 def _is_windows() -> bool:
@@ -36,11 +57,41 @@ def _axes_from_joy2intent(path: Path) -> List[str]:
     return axes
 
 
-def _popen(cmd: List[str], *, new_console: bool) -> subprocess.Popen:
+def _popen(
+    name: str,
+    cmd: List[str],
+    *,
+    new_console: bool,
+    log_dir: Optional[Path],
+) -> ChildProc:
+    """Start a child process with a stable name and a per-child log file."""
+
+    log_path: Optional[Path] = None
+    stdout_handle = None
+    if log_dir is not None:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        # Use a stable file name; names are unique (we include axis_id).
+        log_path = log_dir / f"{name}.log"
+        stdout_handle = open(log_path, "a", encoding="utf-8", errors="replace")
+        stdout_handle.write(f"\n--- spawn {name} @ {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+        stdout_handle.flush()
+
+    popen_kwargs = dict(
+        stdout=stdout_handle,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
     if _is_windows() and new_console:
         # CREATE_NEW_CONSOLE = 0x00000010
-        return subprocess.Popen(cmd, creationflags=0x00000010)
-    return subprocess.Popen(cmd)
+        proc = subprocess.Popen(cmd, creationflags=0x00000010, **popen_kwargs)
+    else:
+        proc = subprocess.Popen(cmd, **popen_kwargs)
+
+    if stdout_handle is not None:
+        stdout_handle.write(f"pid={proc.pid} cmd={' '.join(cmd)}\n")
+        stdout_handle.flush()
+    return ChildProc(name=name, proc=proc, log_path=log_path)
 
 
 def main() -> int:
@@ -103,7 +154,11 @@ def main() -> int:
         if dev_telem_bind[0] == "127.0.0.1" and dev_telem_bind[1] in range(cmd_lo, cmd_hi + 1):
             dev_telem_bind = ("127.0.0.1", cmd_lo + 100)
 
-    procs: List[subprocess.Popen] = []
+    # Per-child logs help a lot when a subprocess exits early (rc!=0)
+    log_dir = Path(".run") / "setup_stack"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    procs: List[ChildProc] = []
     try:
         # --- core ---
         if not args.no_core:
@@ -128,7 +183,7 @@ def main() -> int:
             ]
             for a in axes:
                 core_cmd.extend(["--axis", a])
-            procs.append(_popen(core_cmd, new_console=args.new_console))
+            procs.append(_popen("core", core_cmd, new_console=args.new_console, log_dir=log_dir))
             time.sleep(0.25)
 
         # --- DenSi fleet (one per axis) ---
@@ -150,7 +205,7 @@ def main() -> int:
                     "--log-level",
                     args.log_level,
                 ]
-                procs.append(_popen(densi_cmd, new_console=args.new_console))
+                procs.append(_popen(f"densi-{axis_id}", densi_cmd, new_console=args.new_console, log_dir=log_dir))
                 time.sleep(0.12)
 
         # --- HiP UI ---
@@ -165,7 +220,7 @@ def main() -> int:
                     "--telem-in",
                     f"127.0.0.1:{args.ui_telem_base}",
                 ]
-                procs.append(_popen(hip_cmd, new_console=False))
+                procs.append(_popen(f"hip-{axes[0]}", hip_cmd, new_console=False, log_dir=log_dir))
                 time.sleep(0.15)
             else:
                 for i, axis_id in enumerate(axes):
@@ -181,7 +236,7 @@ def main() -> int:
                         "--log-level",
                         args.log_level,
                     ]
-                    procs.append(_popen(hip_cmd, new_console=False))
+                    procs.append(_popen(f"hip-{axis_id}", hip_cmd, new_console=False, log_dir=log_dir))
                     time.sleep(0.12)
 
         # --- inputd ---
@@ -195,7 +250,7 @@ def main() -> int:
                 "--log-level",
                 args.log_level,
             ]
-            procs.append(_popen(inputd_cmd, new_console=args.new_console))
+            procs.append(_popen("inputd", inputd_cmd, new_console=args.new_console, log_dir=log_dir))
             time.sleep(0.15)
 
         # --- joy2intent ---
@@ -209,7 +264,7 @@ def main() -> int:
                 "--log-level",
                 args.log_level,
             ]
-            procs.append(_popen(joy2intent_cmd, new_console=args.new_console))
+            procs.append(_popen("joy2intent", joy2intent_cmd, new_console=args.new_console, log_dir=log_dir))
             time.sleep(0.15)
 
         print(
@@ -225,11 +280,21 @@ def main() -> int:
 
         while True:
             # If any child exits, report it (useful during dev).
-            for p in list(procs):
-                rc = p.poll()
+            for child in list(procs):
+                rc = child.proc.poll()
                 if rc is not None:
-                    procs.remove(p)
-                    print(f"[setup_stack] child exited rc={rc}", file=sys.stderr)
+                    procs.remove(child)
+                    msg = f"[setup_stack] child exited name={child.name} pid={child.proc.pid} rc={rc}"
+                    if child.log_path:
+                        msg += f" log={child.log_path}"
+                    print(msg, file=sys.stderr)
+                    # Print a short tail to make early-exit debugging fast.
+                    if child.log_path:
+                        tail = _tail_text(child.log_path, max_lines=40)
+                        if tail.strip():
+                            print("[setup_stack] --- last log lines ---", file=sys.stderr)
+                            print(tail, file=sys.stderr)
+                            print("[setup_stack] --- end ---", file=sys.stderr)
             time.sleep(0.5)
 
         # unreachable
@@ -237,14 +302,14 @@ def main() -> int:
     except KeyboardInterrupt:
         return 0
     finally:
-        for p in procs:
+        for child in procs:
             try:
-                p.terminate()
+                child.proc.terminate()
             except Exception:
                 pass
-        for p in procs:
+        for child in procs:
             try:
-                p.wait(timeout=1.5)
+                child.proc.wait(timeout=1.5)
             except Exception:
                 pass
 

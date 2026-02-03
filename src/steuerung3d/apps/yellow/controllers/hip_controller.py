@@ -881,8 +881,9 @@ class HiPController:
             last = getattr(self, "_last_lifetick_echo_log_s", 0.0)
             if now - last > 0.5:
                 self._last_lifetick_echo_log_s = now
-                # INFO so it shows up with default log level, but throttled.
-                log.info(
+                # LifeTick is useful while debugging connectivity, but too chatty
+                # for everyday use. Keep it at DEBUG and throttled.
+                log.debug(
                     "LIFETICK HiP tx EchoLifeTick: axis=%s value=%d hip_id=%s",
                     axis_id,
                     v,

@@ -67,7 +67,7 @@ def main() -> int:
         if rc is not None:
             last_rx_ns = now_ns
             sent_stale_zero = False
-            intents = synthesize_intents(rc, st, rig, bind, lim)
+            intents = synthesize_intents(rc, st, bind, rig, lim)
             for it in intents:
                 intent_out.publish_intent(it)
         else:

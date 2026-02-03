@@ -649,10 +649,10 @@ class DenSiController:
             rx = int(_ax.meta.get("lifetick_rx", 0)) & 0xFFFF
             diff = (tx - rx) & 0xFFFF
 
-            # LIFETICK trace (throttled): DenSi -> Core (tx) and Core/HiP -> DenSi (rx echo)
+            # LifeTick is noisy during normal operation. Keep a throttled trace at DEBUG.
             if self.axis_ids and _axis_id == self.axis_ids[0] and _lt_should_log(now_s, self._lt_last_telem_log_s):
                 self._lt_last_telem_log_s = now_s
-                log.info(
+                log.debug(
                     "LIFETICK DenSi device: axis=%s tx=%d rx=%d diff=%d",
                     _axis_id,
                     tx,

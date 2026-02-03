@@ -119,6 +119,32 @@ This allows you to test:
 
 …without requiring real PLCs.
 
+## Running the full multi-axis demo with `setup_stack`
+
+`setup_stack` is a small process supervisor that launches the typical local demo stack:
+
+- `core_udp_service`
+- `den_si` (one per axis)
+- `hi_p` (one per axis)
+- optional joystick helpers (`inputd`, `joy2intent`)
+
+Example (the one you used):
+
+```powershell
+python -m steuerung3d.apps.setup_stack --joy2intent configs\joy2intent_gamepad.toml --inputd configs\inputd_gamepad.toml --cmd-base 52001 --dev-telem-in 127.0.0.1:52020
+```
+
+Debugging early exits
+
+- Each child gets a stable name (e.g. `core_udp_service`, `densi-Anton`, `hip-Debby`, …).
+- Each child writes combined stdout/stderr to `.run/setup_stack/<name>.log`.
+- If a child exits, `setup_stack` prints the *name*, PID, return code, and a short tail of its log.
+
+Logging noise
+
+- LifeTick trace logs are throttled and emitted at **DEBUG** level.
+  (The default `INFO` level stays readable during normal operation.)
+
 ## Output
 
 The demo prints one line every ~0.5 seconds at 100 Hz, for all configured axes, e.g.:
