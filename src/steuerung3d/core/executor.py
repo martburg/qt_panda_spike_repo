@@ -21,7 +21,7 @@ def build_command_frame(state: MachineState) -> CommandFrame:
     }
     lifetick_echo = dict(getattr(state, "lifetick_echo_by_axis", {}))
 
-    # Keep existing info but move to DEBUG to avoid log spam.
+    # LifeTick echo map is updated frequently; keep at DEBUG to avoid log spam.
     log.debug("core cmd lifetick_echo=%s", state.lifetick_echo_by_axis)
 
     # LIFETICK trace: Core -> devices (via CommandFrame.lifetick_echo)
@@ -32,7 +32,9 @@ def build_command_frame(state: MachineState) -> CommandFrame:
         last_s = float(_lt_last_cmd_log_by_axis.get(axis_id, 0.0))
         if (now_s - last_s) >= _LT_LOG_EVERY_S:
             _lt_last_cmd_log_by_axis[axis_id] = now_s
-            log.info(
+            # LifeTick is useful while debugging connectivity, but too chatty
+            # for everyday use. Keep it at DEBUG and throttled.
+            log.debug(
                 "LIFETICK Core tx cmd: axis=%s cmd_tick=%s echo=%s",
                 axis_id,
                 state.tick,

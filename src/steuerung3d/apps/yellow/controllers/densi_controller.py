@@ -623,7 +623,9 @@ class DenSiController:
                 prev = self._lt_last_echo_by_axis.get(axis_id)
                 if prev != echo_val:
                     self._lt_last_echo_by_axis[axis_id] = echo_val
-                    log.info(
+                    # LifeTick is useful while debugging connectivity, but too chatty
+                    # for everyday use. Keep it at DEBUG (edge-triggered).
+                    log.debug(
                         "LIFETICK DenSi rx cmd echo: axis=%s value=%s cmd_tick=%s",
                         axis_id,
                         echo_val,

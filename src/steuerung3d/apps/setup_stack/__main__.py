@@ -21,17 +21,81 @@ class ChildProc:
     log_path: Optional[Path] = None
 
 
-def _tail_text(path: Path, max_lines: int = 40) -> str:
-    """Return the last N lines of a text file, best-effort."""
-    try:
-        txt = path.read_text(encoding="utf-8", errors="replace")
-        lines = txt.splitlines()
-        tail = lines[-max_lines:]
-        return "\n".join(tail)
-    except Exception:
-        return ""
+class _LogTailer:
+    """Low-overhead incremental tail of a growing log file.
 
+    We avoid re-reading entire log files (which can hurt responsiveness on Windows).
+    The tailer keeps a read offset and only scans newly appended text.
+    """
 
+    def __init__(self, path: Path):
+        self.path = path
+        self._pos = 0
+        self._buf = ""
+        self._fh = None  # opened lazily
+        self.last_hb: str = ""
+        self.last_joy: str = ""
+        self.last_inp: str = ""
+        self.last_dev: str = ""
+
+        # Start at end: we only care about new session activity.
+        try:
+            self._pos = int(self.path.stat().st_size)
+        except Exception:
+            self._pos = 0
+
+    def _open(self):
+        if self._fh is None:
+            self._fh = self.path.open("r", encoding="utf-8", errors="replace")
+            try:
+                self._fh.seek(self._pos)
+            except Exception:
+                pass
+
+    def close(self) -> None:
+        try:
+            if self._fh is not None:
+                self._fh.close()
+        finally:
+            self._fh = None
+
+    def poll(self) -> None:
+        """Read newly appended lines and update last matching strings."""
+        try:
+            self._open()
+            assert self._fh is not None
+            chunk = self._fh.read()
+            if not chunk:
+                return
+            self._pos = self._fh.tell()
+            data = self._buf + chunk
+            if not data:
+                return
+            # Split into lines; keep trailing partial line in buffer.
+            if data.endswith("\n"):
+                self._buf = ""
+                new_lines = data.splitlines()
+            else:
+                *new_lines, self._buf = data.splitlines()
+            for ln in new_lines:
+                ln = ln.strip()
+                if not ln:
+                    continue
+                if ln.startswith("HB "):
+                    self.last_hb = ln
+                if "joy2intent |" in ln:
+                    self.last_joy = ln
+                if "inputd |" in ln:
+                    self.last_inp = ln
+                if "den_si |" in ln:
+                    self.last_dev = ln
+        except FileNotFoundError:
+            # log file not yet created
+            return
+        except Exception:
+            # best-effort; don't crash setup_stack
+            self.close()
+            return
 def _is_windows() -> bool:
     return os.name == "nt"
 
@@ -278,6 +342,23 @@ def main() -> int:
             file=sys.stderr,
         )
 
+        # --- birds-eye view (console): summarize what the stack is doing (1 Hz) ---
+        # Low-overhead: incrementally tail the per-process session log files (no full-file reads).
+        birds_next_s = time.monotonic() + 1.0
+        birds_prev_line = ""
+
+        axis0 = axes[0] if axes else ""
+
+        # Create tailers once log files exist
+        tailers: dict[str, _LogTailer] = {}
+
+        def _ensure_tailer(key: str, path: Optional[Path]) -> None:
+            if not path:
+                return
+            if key not in tailers:
+                tailers[key] = _LogTailer(path)
+
+
         while True:
             # If any child exits, report it (useful during dev).
             for child in list(procs):
@@ -295,6 +376,42 @@ def main() -> int:
                             print("[setup_stack] --- last log lines ---", file=sys.stderr)
                             print(tail, file=sys.stderr)
                             print("[setup_stack] --- end ---", file=sys.stderr)
+            # Birds-eye line (once per second). Prefer the core heartbeat ("HB ...").
+            now_s = time.monotonic()
+
+            # Poll tailers (best-effort) – this is cheap: only reads newly appended bytes.
+            for c in procs:
+                _ensure_tailer(c.name, c.log_path)
+            for t in list(tailers.values()):
+                t.poll()
+
+            if now_s >= birds_next_s:
+                birds_next_s = now_s + 1.0
+
+                parts: List[str] = []
+                t_core = tailers.get("core")
+                t_joy  = tailers.get("joy2intent")
+                t_inp  = tailers.get("inputd")
+                t_dev  = tailers.get(f"densi-{axis0}") if axis0 else None
+
+                if t_core and t_core.last_hb:
+                    parts.append(f"core: {t_core.last_hb}")
+                if t_joy and t_joy.last_joy:
+                    parts.append(f"joy: {t_joy.last_joy}")
+                if t_inp and t_inp.last_inp:
+                    parts.append(f"in: {t_inp.last_inp}")
+                if t_dev and t_dev.last_dev:
+                    parts.append(f"dev: {t_dev.last_dev}")
+
+                if parts:
+                    line = "[birds] " + " | ".join(parts)
+                    # avoid console spam if nothing changes (still print at least every ~5s)
+                    if line != birds_prev_line or int(now_s) % 5 == 0:
+                        # keep it readable even in narrow consoles
+                        if len(line) > 420:
+                            line = line[:417] + "..."
+                        print(line, file=sys.stderr)
+                        birds_prev_line = line
             time.sleep(0.5)
 
         # unreachable
@@ -302,6 +419,14 @@ def main() -> int:
     except KeyboardInterrupt:
         return 0
     finally:
+        try:
+            for t in list(locals().get('tailers', {}).values()):
+                try:
+                    t.close()
+                except Exception:
+                    pass
+        except Exception:
+            pass
         for child in procs:
             try:
                 child.proc.terminate()
