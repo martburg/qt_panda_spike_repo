@@ -6,6 +6,9 @@ import time
 from pathlib import Path
 from typing import List, Optional
 
+from steuerung3d.util.log_context import install_log_context
+from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
+
 from steuerung3d.protocol.raw_controls import RawControls
 from steuerung3d.protocol.udp_channels import UdpRawControlsOut
 
@@ -79,11 +82,17 @@ def run(cfg: InputdConfig, *, log_hz: float = 2.0) -> int:
     samples = 0
     last_desc = ""
 
+    hb = Heartbeat("inputd", interval_s=1.0)
+    ch = ChangeTracker()
+
     while True:
         ok, desc = js.ensure_open(index=cfg.device_index, name_contains=cfg.name_contains)
         if ok and desc != "ok" and desc != last_desc:
             last_desc = desc
             log.info("joystick connected: %s", desc)
+
+        if ch.changed("connected", bool(ok)):
+            log.info("joystick_present=%s", bool(ok))
 
         connected, axes, buttons = js.read(
             max_axes=cfg.max_axes,
@@ -110,14 +119,21 @@ def run(cfg: InputdConfig, *, log_hz: float = 2.0) -> int:
             )
             out.publish_raw_controls(rc)
             samples += 1
+            hb.inc("tx", 1)
         else:
             # when disconnected, keep publishing nothing (policy layer has watchdog)
             prev_axes = None
+            hb.inc("drop", 1)
+
+        hb.set("connected", bool(connected))
+        hb.set("dev", str(desc) if desc else "")
 
         now_s = time.monotonic()
         if now_s - last_log_s >= 1.0 / max(1e-6, log_hz):
             last_log_s = now_s
             log.debug("tx samples=%d connected=%s out=%s", samples, connected, cfg.out_addr)
+
+        hb.emit(log)
 
         next_t += dt
         sleep_s = next_t - time.monotonic()
@@ -138,6 +154,7 @@ def main() -> int:
         level=getattr(logging, args.log_level.upper()),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    install_log_context(role="inputd")
 
     if args.list:
         return _list_devices()

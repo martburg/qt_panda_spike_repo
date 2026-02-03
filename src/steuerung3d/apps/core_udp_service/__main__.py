@@ -7,6 +7,9 @@ import argparse
 import signal
 from typing import Tuple, List
 
+from steuerung3d.util.log_context import install_log_context
+from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
+
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
@@ -133,6 +136,7 @@ def main() -> int:
         level=getattr(logging, args.log_level.upper()),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    install_log_context(role="core")
     log.info("log level = %s", args.log_level.upper())
 
     # --- UDP endpoints ---
@@ -193,6 +197,9 @@ def main() -> int:
     }
     t0 = time.monotonic()
     t_last_report = t0
+
+    # Track key state transitions (avoid log spam while still giving operators context).
+    state_ch = ChangeTracker()
 
     log.info("=== core_udp_service starting ===")
     log.info("Operator: IntentIn  bind=%s", ("127.0.0.1", 51001))
@@ -416,8 +423,13 @@ def main() -> int:
             age_ui  = None if last_seen["ui_telem_ts"] is None else now - last_seen["ui_telem_ts"]
 
             log.info(
-                "HB t=%.1fs intents=%d(age=%s) dev_telem=%d(age=%s) cmd_out=%d(age=%s) ui_telem_out=%d(age=%s)",
+                "HB t=%.1fs mode=%s rig=%s estop=%s fault=%s claims=%d | intents=%d(age=%s) dev_telem=%d(age=%s) cmd_out=%d(age=%s) ui_telem_out=%d(age=%s)",
                 now - t0,
+                getattr(getattr(state, "mode", ""), "value", getattr(state, "mode", "")),
+                getattr(state, "rig_mode", "DISCOVERY"),
+                bool(getattr(state, "estop", False)),
+                bool(getattr(state, "fault", False)),
+                len(dict(getattr(state, "axis_claims", {}) or {})),
                 stats["intents_in"], "n/a" if age_int is None else f"{age_int:.2f}s",
                 stats["dev_telem_in"], "n/a" if age_dev is None else f"{age_dev:.2f}s",
                 stats["cmd_out"], "n/a" if age_cmd is None else f"{age_cmd:.2f}s",
@@ -456,6 +468,31 @@ def main() -> int:
     _lt_last_ui_log_s_by_axis: dict[str, float] = {}
 
     def on_snapshot(snap: TelemetrySnapshot):
+        # Log key state changes once (helps a lot during field debugging).
+        try:
+            mode_v = str(getattr(snap, "mode", ""))
+            estop_v = bool(getattr(snap, "estop", False))
+            fault_v = bool(getattr(snap, "fault", False))
+            rig_v = str(getattr(snap, "rig_mode", ""))
+            if (
+                state_ch.changed("mode", mode_v)
+                or state_ch.changed("estop", estop_v)
+                or state_ch.changed("fault", fault_v)
+                or state_ch.changed("rig_mode", rig_v)
+            ):
+                log.info("state: mode=%s estop=%s fault=%s rig_mode=%s", mode_v, estop_v, fault_v, rig_v)
+
+            claims = tuple(sorted(dict(getattr(st, "axis_claims", {}) or {}).items()))
+            if state_ch.changed("claims", claims):
+                log.info("claims: %s", dict(claims))
+
+            pe = bool(getattr(st, "param_edit_active", False))
+            pg = str(getattr(st, "param_edit_group", ""))
+            if state_ch.changed("param_edit", (pe, pg)):
+                log.info("param_edit: active=%s group=%s", pe, pg)
+        except Exception:
+            pass
+
         # One HiP per axis: send a *sliced* snapshot to each UI target.
         for axis_id in axis_ids:
             tx = axis_ui_outs.get(axis_id)

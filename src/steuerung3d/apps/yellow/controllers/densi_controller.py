@@ -14,6 +14,8 @@ from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
+from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
+
 from steuerung3d.protocol.estop_bits import (
     ESTOP_SPECS,
     ESTOP_CAUSE_KEYS,
@@ -91,6 +93,11 @@ class DenSiController:
 
     def __post_init__(self) -> None:
         self.ui = YellowBindings.from_window(self.win)
+
+        # Logging helpers (1 Hz heartbeat + edge logs)
+        self._hb = Heartbeat("den_si", interval_s=1.0)
+        self._ch = ChangeTracker()
+        self._last_cmd_ns: int | None = None
 
         # Legacy TimeTick display on device side:
         # show (lifetick_tx - lifetick_rx) in milliseconds (WORD wrap).
@@ -495,6 +502,8 @@ class DenSiController:
         frames = self.command_in.drain_command_frames(limit=100)
         if frames:
             self._last_cmd = frames[-1]
+            self._last_cmd_ns = time.monotonic_ns()
+            self._hb.inc("cmd_rx", len(frames))
             log.debug(
                 "rx cmd: tick=%s estop_reset=%s fault=%s mode=%s",
                 self._last_cmd.tick,
@@ -513,6 +522,15 @@ class DenSiController:
                 axes={},
                 estop_reset=False,
             )
+
+        # Edge logs: command mode / reset changes
+        try:
+            if self._ch.changed("cmd_mode", str(getattr(self._last_cmd, "mode", ""))):
+                log.info("cmd_mode=%s", getattr(self._last_cmd, "mode", ""))
+            if self._ch.changed("cmd_estop_reset", bool(getattr(self._last_cmd, "estop_reset", False))):
+                log.info("cmd_estop_reset=%s", bool(getattr(self._last_cmd, "estop_reset", False)))
+        except Exception:
+            pass
 
         # Reset => GO state (no flash)
         if bool(getattr(self._last_cmd, "estop_reset", False)):
@@ -649,6 +667,14 @@ class DenSiController:
             rx = int(_ax.meta.get("lifetick_rx", 0)) & 0xFFFF
             diff = (tx - rx) & 0xFFFF
 
+            # Heartbeat focuses on the primary axis (first configured axis).
+            if self.axis_ids and _axis_id == self.axis_ids[0]:
+                self._hb.set("tx", int(tx))
+                self._hb.set("rx", int(rx))
+                self._hb.set("diff", int(diff))
+                if self._last_cmd_ns is not None:
+                    self._hb.set("cmd_age_ms", int((time.monotonic_ns() - self._last_cmd_ns) / 1_000_000.0))
+
             # LifeTick is noisy during normal operation. Keep a throttled trace at DEBUG.
             if self.axis_ids and _axis_id == self.axis_ids[0] and _lt_should_log(now_s, self._lt_last_telem_log_s):
                 self._lt_last_telem_log_s = now_s
@@ -685,6 +711,26 @@ class DenSiController:
 
         snap = TelemetrySnapshot.from_state(self.state)
         self.telemetry_out.publish_telemetry(snap)
+
+        # Edge logs for key state changes.
+        if self._ch.changed("mode", str(getattr(snap, "mode", ""))):
+            log.info("mode=%s", getattr(snap, "mode", ""))
+        if self._ch.changed("estop", bool(getattr(snap, "estop", False))):
+            log.info("estop=%s word=%s", bool(getattr(snap, "estop", False)), hex(int(getattr(snap, "estop_status_word", 0))))
+        if self._ch.changed("fault", bool(getattr(snap, "fault", False))):
+            log.info("fault=%s", bool(getattr(snap, "fault", False)))
+
+        # Heartbeat summary (1 Hz)
+        self._hb.inc("telem_tx", 1)
+        self._hb.set("tick", int(getattr(snap, "tick", 0)))
+        self._hb.set("mode", str(getattr(snap, "mode", "")))
+        self._hb.set("estop", bool(getattr(snap, "estop", False)))
+        self._hb.set("fault", bool(getattr(snap, "fault", False)))
+        if self.axis_ids:
+            self._hb.set("axis", self.axis_ids[0])
+        if self._last_cmd_ns is not None:
+            self._hb.set("cmd_age_ms", int((time.monotonic_ns() - self._last_cmd_ns) / 1_000_000.0))
+        self._hb.emit(log)
 
         log.debug("device_tick=%s", self.state.axes[next(iter(self.state.axes))].meta.get("device_tick"))
 

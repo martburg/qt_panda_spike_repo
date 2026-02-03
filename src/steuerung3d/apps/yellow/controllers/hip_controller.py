@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import time
+
 import uuid
 
 from PySide6.QtCore import QLocale, QTimer
@@ -22,6 +24,7 @@ from steuerung3d.core.intents import (
 )
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.util.tick import compute_time_tick
+from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
 from steuerung3d.protocol.estop_bits import (
     ESTOP_CAUSE_KEYS,
     ESTOP_OK_KEYS,
@@ -91,6 +94,10 @@ class HiPController:
 
     def __post_init__(self) -> None:
         self.ui = YellowBindings.from_window(self.win)
+
+        # Logging helpers: 1 Hz heartbeat + edge logs.
+        self._hb = Heartbeat("hi_p", interval_s=1.0)
+        self._ch = ChangeTracker()
 
         self._seen_first_telem = False
         self._last_rx_ns: int | None = None
@@ -847,6 +854,25 @@ class HiPController:
             self._render_estop(snap)
             self._render_params_and_edit_state(snap)
             self._tx_lifetick_echo(snap)
+
+            # Edge logs + 1 Hz heartbeat with useful context.
+            self._hb.inc("rx_telem", len(snaps))
+            mode_v = str(getattr(snap, "mode", ""))
+            estop_v = bool(getattr(snap, "estop", False))
+            fault_v = bool(getattr(snap, "fault", False))
+            if self._ch.changed("mode", mode_v):
+                log.info("mode=%s", mode_v)
+            if self._ch.changed("estop", estop_v):
+                log.info("estop=%s", estop_v)
+            if self._ch.changed("fault", fault_v):
+                log.info("fault=%s", fault_v)
+            self._hb.set("tick", int(getattr(snap, "tick", 0) or 0))
+            self._hb.set("mode", mode_v)
+            self._hb.set("estop", estop_v)
+            self._hb.set("fault", fault_v)
+            if self._selected_axis:
+                self._hb.set("axis", self._selected_axis)
+            self._hb.emit(log)
         except Exception:
             # Keep the UI alive; print full traceback once per crash.
             log.exception("HiP poll_once crashed (continuing).")

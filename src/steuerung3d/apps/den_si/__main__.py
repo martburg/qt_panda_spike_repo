@@ -5,6 +5,8 @@ import sys
 import logging
 from typing import Tuple
 
+from steuerung3d.util.log_context import install_log_context
+
 from PySide6.QtWidgets import QApplication
 
 from steuerung3d.apps.yellow.ui_shell import build_yellow_window
@@ -52,6 +54,10 @@ def main() -> int:
     level=getattr(logging, args.log_level.upper()),
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
+    # Provide consistent context fields on all log records (even if the format
+    # doesn't include them yet).
+    axis_ids = [a.strip() for a in args.axis if a and a.strip()] or ["X"]
+    install_log_context(role="den_si", axis=axis_ids[0])
     log.info("log level = %s", args.log_level.upper())
     cmd_in_addr = _parse_hostport(args.cmd_in)
     telem_out_addr = _parse_hostport(args.telem_out)
@@ -62,10 +68,6 @@ def main() -> int:
     win = build_yellow_window(role="cfc")
 
     # Make the window self-identifying (axis + ports) to reduce integration confusion.
-    axis_ids = [a.strip() for a in args.axis if a and a.strip()]
-    if not axis_ids:
-        # Legacy/single-axis convenience: if no axis is provided, fall back to "X".
-        axis_ids = ["X"]
     axis_label = ",".join(axis_ids)
     try:
         win.setWindowTitle(

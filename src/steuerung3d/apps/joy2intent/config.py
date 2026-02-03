@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -14,6 +14,7 @@ def _hostport(s: str) -> Tuple[str, int]:
 
 @dataclass(frozen=True)
 class Joy2IntentConfig:
+    # --- required ---
     raw_in: Tuple[str, int]
     intent_out: Tuple[str, int]
     tick_hz: float
@@ -24,7 +25,6 @@ class Joy2IntentConfig:
 
     max_winch_mps: float
     fine_scale: float
-    max_v: Dict[str, float]
 
     axes: Dict[str, int]
     buttons: Dict[str, int]
@@ -32,6 +32,16 @@ class Joy2IntentConfig:
     deadzone: float
     expo: float
     invert: Dict[str, bool]
+
+    # --- optional / defaults (must come after all non-default fields) ---
+    # Buttons that select winches by position (0..N-1). If omitted, defaults to [0,1,2,3].
+    select_buttons: List[int] = field(default_factory=lambda: [0, 1, 2, 3])
+
+    # Optional legacy alias (float). If present, overrides max_winch_mps.
+    manual_max_v: float | None = None
+
+    # Sync/cartesian limits (currently not used by joy2intent mapping, kept for config completeness).
+    sync_max_v: Dict[str, float] = field(default_factory=dict)
 
 
 def load_joy2intent_config(path: Path) -> Joy2IntentConfig:
@@ -55,9 +65,12 @@ def load_joy2intent_config(path: Path) -> Joy2IntentConfig:
         winches=list(rig.get("winches", ["Anton", "Debby", "Cecil", "Burt"])),
         default_mode=str(mode.get("default", "setup_manual")),
 
+        select_buttons=list(rig.get("select_buttons", [0, 1, 2, 3])),
+
         max_winch_mps=float(lim_m.get("max_winch_mps", 0.30)),
         fine_scale=float(lim_m.get("fine_scale", 0.20)),
-        max_v=dict(lim_s.get("max_v", {"x": 0.60, "y": 0.60, "z": 0.40})),
+        manual_max_v=(float(lim_m["max_v"]) if "max_v" in lim_m and lim_m["max_v"] is not None else None),
+        sync_max_v=dict(lim_s.get("max_v", {"x": 0.60, "y": 0.60, "z": 0.40})),
 
         axes=dict((bindings.get("axes", {}) or {})),
         buttons=dict((bindings.get("buttons", {}) or {})),

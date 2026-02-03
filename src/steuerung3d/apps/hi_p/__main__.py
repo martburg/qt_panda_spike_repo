@@ -5,6 +5,8 @@ import sys
 
 import logging
 
+from steuerung3d.util.log_context import install_log_context
+
 from PySide6.QtWidgets import QApplication
 
 from steuerung3d.apps.yellow.ui_shell import build_yellow_window
@@ -37,6 +39,7 @@ def main() -> int:
         level=getattr(logging, args.log_level.upper()),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    install_log_context(role="hi_p", axis=(args.axis or ""))
     log.info("log level = %s", args.log_level.upper())
     def _parse_hostport(s: str, default_host: str = "127.0.0.1"):
         s = (s or "").strip()

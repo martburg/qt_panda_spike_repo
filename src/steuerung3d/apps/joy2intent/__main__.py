@@ -5,6 +5,9 @@ import logging
 import time
 from pathlib import Path
 
+from steuerung3d.util.log_context import install_log_context
+from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
+
 from steuerung3d.protocol.udp_channels import UdpRawControlsIn, UdpIntentOut
 from steuerung3d.protocol.raw_controls import RawControls
 
@@ -26,6 +29,7 @@ def main() -> int:
         level=getattr(logging, args.log_level.upper()),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    install_log_context(role="joy2intent")
 
     cfg = load_joy2intent_config(Path(args.config))
 
@@ -34,43 +38,27 @@ def main() -> int:
 
     st = JoyState(mode=cfg.default_mode)
     rig = JoyRig(winches=cfg.winches)
-
-    # setup_manual: derive momentary multi-select buttons from bindings.buttons (select_0..select_N)
-    def _select_key(item: tuple[str, int]) -> int:
-        name, _idx = item
-        if not name.startswith("select_"):
-            return 10_000
-        try:
-            return int(name.split("_", 1)[1])
-        except Exception:
-            return 9_999
-
-    select_buttons: list[int] = [
-        int(idx)
-        for name, idx in sorted(cfg.buttons.items(), key=_select_key)
-        if name.startswith("select_")
-    ]
-
     bind = JoyBindings(
         axes=cfg.axes,
         buttons=cfg.buttons,
+        select_buttons=list(cfg.select_buttons or []),
         invert=cfg.invert,
         deadzone=cfg.deadzone,
         expo=cfg.expo,
-        select_buttons=select_buttons,
     )
-
-
     lim = JoyLimits(
         max_winch_mps=cfg.max_winch_mps,
         fine_scale=cfg.fine_scale,
-        max_v=None,  # cfg.max_v is sync-mode dict; not used by setup_manual mapping yet
+        max_v=cfg.manual_max_v,
     )
 
     dt = 1.0 / max(1.0, cfg.tick_hz)
     next_t = time.monotonic()
     last_rx_ns: int | None = None
     sent_stale_zero = False
+
+    hb = Heartbeat("joy2intent", interval_s=1.0)
+    ch = ChangeTracker()
 
     log.info(
         "joy2intent started mode=%s raw_in=%s intent_out=%s tick_hz=%.1f stale_after_ms=%d",
@@ -84,10 +72,40 @@ def main() -> int:
         rcs = raw_in.drain_raw_controls(limit=50)
         rc: RawControls | None = rcs[-1] if rcs else None
 
+        # Heartbeat counters
+        hb.inc("rx", len(rcs))
+
+        if last_rx_ns is not None:
+            hb.set("age_ms", int((now_ns - last_rx_ns) / 1_000_000.0))
+        hb.set("mode", getattr(st, "mode", "?"))
+
         if rc is not None:
             last_rx_ns = now_ns
             sent_stale_zero = False
             intents = synthesize_intents(st, rc, bind, rig, lim)
+
+            # Minimal "what changed" logs (no spam)
+            try:
+                pressed = {i for i, v in enumerate(rc.buttons) if v}
+            except Exception:
+                pressed = set()
+            dm_btn = bind.buttons.get("deadman")
+            deadman = (dm_btn is not None) and (dm_btn in pressed)
+            if ch.changed("deadman", bool(deadman)):
+                log.info("deadman=%s", bool(deadman))
+
+            # selection (setup_manual): log when selection changes
+            try:
+                sel = []
+                for i, b in enumerate(bind.select_buttons or []):
+                    if b in pressed and i < len(rig.winches):
+                        sel.append(rig.winches[i])
+                if ch.changed("selected", tuple(sel)):
+                    log.info("selected=%s", list(sel))
+            except Exception:
+                pass
+
+            hb.inc("intent", len(intents))
             for it in intents:
                 intent_out.publish_intent(it)
         else:
@@ -96,18 +114,22 @@ def main() -> int:
                 age_ms = (now_ns - last_rx_ns) / 1_000_000.0
                 if age_ms > cfg.stale_after_ms and not sent_stale_zero:
                     # Emit stop for both domains; core will ignore the one that doesn't match current mode
-                    intent_out.publish_intent(JogCartesian(vx=0.0, vy=0.0, vz=0.0))  # type: ignore[name-defined]
+                    intent_out.publish_intent(JogCartesian(vx=0.0, vy=0.0, vz=0.0))
                     # Stop any winches that were actively driven last tick.
                     if rig.winches and st.prev_active_winch_idxs:
                         for idx in sorted(st.prev_active_winch_idxs):
                             if 0 <= idx < len(rig.winches):
-                                intent_out.publish_intent(JogWinch(winch_id=rig.winches[idx], rate=0.0))  # type: ignore[name-defined]
+                                intent_out.publish_intent(JogWinch(winch_id=rig.winches[idx], rate=0.0))
                         st.prev_active_winch_idxs.clear()
                     else:
                         # Fallback (legacy single-select)
                         wid = rig.winches[st.selected_winch_idx] if rig.winches else "WINCH"
-                        intent_out.publish_intent(JogWinch(winch_id=wid, rate=0.0))      # type: ignore[name-defined]
+                        intent_out.publish_intent(JogWinch(winch_id=wid, rate=0.0))
                     sent_stale_zero = True
+                    log.warning("raw input stale (age_ms=%.1f) -> emitted stop", age_ms)
+
+        # Periodic summary
+        hb.emit(log)
 
         next_t += dt
         sleep_s = next_t - time.monotonic()

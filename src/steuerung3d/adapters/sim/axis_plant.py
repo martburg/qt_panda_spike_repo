@@ -55,6 +55,7 @@ class SimAxisPlant:
             lt = (lt + step_ms) & 0xFFFF
             meta["lifetick_tx"] = lt
             meta["timetick_ms"] = lt
+            meta["device_tick"] = lt  # TelemetrySnapshot/HiP expects this field
 
             if hasattr(cmd, "lifetick_echo") and isinstance(cmd.lifetick_echo, dict):
                 if axis_id in cmd.lifetick_echo:
