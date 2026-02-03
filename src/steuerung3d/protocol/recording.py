@@ -4,12 +4,19 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic_ns
-from typing import Any, Dict, Iterable, Iterator, Optional
+from typing import Any, Dict, Iterable, Iterator, Optional, List
 
+from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.intents import Intent
 from steuerung3d.core.telemetry import TelemetrySnapshot
-from steuerung3d.protocol.codec import encode_intent, encode_telemetry, decode_intent, decode_telemetry
-from steuerung3d.protocol.transport import Transport
+from steuerung3d.protocol.raw_controls import RawControls
+from steuerung3d.protocol.codec import (
+    encode_intent, decode_intent,
+    encode_telemetry, decode_telemetry,
+    encode_raw_controls, decode_raw_controls,
+    encode_command_frame, decode_command_frame,
+)
+from steuerung3d.protocol.transport import Transport, TransportV2
 
 
 LOG_SCHEMA = "steuerung3d.log/v1"
@@ -44,6 +51,24 @@ class JsonlRecorder:
             "payload": encode_telemetry(snap),
         })
 
+    def record_raw_controls(self, rc: RawControls, tick: Optional[int]) -> None:
+        self.write_record({
+            "schema": LOG_SCHEMA,
+            "kind": "raw_controls",
+            "wall_ns": monotonic_ns(),
+            "tick": tick,
+            "payload": encode_raw_controls(rc),
+        })
+
+    def record_command_frame(self, frame: CommandFrame) -> None:
+        self.write_record({
+            "schema": LOG_SCHEMA,
+            "kind": "command_frame",
+            "wall_ns": monotonic_ns(),
+            "tick": frame.tick,
+            "payload": encode_command_frame(frame),
+        })
+
 
 class JsonlReader:
     def __init__(self, path: Path):
@@ -69,6 +94,16 @@ class JsonlReader:
         for rec in self.iter_records():
             if rec["kind"] == "telemetry":
                 yield decode_telemetry(rec["payload"])
+
+    def iter_raw_controls(self) -> Iterator[tuple[Optional[int], RawControls]]:
+        for rec in self.iter_records():
+            if rec.get("kind") == "raw_controls":
+                yield rec.get("tick"), decode_raw_controls(rec["payload"])
+
+    def iter_command_frames(self) -> Iterator[CommandFrame]:
+        for rec in self.iter_records():
+            if rec.get("kind") == "command_frame":
+                yield decode_command_frame(rec["payload"])
 
 
 @dataclass
@@ -100,4 +135,51 @@ class LoggedTransport(Transport):
         self.inner.publish_telemetry(snap)
 
     def drain_telemetry(self, limit: int = 1000):
+        return self.inner.drain_telemetry(limit=limit)
+
+
+@dataclass
+class LoggedTransportV2(TransportV2):
+    """Logged wrapper for TransportV2.
+
+    This extends JSONL logging to additional streams:
+      - raw_controls published by input devices
+      - command_frames published by core
+    """
+
+    inner: TransportV2
+    recorder: JsonlRecorder
+    last_tick: int = 0
+
+    # --- raw controls ---
+    def publish_raw_controls(self, rc: RawControls) -> None:
+        self.recorder.record_raw_controls(rc, tick=self.last_tick)
+        self.inner.publish_raw_controls(rc)
+
+    def drain_raw_controls(self, limit: int = 1000) -> List[RawControls]:
+        return self.inner.drain_raw_controls(limit=limit)
+
+    # --- intents ---
+    def publish_intent(self, intent: Intent) -> None:
+        self.recorder.record_intent(intent, tick=self.last_tick)
+        self.inner.publish_intent(intent)
+
+    def drain_intents(self, limit: int = 1000) -> List[Intent]:
+        return self.inner.drain_intents(limit=limit)
+
+    # --- command frames ---
+    def publish_command_frame(self, frame: CommandFrame) -> None:
+        self.recorder.record_command_frame(frame)
+        self.inner.publish_command_frame(frame)
+
+    def drain_command_frames(self, limit: int = 1000) -> List[CommandFrame]:
+        return self.inner.drain_command_frames(limit=limit)
+
+    # --- telemetry ---
+    def publish_telemetry(self, snap: TelemetrySnapshot) -> None:
+        self.last_tick = snap.tick
+        self.recorder.record_telemetry(snap)
+        self.inner.publish_telemetry(snap)
+
+    def drain_telemetry(self, limit: int = 1000) -> List[TelemetrySnapshot]:
         return self.inner.drain_telemetry(limit=limit)

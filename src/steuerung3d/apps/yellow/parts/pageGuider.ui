@@ -191,7 +191,7 @@
                      </widget>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="txtGuiderFault">
+                     <widget class="QLineEdit" name="txtSlaveAmpStatus">
                       <property name="maximumSize">
                        <size>
                         <width>140</width>

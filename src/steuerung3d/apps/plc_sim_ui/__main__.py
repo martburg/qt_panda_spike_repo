@@ -222,10 +222,11 @@ class YellowAxisWindow(QMainWindow):
         right = QVBoxLayout()
         right.setSpacing(4)
 
-        self.txt_status = QLineEdit("F 999/99")
-        self.txt_status.setReadOnly(True)
-        self.txt_status.setAlignment(Qt.AlignCenter)
-        self.txt_status.setFixedWidth(110)
+        # Status display (legacy name was txt_status; clarify meaning)
+        self.txt_main_amp_status = QLineEdit("F 999/99")
+        self.txt_main_amp_status.setReadOnly(True)
+        self.txt_main_amp_status.setAlignment(Qt.AlignCenter)
+        self.txt_main_amp_status.setFixedWidth(110)
 
         btn_reset = QPushButton("Reset")
         btn_reset.setFixedWidth(110)
@@ -242,7 +243,7 @@ class YellowAxisWindow(QMainWindow):
         temp_row.addWidget(self.txt_temp)
         temp_row.addWidget(self.txt_tick)
 
-        right.addWidget(self.txt_status)
+        right.addWidget(self.txt_main_amp_status)
         right.addWidget(btn_reset)
         right.addLayout(temp_row)
         right.addItem(QSpacerItem(1, 1, QSizePolicy.Minimum, QSizePolicy.Expanding))

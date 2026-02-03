@@ -2,45 +2,55 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
+import logging
 import time
-
 import uuid
 
 from PySide6.QtCore import QLocale, QTimer
 from PySide6.QtGui import QDoubleValidator
-from PySide6.QtWidgets import QLineEdit, QPushButton, QWidget, QMessageBox, QTabWidget, QComboBox
-from arrow import now
-from more_itertools import last
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTabWidget,
+    QWidget,
+)
 
 from steuerung3d.core.intents import (
+    ClaimAxis,
+    EchoLifeTick,
     ParamCancel,
     ParamEditBegin,
     ParamWrite,
-    RequestEstopReset,
-    ClaimAxis,
     ReleaseAxis,
-    EchoLifeTick,
+    RequestEstopReset,
 )
 from steuerung3d.core.telemetry import TelemetrySnapshot
-from steuerung3d.util.tick import compute_time_tick
-from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
 from steuerung3d.protocol.estop_bits import (
     ESTOP_CAUSE_KEYS,
     ESTOP_OK_KEYS,
     ESTOP_SPECS,
     decode_estop_word,
 )
+from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
+from steuerung3d.util.tick import compute_time_tick
 
 from .bindings import YellowBindings
 from .ports import IntentOut, TelemetryIn
 
-import logging
-import time
+# NOTE: You MUST have this decoder somewhere in your codebase.
+# If the import path differs, adjust it here.
+# The object returned must have:
+#   - .summary() -> str
+#   - .output_powered -> bool
+try:
+    from steuerung3d.protocol.drive_status import decode_drive_status  # type: ignore
+except Exception:  # pragma: no cover
+    decode_drive_status = None  # type: ignore
 
 log = logging.getLogger("hi_p")
-
-
 
 # v0.1 axis-agnostic parameter wiring (UI widget names -> param keys)
 _PARAM_WIDGETS: dict[str, dict[str, str]] = {
@@ -92,8 +102,50 @@ class HiPController:
     # If we stop receiving telemetry for this long, we go back to UNKNOWN
     stale_after_ms: int = 500
 
+    # hard-baked in SafetyPLC
+    _BRAKE_HANDOFF_GRACE_S: float = 3.0
+
+    # ---------- deadman/brake display helpers ----------
+
+    def _update_taster_edge(self, axis_id: str, taster: bool) -> None:
+        """Track taster rising edge (0->1) so we can apply the 3s brake handoff grace."""
+        prev = self._taster_prev.get(axis_id, taster)
+        if (not prev) and taster:
+            self._taster_pressed_s[axis_id] = time.monotonic()
+        self._taster_prev[axis_id] = taster
+
+    def _within_brake_grace(self, axis_id: str) -> bool:
+        """True if within 3 seconds after taster rose."""
+        t0 = self._taster_pressed_s.get(axis_id)
+        if t0 is None:
+            return False
+        return (time.monotonic() - t0) <= float(self._BRAKE_HANDOFF_GRACE_S)
+
+    def _brake_ok_display(self, *, brk_ok_raw: bool, taster: bool, axis_id: str) -> bool:
+        """
+        Display 'brake state OK for current hold mode'.
+
+        Legacy meaning behaves like equivalence (NOT XOR): brk_ok_raw == taster.
+        Add SafetyPLC's 3s handoff grace after taster rises.
+        """
+        if taster and self._within_brake_grace(axis_id):
+            return True
+        return (bool(brk_ok_raw) == bool(taster))
+
+    # ---------- init ----------
+
     def __post_init__(self) -> None:
         self.ui = YellowBindings.from_window(self.win)
+
+        # Estop diagnostics checkboxes (present in the HiP UI but *read-only*).
+        self._estop_checks: dict[str, QCheckBox] = {}
+        for spec in ESTOP_SPECS.values():
+            if not spec.checkbox:
+                continue
+            w = self.win.findChild(QCheckBox, spec.checkbox)
+            if w is not None:
+                w.setEnabled(False)
+                self._estop_checks[spec.key] = w
 
         # Logging helpers: 1 Hz heartbeat + edge logs.
         self._hb = Heartbeat("hi_p", interval_s=1.0)
@@ -106,15 +158,22 @@ class HiPController:
         # HiP identity and current axis selection
         self._hip_id: str = f"hip-{uuid.uuid4().hex[:8]}"
         self._cmb_axis: QComboBox | None = self.win.findChild(QComboBox, "cmb_axis")
+
         # Legacy TimeTick display (ticks elapsed between telemetry updates)
         self._txt_tick: QLineEdit | None = self.win.findChild(QLineEdit, "txt_tick")
+
+        # Legacy drive status fields (main + guider/slave)
+        self._txt_main_amp_status: QLineEdit | None = self.win.findChild(QLineEdit, "txtMainAmpStatus")
+        self._txt_slave_amp_status: QLineEdit | None = self.win.findChild(QLineEdit, "txtSlaveAmpStatus")
+        self._txt_hdr_banner_left: QLineEdit | None = self.win.findChild(QLineEdit, "txtHdrBannerLeft")
+        self._txt_hdr_banner_right: QLineEdit | None = self.win.findChild(QLineEdit, "txtHdrBannerRight")
+
         self._prev_device_tick: int | None = None
 
         # Last EchoLifeTick sent per axis (avoid spamming duplicates)
         self._last_lifetick_echo_sent: dict[str, int] = {}
 
         self._selected_axis: str = ""
-        # Optional: pin this HiP instance to a single axis (useful for one-window-per-axis setup)
         self._fixed_axis: str = ""
         self._lock_axis_combo: bool = False
         self._fixed_axis_applied: bool = False
@@ -135,42 +194,39 @@ class HiPController:
         self._pending_commit_values: dict[str, float] = {}
         self._commit_dialog_shown_for: set[str] = set()
 
+        # Deadman (taster) edge tracking for brake handoff display grace.
+        self._taster_prev: dict[str, bool] = {}
+        self._taster_pressed_s: dict[str, float] = {}
 
         # HIP<->Core transactional param intents (best-effort reliability)
         self._req_seq: int = 0
         self._session_by_group: dict[str, str] = {}
-        # req_id -> dict(intent=..., group=..., sent_ns=..., retries=...)
         self._pending_txn: dict[str, dict] = {}
         self._resend_after_ms: int = 250
         self._max_retries: int = 8
 
-        # Local UI-driven edit state (do not depend on DenSi telemetry for gating)
+        # Local UI-driven edit state
         self._local_edit_group: str = ""
         self._local_edit_active: bool = False
-
-        # (intentionally no duplicate state here)
 
         if self.ui.btn_estop_reset is not None:
             self.ui.btn_estop_reset.clicked.connect(self._on_estop_reset)
             log.info("wired: btnEStopReset -> RequestEstopReset intent")
+            self.ui.btn_estop_reset.setEnabled(False)
         else:
             log.warning("btnEStopReset not found in UI")
-
-        if self.ui.btn_estop_reset:
-            self.ui.btn_estop_reset.setEnabled(False)
 
         # parameter buttons (axis-agnostic v0.1)
         self._wire_param_buttons()
 
-        # Install numeric validators + mark param fields for QSS
+        # validators
         self._init_param_inputs()
 
-        # Parameter UI starts locked until DenSi enters edit mode
+        # Parameter UI starts locked
         self._apply_param_ui_state(edit_active=False, edit_group="")
 
         # paint all known dots as "unknown"
         self._set_all_estop_unknown()
-        # Reset legacy TimeTick display
         if self._txt_tick is not None:
             self._txt_tick.setText("--")
         self._prev_device_tick = None
@@ -178,11 +234,6 @@ class HiPController:
     # ---------- public helpers ----------
 
     def set_fixed_axis(self, axis_id: str, *, lock_combo: bool = True) -> None:
-        """Pin this HiP to a specific axis.
-
-        The combo box will auto-select this axis once telemetry discovery populates it.
-        Optionally disables the combo to avoid accidental re-targeting.
-        """
         self._fixed_axis = (axis_id or "").strip()
         self._lock_axis_combo = bool(lock_combo)
         self._fixed_axis_applied = False
@@ -221,7 +272,6 @@ class HiPController:
         if self.ui.btn_estop_reset:
             self.ui.btn_estop_reset.setEnabled(False)
         self._set_all_estop_unknown()
-        # Reset legacy TimeTick display
         if self._txt_tick is not None:
             self._txt_tick.setText("--")
         self._prev_device_tick = None
@@ -244,23 +294,17 @@ class HiPController:
         return w if isinstance(w, QLineEdit) else None
 
     def _init_param_inputs(self) -> None:
-        """Mark param fields for QSS + restrict input to numbers."""
         loc = QLocale.system()
         for _grp, mapping in _PARAM_WIDGETS.items():
             for _key, obj_name in mapping.items():
                 le = self._find_line_edit(obj_name)
                 if le is None:
                     continue
-                # For QSS: enabled param fields should turn white on HiP.
-                # NOTE: QSS selector uses string: paramField="true"
                 le.setProperty("paramField", "true")
-                # Numeric-only entry; parent the validator to the field so it stays alive.
                 val = QDoubleValidator(-1.0e12, 1.0e12, 6, le)
                 val.setLocale(loc)
                 val.setNotation(QDoubleValidator.Notation.StandardNotation)
                 le.setValidator(val)
-
-                # Force initial polish so the style reacts immediately.
                 le.style().unpolish(le)
                 le.style().polish(le)
                 le.update()
@@ -269,7 +313,6 @@ class HiPController:
         s = (s or "").strip()
         if not s:
             return 0.0
-        # Accept both decimal comma and dot.
         s = s.replace(",", ".")
         return float(s)
 
@@ -301,7 +344,6 @@ class HiPController:
             le.setText(txt)
             le.blockSignals(was)
 
-        # Keep the compact limit widgets in sync with the position limits.
         if group == "pos":
             self._render_limit_fields(values)
 
@@ -313,7 +355,6 @@ class HiPController:
         return s.replace(".", ",")
 
     def _render_limit_fields(self, values: dict[str, float]) -> None:
-        """Update txtLimitHardMin/UserMin/UserMax/HardMax from given values."""
         for key, obj_name in _LIMIT_WIDGETS.items():
             if key not in values:
                 continue
@@ -326,14 +367,12 @@ class HiPController:
             was = le.blockSignals(True)
             le.setText(txt)
             le.blockSignals(was)
-            # display-only
             try:
                 le.setEnabled(False)
             except Exception:
                 pass
 
     def _normalize_pos_chain(self, values: dict[str, float]) -> dict[str, float]:
-        """Enforce HardMax>=UserMax>=UserMin>=HardMin."""
         v = dict(values)
         need = {"HardMax", "UserMax", "UserMin", "HardMin"}
         if not need.issubset(v.keys()):
@@ -347,7 +386,6 @@ class HiPController:
         if hard_max < hard_min:
             hard_max, hard_min = hard_min, hard_max
 
-        # clamp into bounds
         user_max = max(min(user_max, hard_max), hard_min)
         user_min = max(min(user_min, user_max), hard_min)
 
@@ -358,22 +396,16 @@ class HiPController:
         return v
 
     def _normalize_guider_range(self, values: dict[str, float]) -> dict[str, float]:
-        """Enforce PosMin <= PosMax for guider group (clamp; do not swap)."""
         v = dict(values)
         if "PosMin" not in v or "PosMax" not in v:
             return v
-
         pos_min = float(v["PosMin"])
         pos_max = float(v["PosMax"])
-
-        # Clamp so that PosMin <= PosMax without swapping (avoid surprising jumps).
         if pos_min > pos_max:
             pos_min = pos_max
-
         v["PosMin"] = pos_min
         v["PosMax"] = pos_max
         return v
-
 
     def _wire_param_buttons(self) -> None:
         wiring = {
@@ -382,7 +414,6 @@ class HiPController:
             "filter": ("btnFilterEdit", "btnFilterWrite", "btnFilterCancel"),
             "guider": ("btnGuiderEdit", "btnGuiderWrite", "btnGuiderCancel"),
         }
-
         for grp, (b_edit, b_write, b_cancel) in wiring.items():
             be = self._find_button(b_edit)
             bw = self._find_button(b_write)
@@ -390,39 +421,31 @@ class HiPController:
 
             if be is not None:
                 be.clicked.connect(lambda _=False, g=grp: self._tx_param_edit(g))
-                log.info("wired: %s -> ParamEditBegin(axis_id=(self._selected_axis or self._fixed_axis), hip_id=self._hip_id, group=%s)", b_edit, grp)
-            else:
-                log.debug("button not found: %s", b_edit)
-
             if bw is not None:
                 bw.clicked.connect(lambda _=False, g=grp: self._tx_param_write(g))
-                log.info("wired: %s -> ParamWrite(axis_id=(self._selected_axis or self._fixed_axis), hip_id=self._hip_id, group=%s)", b_write, grp)
-            else:
-                log.debug("button not found: %s", b_write)
-
             if bc is not None:
                 bc.clicked.connect(lambda _=False, g=grp: self._tx_param_cancel(g))
-                log.info("wired: %s -> ParamCancel(axis_id=(self._selected_axis or self._fixed_axis), hip_id=self._hip_id, group=%s)", b_cancel, grp)
-            else:
-                log.debug("button not found: %s", b_cancel)
 
     def _tx_param_edit(self, group: str) -> None:
-        # Local gating first: unlock immediately
         self._local_edit_active = True
         self._local_edit_group = group
         self._apply_param_ui_state(edit_active=True, edit_group=group)
 
-        # new edit session per press
         session_id = f"sess-{group}-{int(time.monotonic()*1000)}"
         self._session_by_group[group] = session_id
         req_id = self._next_req_id()
 
-        intent = ParamEditBegin(axis_id=(self._selected_axis or self._fixed_axis), hip_id=self._hip_id, group=group, req_id=req_id, session_id=session_id)
+        intent = ParamEditBegin(
+            axis_id=(self._selected_axis or self._fixed_axis),
+            hip_id=self._hip_id,
+            group=group,
+            req_id=req_id,
+            session_id=session_id,
+        )
         log.info("tx intent: %s group=%s req_id=%s session=%s", type(intent).__name__, group, req_id, session_id)
         self._send_txn_intent(intent, group=group, kind="begin")
 
     def _tx_param_write(self, group: str) -> None:
-        # Normalize locally so HIP fields reflect what is actually sent.
         vals = self._read_param_values(group)
 
         fixed = dict(vals)
@@ -438,6 +461,7 @@ class HiPController:
             if group == "pos":
                 def _fmt(x: float) -> str:
                     return f"{float(x):g}"
+
                 lines = []
                 for k in ("HardMax", "UserMax", "UserMin", "HardMin"):
                     if k in vals and k in fixed and float(vals[k]) != float(fixed[k]):
@@ -446,29 +470,25 @@ class HiPController:
                     QMessageBox.information(
                         self.win,
                         "Position limits adjusted",
-                        "The rule HardMax ≥ UserMax ≥ UserMin ≥ HardMin was enforced.\n\n"
-                        + "\n".join(lines),
+                        "The rule HardMax ≥ UserMax ≥ UserMin ≥ HardMin was enforced.\n\n" + "\n".join(lines),
                     )
 
         session_id = self._ensure_session(group)
         req_id = self._next_req_id()
-        intent = ParamWrite(axis_id=(self._selected_axis or self._fixed_axis), hip_id=self._hip_id, group=group, values=fixed, req_id=req_id, session_id=session_id)
-        log.info(
-            "tx intent: %s group=%s req_id=%s session=%s keys=%s",
-            type(intent).__name__,
-            group,
-            req_id,
-            session_id,
-            sorted(fixed.keys()),
+        intent = ParamWrite(
+            axis_id=(self._selected_axis or self._fixed_axis),
+            hip_id=self._hip_id,
+            group=group,
+            values=fixed,
+            req_id=req_id,
+            session_id=session_id,
         )
         self._send_txn_intent(intent, group=group, kind="write")
 
-        # Remember this commit for modal dialog feedback once core observes applied/timeout
         self._pending_commit_req_id = req_id
         self._pending_commit_group = group
         self._pending_commit_values = dict(fixed)
 
-        # End local edit session immediately (operator finished the group)
         self._local_edit_active = False
         self._local_edit_group = ""
         self._ignore_remote_edit_until_ns = time.monotonic_ns() + 800_000_000
@@ -477,17 +497,19 @@ class HiPController:
     def _tx_param_cancel(self, group: str) -> None:
         session_id = self._ensure_session(group)
         req_id = self._next_req_id()
-        intent = ParamCancel(axis_id=(self._selected_axis or self._fixed_axis), hip_id=self._hip_id, group=group, req_id=req_id, session_id=session_id)
-        log.info("tx intent: %s group=%s req_id=%s session=%s", type(intent).__name__, group, req_id, session_id)
+        intent = ParamCancel(
+            axis_id=(self._selected_axis or self._fixed_axis),
+            hip_id=self._hip_id,
+            group=group,
+            req_id=req_id,
+            session_id=session_id,
+        )
         self._send_txn_intent(intent, group=group, kind="cancel")
 
-        # End local edit session immediately
         self._local_edit_active = False
         self._local_edit_group = ""
         self._ignore_remote_edit_until_ns = time.monotonic_ns() + 800_000_000
         self._apply_param_ui_state(edit_active=False, edit_group="")
-
-
 
     # ---------- HIP<->Core transactional helpers ----------
 
@@ -503,7 +525,6 @@ class HiPController:
         return sid
 
     def _send_txn_intent(self, intent, *, group: str, kind: str = "") -> None:
-        """Publish intent and remember it until core acks it via telemetry.core_acks."""
         req_id = getattr(intent, "req_id", "")
         if req_id:
             self._pending_txn[req_id] = {
@@ -522,7 +543,6 @@ class HiPController:
                 self._pending_txn.pop(rid, None)
                 log.info("core ack: %s", rid)
 
-        # refresh UI state (enables edit again once busy clears)
         self._apply_param_ui_state(edit_active=self._local_edit_active, edit_group=self._local_edit_group)
 
     def _retry_pending(self, now_ns: int) -> None:
@@ -549,7 +569,6 @@ class HiPController:
         for info in self._pending_txn.values():
             if info.get("group") != group:
                 continue
-            # Only treat write/cancel as "busy" for UI disabling.
             if str(info.get("kind") or "") in ("write", "cancel"):
                 return True
         return False
@@ -557,38 +576,26 @@ class HiPController:
     # ----- modal lock helpers -----
 
     def _set_modal_param_lock(self, *, active: bool, group: str) -> None:
-        """Lock the UI while editing one param group.
-
-        Requirement: while editing a group, operator must not:
-          - start editing another group
-          - switch tabs
-          - click other actions
-        They can only finish the edit via Write or Cancel.
-        """
-
         tabs = self.win.findChild(QTabWidget, "tabsMain")
 
         if active and not self._modal_locked:
             self._modal_prev_enabled = {}
 
-            # Disable tab switching (but don't disable the whole QTabWidget, or it would
-            # also disable the allowed children).
             if tabs is not None:
                 self._modal_prev_tabbar_enabled = bool(tabs.tabBar().isEnabled())
                 tabs.tabBar().setEnabled(False)
 
-            # Disable all buttons + line edits first.
             for w in self.win.findChildren(QWidget):
                 if isinstance(w, (QPushButton, QLineEdit)):
                     self._modal_prev_enabled[w] = bool(w.isEnabled())
                     w.setEnabled(False)
 
-            # Re-enable only the active group's line edits and Write/Cancel.
             allow: list[QWidget] = []
             for _k, obj_name in _PARAM_WIDGETS.get(group, {}).items():
                 le = self._find_line_edit(obj_name)
                 if le is not None:
                     allow.append(le)
+
             wiring = {
                 "pos": ("btnPosWrite", "btnPosCancel"),
                 "vel": ("btnVelWrite", "btnVelCancel"),
@@ -614,7 +621,6 @@ class HiPController:
             return
 
         if (not active) and self._modal_locked:
-            # Restore previous enabled states
             for w, was_enabled in list(self._modal_prev_enabled.items()):
                 try:
                     w.setEnabled(bool(was_enabled))
@@ -623,26 +629,23 @@ class HiPController:
                         w.style().polish(w)
                         w.update()
                 except RuntimeError:
-                    # Widget already deleted
                     pass
             self._modal_prev_enabled.clear()
 
             if tabs is not None and self._modal_prev_tabbar_enabled is not None:
                 tabs.tabBar().setEnabled(bool(self._modal_prev_tabbar_enabled))
             self._modal_prev_tabbar_enabled = None
-
             self._modal_locked = False
+
     # ----- parameters: UI state reflection (axis-agnostic v0.1) -----
 
     def _set_param_group_enabled(self, group: str, enabled: bool) -> None:
-        """Enable/disable the parameter line-edits for a group."""
         mapping = _PARAM_WIDGETS.get(group, {})
         for _key, obj_name in mapping.items():
             le = self._find_line_edit(obj_name)
             if le is None:
                 continue
             le.setEnabled(bool(enabled))
-            # Re-polish to ensure QSS (white/gray) applies immediately.
             le.style().unpolish(le)
             le.style().polish(le)
             le.update()
@@ -676,28 +679,18 @@ class HiPController:
             bc.setEnabled(editing)
 
     def _apply_param_ui_state(self, *, edit_active: bool, edit_group: str) -> None:
-        """Reflect edit state onto HiP widget enable/disable.
-
-        - Fields are editable only when their group's Edit was pressed (or DenSi reports edit mode).
-        - While a transactional request for a group is pending, that group is 'busy' and all 3 buttons
-          are disabled to avoid session races.
-        """
         groups = ("pos", "vel", "filter", "guider")
 
-        # Enforce "one group at a time" editing as a modal lock.
         self._set_modal_param_lock(active=bool(edit_active), group=str(edit_group or ""))
 
         if edit_active:
-            # While editing one group, keep all other controls disabled.
             for g in groups:
                 if g == edit_group:
                     busy = self._is_group_busy(g)
-                    is_edit = True
                     self._set_param_group_enabled(g, bool(not busy))
-                    self._set_param_button_state(g, editing=is_edit, busy=busy)
+                    self._set_param_button_state(g, editing=True, busy=busy)
                 else:
                     self._set_param_group_enabled(g, False)
-                    # Force other groups disabled (prevents re-enabling after modal lock).
                     self._set_param_button_state(g, editing=False, busy=True)
             return
 
@@ -707,11 +700,6 @@ class HiPController:
             self._set_param_button_state(g, editing=False, busy=busy)
 
     def _render_params_from_telemetry(self, snap: TelemetrySnapshot) -> None:
-        """Update parameter text fields from telemetry.
-
-        Important: do NOT overwrite the group currently being edited locally, and never overwrite
-        the field that currently has focus.
-        """
         params = getattr(snap, "params", None)
         if not isinstance(params, dict) or not params:
             return
@@ -721,14 +709,11 @@ class HiPController:
         for grp, mapping in _PARAM_WIDGETS.items():
             if freeze_group and grp == freeze_group:
                 continue
-
             for key, obj_name in mapping.items():
                 if key not in params:
                     continue
                 le = self._find_line_edit(obj_name)
-                if le is None:
-                    continue
-                if le.hasFocus():
+                if le is None or le.hasFocus():
                     continue
                 val = params[key]
                 txt = f"{val:g}" if isinstance(val, (int, float)) else str(val)
@@ -738,19 +723,15 @@ class HiPController:
                 le.setText(txt)
                 le.blockSignals(was)
 
-        # Also update compact limit fields in the header bar.
         try:
-            self._render_limit_fields({k: float(params[k]) for k in ("HardMin","UserMin","UserMax","HardMax") if k in params})
+            self._render_limit_fields({k: float(params[k]) for k in ("HardMin", "UserMin", "UserMax", "HardMax") if k in params})
         except Exception:
             pass
 
     def _render_params_and_edit_state(self, snap: TelemetrySnapshot) -> None:
         self._render_params_from_telemetry(snap)
-
-        # --- Option A: modal dialog once core observes applied/timeout ---
         self._maybe_show_param_commit_dialog(snap)
 
-        # Local edit state has priority (UI should not depend on DenSi telemetry timing).
         if self._local_edit_active:
             self._apply_param_ui_state(edit_active=True, edit_group=self._local_edit_group)
             return
@@ -778,11 +759,7 @@ class HiPController:
         self._commit_dialog_shown_for.add(rid)
 
         if status == "applied":
-            QMessageBox.information(
-                self.win,
-                "Parameters applied",
-                f"{group} parameters were applied (observed in telemetry).",
-            )
+            QMessageBox.information(self.win, "Parameters applied", f"{group} parameters were applied (observed in telemetry).")
         else:
             unmatched = list(getattr(snap, "param_commit_unmatched", []) or [])
             params = dict(getattr(snap, "params", {}) or {})
@@ -793,13 +770,8 @@ class HiPController:
                 w = want.get(k, "?")
                 g = params.get(k, "<missing>")
                 lines.append(f"- {k}: want {w}  got {g}")
-            QMessageBox.warning(
-                self.win,
-                "Parameters not confirmed",
-                "\n".join(lines),
-            )
+            QMessageBox.warning(self.win, "Parameters not confirmed", "\n".join(lines))
 
-        # Clear pending commit so the next write can create a new one.
         self._pending_commit_req_id = ""
         self._pending_commit_group = ""
         self._pending_commit_values = {}
@@ -817,7 +789,6 @@ class HiPController:
         snaps = self.telemetry_in.drain_telemetry(limit=50)
         now_ns = time.monotonic_ns()
 
-        # drive transactional resends even if telemetry is quiet
         self._retry_pending(now_ns)
 
         if not snaps:
@@ -828,9 +799,6 @@ class HiPController:
                     self._mark_disconnected()
             return
 
-        # consume any core acks for transactional param intents
-        # IMPORTANT: acks are one-shot; if we drained multiple snapshots, the last one
-        # might no longer contain the ack. So process acks across all received snaps.
         for _s in snaps:
             self._handle_core_acks(_s)
 
@@ -838,24 +806,18 @@ class HiPController:
         self._last_rx_ns = now_ns
 
         try:
-            # Populate axis selection (discovery) and auto-claim on selection.
             self._update_axis_combo(snap)
 
             if not self._seen_first_telem:
-                log.info(
-                    "rx first telemetry: tick=%s estop=%s fault=%s",
-                    getattr(snap, "tick", None),
-                    getattr(snap, "estop", None),
-                    getattr(snap, "fault", None),
-                )
+                log.info("rx first telemetry: tick=%s estop=%s fault=%s", getattr(snap, "tick", None), getattr(snap, "estop", None), getattr(snap, "fault", None))
                 self._seen_first_telem = True
 
             self._render_tick_delta(snap)
+            self._render_drive_status(snap)
             self._render_estop(snap)
             self._render_params_and_edit_state(snap)
             self._tx_lifetick_echo(snap)
 
-            # Edge logs + 1 Hz heartbeat with useful context.
             self._hb.inc("rx_telem", len(snaps))
             mode_v = str(getattr(snap, "mode", ""))
             estop_v = bool(getattr(snap, "estop", False))
@@ -874,19 +836,11 @@ class HiPController:
                 self._hb.set("axis", self._selected_axis)
             self._hb.emit(log)
         except Exception:
-            # Keep the UI alive; print full traceback once per crash.
             log.exception("HiP poll_once crashed (continuing).")
-            return
 
     # ---------- render logic ----------
 
     def _tx_lifetick_echo(self, snap: TelemetrySnapshot) -> None:
-        """Echo the last device-origin lifetick back to Core (legacy semantics).
-
-        Legacy PLC expects LifetickUIrx to mirror the most recently received LifetickUItx.
-        We implement this by sending EchoLifeTick(axis_id, value=device_tick) periodically.
-        Core will forward it to devices via CommandFrame.lifetick_echo.
-        """
         axes = getattr(snap, "axes", None)
         if not isinstance(axes, dict) or not axes:
             return
@@ -902,29 +856,80 @@ class HiPController:
                 continue
 
             self._last_lifetick_echo_sent[axis_id] = v
-
-            now = time.monotonic()
-            last = getattr(self, "_last_lifetick_echo_log_s", 0.0)
-            if now - last > 0.5:
-                self._last_lifetick_echo_log_s = now
-                # LifeTick is useful while debugging connectivity, but too chatty
-                # for everyday use. Keep it at DEBUG and throttled.
-                log.debug(
-                    "LIFETICK HiP tx EchoLifeTick: axis=%s value=%d hip_id=%s",
-                    axis_id,
-                    v,
-                    self._hip_id,
-                )
-
             self.intent_out.publish_intent(EchoLifeTick(axis_id=axis_id, value=v, hip_id=self._hip_id))
 
+    def _render_drive_status(self, snap: TelemetrySnapshot) -> None:
+        if decode_drive_status is None:
+            # Avoid hard crash if import path differs.
+            return
+
+        axis_id = self._selected_axis or self._fixed_axis
+        if not axis_id:
+            for w in (self._txt_main_amp_status, self._txt_slave_amp_status, self._txt_hdr_banner_left, self._txt_hdr_banner_right):
+                if w is not None:
+                    w.setText("")
+            self._set_led_by_name("dotHdrOnline", state=None)
+            self._set_led_by_name("dotHdrReady", state=None)
+            self._set_led_by_name("dotHdrFbt", state=None)
+            self._set_led_by_name("dotHdrBrake1", state=None)
+            self._set_led_by_name("dotHdrBrake2", state=None)
+            return
+
+        axes = getattr(snap, "axes", None)
+        if not isinstance(axes, dict):
+            return
+        ax = axes.get(axis_id)
+        if ax is None:
+            return
+
+        main_word = int(getattr(ax, "status_word", 0) or 0)
+        slave_word = int(getattr(ax, "guide_status_word", 0) or 0)
+
+        main = decode_drive_status(main_word)
+        slave = decode_drive_status(slave_word)
+
+        if self._txt_main_amp_status is not None:
+            self._txt_main_amp_status.setText(main.summary())
+        if self._txt_slave_amp_status is not None:
+            self._txt_slave_amp_status.setText(slave.summary())
+
+        age = int(getattr(ax, "lifetick_age", 0) or 0)
+        banner = f"{main.summary()}   |   age {age}"
+        if self._txt_hdr_banner_left is not None:
+            self._txt_hdr_banner_left.setText(banner)
+        if self._txt_hdr_banner_right is not None:
+            self._txt_hdr_banner_right.setText(banner)
+
+        online_state = "ok" if getattr(main, "output_powered", False) else None
+
+        estop_word = int(getattr(snap, "estop_status_word", 0) or 0)
+        estop_logical = decode_estop_word(estop_word)
+
+        taster = bool(estop_logical.get("taster", False))
+        ready = bool(estop_logical.get("ready", False))
+
+        self._update_taster_edge(axis_id, taster)
+
+        fbt_state = "ok" if taster else ("warn" if online_state else None)
+        ready_state = "ok" if ready else ("warn" if online_state else None)
+
+        brk1_raw = bool(estop_logical.get("brk1_ok", False))
+        brk2_raw = bool(estop_logical.get("brk2_ok", False))
+
+        brk1_ok = self._brake_ok_display(brk_ok_raw=brk1_raw, taster=taster, axis_id=axis_id)
+        brk2_ok = self._brake_ok_display(brk_ok_raw=brk2_raw, taster=taster, axis_id=axis_id)
+
+        brk1_state = "ok" if brk1_ok else ("bad" if online_state else None)
+        brk2_state = "ok" if brk2_ok else ("bad" if online_state else None)
+
+        self._set_led_by_name("dotHdrOnline", state=online_state)
+        self._set_led_by_name("dotHdrReady", state=ready_state)
+        self._set_led_by_name("dotHdrFbt", state=fbt_state)
+        self._set_led_by_name("dotHdrBrake1", state=brk1_state)
+        self._set_led_by_name("dotHdrBrake2", state=brk2_state)
 
     def _render_tick_delta(self, snap: TelemetrySnapshot) -> None:
-        """Render legacy TimeTick into txt_tick.
-
-        Legacy semantics: delta of device-side lifetick between two GUI updates.
-        (This is *not* RTT.)
-        """
+        """Render legacy TimeTick into txt_tick (delta of device_tick)."""
         if self._txt_tick is None:
             return
 
@@ -933,7 +938,6 @@ class HiPController:
             self._txt_tick.setText("--")
             self._prev_device_tick = None
             return
-
 
         axes = getattr(snap, "axes", None)
         if not isinstance(axes, dict):
@@ -948,7 +952,6 @@ class HiPController:
             self._prev_device_tick = None
             return
 
-
         cur_raw = getattr(ax, "device_tick", 0)
         try:
             cur = int(cur_raw)
@@ -957,57 +960,88 @@ class HiPController:
             self._txt_tick.setText("--")
             self._prev_device_tick = None
             return
+
         delta, new_prev = compute_time_tick(self._prev_device_tick, cur)
         self._txt_tick.setText(str(delta))
         self._prev_device_tick = new_prev
 
-
     def _render_estop(self, snap: TelemetrySnapshot) -> None:
         word = int(getattr(snap, "estop_status_word", 0))
         logical = decode_estop_word(word)
-        log.debug("render estop word=%s logical=%s", hex(word), logical)
+
+        if bool(logical.get("schluessel1", False)):
+            profile = "schluessel1"
+        elif bool(logical.get("schluessel2", False)):
+            profile = "schluessel2"
+        else:
+            profile = "integrated"
+
+        if profile == "schluessel1":
+            active_keys = {
+                "master",
+                "estop1", "estop2",
+                "steuerwort",
+                "kw30_ok",
+                "brk1_ok",
+                "sps_ok",
+                "brk2kb_ok",
+                "pos_win", "vel_win", "endlage",
+            }
+        elif profile == "schluessel2":
+            active_keys = {
+                "master", "guider",
+                "estop1", "estop2",
+                "steuerwort",
+                "kw30_ok", "kw05_ok",
+                "brk1_ok", "brk2_ok",
+                "dcs_ok", "sps_ok",
+                "brk2kb_ok",
+                "pos_win", "vel_win", "endlage",
+            }
+        else:
+            active_keys = set(ESTOP_SPECS.keys())
 
         if self.ui.btn_estop_reset:
-            self.ui.btn_estop_reset.setEnabled(True)
+            self.ui.btn_estop_reset.setEnabled(bool(logical.get("reset_able", False)))
+
+        for key, cb in getattr(self, "_estop_checks", {}).items():
+            v = bool(logical.get(key, False))
+            cb.setChecked(v)
+            f = cb.font()
+            f.setBold(key in active_keys)
+            cb.setFont(f)
 
         for spec in ESTOP_SPECS.values():
             if not spec.dot:
                 continue
-
             v = bool(logical.get(spec.key, False))
-
             if spec.key in ESTOP_CAUSE_KEYS:
                 state = "bad" if v else "good"
             elif spec.key in ESTOP_OK_KEYS:
                 state = "good" if v else "bad"
             else:
                 state = "warn" if v else None
-
             self._set_led_by_name(spec.dot, state=state)
 
     # ---------- axis selection / claims ----------
 
     def _update_axis_combo(self, snap: TelemetrySnapshot) -> None:
-        """Populate cmb_axis with discovered axes and keep selection stable."""
         if self._cmb_axis is None:
             return
         axes = getattr(snap, "axes", None)
         if axes is None:
             return
         if not isinstance(axes, dict):
-            # This is the key diagnostic if the core schema changed.
             log.info("HiP axis discovery: snap.axes not dict (%s) -> %r", type(axes).__name__, axes)
             return
 
         axis_ids = sorted(list(axes.keys()))
         if not axis_ids:
-             return
+            return
 
-        # Avoid recursive signal storms by blocking signals during rebuild
         cur = self._cmb_axis.currentText().strip()
         existing = [self._cmb_axis.itemText(i) for i in range(self._cmb_axis.count())]
         if existing == axis_ids:
-            # Still ensure we have a selection
             if not cur and axis_ids:
                 self._cmb_axis.setCurrentText(axis_ids[0])
             return
@@ -1016,13 +1050,11 @@ class HiPController:
         try:
             self._cmb_axis.clear()
             self._cmb_axis.addItems(axis_ids)
-            # Prefer pinned axis if configured
             if self._fixed_axis and (self._fixed_axis in axis_ids):
                 self._cmb_axis.setCurrentText(self._fixed_axis)
                 self._fixed_axis_applied = True
                 if self._lock_axis_combo:
                     self._cmb_axis.setEnabled(False)
-            # otherwise restore selection if possible
             elif cur and cur in axis_ids:
                 self._cmb_axis.setCurrentText(cur)
             else:
@@ -1035,13 +1067,8 @@ class HiPController:
         if not axis_id:
             return
 
-        # Release old claim (best effort)
         if self._selected_axis and self._selected_axis != axis_id:
-            self.intent_out.send_intent(
-                ReleaseAxis(axis_id=self._selected_axis, hip_id=self._hip_id)
-            )
+            self.intent_out.publish_intent(ReleaseAxis(axis_id=self._selected_axis, hip_id=self._hip_id))
 
-        # Claim new
-        self.intent_out.send_intent(ClaimAxis(axis_id=axis_id, hip_id=self._hip_id))
+        self.intent_out.publish_intent(ClaimAxis(axis_id=axis_id, hip_id=self._hip_id))
         self._selected_axis = axis_id
-

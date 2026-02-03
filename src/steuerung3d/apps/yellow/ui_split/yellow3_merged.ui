@@ -205,7 +205,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="txt_status">
+           <widget class="QLineEdit" name="txtMainAmpStatus">
             <property name="minimumSize">
              <size>
               <width>0</width>
@@ -448,7 +448,7 @@
            <number>0</number>
           </property>
           <item>
-           <widget class="QLineEdit" name="txtHeaderTitle"/>
+           <widget class="QLineEdit" name="txtHdrBannerLeft"/>
           </item>
           <item>
            <spacer name="horizontalSpacer">
@@ -481,7 +481,7 @@
              <number>0</number>
             </property>
             <item>
-             <widget class="QFrame" name="ledHdrFbtDot"/>
+             <widget class="QFrame" name="dotHdrFbt"/>
             </item>
             <item>
              <widget class="QLabel" name="lblHdrFbt">
@@ -523,7 +523,7 @@
              <number>0</number>
             </property>
             <item>
-             <widget class="QFrame" name="ledHdrReadyDot"/>
+             <widget class="QFrame" name="dotHdrReady"/>
             </item>
             <item>
              <widget class="QLabel" name="lblHdrReady">
@@ -565,7 +565,7 @@
              <number>0</number>
             </property>
             <item>
-             <widget class="QFrame" name="ledHdrOnlineDot"/>
+             <widget class="QFrame" name="dotHdrOnline"/>
             </item>
             <item>
              <widget class="QLabel" name="lblHdrOnline">
@@ -607,7 +607,7 @@
              <number>0</number>
             </property>
             <item>
-             <widget class="QFrame" name="ledHdrBrk1Dot"/>
+             <widget class="QFrame" name="dotHdrBrake1"/>
             </item>
             <item>
              <widget class="QLabel" name="lblHdrBrk1">
@@ -649,7 +649,7 @@
              <number>0</number>
             </property>
             <item>
-             <widget class="QFrame" name="ledHdrBrk2Dot"/>
+             <widget class="QFrame" name="dotHdrBrake2"/>
             </item>
             <item>
              <widget class="QLabel" name="lblHdrBrk2">
@@ -690,7 +690,7 @@
            </spacer>
           </item>
           <item>
-           <widget class="QLineEdit" name="txtHeaderSpacer"/>
+           <widget class="QLineEdit" name="txtHdrBannerRight"/>
           </item>
          </layout>
         </widget>
@@ -2005,7 +2005,7 @@
                      </widget>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="txtGuiderFault">
+                     <widget class="QLineEdit" name="txtSlaveAmpStatus">
                       <property name="maximumSize">
                        <size>
                         <width>140</width>
@@ -3523,6 +3523,57 @@
                      </property>
                     </widget>
                    </item>
+                  
+                   <item row="3" column="1">
+                    <widget class="QCheckBox" name="chkEsReady">
+                     <property name="text">
+                      <string>Ready</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="2">
+                    <widget class="QCheckBox" name="chkEsTaster">
+                     <property name="text">
+                      <string>Taster</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="3">
+                    <widget class="QCheckBox" name="chkEsSchuetz">
+                     <property name="text">
+                      <string>Schuetz</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="5">
+                    <widget class="QCheckBox" name="chkEsResetAble">
+                     <property name="text">
+                      <string>ResetAble</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="1">
+                    <widget class="QCheckBox" name="chkEsKey1">
+                     <property name="text">
+                      <string>Key1</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="2">
+                    <widget class="QCheckBox" name="chkEsKey2">
+                     <property name="text">
+                      <string>Key2</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="3">
+                    <widget class="QCheckBox" name="chkEsSteuerwort">
+                     <property name="text">
+                      <string>Steuerwort</string>
+                     </property>
+                    </widget>
+                   </item>
+
                   </layout>
                  </widget>
                 </item>

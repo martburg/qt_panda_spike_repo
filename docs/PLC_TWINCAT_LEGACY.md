@@ -132,6 +132,39 @@ Implementation: `src/steuerung3d/adapters/plc_twincat_legacy/udp_sim.py`
 
 ---
 
+## Edge adapter process (TransportV2 bridge)
+
+When running the stack as multiple processes, we bridge the frozen PLC wire protocol
+to the internal CommandFrame/TelemetrySnapshot seam via an "edge" process.
+
+Code:
+
+- `src/steuerung3d/adapters/plc_twincat_legacy/edge.py` (bridge logic)
+- `src/steuerung3d/apps/plc_twincat_legacy_edge/__main__.py` (CLI runner)
+
+The edge adapter consumes **CommandFrame** from a UDP `cmd-in` socket and publishes
+**TelemetrySnapshot** to a UDP `telem-out` target. Separately, it talks to the real PLC
+using the strict semicolon protocol.
+
+Typical example for Anton (values from `legacy_plc_anton.md`):
+
+```bash
+python -m steuerung3d.apps.plc_twincat_legacy_edge \
+  --axis Anton \
+  --cmd-in 172.16.17.5:52001 \
+  --telem-out 172.16.17.5:52002 \
+  --plc-remote 172.16.17.2:15001 \
+  --local-bind 172.16.17.5:15002
+```
+
+Notes:
+
+- `--local-bind` must match the controller-side port the PLC expects to reply to.
+- On Windows, `recvfrom()` may raise WinError 10054 when a PLC is unreachable; the edge
+  adapter treats this like a dropped packet.
+
+---
+
 ## Testing contract (regression guards)
 Tests must enforce:
 

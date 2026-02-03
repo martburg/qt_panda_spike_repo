@@ -3,7 +3,12 @@
 This project uses a *transport* abstraction to decouple the **core engine** from any particular IO mechanism
 (in-process queues, UDP, pipes, websockets, etc.).
 
-Today we ship an in-process transport (`InMemTransport`) and a JSONL recording wrapper (`LoggedTransport`).
+Today we ship:
+
+- an in-process transport (`InMemTransport`) for the original v1 streams (intents + telemetry)
+- an expanded in-process transport (`InMemTransportV2`) for all runtime streams
+- JSONL recording wrappers (`LoggedTransport`, `LoggedTransportV2`)
+
 The PLC integration lives in an *edge adapter* (UDP + codec) and is intentionally kept outside the core.
 
 ## What “transport” means here
@@ -11,9 +16,8 @@ The PLC integration lives in an *edge adapter* (UDP + codec) and is intentionall
 A *transport* is the boundary between:
 
 - **Producers:** UI/CLI clients publishing intents (operator actions, mode changes, jog commands…)
-- **Core engine:** consumes intents and emits:
-  - telemetry snapshots (state)
-  - command frames (the “full-state setpoint” the device should follow)
+- **Core engine:** consumes intents and emits telemetry snapshots and command frames.
+- **Input devices:** can publish raw_controls (the pre-joy2intent seam).
 
 Transport is *not* “networking”. It is an interface that can be backed by networking later.
 
@@ -28,7 +32,16 @@ Transport is *not* “networking”. It is an interface that can be backed by ne
 
 It is deliberately minimal and deterministic (good for unit tests and for record/replay).
 
-### LoggedTransport (recording wrapper)
+### TransportV2 (full stream set)
+
+Newer stacks use `TransportV2`, which adds two more streams:
+
+- `raw_controls`: inputd/gamepad -> joy2intent
+- `command_frames`: core -> device adapters
+
+`InMemTransportV2` implements all four streams.
+
+### LoggedTransport / LoggedTransportV2 (recording wrappers)
 
 `LoggedTransport` wraps a transport and records traffic to JSONL via `JsonlRecorder`.
 
@@ -38,16 +51,16 @@ Recorded streams are used for:
 - deterministic replay
 - future regression tests
 
-### Deep debugging: CommandFrame logging
+### Deep debugging: multi-stream logging
 
 **Status: implemented.**
 
-The architecture logs **CommandFrames** alongside intents and telemetry:
+The JSONL recorder supports these record kinds:
 
-- `CoreEngine` calls an optional `on_command_frame(cmd_frame)` hook each tick.
-- `JsonlRecorder.record_command_frame(...)` writes `kind="command_frame"` records to JSONL.
-- `JsonlReader.iter_command_frames()` reads them back.
-- The replay path can compare generated vs recorded command frames to detect nondeterminism/regressions.
+- `intent`
+- `telemetry`
+- `raw_controls`
+- `command_frame`
 
 To *use* these logs, see `docs/logging.md` and the `log_viewer` CLI.
 

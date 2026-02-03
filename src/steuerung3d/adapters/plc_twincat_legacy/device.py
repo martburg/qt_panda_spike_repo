@@ -91,11 +91,14 @@ class TwinCATLegacyWinchUdpDevice:
         else:
             lifetick = int(getattr(cmd, "tick", 0)) & 0xFFFF
 
+        # Remember what we sent as LifetickUIrx (echo) for UI/diagnostics
+        ax.meta["lifetick_rx"] = int(lifetick) & 0xFFFF
+
         # Apply global safety gating AFTER reading the command
         enable = enable_cmd and (not state.estop) and (not state.fault)
         vel = vel_cmd if enable else 0.0
 
-       # rising edge detect (after gating)
+        # rising edge detect (after gating)
         rebased = enable and (not self._last_enable)
 
         if rebased:
@@ -156,6 +159,8 @@ class TwinCATLegacyWinchUdpDevice:
         ax.meta["device_tick"] = int(device_tick) & 0xFFFF
 
 
+        # Not strict RTT. Shows echo loop staleness (tx - rx) in 16-bit space.
+        ax.meta["lifetick_age"] = (int(ax.meta["device_tick"]) - int(ax.meta.get("lifetick_rx", 0))) & 0xFFFF
         pos_ist = float(parse_float(f.get("PosIst", "0"), default=ax.pos))
         vel_ist = float(parse_float(f.get("SpeedIstUI", "0"), default=ax.vel))
         ax.pos = pos_ist
@@ -166,6 +171,7 @@ class TwinCATLegacyWinchUdpDevice:
         self._last_pos_ist = pos_ist
 
         status_word = parse_int(f.get("Status", "0"), default=0)
+        guide_status_word = parse_int(f.get("GuideStatus", "0"), default=0)
         estop_status = parse_int(f.get("EStopStatus", "0"), default=0)
         
         # Heuristic from ST: StatusnachUI == 4356 is treated as "ready/allowed to do things"
@@ -175,6 +181,7 @@ class TwinCATLegacyWinchUdpDevice:
         # Keep command intent visible for debugging (optional but very useful)
         ax.meta["cmd_enable"] = bool(enable)
         ax.meta["status_word"] = int(status_word)
+        ax.meta["guide_status_word"] = int(guide_status_word)
         ax.meta["estop_status"] = int(estop_status)
 
         ax.fault = (estop_status != 0) or (status_word != 0)

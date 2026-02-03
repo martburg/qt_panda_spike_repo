@@ -111,6 +111,22 @@ def _parse_hostport(s: str, default_host: str = "127.0.0.1") -> Tuple[str, int]:
     return (host, int(port_s))
 
 
+
+def _tail_text(path: str, max_lines: int = 40) -> str:
+    """Return last `max_lines` lines of a text file (best-effort)."""
+    try:
+        p = Path(path)
+        if not p.exists():
+            return ""
+        # Read as bytes to avoid encoding crashes; decode with replacement.
+        data = p.read_bytes()
+        txt = data.decode("utf-8", errors="replace")
+        lines = txt.splitlines()
+        return "\n".join(lines[-max_lines:])
+    except Exception:
+        return ""
+
+
 def _axes_from_joy2intent(path: Path) -> List[str]:
     cfg = tomllib.loads(path.read_text(encoding="utf-8"))
     rig = cfg.get("rig", {}) or {}

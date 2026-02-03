@@ -192,8 +192,8 @@ QFrame#dotPosWin, QFrame#dotVelWin, QFrame#dotEndlage,
 QFrame#g1_com_dot, QFrame#g1_fb_dot, QFrame#g1_out_dot,
 QFrame#g2_com_dot, QFrame#g2_fb_dot, QFrame#g2_out_dot,
 QFrame#g3_com_dot, QFrame#g3_fb_dot, QFrame#g3_out_dot,
-QFrame#ledHdrFbtDot, QFrame#ledHdrReadyDot, QFrame#ledHdrOnlineDot,
-QFrame#ledHdrBrk1Dot, QFrame#ledHdrBrk2Dot,
+QFrame#dotHdrFbt, QFrame#dotHdrReady, QFrame#dotHdrOnline,
+QFrame#dotHdrBrake1, QFrame#dotHdrBrake2,
 QFrame#ledGuiderReadyDot, QFrame#ledGuiderOnlineDot
 {
     min-width: 12px; max-width: 12px;

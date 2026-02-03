@@ -60,6 +60,8 @@ class SimAxisPlant:
             if hasattr(cmd, "lifetick_echo") and isinstance(cmd.lifetick_echo, dict):
                 if axis_id in cmd.lifetick_echo:
                     meta["lifetick_rx"] = int(cmd.lifetick_echo[axis_id]) & 0xFFFF
+                    # Not a strict RTT; just shows how stale the echo loop is.
+                    meta["lifetick_age"] = (int(meta["lifetick_tx"]) - int(meta["lifetick_rx"])) & 0xFFFF
 
             p = self.params.get(axis_id, self.default)
 

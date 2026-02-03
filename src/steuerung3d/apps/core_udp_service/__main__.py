@@ -17,6 +17,7 @@ from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapshot
 from steuerung3d.protocol.core_runner import CoreRunner
+from steuerung3d.protocol.axis_router import AxisRouter
 from steuerung3d.protocol.udp_channels import (
     UdpIntentIn, UdpTelemetryOut,
     UdpTelemetryIn, UdpCommandOut,
@@ -222,21 +223,8 @@ def main() -> int:
     if not axis_ids:
         axis_ids = ["X"]
 
-    # Track last device-scoped values so UI telemetry can be axis-pinned
-    # (each DenSi/PLC reports only its own params/estop word).
-    last_dev_params_by_axis: dict[str, dict[str, float]] = {}
-    last_dev_estop_word_by_axis: dict[str, int] = {}
-    last_dev_param_edit_active_by_axis: dict[str, bool] = {}
-    last_dev_param_edit_group_by_axis: dict[str, str] = {}
-
-    # Per-axis param commit state (comes from DenSi/PLC telemetry). Without this cache,
-    # in multi-axis mode the last received device snapshot would overwrite the commit
-    # fields, causing other HiPs to time out while waiting for their own commit ack.
-    last_dev_param_commit_req_id_by_axis: dict[str, str] = {}
-    last_dev_param_commit_group_by_axis: dict[str, str] = {}
-    last_dev_param_commit_status_by_axis: dict[str, str] = {}
-    last_dev_param_commit_age_ticks_by_axis: dict[str, int] = {}
-    last_dev_param_commit_unmatched_by_axis: dict[str, list[str]] = {}
+    # Router centralizes strict per-axis shaping (commands + UI snapshots)
+    # and holds device-scoped caches used for axis-pinned UI values.
 
     # Enforce uniqueness while preserving order; duplicates are almost always
     # a configuration mistake (and are disastrous with strict per-axis routing).
@@ -312,6 +300,12 @@ def main() -> int:
         st.ensure_axis(a)
         st.ensure_axis_cmd(a)
 
+    router = AxisRouter(
+        axis_ids=axis_ids,
+        dev_cmd_out_by_axis=axis_cmd_outs,
+        ui_telem_out_by_axis=axis_ui_outs,
+    )
+
     def drain_intents():
         ints = op_intent_in.drain_intents(limit=200)
         if ints:
@@ -323,49 +317,26 @@ def main() -> int:
     def device_step(state, cmd_frame, dt):
         nonlocal t_last_report
 
-        # Per-axis command routing (no broadcast).
+        # Per-axis command routing (no broadcast). Router reduces multi-axis frames.
         multi_axis = len(axis_ids) > 1
-        for axis_id in axis_ids:
-            sp = cmd_frame.axes.get(axis_id)
-            if sp is None:
-                # Defensive: axis missing from frame; skip.
-                continue
+        if multi_axis:
+            estop_reset_by_axis = dict(getattr(state, "estop_reset_req_by_axis", {}) or {})
+            param_ops_by_axis = {k: list(v) for k, v in dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).items()}
+        else:
+            axis0 = axis_ids[0]
+            estop_reset_by_axis = {
+                axis0: bool(dict(getattr(state, "estop_reset_req_by_axis", {}) or {}).get(axis0, False) or getattr(state, "estop_reset_req", False))
+            }
+            per_axis_ops = list(dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).get(axis0, []))
+            global_ops = list(getattr(state, "pending_param_ops", []) or [])
+            param_ops_by_axis = {axis0: (per_axis_ops or global_ops)}
 
-            # --- Lifetick echo routing ---
-            # Core builds a *multi-axis* CommandFrame that can carry a per-axis lifetick echo
-            # map (axis_id -> uint16). We route one command frame per device, so we must keep
-            # only this device's echo entry. Otherwise DenSi never observes lifetick_rx.
-            echo_val = None
-            try:
-                echo_map = getattr(cmd_frame, "lifetick_echo", {}) or {}
-                if isinstance(echo_map, dict):
-                    echo_val = echo_map.get(axis_id)
-            except Exception:
-                echo_val = None
-            lifetick_echo_axis = {axis_id: (int(echo_val) & 0xFFFF)} if echo_val is not None else {}
-
-            frame_axis = CommandFrame(
-                tick=cmd_frame.tick,
-                t_s=cmd_frame.t_s,
-                estop=cmd_frame.estop,
-                fault=cmd_frame.fault,
-                mode=cmd_frame.mode,
-                axes={axis_id: sp},
-                lifetick_echo=lifetick_echo_axis,
-                estop_reset=(
-                    bool(getattr(state, "estop_reset_req_by_axis", {}).get(axis_id, False))
-                    if multi_axis
-                    else bool(getattr(state, "estop_reset_req_by_axis", {}).get(axis_id, False) or getattr(state, "estop_reset_req", False))
-                ),
-                param_ops=(
-                    list(getattr(state, "pending_param_ops_by_axis", {}).get(axis_id, []))
-                    if multi_axis
-                    else (list(getattr(state, "pending_param_ops_by_axis", {}).get(axis_id, [])) or list(getattr(state, "pending_param_ops", [])))
-                ),
-            )
-            axis_cmd_outs[axis_id].publish_command_frame(frame_axis)
-
-        stats["cmd_out"] += max(1, len(axis_ids))
+        sent = router.publish_command_frames(
+            cmd_frame,
+            estop_reset_by_axis=estop_reset_by_axis,
+            param_ops_by_axis=param_ops_by_axis,
+        )
+        stats["cmd_out"] += max(1, sent)
         last_seen["cmd_ts"] = time.monotonic()
 
         snaps = dev_telem_in.drain_telemetry(limit=50)
@@ -373,29 +344,7 @@ def main() -> int:
             stats["dev_telem_in"] += len(snaps)
             last_seen["dev_telem_ts"] = time.monotonic()
             # Update axis-scoped caches from all received device snapshots.
-            for s in snaps:
-                try:
-                    k = None
-                    axes_keys = list(getattr(s, "axes", {}).keys())
-                    if len(axes_keys) == 1:
-                        k = str(axes_keys[0])
-                    elif len(axes_keys) > 1:
-                        # If ever multi-axis, ignore (should not happen for DenSi/PLC)
-                        k = None
-                    if k:
-                        last_dev_estop_word_by_axis[k] = int(getattr(s, "estop_status_word", 0))
-                        last_dev_params_by_axis[k] = dict(getattr(s, "params", {}) or {})
-                        last_dev_param_edit_active_by_axis[k] = bool(getattr(s, "param_edit_active", False))
-                        last_dev_param_edit_group_by_axis[k] = str(getattr(s, "param_edit_group", ""))
-
-                        # Param commit state is also device-scoped.
-                        last_dev_param_commit_req_id_by_axis[k] = str(getattr(s, "param_commit_req_id", ""))
-                        last_dev_param_commit_group_by_axis[k] = str(getattr(s, "param_commit_group", ""))
-                        last_dev_param_commit_status_by_axis[k] = str(getattr(s, "param_commit_status", "idle"))
-                        last_dev_param_commit_age_ticks_by_axis[k] = int(getattr(s, "param_commit_age_ticks", 0))
-                        last_dev_param_commit_unmatched_by_axis[k] = list(getattr(s, "param_commit_unmatched", []) or [])
-                except Exception:
-                    pass
+            router.ingest_device_telemetry(snaps)
             # Device-side measured telemetry can arrive from multiple sources
             # (e.g. one DenSi process per axis). Apply *all* snapshots so each
             # axis' measured/meta fields get updated, instead of only the most
@@ -437,33 +386,6 @@ def main() -> int:
             )
             t_last_report = now
 
-    def _slice_for_axis(snap: TelemetrySnapshot, axis_id: str) -> TelemetrySnapshot:
-        ax_t = dict(getattr(snap, "axes", {})).get(axis_id)
-        axes = {axis_id: ax_t} if ax_t is not None else {}
-        densis = dict(getattr(snap, "densis", {}))
-        densis_one = {axis_id: densis[axis_id]} if axis_id in densis else {}
-
-        return TelemetrySnapshot(
-            tick=int(getattr(snap, "tick", 0)),
-            t_s=float(getattr(snap, "t_s", 0.0)),
-            mode=str(getattr(snap, "mode", "")),
-            estop=bool(getattr(snap, "estop", False)),
-            fault=bool(getattr(snap, "fault", False)),
-            axes=axes,
-            rig_mode=str(getattr(snap, "rig_mode", "DISCOVERY")),
-            densis=densis_one,
-            estop_status_word=int(last_dev_estop_word_by_axis.get(axis_id, int(getattr(snap, "estop_status_word", 0)))),
-            param_edit_active=bool(last_dev_param_edit_active_by_axis.get(axis_id, bool(getattr(snap, "param_edit_active", False)))),
-            param_edit_group=str(last_dev_param_edit_group_by_axis.get(axis_id, str(getattr(snap, "param_edit_group", "")))),
-            params=dict(last_dev_params_by_axis.get(axis_id, dict(getattr(snap, "params", {})) or {})),
-            core_acks=list(getattr(snap, "core_acks", [])),
-            param_commit_req_id=str(last_dev_param_commit_req_id_by_axis.get(axis_id, str(getattr(snap, "param_commit_req_id", "")))),
-            param_commit_group=str(last_dev_param_commit_group_by_axis.get(axis_id, str(getattr(snap, "param_commit_group", "")))),
-            param_commit_status=str(last_dev_param_commit_status_by_axis.get(axis_id, str(getattr(snap, "param_commit_status", "idle")))),
-            param_commit_age_ticks=int(last_dev_param_commit_age_ticks_by_axis.get(axis_id, int(getattr(snap, "param_commit_age_ticks", 0)))),
-            param_commit_unmatched=list(last_dev_param_commit_unmatched_by_axis.get(axis_id, list(getattr(snap, "param_commit_unmatched", [])) or [])),
-        )
-
     # Lifetick tracing: log Core->UI device tick at most every 0.5s per axis.
     _lt_last_ui_log_s_by_axis: dict[str, float] = {}
 
@@ -494,13 +416,10 @@ def main() -> int:
             pass
 
         # One HiP per axis: send a *sliced* snapshot to each UI target.
-        for axis_id in axis_ids:
-            tx = axis_ui_outs.get(axis_id)
-            if tx is None:
-                continue
-            tx.publish_telemetry(_slice_for_axis(snap, axis_id))
+        router.publish_ui_snapshot(snap)
 
-            # LIFETICK trace: Core -> HiP (TelemetrySnapshot.axes[axis].device_tick)
+        # LIFETICK trace: Core -> HiP (TelemetrySnapshot.axes[axis].device_tick)
+        for axis_id in axis_ids:
             try:
                 ax = dict(getattr(snap, "axes", {}) or {}).get(axis_id)
                 dev_tick = getattr(ax, "device_tick", None)

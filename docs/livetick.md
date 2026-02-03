@@ -12,11 +12,31 @@ We use it to quickly detect:
 
 ## Signal semantics
 
-1. **Core emits a 16‑bit tick** (`0..65535`, wraps) periodically.
-2. Each **HiP instance echoes that tick back** to the core.
-3. The **core forwards the echo** (together with the most recently sent tick) so the UI can judge freshness.
+There are **two related but different** “tick” concepts in this repo:
 
-The important part is not the absolute tick value, but the *difference* between “what we sent” and “what came back”.
+### 1) Legacy PLC LifeTick (device‑origin)
+
+This is the one we keep for compatibility with the frozen TwinCAT PLC programs.
+
+- The **PLC/device emits** a 16‑bit tick: `LifetickUItx` (uplink field 1).
+- The **UI echoes** the last received tick back as `LifetickUIrx` (downlink field 25).
+- The PLC uses the echoed value as a simple freshness/health signal.  
+  **This is not a strict RTT measurement.** It’s a loopback staleness indicator.
+
+In our stack this becomes:
+
+**PLC → Core → HiP → Core → (back to PLC via DenSi/device)**
+
+We expose two numbers to the UI:
+
+- `device_tick` (== `LifetickUItx`)
+- `lifetick_age` (== `(device_tick - lifetick_rx) mod 65536`)
+
+### 2) Core tick (internal)
+
+Core also has its own `CommandFrame.tick` for scheduling/replay/debugging.
+Don’t confuse this with the PLC LifeTick above.
+
 
 ## What DenSi shows
 

@@ -10,11 +10,19 @@ from steuerung3d.core.param_registry import eps_for_param
 
 @dataclass(frozen=True)
 class AxisTelemetry:
+    # measured
     pos: float
     vel: float
     enabled: bool
     fault: bool
-    device_tick: int = 0  # PLC/device lifetick (legacy LifetickUItx)
+
+    # legacy/layer-0 diagnostics (optional on the wire)
+    device_tick: int = 0          # PLC/device lifetick (legacy LifetickUItx)
+    lifetick_rx: int = 0          # echoed tick seen at device (legacy LifetickUIrx), if available
+    lifetick_age: int = 0         # (device_tick - lifetick_rx) mod 65536, if available
+    status_word: int = 0          # legacy Status (drive/main amp)
+    guide_status_word: int = 0    # legacy GuideStatus (slave/guider amp)
+
 
 
 
@@ -66,7 +74,11 @@ class TelemetrySnapshot:
                 vel=float(ax.vel),
                 enabled=bool(ax.enabled),
                 fault=bool(ax.fault),
-                device_tick=int(getattr(ax, 'meta', {}).get('device_tick', 0)),
+                device_tick=int(getattr(ax, 'meta', {}).get('device_tick', 0)) & 0xFFFF,
+                lifetick_rx=int(getattr(ax, 'meta', {}).get('lifetick_rx', 0)) & 0xFFFF,
+                lifetick_age=int(getattr(ax, 'meta', {}).get('lifetick_age', 0)) & 0xFFFF,
+                status_word=int(getattr(ax, 'meta', {}).get('status_word', 0)),
+                guide_status_word=int(getattr(ax, 'meta', {}).get('guide_status_word', 0)),
             )
             for axis_id, ax in state.axes.items()
         }
@@ -187,3 +199,7 @@ def apply_measured_snapshot(state: MachineState, snap: TelemetrySnapshot) -> Non
         # Carry device-side lifetick through the core (legacy LifetickUItx analogue).
         # Needed for UI TimeTick (delta between successive received device ticks).
         ax.meta["device_tick"] = int(getattr(ax_t, "device_tick", 0)) & 0xFFFF
+        ax.meta["lifetick_rx"] = int(getattr(ax_t, "lifetick_rx", 0)) & 0xFFFF
+        ax.meta["lifetick_age"] = int(getattr(ax_t, "lifetick_age", 0)) & 0xFFFF
+        ax.meta["status_word"] = int(getattr(ax_t, "status_word", 0))
+        ax.meta["guide_status_word"] = int(getattr(ax_t, "guide_status_word", 0))
