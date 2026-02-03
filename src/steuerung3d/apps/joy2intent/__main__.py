@@ -34,17 +34,37 @@ def main() -> int:
 
     st = JoyState(mode=cfg.default_mode)
     rig = JoyRig(winches=cfg.winches)
+
+    # setup_manual: derive momentary multi-select buttons from bindings.buttons (select_0..select_N)
+    def _select_key(item: tuple[str, int]) -> int:
+        name, _idx = item
+        if not name.startswith("select_"):
+            return 10_000
+        try:
+            return int(name.split("_", 1)[1])
+        except Exception:
+            return 9_999
+
+    select_buttons: list[int] = [
+        int(idx)
+        for name, idx in sorted(cfg.buttons.items(), key=_select_key)
+        if name.startswith("select_")
+    ]
+
     bind = JoyBindings(
         axes=cfg.axes,
         buttons=cfg.buttons,
         invert=cfg.invert,
         deadzone=cfg.deadzone,
         expo=cfg.expo,
+        select_buttons=select_buttons,
     )
+
+
     lim = JoyLimits(
         max_winch_mps=cfg.max_winch_mps,
         fine_scale=cfg.fine_scale,
-        max_v=cfg.max_v,
+        max_v=None,  # cfg.max_v is sync-mode dict; not used by setup_manual mapping yet
     )
 
     dt = 1.0 / max(1.0, cfg.tick_hz)
@@ -67,7 +87,7 @@ def main() -> int:
         if rc is not None:
             last_rx_ns = now_ns
             sent_stale_zero = False
-            intents = synthesize_intents(rc, st, bind, rig, lim)
+            intents = synthesize_intents(st, rc, bind, rig, lim)
             for it in intents:
                 intent_out.publish_intent(it)
         else:
