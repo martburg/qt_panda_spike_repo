@@ -163,15 +163,16 @@ def main() -> int:
             level = 'WARN' if stale else 'OK'
             age_ms_i = int(age_ms_f) if age_ms_f is not None else None
             status.emit_every(
-                0.5,
                 level=level,
                 summary=f"mode={st.mode} age_ms={age_ms_i if age_ms_i is not None else 'NA'} stale_stop={sent_stale_zero}",
-                mode=st.mode,
-                age_ms=age_ms_i,
-                stale_stop=sent_stale_zero,
-                raw_in=f"{cfg.raw_in[0]}:{cfg.raw_in[1]}",
-                intent_out=f"{cfg.intent_out[0]}:{cfg.intent_out[1]}",
-                winches=list(rig.winches),
+                fields={
+                    "mode": st.mode,
+                    "age_ms": age_ms_i,
+                    "stale_stop": sent_stale_zero,
+                    "raw_in": f"{cfg.raw_in[0]}:{cfg.raw_in[1]}",
+                    "intent_out": f"{cfg.intent_out[0]}:{cfg.intent_out[1]}",
+                    "winches": list(rig.winches),
+                },
             )
 
         # Periodic summary

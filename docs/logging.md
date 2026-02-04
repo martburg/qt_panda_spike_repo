@@ -1,6 +1,44 @@
 # Logging, replay, and log viewing
 
-Logs are written as **JSONL** (one JSON object per line).
+This repo has **two** log streams:
+
+1) **Session logs (per process)** from the stack supervisor (`python -m steuerung3d up ...`).
+2) **JSONL event logs** (intents/telemetry/command frames) written by the recorder.
+
+They serve different purposes:
+- session logs answer: *"what did each process print / why did it exit?"*
+- JSONL logs answer: *"what did the system do tick-by-tick?"*
+
+---
+
+## Session logs (supervisor)
+
+Each `up` run creates a session dir:
+
+```
+.run/<stack>/sessions/<timestamp>/
+  core.log
+  densi-Anton.log
+  hip-Debby.log
+  ...
+  meta.json
+```
+
+Helper commands:
+
+```bash
+python -m steuerung3d status --profile dev_sim
+python -m steuerung3d logs core --profile dev_sim --follow
+python -m steuerung3d down --profile dev_sim
+```
+
+By default we keep the last 5 sessions; older ones are deleted.
+
+---
+
+## JSONL event logs (recorder)
+
+Recorder logs are written as **JSONL** (one JSON object per line).
 
 ## Record kinds
 

@@ -542,17 +542,18 @@ class DenSiController:
 
         try:
             self._status.emit_every(
-                0.5,
                 level=level,
                 summary=summary,
-                axis=axis,
-                mode=mode,
-                online=bool(online),
-                age_ms=(-1 if age_ms is None else float(age_ms)),
-                stale=bool(stale),
-                estop=bool(self._last_estop),
-                fault=bool(self._last_fault),
-                tick=int(getattr(self.state, "tick", 0) or 0),
+                fields={
+                    "axis": axis,
+                    "mode": mode,
+                    "online": bool(online),
+                    "age_ms": (-1 if age_ms is None else float(age_ms)),
+                    "stale": bool(stale),
+                    "estop": bool(self._last_estop),
+                    "fault": bool(self._last_fault),
+                    "tick": int(getattr(self.state, "tick", 0) or 0),
+                },
             )
         except Exception:
             pass

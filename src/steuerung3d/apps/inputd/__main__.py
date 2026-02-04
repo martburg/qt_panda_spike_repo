@@ -141,13 +141,14 @@ def run(cfg: InputdConfig, *, log_hz: float = 2.0) -> int:
             # Derived, low-rate heartbeat for supervisor birds-eye (does not affect PLC UDP packets).
             level = "OK" if connected else "WARN"
             status.emit_every(
-                0.5,
                 level=level,
                 summary=f"connected={bool(connected)} tx={samples} out={cfg.out_addr}",
-                connected=bool(connected),
-                tx_samples=int(samples),
-                out=str(cfg.out_addr),
-                dev=str(desc) if desc else "",
+                fields={
+                    "connected": bool(connected),
+                    "tx_samples": int(samples),
+                    "out": str(cfg.out_addr),
+                    "dev": str(desc) if desc else "",
+                },
             )
 
         next_t += dt

@@ -811,15 +811,16 @@ class HiPController:
 
         try:
             self._status.emit_every(
-                0.5,
                 level=level,
                 summary=summary,
-                axis=axis,
-                mode=mode,
-                age_ms=(-1 if age_ms is None else float(age_ms)),
-                stale=bool(stale),
-                estop=bool(self._last_estop),
-                fault=bool(self._last_fault),
+                fields={
+                    "axis": axis,
+                    "mode": mode,
+                    "age_ms": (-1 if age_ms is None else float(age_ms)),
+                    "stale": bool(stale),
+                    "estop": bool(self._last_estop),
+                    "fault": bool(self._last_fault),
+                },
             )
         except Exception:
             # Never let status emission break the UI loop.

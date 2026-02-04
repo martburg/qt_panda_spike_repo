@@ -1,4 +1,30 @@
-# Dev stack
+# Dev stack and boot profiles
+
+There are two ways to run local demos:
+
+1) **Profile-driven boot (recommended)**
+
+```powershell
+python -m steuerung3d up --profile dev_sim
+```
+
+2) The historical single-process dev runner:
+
+```powershell
+python -m steuerung3d.apps.dev_stack --config configs\dev_plc.toml
+```
+
+The profile-driven supervisor is the “real” boot path going forward:
+
+- one reusable supervisor/runtime (`StackRuntime`)
+- per-run session logging (one log per process)
+- structured birds-eye status via a UDP JSON heartbeat side-channel
+
+See: `docs/STACK_BOOT_STATUS.md`
+
+---
+
+## Legacy dev_stack (single process)
 
 `python -m steuerung3d.apps.dev_stack --config <file.toml>` runs a small end-to-end demo.
 
@@ -10,7 +36,7 @@ What it does:
 - publishes telemetry snapshots back to the transport
 - prints snapshots periodically and toggles ESTOP once during the run
 
-## Run it
+### Run it
 
 Run from the **repo root**:
 
@@ -23,6 +49,8 @@ If you run from `src/` you must adjust the path:
 ```powershell
 python -m steuerung3d.apps.dev_stack --config ..\configs\dev_plc.toml
 ```
+
+---
 
 ## UDP HiP ↔ Core ↔ DenSi demo (parameter editing)
 
@@ -119,31 +147,38 @@ This allows you to test:
 
 …without requiring real PLCs.
 
+---
+
 ## Running the full multi-axis demo with `setup_stack`
 
-`setup_stack` is a small process supervisor that launches the typical local demo stack:
+`setup_stack` predates the profile-driven boot CLI. It is now a **thin compatibility wrapper**
+over the same runtime (so we only have one supervisor implementation).
+
+It launches the typical local demo stack:
 
 - `core_udp_service`
 - `den_si` (one per axis)
 - `hi_p` (one per axis)
 - optional joystick helpers (`inputd`, `joy2intent`)
 
-Example (the one you used):
+Example (legacy style):
 
 ```powershell
 python -m steuerung3d.apps.setup_stack --joy2intent configs\joy2intent_gamepad.toml --inputd configs\inputd_gamepad.toml --cmd-base 52001 --dev-telem-in 127.0.0.1:52020
 ```
 
-Debugging early exits
+### Debugging early exits
 
 - Each child gets a stable name (e.g. `core_udp_service`, `densi-Anton`, `hip-Debby`, …).
 - Each child writes combined stdout/stderr to `.run/setup_stack/<name>.log`.
 - If a child exits, `setup_stack` prints the *name*, PID, return code, and a short tail of its log.
 
-Logging noise
+### Logging noise
 
 - LifeTick trace logs are throttled and emitted at **DEBUG** level.
   (The default `INFO` level stays readable during normal operation.)
+
+---
 
 ## Output
 
@@ -171,11 +206,12 @@ Logs are written to `logs/session.jsonl` (JSON Lines) via the recorder.
 
 
 
-## Setup stack: 4× DenSi + 4× HiP + Core (+ inputd/joy2intent)
+### Setup stack (legacy convenience)
 
-`setup_stack` is the current recommended way to spin up the full local demo with clear, per-axis wiring.
+`setup_stack` remains useful for quick local runs (especially when you like its flags), but new work should
+prefer `python -m steuerung3d up --profile ...` so the wiring lives in one place.
 
-It launches:
+It launches the same components as the profiles:
 
 - **Core** (`core_udp_service`)
 - **DenSi** (one per axis; device-side sim UI)

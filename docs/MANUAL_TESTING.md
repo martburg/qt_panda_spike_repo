@@ -16,6 +16,12 @@ Optional: clear previous logs
 if (Test-Path .\logs) { Remove-Item .\logs\* -Force }
 ```
 
+Optional: clear previous supervisor run sessions
+
+```powershell
+if (Test-Path .\.run) { Remove-Item .\.run\* -Recurse -Force }
+```
+
 ## Environment sanity (Windows)
 
 The apps are meant to be imported as `steuerung3d.*` (not `src.steuerung3d.*`).
@@ -30,6 +36,36 @@ Quick check:
 
 ```powershell
 python -c "import importlib.util as u; print(u.find_spec('steuerung3d'))"
+```
+
+## Test 0 — Profile-driven boot (recommended)
+
+Preflight the profile (no processes started):
+
+```powershell
+python -m steuerung3d plan   --profile dev_sim
+python -m steuerung3d doctor --profile dev_sim
+```
+
+Start the stack:
+
+```powershell
+python -m steuerung3d up --profile dev_sim
+```
+
+What to look for:
+- birds-eye prints structured lines for core / inputd / joy2intent / hip / densi
+- session logs created under `.run/dev_sim/sessions/<timestamp>/`
+
+Crash behavior:
+- kill one child -> supervisor prints a short log tail and shuts down cleanly
+
+Post-mortem helpers (new terminal):
+
+```powershell
+python -m steuerung3d status --profile dev_sim
+python -m steuerung3d logs core --profile dev_sim --follow
+python -m steuerung3d down --profile dev_sim
 ```
 
 ## Test A — Core + SIM via CLI client (fast sanity)
@@ -147,3 +183,43 @@ Run the dev stack with `device.kind = "plc_twincat_legacy_fleet"`.
 We keep a small pytest tripwire:
 
 - `tests/test_protocol_imports.py` imports `udp_channels` and round-trips `RawControls`.
+
+---
+
+## Test E — Profile-driven boot + birds-eye status (recommended path)
+
+This validates the **current supervisor** (sessions, structured status, metadata helpers).
+
+### E1 — Plan/doctor
+
+```powershell
+python -m steuerung3d plan   --profile dev_sim
+python -m steuerung3d doctor --profile dev_sim
+```
+
+What to look for:
+- argv and port expansions make sense per axis
+- doctor reports OK and no port collisions
+
+### E2 — Up/run
+
+```powershell
+python -m steuerung3d up --profile dev_sim
+```
+
+What to look for:
+- birds-eye prints structured lines for core / inputd / joy2intent / hip / densi
+- a new session directory exists under `.run/dev_sim/sessions/<timestamp>/`
+
+### E3 — Crash path
+
+- kill one child (Task Manager on Windows is fine)
+- expect: supervisor prints a short tail of the child log, then shuts down cleanly
+
+### E4 — Post-mortem helpers
+
+```powershell
+python -m steuerung3d status --profile dev_sim
+python -m steuerung3d logs core --profile dev_sim --follow
+python -m steuerung3d down   --profile dev_sim
+```

@@ -208,6 +208,7 @@ class StackRuntime:
         env = os.environ.copy()
 
         # Inject structured-status env so children can emit heartbeats (side-channel).
+        # Children should send heartbeats to the supervisor's status_in bind.
         status_out = (self.spec.net or {}).get("status_in")
         if status_out:
             svc_name, inst = (p.name.split("-", 1) + [""])[:2]
@@ -217,11 +218,10 @@ class StackRuntime:
                     service_name=svc_name,
                     instance=inst,
                     status_out=str(status_out),
-                    extra_env=(p.env or {}),
                 )
             )
-        else:
-            env.update(p.env or {})
+        # Preserve per-process environment additions (ports, endpoints, etc.).
+        env.update(p.env or {})
 
         popen_kwargs = dict(stdout=log_f, stderr=subprocess.STDOUT, cwd=str(self.spec.base_dir), env=env)
         if self.new_console and os.name == "nt":
@@ -273,7 +273,15 @@ class StackRuntime:
                 if sm:
                     age = self.status.age_s(svc, inst)
                     age_ms = int((age or 0.0) * 1000.0)
-                    parts.append(f"{rp.spec.name}: {sm.level} {sm.summary} ({age_ms}ms)")
+                    # StatusCollector may return either a small dataclass-like object
+                    # or a plain dict (depending on import boundaries / older callers).
+                    if isinstance(sm, dict):
+                        level = str(sm.get("level", ""))
+                        summary = str(sm.get("summary", ""))
+                    else:
+                        level = str(getattr(sm, "level", ""))
+                        summary = str(getattr(sm, "summary", ""))
+                    parts.append(f"{rp.spec.name}: {level} {summary} ({age_ms}ms)")
                 else:
                     t = self.tailers.get(rp.spec.name)
                     if t:

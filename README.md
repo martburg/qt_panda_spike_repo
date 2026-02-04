@@ -52,6 +52,51 @@ Manual runbook:
 
 - `docs/MANUAL_TESTING.md` (recommended after `pytest -q` stays green)
 
+---
+
+## Boot a stack (profile-driven)
+
+The current recommended entry point is the **profile-driven supervisor**:
+
+```powershell
+python -m steuerung3d up --profile dev_sim
+```
+
+Companion tools:
+
+```powershell
+python -m steuerung3d plan   --profile dev_sim
+python -m steuerung3d doctor --profile dev_sim
+python -m steuerung3d status --profile dev_sim
+python -m steuerung3d logs core --profile dev_sim --follow
+python -m steuerung3d down   --profile dev_sim
+```
+
+Profiles live in `configs/stacks/*.toml` and own the **rig axes + wiring** (ports, services enabled, per-axis expansion).
+
+### Session logging (per run, per process)
+
+Each `up` creates a fresh session directory:
+
+```
+.run/<stack>/sessions/<timestamp>/
+  core.log
+  densi-Anton.log
+  hip-Debby.log
+  ...
+  meta.json
+```
+
+- keeps the last **5** sessions by default (older sessions are deleted)
+- `.run/<stack>/LATEST` points to the newest session (portable, no symlink)
+
+### Structured birds-eye status
+
+Stacks can enable a UDP JSON heartbeat side-channel (does **not** touch PLC UDP formats).
+When enabled, the supervisor prints a compact “birds-eye” table and can still fall back to a log tail on crash.
+
+See: `docs/STACK_BOOT_STATUS.md`
+
 ### Run the HiP ↔ Core ↔ DenSi UDP demo (Yellow UI)
 
 Open three terminals:
@@ -80,6 +125,9 @@ Notes:
 - After Write, HiP shows a **modal dialog** once the device is observed as applied (or after a timeout if not confirmed).
 - If **pos limits** are auto-adjusted to satisfy `HardMax ≥ UserMax ≥ UserMin ≥ HardMin`, HiP shows an info dialog listing the adjusted values.
 - For **Guider** limits, `PosMin` is **clamped** to ensure `PosMin ≤ PosMax` (no swapping).
+
+> Note: the above “3 terminals” demo still works, but most local development is now done via
+> `python -m steuerung3d up --profile ...`.
 
 ### Run the dev stack
 
@@ -112,6 +160,7 @@ This is a foundation for incremental expansion:
 - ✅ command vs measured separation in `MachineState`
 - ✅ TwinCAT legacy UDP codec/device/fleet + Windows-safe UDP behavior
 - ✅ config-driven selection in `apps/dev_stack`
+- ✅ profile-driven boot supervisor + per-session logs + structured birds-eye status
 
 Next milestones typically include:
 

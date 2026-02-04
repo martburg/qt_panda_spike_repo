@@ -15,6 +15,7 @@ import argparse
 import os
 import re
 import signal
+import sys
 import time
 from pathlib import Path
 
@@ -23,6 +24,97 @@ from steuerung3d.core.stack_runtime import expand_processes
 
 from steuerung3d.core.stack_loader import load_stack_profile
 from steuerung3d.core.stack_runtime import StackRuntime
+
+
+def discover_stack_profiles(stacks_dir: Path | None = None) -> list[str]:
+    """Return available stack profile *names* (without .toml).
+
+    We intentionally keep this lightweight and file-system based.
+    A profile can still be provided as an explicit TOML path.
+    """
+    d = stacks_dir or (Path("configs") / "stacks")
+    if not d.exists() or not d.is_dir():
+        return []
+    out: list[str] = []
+    for p in sorted(d.glob("*.toml")):
+        if p.is_file():
+            out.append(p.stem)
+    return out
+
+
+def _print_profiles(stacks_dir: Path | None = None, *, as_paths: bool = False) -> None:
+    names = discover_stack_profiles(stacks_dir)
+    d = stacks_dir or (Path("configs") / "stacks")
+    if not names:
+        print(f"[profiles] none found (looked in {d})")
+        return
+    print(f"[profiles] available ({len(names)}) in {d}:")
+    for n in names:
+        if as_paths:
+            print(f"- {d / (n + '.toml')}")
+        else:
+            print(f"- {n}")
+
+
+def _profile_arg(value: str) -> str:
+    """argparse type for --profile.
+
+    Accepts either:
+      - a known profile name (resolved via configs/stacks/<name>.toml)
+      - an explicit TOML path
+
+    Raises a helpful error listing known profile names.
+    """
+    v = (value or "").strip()
+    if not v:
+        raise argparse.ArgumentTypeError("empty profile")
+    p = Path(v)
+    if p.exists() or p.suffix.lower() == ".toml":
+        return v
+    names = discover_stack_profiles()
+    if v in names:
+        return v
+    if names:
+        sample = ", ".join(names[:12])
+        more = " …" if len(names) > 12 else ""
+        raise argparse.ArgumentTypeError(
+            f"unknown profile '{v}'. Available: {sample}{more}. "
+            "(Tip: run `python -m steuerung3d profiles`)"
+        )
+    raise argparse.ArgumentTypeError(
+        f"unknown profile '{v}' and no profiles discovered. "
+        "(Tip: expected configs/stacks/*.toml or a direct .toml path)"
+    )
+
+
+class St3DArgumentParser(argparse.ArgumentParser):
+    """ArgumentParser with nicer errors for missing/unknown profiles."""
+
+    def error(self, message: str) -> None:  # type: ignore[override]
+        # Custom error path so we can append profile discovery hints.
+        extra = ""
+        if "--profile" in message:
+            names = discover_stack_profiles()
+            if names:
+                extra_lines = ["", "Available profiles (configs/stacks/*.toml):"]
+                extra_lines += [f"  - {n}" for n in names]
+                extra_lines += ["", "Tip: python -m steuerung3d profiles"]
+                extra = "\n".join(extra_lines) + "\n"
+            else:
+                extra = (
+                    "\nNo profiles found under configs/stacks/. "
+                    "Provide a direct .toml path, or add configs/stacks/<name>.toml.\n"
+                )
+
+        self.print_usage(sys.stderr)
+        self.exit(2, f"{self.prog}: error: {message}\n{extra}")
+
+
+def cmd_profiles(args: argparse.Namespace) -> int:
+    # Keep the behavior minimal and script-friendly.
+    stacks_dir = Path(args.dir) if getattr(args, "dir", None) else None
+    _print_profiles(stacks_dir=stacks_dir, as_paths=bool(args.paths))
+    return 0
 
 
 def _stack_run_base(name: str) -> Path:
@@ -179,11 +271,21 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="steuerung3d", add_help=True)
-    sub = ap.add_subparsers(dest="cmd", required=True)
+    ap = St3DArgumentParser(prog="steuerung3d", add_help=True)
+    sub = ap.add_subparsers(dest="cmd", required=True, parser_class=St3DArgumentParser)
+
+    prof = sub.add_parser("profiles", help="List available stack profiles")
+    prof.add_argument("--dir", default=None, help="Directory to scan (default: configs/stacks)")
+    prof.add_argument("--paths", action="store_true", help="Print names with TOML paths")
+    prof.set_defaults(_fn=cmd_profiles)
 
     up = sub.add_parser("up", help="Start a configured stack profile")
-    up.add_argument("--profile", required=True, help="Profile name or path (TOML)")
+    up.add_argument(
+        "--profile",
+        required=True,
+        type=_profile_arg,
+        help="Profile name or path (TOML). Hint: python -m steuerung3d profiles",
+    )
     up.add_argument(
         "--override",
         action="append",
@@ -201,27 +303,52 @@ def build_parser() -> argparse.ArgumentParser:
     up.set_defaults(_fn=cmd_up)
 
     plan = sub.add_parser("plan", help="Print the expanded process plan without starting it")
-    plan.add_argument("--profile", required=True, help="Profile name or path (TOML)")
+    plan.add_argument(
+        "--profile",
+        required=True,
+        type=_profile_arg,
+        help="Profile name or path (TOML). Hint: python -m steuerung3d profiles",
+    )
     plan.add_argument("--override", action="append", default=None, help="Override TOML (repeatable)")
     plan.add_argument("--set", action="append", default=None, help="Inline override key=value (repeatable)")
     plan.set_defaults(_fn=cmd_plan)
 
     status = sub.add_parser("status", help="Show status for the latest session")
-    status.add_argument("--profile", required=True, help="Profile name or path (TOML)")
+    status.add_argument(
+        "--profile",
+        required=True,
+        type=_profile_arg,
+        help="Profile name or path (TOML). Hint: python -m steuerung3d profiles",
+    )
     status.set_defaults(_fn=cmd_status)
 
     down = sub.add_parser("down", help="Terminate processes from the latest session")
-    down.add_argument("--profile", required=True, help="Profile name or path (TOML)")
+    down.add_argument(
+        "--profile",
+        required=True,
+        type=_profile_arg,
+        help="Profile name or path (TOML). Hint: python -m steuerung3d profiles",
+    )
     down.set_defaults(_fn=cmd_down)
 
     logs = sub.add_parser("logs", help="Show or follow logs from the latest session")
     logs.add_argument("service", help="Service log name (e.g. core, densi-Anton, hip)")
-    logs.add_argument("--profile", required=True, help="Profile name or path (TOML)")
+    logs.add_argument(
+        "--profile",
+        required=True,
+        type=_profile_arg,
+        help="Profile name or path (TOML). Hint: python -m steuerung3d profiles",
+    )
     logs.add_argument("--follow", action="store_true", help="Follow (tail -f)")
     logs.set_defaults(_fn=cmd_logs)
 
     doctor = sub.add_parser("doctor", help="Validate profile/modules/ports before starting")
-    doctor.add_argument("--profile", required=True, help="Profile name or path (TOML)")
+    doctor.add_argument(
+        "--profile",
+        required=True,
+        type=_profile_arg,
+        help="Profile name or path (TOML). Hint: python -m steuerung3d profiles",
+    )
     doctor.add_argument("--override", action="append", default=None, help="Override TOML (repeatable)")
     doctor.add_argument("--set", action="append", default=None, help="Inline override key=value (repeatable)")
     doctor.set_defaults(_fn=cmd_doctor)

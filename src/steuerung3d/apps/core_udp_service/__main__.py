@@ -470,17 +470,18 @@ def main() -> int:
                 )
 
                 status.emit_every(
-                    0.5,
                     level=level,
                     summary=summary,
-                    tick=int(getattr(snap, "tick", 0) or 0),
-                    mode=str(mode_v),
-                    estop=estop_v,
-                    fault=fault_v,
-                    age_int_ms=None if age_int is None else age_int * 1000.0,
-                    age_dev_ms=None if age_dev is None else age_dev * 1000.0,
-                    age_cmd_ms=None if age_cmd is None else age_cmd * 1000.0,
-                    age_ui_ms=None if age_ui is None else age_ui * 1000.0,
+                    fields={
+                        "tick": int(getattr(snap, "tick", 0) or 0),
+                        "mode": str(mode_v),
+                        "estop": estop_v,
+                        "fault": fault_v,
+                        "age_int_ms": None if age_int is None else age_int * 1000.0,
+                        "age_dev_ms": None if age_dev is None else age_dev * 1000.0,
+                        "age_cmd_ms": None if age_cmd is None else age_cmd * 1000.0,
+                        "age_ui_ms": None if age_ui is None else age_ui * 1000.0,
+                    },
                 )
             except Exception:
                 pass
