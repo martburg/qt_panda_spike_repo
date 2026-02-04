@@ -4,6 +4,7 @@ import argparse
 import logging
 import time
 from pathlib import Path
+from dataclasses import replace
 
 from steuerung3d.util.log_context import install_log_context
 from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
@@ -22,6 +23,13 @@ log = logging.getLogger("joy2intent")
 def main() -> int:
     ap = argparse.ArgumentParser(prog="steuerung3d.apps.joy2intent")
     ap.add_argument("--config", default="configs/joy2intent_gamepad.toml")
+    ap.add_argument("--raw-in", default=None, help="Override RawControls UDP bind host:port")
+    ap.add_argument("--intent-out", default=None, help="Override Intent UDP target host:port")
+    ap.add_argument(
+        "--winches",
+        default=None,
+        help="Override winch list as comma-separated axis ids (e.g. Anton,Debby,Cecil,Burt)",
+    )
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
     args = ap.parse_args()
 
@@ -32,6 +40,20 @@ def main() -> int:
     install_log_context(role="joy2intent")
 
     cfg = load_joy2intent_config(Path(args.config))
+
+    # Stack profiles may own infrastructure wiring (ports / axis list). Allow explicit overrides.
+    def _parse_hostport(s: str) -> tuple[str, int]:
+        host, port = s.rsplit(":", 1)
+        return host.strip(), int(port)
+
+    if args.raw_in:
+        cfg = replace(cfg, raw_in=_parse_hostport(str(args.raw_in)))
+    if args.intent_out:
+        cfg = replace(cfg, intent_out=_parse_hostport(str(args.intent_out)))
+    if args.winches:
+        winches = [w.strip() for w in str(args.winches).split(",") if w.strip()]
+        if winches:
+            cfg = replace(cfg, winches=winches)
 
     raw_in = UdpRawControlsIn.bind(cfg.raw_in)
     intent_out = UdpIntentOut.connect(cfg.intent_out)

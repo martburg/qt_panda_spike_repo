@@ -1,101 +1,33 @@
+"""Legacy stack launcher (compat wrapper).
+
+`setup_stack` predates the profile-driven boot CLI. Users still rely on its
+convenient flags and default behavior, so we keep the command as a thin
+compatibility layer.
+
+Implementation rule:
+  - No supervision logic lives here.
+  - We translate legacy flags into a :class:`~steuerung3d.core.stack_spec.StackSpec`
+    and run it with :class:`~steuerung3d.core.stack_runtime.StackRuntime`.
+
+This keeps *one* boot/supervisor implementation going forward.
+"""
+
 from __future__ import annotations
 
 import argparse
 import os
-import subprocess
-import sys
-import time
-from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
-import tomllib
+try:
+    import tomllib  # py3.11+
+except Exception:  # pragma: no cover
+    tomllib = None  # type: ignore
 
-
-@dataclass
-class ChildProc:
-    """A supervised child process with a stable human name and an associated log file."""
-
-    name: str
-    proc: subprocess.Popen
-    log_path: Optional[Path] = None
+from steuerung3d.core.stack_runtime import StackRuntime
+from steuerung3d.core.stack_spec import ServiceSpec, StackSpec
 
 
-class _LogTailer:
-    """Low-overhead incremental tail of a growing log file.
-
-    We avoid re-reading entire log files (which can hurt responsiveness on Windows).
-    The tailer keeps a read offset and only scans newly appended text.
-    """
-
-    def __init__(self, path: Path):
-        self.path = path
-        self._pos = 0
-        self._buf = ""
-        self._fh = None  # opened lazily
-        self.last_hb: str = ""
-        self.last_joy: str = ""
-        self.last_inp: str = ""
-        self.last_dev: str = ""
-
-        # Start at end: we only care about new session activity.
-        try:
-            self._pos = int(self.path.stat().st_size)
-        except Exception:
-            self._pos = 0
-
-    def _open(self):
-        if self._fh is None:
-            self._fh = self.path.open("r", encoding="utf-8", errors="replace")
-            try:
-                self._fh.seek(self._pos)
-            except Exception:
-                pass
-
-    def close(self) -> None:
-        try:
-            if self._fh is not None:
-                self._fh.close()
-        finally:
-            self._fh = None
-
-    def poll(self) -> None:
-        """Read newly appended lines and update last matching strings."""
-        try:
-            self._open()
-            assert self._fh is not None
-            chunk = self._fh.read()
-            if not chunk:
-                return
-            self._pos = self._fh.tell()
-            data = self._buf + chunk
-            if not data:
-                return
-            # Split into lines; keep trailing partial line in buffer.
-            if data.endswith("\n"):
-                self._buf = ""
-                new_lines = data.splitlines()
-            else:
-                *new_lines, self._buf = data.splitlines()
-            for ln in new_lines:
-                ln = ln.strip()
-                if not ln:
-                    continue
-                if ln.startswith("HB "):
-                    self.last_hb = ln
-                if "joy2intent |" in ln:
-                    self.last_joy = ln
-                if "inputd |" in ln:
-                    self.last_inp = ln
-                if "den_si |" in ln:
-                    self.last_dev = ln
-        except FileNotFoundError:
-            # log file not yet created
-            return
-        except Exception:
-            # best-effort; don't crash setup_stack
-            self.close()
-            return
 def _is_windows() -> bool:
     return os.name == "nt"
 
@@ -111,76 +43,162 @@ def _parse_hostport(s: str, default_host: str = "127.0.0.1") -> Tuple[str, int]:
     return (host, int(port_s))
 
 
-
-def _tail_text(path: str, max_lines: int = 40) -> str:
-    """Return last `max_lines` lines of a text file (best-effort)."""
-    try:
-        p = Path(path)
-        if not p.exists():
-            return ""
-        # Read as bytes to avoid encoding crashes; decode with replacement.
-        data = p.read_bytes()
-        txt = data.decode("utf-8", errors="replace")
-        lines = txt.splitlines()
-        return "\n".join(lines[-max_lines:])
-    except Exception:
-        return ""
-
-
 def _axes_from_joy2intent(path: Path) -> List[str]:
+    """Legacy convenience: read [rig].winches from an old joy2intent config.
+
+    New boot profiles own axes; joy2intent binding configs should not.
+    We keep this helper so old configs keep working.
+    """
+    if tomllib is None:  # pragma: no cover
+        raise RuntimeError("tomllib not available (requires Python 3.11+)")
     cfg = tomllib.loads(path.read_text(encoding="utf-8"))
     rig = cfg.get("rig", {}) or {}
     winches = rig.get("winches", [])
     axes = [str(x).strip() for x in winches if str(x).strip()]
     if not axes:
-        raise ValueError(f"No [rig].winches found in {path}")
+        raise ValueError(f"No [rig].winches found in {path} (use --axes or a stack profile)")
     return axes
 
 
-def _popen(
-    name: str,
-    cmd: List[str],
-    *,
-    new_console: bool,
-    log_dir: Optional[Path],
-) -> ChildProc:
-    """Start a child process with a stable name and a per-child log file."""
+def _parse_axes_arg(s: str) -> List[str]:
+    axes = [a.strip() for a in (s or "").split(",") if a.strip()]
+    if not axes:
+        raise ValueError("--axes must be a non-empty comma-separated list")
+    return axes
 
-    log_path: Optional[Path] = None
-    stdout_handle = None
-    if log_dir is not None:
-        log_dir.mkdir(parents=True, exist_ok=True)
-        # Use a stable file name; names are unique (we include axis_id).
-        log_path = log_dir / f"{name}.log"
-        stdout_handle = open(log_path, "a", encoding="utf-8", errors="replace")
-        stdout_handle.write(f"\n--- spawn {name} @ {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
-        stdout_handle.flush()
 
-    popen_kwargs = dict(
-        stdout=stdout_handle,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-    )
-    if _is_windows() and new_console:
-        # CREATE_NEW_CONSOLE = 0x00000010
-        proc = subprocess.Popen(cmd, creationflags=0x00000010, **popen_kwargs)
+def build_stack_spec_from_args(args: argparse.Namespace) -> StackSpec:
+    """Build a StackSpec matching historical setup_stack behavior."""
+    # Determine axes.
+    axes: List[str]
+    if args.axes:
+        axes = _parse_axes_arg(args.axes)
     else:
-        proc = subprocess.Popen(cmd, **popen_kwargs)
+        axes = _axes_from_joy2intent(Path(args.joy2intent))
 
-    if stdout_handle is not None:
-        stdout_handle.write(f"pid={proc.pid} cmd={' '.join(cmd)}\n")
-        stdout_handle.flush()
-    return ChildProc(name=name, proc=proc, log_path=log_path)
+    # Determine core device telemetry bind with the old "avoid cmd port overlap" rule.
+    dev_telem_s = args.dev_telem_in or args.dev_telem_out or "127.0.0.1:52002"
+    dev_telem_bind = _parse_hostport(dev_telem_s)
+
+    cmd_lo = int(args.cmd_base)
+    cmd_hi = cmd_lo + len(axes) - 1
+    if args.dev_telem_in is None and args.dev_telem_out is None:
+        if dev_telem_bind[0] == "127.0.0.1" and dev_telem_bind[1] in range(cmd_lo, cmd_hi + 1):
+            dev_telem_bind = ("127.0.0.1", cmd_lo + 100)
+
+    hip_count = 0 if args.no_hip else (1 if args.single_hip else len(axes))
+
+    net = {
+        "bind_host": "127.0.0.1",
+        "cmd_base": int(args.cmd_base),
+        "ui_telem_base": int(args.ui_telem_base),
+        "dev_telem_in": f"{dev_telem_bind[0]}:{dev_telem_bind[1]}",
+    }
+
+    services: dict[str, ServiceSpec] = {}
+
+    # --- core ---
+    services["core"] = ServiceSpec(
+        enabled=not args.no_core,
+        module="steuerung3d.apps.core_udp_service",
+        mode="single",
+        args=[
+            "--dt",
+            str(args.core_dt),
+            "--log-level",
+            args.log_level,
+            "--dev-telem-in",
+            net["dev_telem_in"],
+            "--dev-cmd-base",
+            str(net["cmd_base"]),
+            "--dev-cmd-count",
+            str(len(axes)),
+            "--ui-telem-base",
+            str(net["ui_telem_base"]),
+            "--ui-telem-count",
+            str(hip_count if hip_count > 0 else 1),
+            # axes are repeatable flags
+            *sum((["--axis", a] for a in axes), start=[]),
+        ],
+    )
+
+    # --- DenSi fleet ---
+    services["densi"] = ServiceSpec(
+        enabled=not args.no_densi,
+        module="steuerung3d.apps.den_si",
+        mode="per_axis",
+        args=[
+            "--axis",
+            "{axis}",
+            "--dt",
+            str(args.densi_dt),
+            "--cmd-in",
+            "{net.bind_host}:{net.cmd_base+axis_index}",
+            "--telem-out",
+            "{net.dev_telem_in}",
+            "--log-level",
+            args.log_level,
+        ],
+    )
+
+    # --- HiP UI ---
+    services["hip"] = ServiceSpec(
+        enabled=not args.no_hip,
+        module="steuerung3d.apps.hi_p",
+        mode="single" if args.single_hip else "per_axis",
+        args=[
+            "--log-level",
+            args.log_level,
+            "--telem-in",
+            "{net.bind_host}:{net.ui_telem_base}" if args.single_hip else "{net.bind_host}:{net.ui_telem_base+axis_index}",
+        ],
+    )
+
+    # --- inputd ---
+    services["inputd"] = ServiceSpec(
+        enabled=not args.no_inputd,
+        module="steuerung3d.apps.inputd",
+        mode="single",
+        args=["--log-level", args.log_level],
+        config=args.inputd,
+    )
+
+    # --- joy2intent ---
+    # We intentionally keep wiring defaults inside joy2intent for now.
+    # Boot profiles can override with --raw-in/--intent-out/--winches.
+    services["joy2intent"] = ServiceSpec(
+        enabled=not args.no_joy2intent,
+        module="steuerung3d.apps.joy2intent",
+        mode="single",
+        args=["--log-level", args.log_level],
+        config=args.joy2intent,
+    )
+
+    return StackSpec(
+        name="setup_stack",
+        base_dir=Path.cwd(),
+        axes=axes,
+        net=net,
+        services=services,
+    )
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(
         prog="steuerung3d.apps.setup_stack",
-        description="Launch the full setup stack: inputd + joy2intent + core_udp_service + DenSi fleet + HiP.",
+        description="Legacy launcher: inputd + joy2intent + core_udp_service + DenSi fleet + HiP.",
     )
-    ap.add_argument("--joy2intent", default="configs/joy2intent_gamepad.toml", help="Path to joy2intent TOML.")
+    ap.add_argument(
+        "--joy2intent",
+        default="configs/joy2intent_bindings_gamepad.toml",
+        help="Path to joy2intent TOML (bindings). Legacy configs may include [rig].winches.",
+    )
     ap.add_argument("--inputd", default="configs/inputd_gamepad.toml", help="Path to inputd TOML.")
+    ap.add_argument(
+        "--axes",
+        default=None,
+        help="Comma-separated axes (overrides legacy [rig].winches in joy2intent).",
+    )
 
     ap.add_argument("--cmd-base", type=int, default=52001, help="Base UDP port for DenSi CommandIn.")
     ap.add_argument("--ui-telem-base", type=int, default=51002, help="Base UDP port for HiP TelemetryIn bind.")
@@ -190,15 +208,10 @@ def main() -> int:
         help=(
             "Core Device TelemetryIn bind host:port. DenSi instances will send telemetry to this address. "
             "If omitted, defaults to 127.0.0.1:52002 unless that overlaps the DenSi cmd port range, in which case "
-            "it will auto-shift to cmd_base+100."
+            "it auto-shifts to cmd_base+100."
         ),
     )
-    # Backward-compat alias (older wrapper called it --dev-telem-out)
-    ap.add_argument(
-        "--dev-telem-out",
-        default=None,
-        help=argparse.SUPPRESS,
-    )
+    ap.add_argument("--dev-telem-out", default=None, help=argparse.SUPPRESS)
     ap.add_argument("--densi-dt", type=float, default=0.01, help="DenSi sim timestep (s).")
     ap.add_argument("--core-dt", type=float, default=0.02, help="Core tick (s).")
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
@@ -206,11 +219,7 @@ def main() -> int:
     ap.add_argument("--no-inputd", action="store_true", help="Do not launch inputd.")
     ap.add_argument("--no-joy2intent", action="store_true", help="Do not launch joy2intent.")
     ap.add_argument("--no-hip", action="store_true", help="Do not launch HiP window(s).")
-    ap.add_argument(
-        "--single-hip",
-        action="store_true",
-        help="Launch only one HiP window (default: one HiP per axis).",
-    )
+    ap.add_argument("--single-hip", action="store_true", help="Launch only one HiP window.")
     ap.add_argument("--no-densi", action="store_true", help="Do not launch DenSi fleet.")
     ap.add_argument("--no-core", action="store_true", help="Do not launch core_udp_service.")
 
@@ -220,239 +229,24 @@ def main() -> int:
         default=_is_windows(),
         help="On Windows, launch components in new console windows (default: true on Windows).",
     )
+    ap.add_argument(
+        "--keep-sessions",
+        type=int,
+        default=5,
+        help="Keep the last N log sessions under .run/setup_stack/sessions (default: 5).",
+    )
+
     args = ap.parse_args()
+    spec = build_stack_spec_from_args(args)
 
-    joy_cfg = Path(args.joy2intent)
-    axes = _axes_from_joy2intent(joy_cfg)
-    dev_telem_s = args.dev_telem_in or args.dev_telem_out or "127.0.0.1:52002"
-    dev_telem_bind = _parse_hostport(dev_telem_s)
-
-    # Avoid overlap: cmd ports are cmd_base..cmd_base+len(axes)-1
-    cmd_lo = int(args.cmd_base)
-    cmd_hi = cmd_lo + len(axes) - 1
-    if args.dev_telem_in is None and args.dev_telem_out is None:
-        if dev_telem_bind[0] == "127.0.0.1" and dev_telem_bind[1] in range(cmd_lo, cmd_hi + 1):
-            dev_telem_bind = ("127.0.0.1", cmd_lo + 100)
-
-    # Per-child logs help a lot when a subprocess exits early (rc!=0)
-    log_dir = Path(".run") / "setup_stack"
-    log_dir.mkdir(parents=True, exist_ok=True)
-
-    procs: List[ChildProc] = []
-    try:
-        # --- core ---
-        if not args.no_core:
-            core_cmd = [
-                sys.executable,
-                "-m",
-                "steuerung3d.apps.core_udp_service",
-                "--dt",
-                str(args.core_dt),
-                "--log-level",
-                args.log_level,
-                "--dev-telem-in",
-                f"{dev_telem_bind[0]}:{dev_telem_bind[1]}",
-                "--dev-cmd-base",
-                str(args.cmd_base),
-                "--dev-cmd-count",
-                str(len(axes)),
-                "--ui-telem-base",
-                str(args.ui_telem_base),
-                "--ui-telem-count",
-                str(len(axes) if (not args.single_hip and not args.no_hip) else 1),
-            ]
-            for a in axes:
-                core_cmd.extend(["--axis", a])
-            procs.append(_popen("core", core_cmd, new_console=args.new_console, log_dir=log_dir))
-            time.sleep(0.25)
-
-        # --- DenSi fleet (one per axis) ---
-        if not args.no_densi:
-            for i, axis_id in enumerate(axes):
-                cmd_in_port = args.cmd_base + i
-                densi_cmd = [
-                    sys.executable,
-                    "-m",
-                    "steuerung3d.apps.den_si",
-                    "--axis",
-                    axis_id,
-                    "--dt",
-                    str(args.densi_dt),
-                    "--cmd-in",
-                    f"127.0.0.1:{cmd_in_port}",
-                    "--telem-out",
-                f"{dev_telem_bind[0]}:{dev_telem_bind[1]}",
-                    "--log-level",
-                    args.log_level,
-                ]
-                procs.append(_popen(f"densi-{axis_id}", densi_cmd, new_console=args.new_console, log_dir=log_dir))
-                time.sleep(0.12)
-
-        # --- HiP UI ---
-        if not args.no_hip:
-            if args.single_hip:
-                hip_cmd = [
-                    sys.executable,
-                    "-m",
-                    "steuerung3d.apps.hi_p",
-                    "--log-level",
-                    args.log_level,
-                    "--telem-in",
-                    f"127.0.0.1:{args.ui_telem_base}",
-                ]
-                procs.append(_popen(f"hip-{axes[0]}", hip_cmd, new_console=False, log_dir=log_dir))
-                time.sleep(0.15)
-            else:
-                for i, axis_id in enumerate(axes):
-                    telem_port = args.ui_telem_base + i
-                    hip_cmd = [
-                        sys.executable,
-                        "-m",
-                        "steuerung3d.apps.hi_p",
-                        "--axis",
-                        axis_id,
-                        "--telem-in",
-                        f"127.0.0.1:{telem_port}",
-                        "--log-level",
-                        args.log_level,
-                    ]
-                    procs.append(_popen(f"hip-{axis_id}", hip_cmd, new_console=False, log_dir=log_dir))
-                    time.sleep(0.12)
-
-        # --- inputd ---
-        if not args.no_inputd:
-            inputd_cmd = [
-                sys.executable,
-                "-m",
-                "steuerung3d.apps.inputd",
-                "--config",
-                str(Path(args.inputd)),
-                "--log-level",
-                args.log_level,
-            ]
-            procs.append(_popen("inputd", inputd_cmd, new_console=args.new_console, log_dir=log_dir))
-            time.sleep(0.15)
-
-        # --- joy2intent ---
-        if not args.no_joy2intent:
-            joy2intent_cmd = [
-                sys.executable,
-                "-m",
-                "steuerung3d.apps.joy2intent",
-                "--config",
-                str(joy_cfg),
-                "--log-level",
-                args.log_level,
-            ]
-            procs.append(_popen("joy2intent", joy2intent_cmd, new_console=args.new_console, log_dir=log_dir))
-            time.sleep(0.15)
-
-        print(
-            "\n=== setup_stack running ===\n"
-            f"axes={axes}\n"
-            f"core_udp_service: intents in 51001, ui telem out {args.ui_telem_base}.., dev cmd out {args.cmd_base}..{args.cmd_base + len(axes) - 1}, dev telem in {dev_telem_bind[0]}:{dev_telem_bind[1]}\n"
-            f"DenSi telemetry out -> {dev_telem_bind[0]}:{dev_telem_bind[1]}\n"
-            f"joy2intent config: {joy_cfg}\n"
-            f"inputd config: {args.inputd}\n"
-            "Ctrl+C to stop.\n",
-            file=sys.stderr,
-        )
-
-        # --- birds-eye view (console): summarize what the stack is doing (1 Hz) ---
-        # Low-overhead: incrementally tail the per-process session log files (no full-file reads).
-        birds_next_s = time.monotonic() + 1.0
-        birds_prev_line = ""
-
-        axis0 = axes[0] if axes else ""
-
-        # Create tailers once log files exist
-        tailers: dict[str, _LogTailer] = {}
-
-        def _ensure_tailer(key: str, path: Optional[Path]) -> None:
-            if not path:
-                return
-            if key not in tailers:
-                tailers[key] = _LogTailer(path)
-
-
-        while True:
-            # If any child exits, report it (useful during dev).
-            for child in list(procs):
-                rc = child.proc.poll()
-                if rc is not None:
-                    procs.remove(child)
-                    msg = f"[setup_stack] child exited name={child.name} pid={child.proc.pid} rc={rc}"
-                    if child.log_path:
-                        msg += f" log={child.log_path}"
-                    print(msg, file=sys.stderr)
-                    # Print a short tail to make early-exit debugging fast.
-                    if child.log_path:
-                        tail = _tail_text(child.log_path, max_lines=40)
-                        if tail.strip():
-                            print("[setup_stack] --- last log lines ---", file=sys.stderr)
-                            print(tail, file=sys.stderr)
-                            print("[setup_stack] --- end ---", file=sys.stderr)
-            # Birds-eye line (once per second). Prefer the core heartbeat ("HB ...").
-            now_s = time.monotonic()
-
-            # Poll tailers (best-effort) – this is cheap: only reads newly appended bytes.
-            for c in procs:
-                _ensure_tailer(c.name, c.log_path)
-            for t in list(tailers.values()):
-                t.poll()
-
-            if now_s >= birds_next_s:
-                birds_next_s = now_s + 1.0
-
-                parts: List[str] = []
-                t_core = tailers.get("core")
-                t_joy  = tailers.get("joy2intent")
-                t_inp  = tailers.get("inputd")
-                t_dev  = tailers.get(f"densi-{axis0}") if axis0 else None
-
-                if t_core and t_core.last_hb:
-                    parts.append(f"core: {t_core.last_hb}")
-                if t_joy and t_joy.last_joy:
-                    parts.append(f"joy: {t_joy.last_joy}")
-                if t_inp and t_inp.last_inp:
-                    parts.append(f"in: {t_inp.last_inp}")
-                if t_dev and t_dev.last_dev:
-                    parts.append(f"dev: {t_dev.last_dev}")
-
-                if parts:
-                    line = "[birds] " + " | ".join(parts)
-                    # avoid console spam if nothing changes (still print at least every ~5s)
-                    if line != birds_prev_line or int(now_s) % 5 == 0:
-                        # keep it readable even in narrow consoles
-                        if len(line) > 420:
-                            line = line[:417] + "..."
-                        print(line, file=sys.stderr)
-                        birds_prev_line = line
-            time.sleep(0.5)
-
-        # unreachable
-        # return 0
-    except KeyboardInterrupt:
-        return 0
-    finally:
-        try:
-            for t in list(locals().get('tailers', {}).values()):
-                try:
-                    t.close()
-                except Exception:
-                    pass
-        except Exception:
-            pass
-        for child in procs:
-            try:
-                child.proc.terminate()
-            except Exception:
-                pass
-        for child in procs:
-            try:
-                child.proc.wait(timeout=1.5)
-            except Exception:
-                pass
+    rt = StackRuntime(
+        spec,
+        run_base=Path(".run"),
+        keep_last_sessions=max(1, int(args.keep_sessions)),
+        new_console=bool(args.new_console),
+    )
+    rt.start()
+    return rt.run_forever()
 
 
 if __name__ == "__main__":

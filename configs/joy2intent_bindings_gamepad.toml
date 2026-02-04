@@ -1,0 +1,48 @@
+[mode]
+# Joystick control sub-mode (not the core safety Mode)
+default = "setup_manual"
+
+[limits.manual]
+# Max jog speed for a single winch (m/s or your chosen axis units)
+max_winch_mps = 0.30
+# Fine mode multiplier (when fine button held)
+fine_scale = 0.20
+
+[limits.sync]
+# Max cartesian jog speeds (placeholder until kinematics layer exists)
+max_v = { x = 0.60, y = 0.60, z = 0.40 }
+
+[bindings.axes]
+# Axis indices as reported by your joystick.
+# Use:  python -m steuerung3d.apps.inputd --list
+# and/or python -m steuerung3d.apps.inputd --dump
+manual_jog = 1
+x = 0
+y = 1
+z = 2
+
+[bindings.buttons]
+# Button indices as reported by your joystick.
+# Typical Xbox layout: A=0, B=1, X=2, Y=3, LB=4, RB=5, Back=6, Start=7
+# Adjust as needed.
+deadman = 5
+# setup_manual: momentary multi-select winches (hold to select)
+select_0 = 0
+select_1 = 1
+select_2 = 2
+select_3 = 3
+
+# fine mode (user muscle memory)
+fine = 7
+
+# optional extras (uncomment + adjust if you want them)
+# mode_toggle = 6
+# smooth_stop = 7
+
+[filters]
+# Deadzone and expo are applied after reading axes.
+deadzone = 0.08
+expo = 0.25
+# Optional per-logical-axis inversion.
+# Keys: manual_jog, x, y, z
+invert = { manual_jog = true, y = true }

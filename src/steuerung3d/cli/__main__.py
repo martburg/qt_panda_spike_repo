@@ -1,0 +1,239 @@
+"""Unified entry point for booting Steuerung3D stacks.
+
+Primary commands:
+  python -m steuerung3d up --profile dev_sim
+  python -m steuerung3d plan --profile dev_sim
+  python -m steuerung3d status --profile dev_sim
+  python -m steuerung3d down --profile dev_sim
+  python -m steuerung3d logs core --profile dev_sim --follow
+  python -m steuerung3d doctor --profile dev_sim
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import signal
+import time
+from pathlib import Path
+
+from steuerung3d.core.stack_meta import find_latest_session_dir, load_meta
+from steuerung3d.core.stack_runtime import expand_processes
+
+from steuerung3d.core.stack_loader import load_stack_profile
+from steuerung3d.core.stack_runtime import StackRuntime
+
+
+def _stack_run_base(name: str) -> Path:
+    return Path(".run") / name
+
+
+def _default_profile_path(name_or_path: str) -> Path:
+    p = Path(name_or_path)
+    if p.suffix.lower() == ".toml" or p.exists():
+        return p
+    # name -> configs/stacks/<name>.toml
+    return Path("configs") / "stacks" / f"{name_or_path}.toml"
+
+
+def cmd_up(args: argparse.Namespace) -> int:
+    profile = _default_profile_path(args.profile)
+    spec = load_stack_profile(profile, overrides=args.override, sets=args.set)
+    rt = StackRuntime(spec, keep_last_sessions=args.keep_last_sessions, new_console=bool(args.new_console))
+    session_dir = rt.start()
+    print(f"[stack] started: {spec.name} (session {session_dir})")
+    return rt.run_forever()
+
+
+def cmd_plan(args: argparse.Namespace) -> int:
+    profile = _default_profile_path(args.profile)
+    spec = load_stack_profile(profile, overrides=args.override, sets=args.set)
+    # Use a temporary session dir name (not created) for stable log path previews.
+    session_dir = _stack_run_base(spec.name) / "sessions" / "PLAN"
+    plan = expand_processes(spec, session_dir=session_dir)
+    for p in plan:
+        print(f"- {p.name}")
+        print(f"    log: {p.log_path}")
+        print(f"    argv: {' '.join(p.argv)}")
+    return 0
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    profile = _default_profile_path(args.profile)
+    spec = load_stack_profile(profile)
+    base = _stack_run_base(spec.name)
+    session = find_latest_session_dir(base)
+    if not session:
+        print(f"[status] no sessions found in {base}")
+        return 1
+    meta = load_meta(session)
+    alive = meta.is_running()
+    state = "RUNNING" if alive else "STOPPED"
+    print(f"[status] {meta.stack_name}: {state} (session {session})")
+    for name, c in meta.children.items():
+        is_up = "up" if (alive and c.pid and _pid_alive(c.pid)) else "down"
+        print(f"  - {name:<16} pid={c.pid:<6} {is_up} rc={c.returncode}")
+    return 0 if alive else 2
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def cmd_down(args: argparse.Namespace) -> int:
+    profile = _default_profile_path(args.profile)
+    spec = load_stack_profile(profile)
+    base = _stack_run_base(spec.name)
+    session = find_latest_session_dir(base)
+    if not session:
+        print(f"[down] no sessions found in {base}")
+        return 1
+    meta = load_meta(session)
+    # Terminate children (best-effort). We do not hard-kill by default.
+    n = 0
+    for c in meta.children.values():
+        if c.pid and _pid_alive(c.pid):
+            try:
+                os.kill(c.pid, signal.SIGTERM)
+                n += 1
+            except Exception:
+                pass
+    print(f"[down] sent terminate to {n} processes (session {session})")
+    return 0
+
+
+def cmd_logs(args: argparse.Namespace) -> int:
+    profile = _default_profile_path(args.profile)
+    spec = load_stack_profile(profile)
+    base = _stack_run_base(spec.name)
+    session = find_latest_session_dir(base)
+    if not session:
+        print(f"[logs] no sessions found in {base}")
+        return 1
+    log_path = session / f"{args.service}.log"
+    if not log_path.exists():
+        print(f"[logs] no log for {args.service} in {session}")
+        return 1
+    if not args.follow:
+        print(log_path.read_text(encoding="utf-8", errors="replace")[-8000:])
+        return 0
+    # follow
+    pos = 0
+    try:
+        while True:
+            if log_path.exists():
+                with log_path.open("r", encoding="utf-8", errors="replace") as f:
+                    f.seek(pos)
+                    chunk = f.read()
+                    pos = f.tell()
+                if chunk:
+                    print(chunk, end="")
+            time.sleep(0.25)
+    except KeyboardInterrupt:
+        return 0
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    profile = _default_profile_path(args.profile)
+    spec = load_stack_profile(profile, overrides=args.override, sets=args.set)
+    session_dir = _stack_run_base(spec.name) / "sessions" / "PLAN"
+    plan = expand_processes(spec, session_dir=session_dir)
+    problems: list[str] = []
+
+    # Check modules importable
+    for svc in spec.services.values():
+        if not svc.enabled:
+            continue
+        try:
+            __import__(svc.module)
+        except Exception as e:
+            problems.append(f"service module import failed: {svc.module}: {e}")
+
+    # Collect host:port tokens from argv heuristically
+    hp_re = re.compile(r"^([^\s:]+):(\d{2,5})$")
+    seen: dict[str, str] = {}
+    for p in plan:
+        for a in p.argv:
+            m = hp_re.match(a)
+            if not m:
+                continue
+            key = f"{m.group(1)}:{m.group(2)}"
+            if key in seen:
+                problems.append(f"port collision: {key} used by {seen[key]} and {p.name}")
+            else:
+                seen[key] = p.name
+
+    if problems:
+        print("[doctor] problems found:")
+        for pr in problems:
+            print(f"  - {pr}")
+        return 2
+
+    print(f"[doctor] OK: {spec.name} ({len(plan)} processes, {len(seen)} endpoints)")
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    ap = argparse.ArgumentParser(prog="steuerung3d", add_help=True)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    up = sub.add_parser("up", help="Start a configured stack profile")
+    up.add_argument("--profile", required=True, help="Profile name or path (TOML)")
+    up.add_argument(
+        "--override",
+        action="append",
+        default=None,
+        help="Optional override TOML (can be repeated; applied in order)",
+    )
+    up.add_argument(
+        "--set",
+        action="append",
+        default=None,
+        help='Inline override key=value (can be repeated), e.g. --set net.cmd_base=53001',
+    )
+    up.add_argument("--keep-last-sessions", type=int, default=5, help="How many sessions to keep")
+    up.add_argument("--new-console", action="store_true", help="Windows: start each child in a new console window")
+    up.set_defaults(_fn=cmd_up)
+
+    plan = sub.add_parser("plan", help="Print the expanded process plan without starting it")
+    plan.add_argument("--profile", required=True, help="Profile name or path (TOML)")
+    plan.add_argument("--override", action="append", default=None, help="Override TOML (repeatable)")
+    plan.add_argument("--set", action="append", default=None, help="Inline override key=value (repeatable)")
+    plan.set_defaults(_fn=cmd_plan)
+
+    status = sub.add_parser("status", help="Show status for the latest session")
+    status.add_argument("--profile", required=True, help="Profile name or path (TOML)")
+    status.set_defaults(_fn=cmd_status)
+
+    down = sub.add_parser("down", help="Terminate processes from the latest session")
+    down.add_argument("--profile", required=True, help="Profile name or path (TOML)")
+    down.set_defaults(_fn=cmd_down)
+
+    logs = sub.add_parser("logs", help="Show or follow logs from the latest session")
+    logs.add_argument("service", help="Service log name (e.g. core, densi-Anton, hip)")
+    logs.add_argument("--profile", required=True, help="Profile name or path (TOML)")
+    logs.add_argument("--follow", action="store_true", help="Follow (tail -f)")
+    logs.set_defaults(_fn=cmd_logs)
+
+    doctor = sub.add_parser("doctor", help="Validate profile/modules/ports before starting")
+    doctor.add_argument("--profile", required=True, help="Profile name or path (TOML)")
+    doctor.add_argument("--override", action="append", default=None, help="Override TOML (repeatable)")
+    doctor.add_argument("--set", action="append", default=None, help="Inline override key=value (repeatable)")
+    doctor.set_defaults(_fn=cmd_doctor)
+
+    return ap
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = build_parser()
+    ns = ap.parse_args(argv)
+    return int(ns._fn(ns))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

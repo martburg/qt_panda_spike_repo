@@ -1,0 +1,85 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from steuerung3d.core.stack_loader import load_stack_profile
+from steuerung3d.core.stack_runtime import expand_processes
+
+
+def test_dev_sim_profile_loads_and_expands(tmp_path: Path):
+    profile = Path("configs/stacks/dev_sim.toml")
+    spec = load_stack_profile(profile)
+    assert spec.name == "dev_sim"
+    assert spec.axes == ["Anton", "Debby", "Cecil", "Burt"]
+
+    procs = expand_processes(spec, session_dir=tmp_path)
+    names = [p.name for p in procs]
+
+    # Start-order heuristic: core first, densis, hip, inputd, joy2intent.
+    assert names[0] == "core"
+    assert "hip" in names
+    assert "inputd" in names
+    assert "joy2intent" in names
+
+    # Per-axis fanout
+    assert "densi-Anton" in names
+    assert "densi-Debby" in names
+    assert "densi-Cecil" in names
+    assert "densi-Burt" in names
+
+    # Verify cmd ports are computed correctly for per-axis densis.
+    densi_anton = next(p for p in procs if p.name == "densi-Anton")
+    assert "--cmd-in" in densi_anton.argv
+    cmd_in = densi_anton.argv[densi_anton.argv.index("--cmd-in") + 1]
+    assert cmd_in.endswith(":52001")
+
+    densi_burt = next(p for p in procs if p.name == "densi-Burt")
+    cmd_in_b = densi_burt.argv[densi_burt.argv.index("--cmd-in") + 1]
+    assert cmd_in_b.endswith(":52004")
+
+
+def test_profile_missing_axes_is_error(tmp_path: Path):
+    bad = tmp_path / "bad.toml"
+    bad.write_text(
+        """
+[stack]
+name = "bad"
+
+[services.core]
+enabled = true
+module = "steuerung3d.apps.core_udp_service"
+args = []
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        load_stack_profile(bad)
+
+
+def test_override_toml_rewrites_ports(tmp_path: Path):
+    """Override TOML should take precedence over base for scalar fields."""
+    profile = Path("configs/stacks/dev_sim.toml")
+    ov = tmp_path / "override.toml"
+    ov.write_text(
+        """
+[net]
+cmd_base = 53001
+""",
+        encoding="utf-8",
+    )
+    spec = load_stack_profile(profile, overrides=[ov])
+    procs = expand_processes(spec, session_dir=tmp_path)
+    densi_anton = next(p for p in procs if p.name == "densi-Anton")
+    cmd_in = densi_anton.argv[densi_anton.argv.index("--cmd-in") + 1]
+    assert cmd_in.endswith(":53001")
+
+
+def test_set_disables_service(tmp_path: Path):
+    profile = Path("configs/stacks/dev_sim.toml")
+    spec = load_stack_profile(profile, sets=["services.hip.enabled=false"])
+    procs = expand_processes(spec, session_dir=tmp_path)
+    names = [p.name for p in procs]
+    assert "hip" not in names
