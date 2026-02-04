@@ -900,7 +900,12 @@ class HiPController:
         if self._txt_hdr_banner_right is not None:
             self._txt_hdr_banner_right.setText(banner)
 
-        online_state = "ok" if getattr(main, "output_powered", False) else None
+        # Header ONLINE dot should represent the *link/connection* to Core/PLC telemetry.
+        # 30 is an empirically-derived threshold to allow for some jitter but still indicate staleness reasonably quickly.
+        # 500 is a sanity cap to avoid showing "good" for wildly stale telemetry 
+        # (e.g. if lifetick_age is erroneously large due to a bug or overflow).
+        # both numbers are somewhat arbitrary and should be adjusted based on real-world experience.
+        online_state = "good" if (age <= 500) and (age > 30) else "bad"
 
         estop_word = int(getattr(snap, "estop_status_word", 0) or 0)
         estop_logical = decode_estop_word(estop_word)
@@ -910,8 +915,8 @@ class HiPController:
 
         self._update_taster_edge(axis_id, taster)
 
-        fbt_state = "ok" if taster else ("warn" if online_state else None)
-        ready_state = "ok" if ready else ("warn" if online_state else None)
+        fbt_state = "good" if taster else "warn"
+        ready_state = "good" if ready else "warn"
 
         brk1_raw = bool(estop_logical.get("brk1_ok", False))
         brk2_raw = bool(estop_logical.get("brk2_ok", False))
@@ -919,8 +924,8 @@ class HiPController:
         brk1_ok = self._brake_ok_display(brk_ok_raw=brk1_raw, taster=taster, axis_id=axis_id)
         brk2_ok = self._brake_ok_display(brk_ok_raw=brk2_raw, taster=taster, axis_id=axis_id)
 
-        brk1_state = "ok" if brk1_ok else ("bad" if online_state else None)
-        brk2_state = "ok" if brk2_ok else ("bad" if online_state else None)
+        brk1_state = "good" if brk1_ok else "bad"
+        brk2_state = "good" if brk2_ok else "bad"
 
         self._set_led_by_name("dotHdrOnline", state=online_state)
         self._set_led_by_name("dotHdrReady", state=ready_state)

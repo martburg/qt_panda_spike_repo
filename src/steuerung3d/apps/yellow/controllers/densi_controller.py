@@ -141,6 +141,10 @@ class DenSiController:
         self.device = SimDevice(plant=SimAxisPlant())
         self._last_cmd: CommandFrame | None = None
 
+        # Online heuristics: DenSi is considered "online" once we've seen at least one
+        # command frame from Core/HiP recently.
+        self._seen_first_cmd: bool = False
+
         # Lifetick tracing / log throttling
         self._lt_last_telem_log_s: float = 0.0
         self._lt_last_cmd_log_s: float = 0.0
@@ -150,14 +154,9 @@ class DenSiController:
         # LOGICAL injected bits (invert handled by encode/decode)
         self._inj_bits = {k: False for k in ESTOP_SPECS.keys()}
 
-        # safe defaults:
-        for k in ESTOP_OK_KEYS:
-            self._inj_bits[k] = False          # OK chain healthy
-
-        for k in ESTOP_CAUSE_KEYS:
-            self._inj_bits[k] = False         # no trip cause
-
-        self._inj_estop_word = encode_estop_word(self._inj_bits)
+        # Start in a stable "GO" state so HiP can always request a reset.
+        # (Otherwise btnEStopReset stays disabled and you can get stuck.)
+        self._apply_go_state()
 
         self._estop_latched = False
         self._safety_ok = True  # placeholder
@@ -307,6 +306,27 @@ class DenSiController:
         w.style().unpolish(w)
         w.style().polish(w)
         w.update()
+
+    def _render_header_online_dot(self) -> None:
+        """Drive the header 'Online' dot (dotHdrOnline).
+
+        On the DenSi side we don't have a drive status-word like HiP.
+        Instead we treat the device as 'online' once it is actively
+        receiving command frames from Core/HiP.
+        """
+
+        if not self._seen_first_cmd:
+            self._set_led_state_by_name("dotHdrOnline", None)
+            return
+
+        now_ns = time.monotonic_ns()
+        last_ns = self._last_cmd_ns or 0
+        age_s = (now_ns - last_ns) / 1e9 if last_ns else 1e9
+
+        # Green while frames are flowing, amber when stale.
+        # (Tune threshold as needed; 1s is a good first cut for dt=10ms.)
+        state = "good" if age_s <= 1.0 else "warn"
+        self._set_led_state_by_name("dotHdrOnline", state)
 
     # ----- parameter helpers -----
     def _find_line_edit(self, object_name: str) -> QLineEdit | None:
@@ -482,12 +502,10 @@ class DenSiController:
         self._render_estop_word_to_ui(self._inj_estop_word)
 
     def _clear_inj_estop_all(self) -> None:
-        # Clear ALL logical bits to False
-        for k in self._inj_bits.keys():
-            self._inj_bits[k] = False
-        self._inj_estop_word = encode_estop_word(self._inj_bits)
-        log.info("inject: CLEAR ALL bits (word=0x%08X)", self._inj_estop_word)
-        self._render_estop_word_to_ui(self._inj_estop_word)
+        # Restore a stable "GO" state (healthy chain) instead of clearing everything.
+        # This keeps ResetAble/OK bits true and avoids painting the operator into a corner.
+        self._apply_go_state()
+        log.info("inject: GO state (word=0x%08X)", self._inj_estop_word)
 
     # ----- runtime -----
 
@@ -503,6 +521,7 @@ class DenSiController:
         if frames:
             self._last_cmd = frames[-1]
             self._last_cmd_ns = time.monotonic_ns()
+            self._seen_first_cmd = True
             self._hb.inc("cmd_rx", len(frames))
             log.debug(
                 "rx cmd: tick=%s estop_reset=%s fault=%s mode=%s",
@@ -522,6 +541,9 @@ class DenSiController:
                 axes={},
                 estop_reset=False,
             )
+
+        # Header online dot: green when we are receiving command frames, amber when stale.
+        self._render_header_online_dot()
 
         # Edge logs: command mode / reset changes
         try:

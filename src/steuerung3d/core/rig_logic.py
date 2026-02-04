@@ -46,7 +46,7 @@ def note_densi_seen(state: MachineState, device_id: str, *, device_tick: int | N
 def densi_online(state: MachineState, device_id: str) -> bool:
     ensure_densi(state, device_id)
     d = state.densi_registry[device_id]
-    timeout = int(getattr(state, "densi_offline_after_ticks", 40))
+    timeout = int(getattr(state, "densi_offline_after_ticks", 200))
     if d.last_seen_core_tick < 0:
         return False
     return (int(state.tick) - int(d.last_seen_core_tick)) <= timeout

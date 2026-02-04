@@ -32,6 +32,11 @@ class MachineState:
     tick: int = 0
     t_s: float = 0.0
 
+    # DenSi device offline detection.
+    # Default is intentionally conservative to tolerate ~100-200ms RTT + jitter.
+    # (Core tick is typically 10ms -> 200 ticks ~= 2.0s)
+    densi_offline_after_ticks: int = 200
+
     mode: Mode = Mode.IDLE
 
     axes: Dict[str, AxisState] = field(default_factory=dict)

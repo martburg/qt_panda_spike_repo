@@ -85,7 +85,7 @@ class TelemetrySnapshot:
 
         densis = {}
         try:
-            offline_after = int(getattr(state, "densi_offline_after_ticks", 40))
+            offline_after = int(getattr(state, "densi_offline_after_ticks", 200))
             for dev_id, d in dict(getattr(state, "densi_registry", {})).items():
                 age = int(state.tick) - int(getattr(d, "last_seen_core_tick", -10**9))
                 online = age <= offline_after
