@@ -23,6 +23,7 @@ from .run_dirs import make_session_dir
 from .stack_render import make_context, render_argv
 from .stack_spec import ProcessSpec, ServiceSpec, StackSpec
 from .stack_meta import write_meta
+from .status import StatusCollector, env_for_process
 
 
 def _now_ts() -> str:
@@ -151,10 +152,18 @@ class StackRuntime:
         self.session_dir: Optional[Path] = None
         self.processes: List[RunningProcess] = []
         self.tailers: Dict[str, _LogTailer] = {}
+        self.status: Optional[StatusCollector] = None
 
     def start(self) -> Path:
         base = self.run_base / self.spec.name
         self.session_dir = make_session_dir(base, keep_last=self.keep_last_sessions)
+
+        status_in = (self.spec.net or {}).get("status_in")
+        if status_in:
+            try:
+                self.status = StatusCollector(bind=str(status_in))
+            except Exception:
+                self.status = None
 
         plan = expand_processes(self.spec, session_dir=self.session_dir)
 
@@ -197,7 +206,22 @@ class StackRuntime:
         log_f = p.log_path.open("w", encoding="utf-8")
 
         env = os.environ.copy()
-        env.update(p.env or {})
+
+        # Inject structured-status env so children can emit heartbeats (side-channel).
+        status_out = (self.spec.net or {}).get("status_in")
+        if status_out:
+            svc_name, inst = (p.name.split("-", 1) + [""])[:2]
+            env.update(
+                env_for_process(
+                    stack_name=self.spec.name,
+                    service_name=svc_name,
+                    instance=inst,
+                    status_out=str(status_out),
+                    extra_env=(p.env or {}),
+                )
+            )
+        else:
+            env.update(p.env or {})
 
         popen_kwargs = dict(stdout=log_f, stderr=subprocess.STDOUT, cwd=str(self.spec.base_dir), env=env)
         if self.new_console and os.name == "nt":
@@ -239,10 +263,29 @@ class StackRuntime:
 
     def _birds_eye_line(self) -> str:
         parts: List[str] = []
-        for name, t in self.tailers.items():
-            t.poll()
-            if t.last_line:
-                parts.append(f"{name}: {t.last_line[:120]}")
+
+        # Prefer structured status heartbeats when available.
+        if self.status:
+            self.status.poll()
+            for rp in self.processes:
+                svc, inst = (rp.spec.name.split("-", 1) + [""])[:2]
+                sm = self.status.get(svc, inst)
+                if sm:
+                    age = self.status.age_s(svc, inst)
+                    age_ms = int((age or 0.0) * 1000.0)
+                    parts.append(f"{rp.spec.name}: {sm.level} {sm.summary} ({age_ms}ms)")
+                else:
+                    t = self.tailers.get(rp.spec.name)
+                    if t:
+                        t.poll()
+                        if t.last_line:
+                            parts.append(f"{rp.spec.name}: {t.last_line[:120]}")
+        else:
+            for name, t in self.tailers.items():
+                t.poll()
+                if t.last_line:
+                    parts.append(f"{name}: {t.last_line[:120]}")
+
         if not parts:
             return ""
         return "[birds] " + " | ".join(parts[:6])

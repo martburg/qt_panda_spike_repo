@@ -16,6 +16,12 @@ from steuerung3d.core.telemetry import TelemetrySnapshot
 
 from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
 
+# Optional structured status heartbeat (used by stack supervisor birds-eye)
+try:
+    from steuerung3d.core.status import StatusEmitter  # type: ignore
+except Exception:  # pragma: no cover
+    StatusEmitter = None  # type: ignore
+
 from steuerung3d.protocol.estop_bits import (
     ESTOP_SPECS,
     ESTOP_CAUSE_KEYS,
@@ -89,6 +95,7 @@ class DenSiController:
     telemetry_out: TelemetryOut
     axis_ids: list[str]
     dt_s: float = 0.01
+    stale_after_ms: int = 500
 
 
     def __post_init__(self) -> None:
@@ -98,6 +105,12 @@ class DenSiController:
         self._hb = Heartbeat("den_si", interval_s=1.0)
         self._ch = ChangeTracker()
         self._last_cmd_ns: int | None = None
+
+        # Structured status heartbeat (side-channel for supervisor birds-eye; PLC packets unchanged)
+        self._status = StatusEmitter.from_env(default_service="den_si") if StatusEmitter else None
+        self._last_mode: str = ""
+        self._last_estop: bool = False
+        self._last_fault: bool = False
 
         # Legacy TimeTick display on device side:
         # show (lifetick_tx - lifetick_rx) in milliseconds (WORD wrap).
@@ -507,6 +520,44 @@ class DenSiController:
         self._apply_go_state()
         log.info("inject: GO state (word=0x%08X)", self._inj_estop_word)
 
+
+    def _emit_status(self, now_ns: int) -> None:
+        """Emit a compact structured heartbeat for the supervisor birds-eye view."""
+        if not getattr(self, "_status", None):
+            return
+
+        age_ms: float | None
+        if self._last_cmd_ns is None:
+            age_ms = None
+        else:
+            age_ms = (now_ns - self._last_cmd_ns) / 1_000_000.0
+
+        stale = (age_ms is None) or (age_ms >= float(self.stale_after_ms))
+        level = "ERR" if (self._last_estop or self._last_fault) else ("WARN" if stale else "OK")
+        axis = self.axis_ids[0] if self.axis_ids else ""
+        mode = self._last_mode or ""
+        online = bool(self._seen_first_cmd) and (not stale)
+        age_disp = "NA" if age_ms is None else f"{age_ms:.0f}"
+        summary = f"axis={axis or '-'} mode={mode or '-'} online={int(online)} age_ms={age_disp}"
+
+        try:
+            self._status.emit_every(
+                0.5,
+                level=level,
+                summary=summary,
+                axis=axis,
+                mode=mode,
+                online=bool(online),
+                age_ms=(-1 if age_ms is None else float(age_ms)),
+                stale=bool(stale),
+                estop=bool(self._last_estop),
+                fault=bool(self._last_fault),
+                tick=int(getattr(self.state, "tick", 0) or 0),
+            )
+        except Exception:
+            pass
+
+
     # ----- runtime -----
 
     def start(self) -> None:
@@ -755,6 +806,10 @@ class DenSiController:
         if self._last_cmd_ns is not None:
             self._hb.set("cmd_age_ms", int((time.monotonic_ns() - self._last_cmd_ns) / 1_000_000.0))
         self._hb.emit(log)
+        self._last_mode = str(getattr(self._last_cmd, "mode", "") or "")
+        self._last_estop = bool(getattr(self._last_cmd, "estop", False))
+        self._last_fault = bool(getattr(self._last_cmd, "fault", False))
+        self._emit_status(time.monotonic_ns())
 
         log.debug("device_tick=%s", self.state.axes[next(iter(self.state.axes))].meta.get("device_tick"))
 

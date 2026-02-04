@@ -10,6 +10,8 @@ from typing import Tuple, List
 from steuerung3d.util.log_context import install_log_context
 from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
 
+from steuerung3d.core.status import StatusEmitter
+
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
@@ -139,6 +141,10 @@ def main() -> int:
     )
     install_log_context(role="core")
     log.info("log level = %s", args.log_level.upper())
+
+    # Optional structured heartbeat (supervisor birds-eye). Controlled by env:
+    #   ST3D_STATUS_OUT, ST3D_STACK_NAME, ST3D_SERVICE_NAME, ST3D_INSTANCE
+    status = StatusEmitter.from_env(default_service="core")
 
     # --- UDP endpoints ---
     op_intent_in = UdpIntentIn.bind(("127.0.0.1", 51001))
@@ -435,6 +441,49 @@ def main() -> int:
         last_seen["ui_telem_ts"] = time.monotonic()
 
         log.debug("tx ui telem: tick=%s estop=%s fault=%s", snap.tick, snap.estop, snap.fault)
+
+        # Structured heartbeat for supervisor birds-eye (PLC telemetry remains unchanged).
+        if status is not None:
+            try:
+                now = time.monotonic()
+                age_int = None if last_seen["intent_ts"] is None else (now - float(last_seen["intent_ts"]))
+                age_dev = None if last_seen["dev_telem_ts"] is None else (now - float(last_seen["dev_telem_ts"]))
+                age_cmd = None if last_seen["cmd_ts"] is None else (now - float(last_seen["cmd_ts"]))
+                age_ui  = None if last_seen["ui_telem_ts"] is None else (now - float(last_seen["ui_telem_ts"]))
+
+                estop_v = bool(getattr(snap, "estop", False))
+                fault_v = bool(getattr(snap, "fault", False))
+                mode_v = getattr(getattr(snap, "mode", ""), "value", getattr(snap, "mode", ""))
+
+                # Simple policy: ERR on estop/fault; WARN on stale inputs; else OK.
+                stale = False
+                for a in (age_int, age_dev):
+                    if a is not None and a > 2.0:
+                        stale = True
+                level = "ERR" if (estop_v or fault_v) else ("WARN" if stale else "OK")
+
+                summary = (
+                    f"tick={int(getattr(snap, 'tick', 0))} mode={mode_v} "
+                    f"estop={int(estop_v)} fault={int(fault_v)} "
+                    f"age_int_ms={-1 if age_int is None else int(age_int*1000)} "
+                    f"age_dev_ms={-1 if age_dev is None else int(age_dev*1000)}"
+                )
+
+                status.emit_every(
+                    0.5,
+                    level=level,
+                    summary=summary,
+                    tick=int(getattr(snap, "tick", 0) or 0),
+                    mode=str(mode_v),
+                    estop=estop_v,
+                    fault=fault_v,
+                    age_int_ms=None if age_int is None else age_int * 1000.0,
+                    age_dev_ms=None if age_dev is None else age_dev * 1000.0,
+                    age_cmd_ms=None if age_cmd is None else age_cmd * 1000.0,
+                    age_ui_ms=None if age_ui is None else age_ui * 1000.0,
+                )
+            except Exception:
+                pass
 
     eng = CoreEngine(
         timebase=tb,

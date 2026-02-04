@@ -10,6 +10,7 @@ bind_host = "127.0.0.1"
 cmd_base = 52001
 ui_telem_base = 51002
 dev_telem_in = "127.0.0.1:52020"
+status_in = "127.0.0.1:51200"  # supervisor birds-eye heartbeat
 raw_in = "127.0.0.1:50100"      # inputd -> joy2intent
 intent_out = "127.0.0.1:51001"  # joy2intent -> core
 

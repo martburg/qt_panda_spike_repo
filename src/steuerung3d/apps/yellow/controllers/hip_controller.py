@@ -37,6 +37,12 @@ from steuerung3d.protocol.estop_bits import (
 from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 from steuerung3d.util.tick import compute_time_tick
 
+# Optional structured status heartbeat (used by stack supervisor birds-eye)
+try:
+    from steuerung3d.core.status import StatusEmitter  # type: ignore
+except Exception:  # pragma: no cover
+    StatusEmitter = None  # type: ignore
+
 from .bindings import YellowBindings
 from .ports import IntentOut, TelemetryIn
 
@@ -150,6 +156,12 @@ class HiPController:
         # Logging helpers: 1 Hz heartbeat + edge logs.
         self._hb = Heartbeat("hi_p", interval_s=1.0)
         self._ch = ChangeTracker()
+
+        # Structured status heartbeat (side-channel for supervisor birds-eye; PLC packets unchanged)
+        self._status = StatusEmitter.from_env(default_service="hi_p") if StatusEmitter else None
+        self._last_mode: str = ""
+        self._last_estop: bool = False
+        self._last_fault: bool = False
 
         self._seen_first_telem = False
         self._last_rx_ns: int | None = None
@@ -776,6 +788,44 @@ class HiPController:
         self._pending_commit_group = ""
         self._pending_commit_values = {}
 
+
+    def _emit_status(self, now_ns: int) -> None:
+        """Emit a compact structured heartbeat for the supervisor birds-eye view.
+
+        This is a best-effort side-channel (UDP JSON) and does not affect PLC telemetry.
+        """
+        if not getattr(self, "_status", None):
+            return
+        age_ms: float | None
+        if self._last_rx_ns is None:
+            age_ms = None
+        else:
+            age_ms = (now_ns - self._last_rx_ns) / 1_000_000.0
+
+        stale = (age_ms is None) or (age_ms >= float(self.stale_after_ms))
+        level = "ERR" if (self._last_estop or self._last_fault) else ("WARN" if stale else "OK")
+        axis = self._selected_axis or self._fixed_axis or ""
+        mode = self._last_mode or ""
+        age_disp = "NA" if age_ms is None else f"{age_ms:.0f}"
+        summary = f"axis={axis or '-'} mode={mode or '-'} age_ms={age_disp}"
+
+        try:
+            self._status.emit_every(
+                0.5,
+                level=level,
+                summary=summary,
+                axis=axis,
+                mode=mode,
+                age_ms=(-1 if age_ms is None else float(age_ms)),
+                stale=bool(stale),
+                estop=bool(self._last_estop),
+                fault=bool(self._last_fault),
+            )
+        except Exception:
+            # Never let status emission break the UI loop.
+            pass
+
+
     # ---------- polling ----------
 
     def start_polling(self, *, period_ms: int = 50) -> None:
@@ -797,6 +847,7 @@ class HiPController:
                 if age_ms >= float(self.stale_after_ms):
                     self._last_rx_ns = None
                     self._mark_disconnected()
+            self._emit_status(now_ns)
             return
 
         for _s in snaps:

@@ -8,6 +8,7 @@ from typing import List, Optional
 
 from steuerung3d.util.log_context import install_log_context
 from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
+from steuerung3d.core.status import StatusEmitter
 
 from steuerung3d.protocol.raw_controls import RawControls
 from steuerung3d.protocol.udp_channels import UdpRawControlsOut
@@ -84,6 +85,7 @@ def run(cfg: InputdConfig, *, log_hz: float = 2.0) -> int:
 
     hb = Heartbeat("inputd", interval_s=1.0)
     ch = ChangeTracker()
+    status = StatusEmitter.from_env(default_service="inputd")
 
     while True:
         ok, desc = js.ensure_open(index=cfg.device_index, name_contains=cfg.name_contains)
@@ -134,6 +136,19 @@ def run(cfg: InputdConfig, *, log_hz: float = 2.0) -> int:
             log.debug("tx samples=%d connected=%s out=%s", samples, connected, cfg.out_addr)
 
         hb.emit(log)
+
+        if status is not None:
+            # Derived, low-rate heartbeat for supervisor birds-eye (does not affect PLC UDP packets).
+            level = "OK" if connected else "WARN"
+            status.emit_every(
+                0.5,
+                level=level,
+                summary=f"connected={bool(connected)} tx={samples} out={cfg.out_addr}",
+                connected=bool(connected),
+                tx_samples=int(samples),
+                out=str(cfg.out_addr),
+                dev=str(desc) if desc else "",
+            )
 
         next_t += dt
         sleep_s = next_t - time.monotonic()

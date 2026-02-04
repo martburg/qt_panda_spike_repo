@@ -9,6 +9,8 @@ from dataclasses import replace
 from steuerung3d.util.log_context import install_log_context
 from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
 
+from steuerung3d.core.status import StatusEmitter
+
 from steuerung3d.protocol.udp_channels import UdpRawControlsIn, UdpIntentOut
 from steuerung3d.protocol.raw_controls import RawControls
 
@@ -38,6 +40,8 @@ def main() -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     install_log_context(role="joy2intent")
+
+    status = StatusEmitter.from_env(default_service="joy2intent")
 
     cfg = load_joy2intent_config(Path(args.config))
 
@@ -149,6 +153,26 @@ def main() -> int:
                         intent_out.publish_intent(JogWinch(winch_id=wid, rate=0.0))
                     sent_stale_zero = True
                     log.warning("raw input stale (age_ms=%.1f) -> emitted stop", age_ms)
+
+        # Structured birds-eye status (side-channel; does not affect PLC packets)
+        if status is not None:
+            age_ms_f: float | None = None
+            if last_rx_ns is not None:
+                age_ms_f = (now_ns - last_rx_ns) / 1_000_000.0
+            stale = (age_ms_f is not None) and (age_ms_f > cfg.stale_after_ms)
+            level = 'WARN' if stale else 'OK'
+            age_ms_i = int(age_ms_f) if age_ms_f is not None else None
+            status.emit_every(
+                0.5,
+                level=level,
+                summary=f"mode={st.mode} age_ms={age_ms_i if age_ms_i is not None else 'NA'} stale_stop={sent_stale_zero}",
+                mode=st.mode,
+                age_ms=age_ms_i,
+                stale_stop=sent_stale_zero,
+                raw_in=f"{cfg.raw_in[0]}:{cfg.raw_in[1]}",
+                intent_out=f"{cfg.intent_out[0]}:{cfg.intent_out[1]}",
+                winches=list(rig.winches),
+            )
 
         # Periodic summary
         hb.emit(log)
