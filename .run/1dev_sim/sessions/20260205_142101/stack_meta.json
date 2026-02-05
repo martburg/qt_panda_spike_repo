@@ -18,8 +18,8 @@
         "--axis",
         "Anton"
       ],
-      "log_path": ".run\\1dev_sim\\sessions\\20260205_132700\\core.log",
-      "pid": 9388,
+      "log_path": ".run\\1dev_sim\\sessions\\20260205_142101\\core.log",
+      "pid": 19944,
       "returncode": 1
     },
     "densi-Anton": {
@@ -34,8 +34,8 @@
         "--telem-out",
         "127.0.0.1:52020"
       ],
-      "log_path": ".run\\1dev_sim\\sessions\\20260205_132700\\densi-Anton.log",
-      "pid": 6416,
+      "log_path": ".run\\1dev_sim\\sessions\\20260205_142101\\densi-Anton.log",
+      "pid": 19384,
       "returncode": 1
     },
     "hip": {
@@ -46,8 +46,8 @@
         "--telem-in",
         "127.0.0.1:51002"
       ],
-      "log_path": ".run\\1dev_sim\\sessions\\20260205_132700\\hip.log",
-      "pid": 24236,
+      "log_path": ".run\\1dev_sim\\sessions\\20260205_142101\\hip.log",
+      "pid": 1192,
       "returncode": 1
     },
     "inputd": {
@@ -58,8 +58,8 @@
         "--config",
         "configs/inputd_gamepad.toml"
       ],
-      "log_path": ".run\\1dev_sim\\sessions\\20260205_132700\\inputd.log",
-      "pid": 17220,
+      "log_path": ".run\\1dev_sim\\sessions\\20260205_142101\\inputd.log",
+      "pid": 23944,
       "returncode": 1
     },
     "joy2intent": {
@@ -76,15 +76,15 @@
         "--config",
         "configs/joy2intent_bindings_gamepad.toml"
       ],
-      "log_path": ".run\\1dev_sim\\sessions\\20260205_132700\\joy2intent.log",
-      "pid": 8768,
+      "log_path": ".run\\1dev_sim\\sessions\\20260205_142101\\joy2intent.log",
+      "pid": 21444,
       "returncode": 1
     }
   },
   "profile_path": "",
-  "session_dir": ".run\\1dev_sim\\sessions\\20260205_132700",
+  "session_dir": ".run\\1dev_sim\\sessions\\20260205_142101",
   "stack_name": "1dev_sim",
-  "started_at_s": 1770294421.268794,
-  "stopped_at_s": 1770294421.268794,
-  "supervisor_pid": 2884
+  "started_at_s": 1770297686.1848593,
+  "stopped_at_s": 1770297686.1848593,
+  "supervisor_pid": 15900
 }
