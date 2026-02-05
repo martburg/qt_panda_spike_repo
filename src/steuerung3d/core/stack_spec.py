@@ -26,6 +26,11 @@ class ServiceSpec:
     enabled: bool = True
     module: str = ""  # python -m <module>
     mode: FanoutMode = "single"
+    # Optional: start multiple identical instances ("pool") of this service.
+    # If set to an int, starts that many processes named <key>-1..<key>-N.
+    # If set to the string "auto", StackRuntime may choose a sensible count
+    # based on the current inventory (SIM vs REAL).
+    count: Any = None
     args: List[Any] = field(default_factory=list)
     config: Optional[str] = None  # if set, becomes --config <path>
     env: Dict[str, str] = field(default_factory=dict)
@@ -38,8 +43,10 @@ class StackSpec:
     name: str
     base_dir: Path
 
-    # High-level: rig and ports.
+    # High-level rig: in SIM this is the expected axes list (spawns sims).
+    # In REAL this may be empty; the runtime discovers devices from telemetry.
     axes: List[str]
+    rig: Dict[str, Any]
     net: Dict[str, Any]
 
     # Services by key (core, hip, densi, inputd, joy2intent, ...)

@@ -1,0 +1,144 @@
+{
+  "children": {
+    "core": {
+      "argv": [
+        "C:\\Users\\Martin\\anaconda3\\envs\\steuerung3d\\python.exe",
+        "-m",
+        "steuerung3d.apps.core_udp_service",
+        "--dev-telem-in",
+        "127.0.0.1:52020",
+        "--dev-cmd-base",
+        "52001",
+        "--dev-cmd-count",
+        "4",
+        "--ui-telem-base",
+        "51002",
+        "--ui-telem-count",
+        "4",
+        "--axis",
+        "Anton",
+        "--axis",
+        "Debby",
+        "--axis",
+        "Cecil",
+        "--axis",
+        "Burt"
+      ],
+      "log_path": ".run\\dev_sim\\sessions\\20260204_132625\\core.log",
+      "pid": 1680,
+      "returncode": 1
+    },
+    "densi-Anton": {
+      "argv": [
+        "C:\\Users\\Martin\\anaconda3\\envs\\steuerung3d\\python.exe",
+        "-m",
+        "steuerung3d.apps.den_si",
+        "--axis",
+        "Anton",
+        "--cmd-in",
+        "127.0.0.1:52001",
+        "--telem-out",
+        "127.0.0.1:52020"
+      ],
+      "log_path": ".run\\dev_sim\\sessions\\20260204_132625\\densi-Anton.log",
+      "pid": 5928,
+      "returncode": 1
+    },
+    "densi-Burt": {
+      "argv": [
+        "C:\\Users\\Martin\\anaconda3\\envs\\steuerung3d\\python.exe",
+        "-m",
+        "steuerung3d.apps.den_si",
+        "--axis",
+        "Burt",
+        "--cmd-in",
+        "127.0.0.1:52004",
+        "--telem-out",
+        "127.0.0.1:52020"
+      ],
+      "log_path": ".run\\dev_sim\\sessions\\20260204_132625\\densi-Burt.log",
+      "pid": 4460,
+      "returncode": 1
+    },
+    "densi-Cecil": {
+      "argv": [
+        "C:\\Users\\Martin\\anaconda3\\envs\\steuerung3d\\python.exe",
+        "-m",
+        "steuerung3d.apps.den_si",
+        "--axis",
+        "Cecil",
+        "--cmd-in",
+        "127.0.0.1:52003",
+        "--telem-out",
+        "127.0.0.1:52020"
+      ],
+      "log_path": ".run\\dev_sim\\sessions\\20260204_132625\\densi-Cecil.log",
+      "pid": 15936,
+      "returncode": 1
+    },
+    "densi-Debby": {
+      "argv": [
+        "C:\\Users\\Martin\\anaconda3\\envs\\steuerung3d\\python.exe",
+        "-m",
+        "steuerung3d.apps.den_si",
+        "--axis",
+        "Debby",
+        "--cmd-in",
+        "127.0.0.1:52002",
+        "--telem-out",
+        "127.0.0.1:52020"
+      ],
+      "log_path": ".run\\dev_sim\\sessions\\20260204_132625\\densi-Debby.log",
+      "pid": 1520,
+      "returncode": 1
+    },
+    "hip": {
+      "argv": [
+        "C:\\Users\\Martin\\anaconda3\\envs\\steuerung3d\\python.exe",
+        "-m",
+        "steuerung3d.apps.hi_p",
+        "--telem-in",
+        "127.0.0.1:51002"
+      ],
+      "log_path": ".run\\dev_sim\\sessions\\20260204_132625\\hip.log",
+      "pid": 3256,
+      "returncode": 1
+    },
+    "inputd": {
+      "argv": [
+        "C:\\Users\\Martin\\anaconda3\\envs\\steuerung3d\\python.exe",
+        "-m",
+        "steuerung3d.apps.inputd",
+        "--config",
+        "configs/inputd_gamepad.toml"
+      ],
+      "log_path": ".run\\dev_sim\\sessions\\20260204_132625\\inputd.log",
+      "pid": 20012,
+      "returncode": 1
+    },
+    "joy2intent": {
+      "argv": [
+        "C:\\Users\\Martin\\anaconda3\\envs\\steuerung3d\\python.exe",
+        "-m",
+        "steuerung3d.apps.joy2intent",
+        "--raw-in",
+        "127.0.0.1:50100",
+        "--intent-out",
+        "127.0.0.1:51001",
+        "--winches",
+        "Anton,Debby,Cecil,Burt",
+        "--config",
+        "configs/joy2intent_bindings_gamepad.toml"
+      ],
+      "log_path": ".run\\dev_sim\\sessions\\20260204_132625\\joy2intent.log",
+      "pid": 9652,
+      "returncode": 1
+    }
+  },
+  "profile_path": "",
+  "session_dir": ".run\\dev_sim\\sessions\\20260204_132625",
+  "stack_name": "dev_sim",
+  "started_at_s": 1770207999.845435,
+  "stopped_at_s": 1770207999.845435,
+  "supervisor_pid": 9280
+}

@@ -1,19 +1,19 @@
 [stack]
-name = "dev_sim"
+name = "1dev_sim"
 
 [rig]
-# Axis IDs to boot. Keep this explicit; do not derive implicitly from joy2intent.
-axes = ["Anton", "Debby", "Cecil", "Burt"]
-device_source = "sim"  # sim | real
+# Minimal SIM stack: one simulated device, one HiP, all the trimmings.
+axes = ["Anton"]
+device_source = "sim"
 
 [net]
 bind_host = "127.0.0.1"
 cmd_base = 52001
 ui_telem_base = 51002
 dev_telem_in = "127.0.0.1:52020"
-status_in = "127.0.0.1:51200"  # supervisor birds-eye heartbeat
-raw_in = "127.0.0.1:50100"      # inputd -> joy2intent
-intent_out = "127.0.0.1:51001"  # joy2intent -> core
+status_in = "127.0.0.1:51200"
+raw_in = "127.0.0.1:50100"
+intent_out = "127.0.0.1:51001"
 
 [services.core]
 enabled = true
@@ -42,7 +42,7 @@ args = [
 enabled = true
 module = "steuerung3d.apps.hi_p"
 mode = "single"
-count = "auto"  # one HiP window per axis (unattached by default)
+count = "auto"
 args = [
   "--telem-in", "{net.bind_host}:{net.ui_telem_base}",
 ]

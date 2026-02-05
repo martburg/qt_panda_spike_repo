@@ -178,6 +178,7 @@ def build_stack_spec_from_args(args: argparse.Namespace) -> StackSpec:
         name="setup_stack",
         base_dir=Path.cwd(),
         axes=axes,
+        rig={"axes": list(axes), "device_source": "sim"},
         net=net,
         services=services,
     )

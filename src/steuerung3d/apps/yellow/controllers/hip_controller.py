@@ -189,6 +189,7 @@ class HiPController:
         self._fixed_axis: str = ""
         self._lock_axis_combo: bool = False
         self._fixed_axis_applied: bool = False
+        self._NOT_ATTACHED: str = "NotAttached"
         if self._cmb_axis is not None:
             self._cmb_axis.currentTextChanged.connect(self._on_axis_selected)
 
@@ -245,6 +246,21 @@ class HiPController:
 
     # ---------- public helpers ----------
 
+    def _attached_axis(self) -> str:
+        """Return currently attached axis_id ("" if unattached)."""
+        return (self._selected_axis or self._fixed_axis or "").strip()
+
+    def _is_attached(self) -> bool:
+        return bool(self._attached_axis())
+
+    def _require_attached(self) -> str | None:
+        axis = self._attached_axis()
+        if not axis:
+            log.info("blocked action: HiP not attached")
+            return None
+        return axis
+
+
     def set_fixed_axis(self, axis_id: str, *, lock_combo: bool = True) -> None:
         self._fixed_axis = (axis_id or "").strip()
         self._lock_axis_combo = bool(lock_combo)
@@ -291,7 +307,10 @@ class HiPController:
     # ---------- intents ----------
 
     def _on_estop_reset(self) -> None:
-        intent = RequestEstopReset(axis_id=(self._selected_axis or self._fixed_axis), hip_id=self._hip_id)
+        axis = self._require_attached()
+        if axis is None:
+            return
+        intent = RequestEstopReset(axis_id=axis, hip_id=self._hip_id)
         log.info("tx intent: %s", type(intent).__name__)
         self.intent_out.publish_intent(intent)
 
@@ -439,6 +458,9 @@ class HiPController:
                 bc.clicked.connect(lambda _=False, g=grp: self._tx_param_cancel(g))
 
     def _tx_param_edit(self, group: str) -> None:
+        axis = self._require_attached()
+        if axis is None:
+            return
         self._local_edit_active = True
         self._local_edit_group = group
         self._apply_param_ui_state(edit_active=True, edit_group=group)
@@ -448,7 +470,7 @@ class HiPController:
         req_id = self._next_req_id()
 
         intent = ParamEditBegin(
-            axis_id=(self._selected_axis or self._fixed_axis),
+            axis_id=axis,
             hip_id=self._hip_id,
             group=group,
             req_id=req_id,
@@ -458,6 +480,9 @@ class HiPController:
         self._send_txn_intent(intent, group=group, kind="begin")
 
     def _tx_param_write(self, group: str) -> None:
+        axis = self._require_attached()
+        if axis is None:
+            return
         vals = self._read_param_values(group)
 
         fixed = dict(vals)
@@ -488,7 +513,7 @@ class HiPController:
         session_id = self._ensure_session(group)
         req_id = self._next_req_id()
         intent = ParamWrite(
-            axis_id=(self._selected_axis or self._fixed_axis),
+            axis_id=axis,
             hip_id=self._hip_id,
             group=group,
             values=fixed,
@@ -507,10 +532,13 @@ class HiPController:
         self._apply_param_ui_state(edit_active=False, edit_group="")
 
     def _tx_param_cancel(self, group: str) -> None:
+        axis = self._require_attached()
+        if axis is None:
+            return
         session_id = self._ensure_session(group)
         req_id = self._next_req_id()
         intent = ParamCancel(
-            axis_id=(self._selected_axis or self._fixed_axis),
+            axis_id=axis,
             hip_id=self._hip_id,
             group=group,
             req_id=req_id,
@@ -710,6 +738,10 @@ class HiPController:
             busy = self._is_group_busy(g)
             self._set_param_group_enabled(g, False)
             self._set_param_button_state(g, editing=False, busy=busy)
+
+        # Pool HiP visual hint: if unattached, force-disable controls.
+        if not self._is_attached():
+            self._set_attach_ui_state(attached=False)
 
     def _render_params_from_telemetry(self, snap: TelemetrySnapshot) -> None:
         params = getattr(snap, "params", None)
@@ -915,7 +947,7 @@ class HiPController:
             # Avoid hard crash if import path differs.
             return
 
-        axis_id = self._selected_axis or self._fixed_axis
+        axis_id = self._attached_axis()
         if not axis_id:
             for w in (self._txt_main_amp_status, self._txt_slave_amp_status, self._txt_hdr_banner_left, self._txt_hdr_banner_right):
                 if w is not None:
@@ -990,7 +1022,7 @@ class HiPController:
         if self._txt_tick is None:
             return
 
-        axis_id = self._selected_axis or self._fixed_axis
+        axis_id = self._attached_axis()
         if not axis_id:
             self._txt_tick.setText("--")
             self._prev_device_tick = None
@@ -1059,7 +1091,7 @@ class HiPController:
             active_keys = set(ESTOP_SPECS.keys())
 
         if self.ui.btn_estop_reset:
-            self.ui.btn_estop_reset.setEnabled(bool(logical.get("reset_able", False)))
+            self.ui.btn_estop_reset.setEnabled(self._is_attached() and bool(logical.get("reset_able", False)))
 
         for key, cb in getattr(self, "_estop_checks", {}).items():
             v = bool(logical.get(key, False))
@@ -1082,6 +1114,7 @@ class HiPController:
 
     # ---------- axis selection / claims ----------
 
+
     def _update_axis_combo(self, snap: TelemetrySnapshot) -> None:
         if self._cmb_axis is None:
             return
@@ -1096,36 +1129,95 @@ class HiPController:
         if not axis_ids:
             return
 
+        want_items = [self._NOT_ATTACHED] + axis_ids
+
         cur = self._cmb_axis.currentText().strip()
         existing = [self._cmb_axis.itemText(i) for i in range(self._cmb_axis.count())]
-        if existing == axis_ids:
-            if not cur and axis_ids:
-                self._cmb_axis.setCurrentText(axis_ids[0])
+
+        # If list unchanged, just enforce selection invariants.
+        if existing == want_items:
+            # Fixed axis overrides everything (legacy single-panel mode).
+            if self._fixed_axis and (self._fixed_axis in axis_ids):
+                if cur != self._fixed_axis:
+                    self._cmb_axis.setCurrentText(self._fixed_axis)
+                return
+
+            # Pool mode: keep current selection if valid, otherwise NotAttached.
+            if cur not in want_items:
+                self._cmb_axis.setCurrentText(self._NOT_ATTACHED)
             return
 
         self._cmb_axis.blockSignals(True)
         try:
             self._cmb_axis.clear()
-            self._cmb_axis.addItems(axis_ids)
+            self._cmb_axis.addItems(want_items)
+
             if self._fixed_axis and (self._fixed_axis in axis_ids):
                 self._cmb_axis.setCurrentText(self._fixed_axis)
                 self._fixed_axis_applied = True
                 if self._lock_axis_combo:
                     self._cmb_axis.setEnabled(False)
-            elif cur and cur in axis_ids:
-                self._cmb_axis.setCurrentText(cur)
             else:
-                self._cmb_axis.setCurrentText(axis_ids[0])
+                sel = (self._selected_axis or "").strip()
+                if sel and sel in axis_ids:
+                    self._cmb_axis.setCurrentText(sel)
+                else:
+                    # Pool mode default: NotAttached (no auto-claim)
+                    self._cmb_axis.setCurrentText(self._NOT_ATTACHED)
         finally:
             self._cmb_axis.blockSignals(False)
 
+
     def _on_axis_selected(self, axis_id: str) -> None:
         axis_id = (axis_id or "").strip()
-        if not axis_id:
+
+        # Sentinel = detach (pool HiP)
+        if (not axis_id) or (axis_id == self._NOT_ATTACHED):
+            if self._selected_axis:
+                self.intent_out.publish_intent(ReleaseAxis(axis_id=self._selected_axis, hip_id=self._hip_id))
+            self._selected_axis = ""
+            if self._txt_tick is not None:
+                self._txt_tick.setText("--")
+            self._prev_device_tick = None
+            self._set_attach_ui_state(attached=False)
             return
 
+        # Normal attach
         if self._selected_axis and self._selected_axis != axis_id:
             self.intent_out.publish_intent(ReleaseAxis(axis_id=self._selected_axis, hip_id=self._hip_id))
 
         self.intent_out.publish_intent(ClaimAxis(axis_id=axis_id, hip_id=self._hip_id))
         self._selected_axis = axis_id
+        self._set_attach_ui_state(attached=True)
+
+    def _set_attach_ui_state(self, *, attached: bool) -> None:
+        """Visual hint: when unattached, disable E-Stop reset + param/guider controls and tab switching."""
+        tabs = self.win.findChild(QTabWidget, "tabsMain")
+        if tabs is not None:
+            # Do not override the modal lock if active; just force-disable when unattached.
+            if not attached:
+                tabs.tabBar().setEnabled(False)
+            else:
+                if not self._modal_locked:
+                    tabs.tabBar().setEnabled(True)
+
+        # E-Stop reset button
+        if self.ui.btn_estop_reset is not None:
+            if not attached:
+                self.ui.btn_estop_reset.setEnabled(False)
+            # If attached, _render_estop() will decide enable based on reset_able.
+
+        # Param/guider action buttons (disable when unattached; enable is handled by _apply_param_ui_state when attached)
+        for name in (
+            "btnPosEdit","btnPosWrite","btnPosCancel",
+            "btnVelEdit","btnVelWrite","btnVelCancel",
+            "btnFilterEdit","btnFilterWrite","btnFilterCancel",
+            "btnGuiderEdit","btnGuiderWrite","btnGuiderCancel",
+        ):
+            b = self._find_button(name)
+            if b is not None and (not attached):
+                b.setEnabled(False)
+
+        if attached:
+            # Re-apply current param UI state so buttons become active immediately on attach
+            self._apply_param_ui_state(edit_active=self._local_edit_active, edit_group=self._local_edit_group)

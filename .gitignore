@@ -1,77 +1,39 @@
-# =========================
-# Python / tooling
-# =========================
+# Python
 __pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-*.so
-*.dylib
-
+*.pyc
 .venv/
-venv/
 .env
-.env.*
 
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-*.egg-info/
-.eggs/
+# VS Code
+.vscode/
 
-# =========================
 # Build / dist
-# =========================
 build/
 dist/
-*.whl
-pip-wheel-metadata/
-
-# =========================
-# IDE / editor
-# =========================
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# =========================
-# OS junk
-# =========================
-Thumbs.db
-.DS_Store
-
-# =========================
-# Runtime artefacts (Steuerung3D Remake)
-# =========================
-# per-session supervisor runs (portable LATEST file lives here too)
-.run/
-run/
-
-# if you ever use a different run dir name
-logs/
-src/logs/
-
-# =========================
-# Logs / recordings (local-only by default)
-# =========================
 *.log
-*.jsonl
 
-# If there are JSONL fixtures you DO want in git, whitelist them like:
-# !tests/**/fixtures/**/*.jsonl
 
-# =========================
-# Obsidian / knowledge vault (local-only)
-# =========================
+# Obsidian volatile files (don't commit)
 vault/
-# If you keep attachments inside the repo but want them ignored:
-# vault/Attachments/
 
-# =========================
-# Local helper tooling
-# =========================
+# logs + lockfile from your local saver
 Logs/*.log
 Logs/server.lock
+*.jsonl
+
+# Attachments: choose ONE policy:
+# If you want attachments in git, keep them tracked (comment next line)
+# If you want attachments out of git, uncomment:
+# vault/Attachments/
+
+# OS junk
+Thumbs.db
+.DS_Store
+logs/
+*.egg-info/
+src/logs/
+
+# tooling
+.pytest_cache/
+.mypy_cache/
+.venv/

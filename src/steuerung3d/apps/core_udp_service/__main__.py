@@ -469,6 +469,14 @@ def main() -> int:
                     f"age_dev_ms={-1 if age_dev is None else int(age_dev*1000)}"
                 )
 
+                # Discovered devices (REAL) or spawned sims (SIM): expose as fields so the
+                # supervisor can provision a HiP pool in REAL mode.
+                try:
+                    densis = getattr(snap, "densis", {}) or {}
+                    devices = sorted([str(k) for k in densis.keys()])
+                except Exception:
+                    devices = []
+
                 status.emit_every(
                     level=level,
                     summary=summary,
@@ -477,6 +485,8 @@ def main() -> int:
                         "mode": str(mode_v),
                         "estop": estop_v,
                         "fault": fault_v,
+                        "devices": devices[:32],
+                        "devices_n": len(devices),
                         "age_int_ms": None if age_int is None else age_int * 1000.0,
                         "age_dev_ms": None if age_dev is None else age_dev * 1000.0,
                         "age_cmd_ms": None if age_cmd is None else age_cmd * 1000.0,

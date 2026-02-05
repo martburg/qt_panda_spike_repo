@@ -100,6 +100,35 @@ Joy2intent config is now bindings-only (axes live in the stack profile):
 
 ---
 
+## SIM vs REAL boot: device provisioning
+
+We support two boot semantics via `[rig].device_source`.
+
+### SIM (`device_source = "sim"`)
+
+- The profile provides `[rig].axes = [...]`.
+- The supervisor spawns one DenSi simulator per axis.
+- HiP can be provisioned as a *pool* by setting:
+
+```toml
+[services.hip]
+count = "auto"  # one HiP window per configured axis
+```
+
+By default the HiP windows start **unattached**; the operator picks which device each HiP controls.
+
+### REAL (`device_source = "real"`)
+
+- PLCs/DenSis are already running and emitting telemetry.
+- The supervisor starts core + tooling first.
+- It listens for core status heartbeats for `[rig].discovery_ms` and reads discovered `devices` from core.
+- Then it starts a HiP pool sized to the discovered devices (`count = "auto"`, min 1).
+- DenSi sims are suppressed automatically in REAL mode.
+
+See example profile: `configs/stacks/dev_real.toml`.
+
+---
+
 ## Tests
 
 `pytest -q` is green (last seen: 71 passed, 1 skipped).

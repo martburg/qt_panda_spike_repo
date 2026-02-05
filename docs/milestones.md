@@ -12,6 +12,8 @@ This is a living checklist of what we’ve already achieved and what comes next.
 - Logging usability:
   - log viewer CLI (commanded vs measured per tick)
   - regression test for command-frame sequence fingerprint
+- Profile-driven boot supervisor (`python -m steuerung3d up ...`) with per-session logs and birds-eye status
+- SIM vs REAL boot semantics via `[rig].device_source` (REAL: discover devices from telemetry, then provision HiP pool)
 
 ## Next goals
 

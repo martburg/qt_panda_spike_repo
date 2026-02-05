@@ -15,7 +15,7 @@ import os
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -76,7 +76,7 @@ class RunningProcess:
 def expand_processes(spec: StackSpec, *, session_dir: Path) -> List[ProcessSpec]:
     """Expand services into concrete process specs."""
     stack_ctx = {"name": spec.name}
-    rig_ctx = {"axes": spec.axes}
+    rig_ctx = {"axes": spec.axes, **(spec.rig or {})}
     net_ctx = dict(spec.net)
 
     processes: List[ProcessSpec] = []
@@ -98,10 +98,19 @@ def expand_processes(spec: StackSpec, *, session_dir: Path) -> List[ProcessSpec]
                 argv += render_argv(_service_args_with_config(svc), ctx)
                 add_process(f"{svc_key}-{axis}", argv, dict(svc.env))
         else:
-            ctx = make_context(stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=None, axis_index=None)
-            argv = [sys.executable, "-m", svc.module]
-            argv += render_argv(_service_args_with_config(svc), ctx)
-            add_process(svc_key, argv, dict(svc.env))
+            # Single service instance, or an explicit pool.
+            count = getattr(svc, "count", None)
+            if isinstance(count, int) and count > 1:
+                for i in range(int(count)):
+                    ctx = make_context(stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=None, axis_index=None)
+                    argv = [sys.executable, "-m", svc.module]
+                    argv += render_argv(_service_args_with_config(svc), ctx)
+                    add_process(f"{svc_key}-{i+1}", argv, dict(svc.env))
+            else:
+                ctx = make_context(stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=None, axis_index=None)
+                argv = [sys.executable, "-m", svc.module]
+                argv += render_argv(_service_args_with_config(svc), ctx)
+                add_process(svc_key, argv, dict(svc.env))
 
     return _order_processes(processes)
 
@@ -165,11 +174,36 @@ class StackRuntime:
             except Exception:
                 self.status = None
 
-        plan = expand_processes(self.spec, session_dir=self.session_dir)
+        device_source = str((self.spec.rig or {}).get("device_source") or "sim").strip().lower()
+
+        # --- Phase 1: spawn everything except dynamic components ---
+        # In REAL mode, PLCs are already running. We start core+tooling first,
+        # discover live devices from telemetry, then start a HiP pool.
+        spec_for_phase1 = self.spec
+        if device_source == "real":
+            services = dict(self.spec.services)
+            if "densi" in services:
+                services["densi"] = replace(services["densi"], enabled=False)
+            if "hip" in services:
+                services["hip"] = replace(services["hip"], enabled=False)
+            spec_for_phase1 = replace(self.spec, services=services)
+        else:
+            # SIM mode convenience: hip.count="auto" => spawn one HiP per configured axis.
+            hip = self.spec.services.get("hip")
+            if hip and getattr(hip, "count", None) == "auto":
+                services = dict(self.spec.services)
+                services["hip"] = replace(hip, count=max(1, len(self.spec.axes)))
+                spec_for_phase1 = replace(self.spec, services=services)
+
+        plan = expand_processes(spec_for_phase1, session_dir=self.session_dir)
 
         for p in plan:
             self._spawn(p)
             time.sleep(0.05)
+
+        # --- Phase 2 (REAL): discover devices then start HiP pool ---
+        if device_source == "real" and self.spec.services.get("hip") and self.spec.services["hip"].enabled:
+            self._start_hips_real()
 
         # Write initial metadata for status/log tooling
         self._write_meta(stopped_at_s=None)
@@ -177,6 +211,63 @@ class StackRuntime:
         # tailers
         self.tailers = {rp.spec.name: _LogTailer(rp.spec.log_path) for rp in self.processes}
         return self.session_dir
+
+    def _discover_devices(self, *, timeout_s: float) -> List[str]:
+        """Discover live device ids from core status heartbeats."""
+        if not self.status:
+            return []
+
+        deadline = time.time() + max(0.1, float(timeout_s))
+        last_devices: List[str] = []
+        while time.time() < deadline:
+            self.status.poll()
+            msg = self.status.get("core", "")
+            if msg:
+                fields = msg.get("fields", {}) if isinstance(msg, dict) else {}
+                devs = fields.get("devices")
+                if isinstance(devs, list) and devs:
+                    # Normalize to strings.
+                    last_devices = [str(x) for x in devs if str(x).strip()]
+            time.sleep(0.05)
+        # De-dup / stable order.
+        out: List[str] = []
+        seen = set()
+        for d in last_devices:
+            if d not in seen:
+                seen.add(d)
+                out.append(d)
+        return out
+
+    def _start_hips_real(self) -> None:
+        """REAL-mode HiP provisioning: start a pool sized to discovered devices."""
+        assert self.session_dir is not None
+        hip = self.spec.services.get("hip")
+        if not hip or not hip.enabled:
+            return
+
+        discovery_ms = int((self.spec.rig or {}).get("discovery_ms") or 2000)
+        devices = self._discover_devices(timeout_s=discovery_ms / 1000.0)
+
+        # Resolve hip.count
+        count = getattr(hip, "count", None)
+        if isinstance(count, int):
+            n_hips = max(1, int(count))
+        else:
+            # "auto" / None
+            n_hips = max(1, len(devices))
+
+        # Start HiPs unattached by default (operator assigns).
+        stack_ctx = {"name": self.spec.name}
+        rig_ctx = {"axes": self.spec.axes, **(self.spec.rig or {})}
+        net_ctx = dict(self.spec.net)
+
+        for i in range(n_hips):
+            name = f"hip-{i+1}"
+            ctx = make_context(stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=None, axis_index=None)
+            argv = [sys.executable, "-m", hip.module] + render_argv(_service_args_with_config(hip), ctx)
+            p = ProcessSpec(name=name, argv=argv, log_path=self.session_dir / f"{name}.log", env=dict(hip.env))
+            self._spawn(p)
+            time.sleep(0.05)
 
     def _write_meta(self, *, stopped_at_s: float | None) -> None:
         if self.session_dir is None:

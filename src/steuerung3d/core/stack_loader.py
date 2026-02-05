@@ -145,9 +145,14 @@ def load_stack_profile(
     stack_tbl = data.get("stack", {})
     name = str(stack_tbl.get("name") or profile_path.stem)
 
-    rig_tbl = data.get("rig", {})
+    rig_tbl = dict(data.get("rig", {}) or {})
+    device_source = str(rig_tbl.get("device_source") or "sim").strip().lower()
+    if device_source not in ("sim", "real"):
+        raise ValueError(f"Invalid [rig].device_source={device_source!r} (expected 'sim' or 'real')")
+
     axes = list(rig_tbl.get("axes") or [])
-    if not axes:
+    # In REAL mode the PLCs are already running; axes may be discovered at runtime.
+    if not axes and device_source != "real":
         raise ValueError(f"Stack profile {profile_path} has no [rig].axes")
 
     net_tbl = dict(data.get("net", {}))
@@ -163,6 +168,7 @@ def load_stack_profile(
             enabled=bool(tbl.get("enabled", True)),
             module=str(tbl.get("module", "")),
             mode=str(tbl.get("mode", "single")),
+            count=tbl.get("count", None),
             args=list(tbl.get("args", []) or []),
             config=tbl.get("config"),
             env=dict(tbl.get("env", {}) or {}),
@@ -176,6 +182,7 @@ def load_stack_profile(
         name=name,
         base_dir=Path(base_dir),
         axes=[str(a) for a in axes],
+        rig=rig_tbl,
         net=net_tbl,
         services=services,
     )
@@ -199,6 +206,7 @@ def merge_overrides(base: StackSpec, override: StackSpec) -> StackSpec:
                 enabled=v.enabled,
                 module=v.module or cur.module,
                 mode=v.mode or cur.mode,
+                count=v.count if getattr(v, "count", None) is not None else getattr(cur, "count", None),
                 args=v.args or cur.args,
                 config=v.config if v.config is not None else cur.config,
                 env={**cur.env, **(v.env or {})},
@@ -208,4 +216,6 @@ def merge_overrides(base: StackSpec, override: StackSpec) -> StackSpec:
 
     axes = override.axes or base.axes
     name = override.name or base.name
-    return StackSpec(name=name, base_dir=base.base_dir, axes=axes, net=net, services=services)
+    rig = dict(getattr(base, "rig", {}) or {})
+    rig.update(getattr(override, "rig", {}) or {})
+    return StackSpec(name=name, base_dir=base.base_dir, axes=axes, rig=rig, net=net, services=services)
