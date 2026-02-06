@@ -1,0 +1,28 @@
+{
+  "children": {
+    "densi": {
+      "argv": [
+        "C:\\Users\\Martin\\anaconda3\\envs\\steuerung3d\\python.exe",
+        "-m",
+        "steuerung3d.apps.den_si",
+        "--axis",
+        "Anton",
+        "--cmd-in",
+        "127.0.0.1:52001",
+        "--telem-out",
+        "127.0.0.1:52020",
+        "--wire-proto",
+        "plc"
+      ],
+      "log_path": ".run\\only_densi_anton\\sessions\\20260206_183858\\densi.log",
+      "pid": 13556,
+      "returncode": 1
+    }
+  },
+  "profile_path": "",
+  "session_dir": ".run\\only_densi_anton\\sessions\\20260206_183858",
+  "stack_name": "only_densi_anton",
+  "started_at_s": 1770399549.529002,
+  "stopped_at_s": 1770399549.529002,
+  "supervisor_pid": 14616
+}

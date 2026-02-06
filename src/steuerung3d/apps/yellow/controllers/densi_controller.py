@@ -90,6 +90,73 @@ _LIMIT_WIDGETS: dict[str, str] = {
 
 @dataclass
 class DenSiController:
+
+    def _drain_command_frames_compat(self, limit: int = 100):
+        """Drain command frames from either JSON channels or PLC wire channels.
+
+        JSON path typically provides drain_command_frames(limit=...).
+        PLC path may provide drain(limit=...), recv_nowait(), or recv(timeout=0).
+        Returns a list of frames/messages.
+        """
+        cin = self.command_in
+
+        fn = getattr(cin, "drain_command_frames", None)
+        if callable(fn):
+            return fn(limit=limit)
+
+        fn = getattr(cin, "drain", None)
+        if callable(fn):
+            return fn(limit=limit)
+
+        out = []
+        fn = getattr(cin, "recv_nowait", None)
+        if callable(fn):
+            for _ in range(limit):
+                msg = fn()
+                if msg is None:
+                    break
+                out.append(msg)
+            return out
+
+        fn = getattr(cin, "recv", None)
+        if callable(fn):
+            for _ in range(limit):
+                msg = fn(timeout=0)
+                if msg is None:
+                    break
+                out.append(msg)
+            return out
+
+        raise AttributeError(f"CommandIn does not support draining: {type(cin).__name__}")
+
+    def _publish_telemetry_compat(self, payload) -> None:
+        """Publish telemetry via either JSON channels or PLC wire channels.
+
+        JSON path expects publish_telemetry(TelemetrySnapshot).
+        PLC path usually expects send(str|bytes) of a pre-serialized telegram.
+        """
+        out = self.telemetry_out
+
+        fn = getattr(out, "publish_telemetry", None)
+        if callable(fn):
+            fn(payload)
+            return
+
+        for meth in ("send", "publish", "send_text", "send_bytes", "write", "sendto"):
+            f = getattr(out, meth, None)
+            if callable(f):
+                f(payload)
+                return
+
+        link = getattr(out, "link", None)
+        if link is not None:
+            for meth in ("send", "publish", "send_text", "send_bytes", "write", "sendto"):
+                f = getattr(link, meth, None)
+                if callable(f):
+                    f(payload)
+                    return
+
+        raise AttributeError(f"TelemetryOut does not support publishing: {type(out).__name__}")
     win: QWidget
     command_in: CommandIn
     telemetry_out: TelemetryOut
@@ -169,7 +236,7 @@ class DenSiController:
 
         # Start in a stable "GO" state so HiP can always request a reset.
         # (Otherwise btnEStopReset stays disabled and you can get stuck.)
-        self._apply_startup_estop_fault_state()
+        self._apply_go_state()
 
         self._estop_latched = False
         self._safety_ok = True  # placeholder
@@ -289,33 +356,6 @@ class DenSiController:
         return v
 
     # ----- UI helpers -----
-
-    def _apply_startup_estop_fault_state(self) -> None:
-        """Startup E-Stop state: faulted but resettable.
-
-        Emulates a real axis after power-up: E-Stop chain appears tripped until an explicit
-        reset is issued (cmd.estop_reset), at which point _apply_go_state() is called.
-        """
-        # Start with all bits asserted
-        for k in self._inj_bits.keys():
-            self._inj_bits[k] = True
-
-        # OK-chain bits should appear broken (False)
-        for k in ESTOP_OK_KEYS:
-            self._inj_bits[k] = False
-
-        # Trip cause bits asserted (True)
-        for k in ESTOP_CAUSE_KEYS:
-            self._inj_bits[k] = True
-
-        # Critical: allow reset at startup
-        self._inj_bits["reset_able"] = True
-
-        self._inj_estop_word = encode_estop_word(self._inj_bits)
-        self._estop_latched = True
-        self._render_estop_word_to_ui(self._inj_estop_word)
-
-
     def _apply_go_state(self) -> None:
         """Set injected bits to a stable 'GO' state (no flash)."""
         # default everything False
@@ -596,7 +636,7 @@ class DenSiController:
         self._timer = t
 
     def step_once(self) -> None:
-        frames = self.command_in.drain_command_frames(limit=100)
+        frames = self._drain_command_frames_compat(limit=100)
         if frames:
             self._last_cmd = frames[-1]
             self._last_cmd_ns = time.monotonic_ns()
@@ -813,7 +853,7 @@ class DenSiController:
                     self._txt_tick.setText("--")
 
         snap = TelemetrySnapshot.from_state(self.state)
-        self.telemetry_out.publish_telemetry(snap)
+        self._publish_telemetry_compat(snap)
 
         # Edge logs for key state changes.
         if self._ch.changed("mode", str(getattr(snap, "mode", ""))):

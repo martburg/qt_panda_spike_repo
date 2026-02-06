@@ -24,8 +24,8 @@
         "--axis",
         "Burt"
       ],
-      "log_path": ".run\\dev_sim\\sessions\\20260204_203332\\core.log",
-      "pid": 4496,
+      "log_path": ".run\\dev_sim\\sessions\\20260205_204021\\core.log",
+      "pid": 16524,
       "returncode": 1
     },
     "densi-Anton": {
@@ -40,8 +40,8 @@
         "--telem-out",
         "127.0.0.1:52020"
       ],
-      "log_path": ".run\\dev_sim\\sessions\\20260204_203332\\densi-Anton.log",
-      "pid": 19072,
+      "log_path": ".run\\dev_sim\\sessions\\20260205_204021\\densi-Anton.log",
+      "pid": 16372,
       "returncode": 1
     },
     "densi-Burt": {
@@ -56,8 +56,8 @@
         "--telem-out",
         "127.0.0.1:52020"
       ],
-      "log_path": ".run\\dev_sim\\sessions\\20260204_203332\\densi-Burt.log",
-      "pid": 7508,
+      "log_path": ".run\\dev_sim\\sessions\\20260205_204021\\densi-Burt.log",
+      "pid": 16804,
       "returncode": 1
     },
     "densi-Cecil": {
@@ -72,8 +72,8 @@
         "--telem-out",
         "127.0.0.1:52020"
       ],
-      "log_path": ".run\\dev_sim\\sessions\\20260204_203332\\densi-Cecil.log",
-      "pid": 21448,
+      "log_path": ".run\\dev_sim\\sessions\\20260205_204021\\densi-Cecil.log",
+      "pid": 5488,
       "returncode": 1
     },
     "densi-Debby": {
@@ -88,11 +88,11 @@
         "--telem-out",
         "127.0.0.1:52020"
       ],
-      "log_path": ".run\\dev_sim\\sessions\\20260204_203332\\densi-Debby.log",
-      "pid": 312,
+      "log_path": ".run\\dev_sim\\sessions\\20260205_204021\\densi-Debby.log",
+      "pid": 7940,
       "returncode": 1
     },
-    "hip": {
+    "hip-1": {
       "argv": [
         "C:\\Users\\Martin\\anaconda3\\envs\\steuerung3d\\python.exe",
         "-m",
@@ -100,8 +100,44 @@
         "--telem-in",
         "127.0.0.1:51002"
       ],
-      "log_path": ".run\\dev_sim\\sessions\\20260204_203332\\hip.log",
-      "pid": 14784,
+      "log_path": ".run\\dev_sim\\sessions\\20260205_204021\\hip-1.log",
+      "pid": 11092,
+      "returncode": 1
+    },
+    "hip-2": {
+      "argv": [
+        "C:\\Users\\Martin\\anaconda3\\envs\\steuerung3d\\python.exe",
+        "-m",
+        "steuerung3d.apps.hi_p",
+        "--telem-in",
+        "127.0.0.1:51002"
+      ],
+      "log_path": ".run\\dev_sim\\sessions\\20260205_204021\\hip-2.log",
+      "pid": 1720,
+      "returncode": 1
+    },
+    "hip-3": {
+      "argv": [
+        "C:\\Users\\Martin\\anaconda3\\envs\\steuerung3d\\python.exe",
+        "-m",
+        "steuerung3d.apps.hi_p",
+        "--telem-in",
+        "127.0.0.1:51002"
+      ],
+      "log_path": ".run\\dev_sim\\sessions\\20260205_204021\\hip-3.log",
+      "pid": 8356,
+      "returncode": 1
+    },
+    "hip-4": {
+      "argv": [
+        "C:\\Users\\Martin\\anaconda3\\envs\\steuerung3d\\python.exe",
+        "-m",
+        "steuerung3d.apps.hi_p",
+        "--telem-in",
+        "127.0.0.1:51002"
+      ],
+      "log_path": ".run\\dev_sim\\sessions\\20260205_204021\\hip-4.log",
+      "pid": 12120,
       "returncode": 1
     },
     "inputd": {
@@ -112,8 +148,8 @@
         "--config",
         "configs/inputd_gamepad.toml"
       ],
-      "log_path": ".run\\dev_sim\\sessions\\20260204_203332\\inputd.log",
-      "pid": 6596,
+      "log_path": ".run\\dev_sim\\sessions\\20260205_204021\\inputd.log",
+      "pid": 16520,
       "returncode": 1
     },
     "joy2intent": {
@@ -130,15 +166,15 @@
         "--config",
         "configs/joy2intent_bindings_gamepad.toml"
       ],
-      "log_path": ".run\\dev_sim\\sessions\\20260204_203332\\joy2intent.log",
-      "pid": 1056,
+      "log_path": ".run\\dev_sim\\sessions\\20260205_204021\\joy2intent.log",
+      "pid": 1596,
       "returncode": 1
     }
   },
   "profile_path": "",
-  "session_dir": ".run\\dev_sim\\sessions\\20260204_203332",
+  "session_dir": ".run\\dev_sim\\sessions\\20260205_204021",
   "stack_name": "dev_sim",
-  "started_at_s": 1770233613.67933,
-  "stopped_at_s": 1770233613.67933,
-  "supervisor_pid": 6660
+  "started_at_s": 1770320422.296918,
+  "stopped_at_s": 1770320422.296918,
+  "supervisor_pid": 8332
 }

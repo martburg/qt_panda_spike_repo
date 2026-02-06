@@ -135,3 +135,35 @@ def parse_uplink(message: str) -> LegacyPlcUplink:
             tail[name] = tail_tokens[i]
 
     return LegacyPlcUplink(fields=fields, tail=tail, raw=raw)
+
+
+def encode_uplink(fields: Dict[str, object] | None = None, tail: Dict[str, object] | None = None) -> str:
+    """Encode a PLC->controller uplink frame (semicolon-delimited ASCII).
+
+    Notes:
+    - Uses UPLINK_BASE_FIELDS and UPLINK_TAIL_FIELDS as the canonical ordering.
+    - Ensures the frame contains the literal token "EOD\\" as a field.
+    - Always ends with a trailing ';' (matches legacy behavior).
+    """
+    fields = dict(fields or {})
+    tail = dict(tail or {})
+
+    # Base fields
+    parts: list[str] = []
+    for k in UPLINK_BASE_FIELDS:
+        v = fields.get(k, 0)
+        if v is None:
+            v = 0
+        parts.append(str(v))
+
+    # EOD marker (legacy uses a literal token containing a backslash)
+    parts.append("EOD\\")
+
+    # Tail fields
+    for k in UPLINK_TAIL_FIELDS:
+        v = tail.get(k, 0)
+        if v is None:
+            v = 0
+        parts.append(str(v))
+
+    return ";".join(parts) + ";"

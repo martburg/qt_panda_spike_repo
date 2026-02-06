@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import logging
 from typing import Tuple
@@ -11,11 +12,11 @@ from PySide6.QtWidgets import QApplication
 
 from steuerung3d.apps.yellow.ui_shell import build_yellow_window
 from steuerung3d.apps.yellow.controllers.densi_controller import DenSiController
-#from steuerung3d.protocol.transport import InMemTransport
-from steuerung3d.protocol.udp_channels import UdpCommandIn, UdpTelemetryOut
-from steuerung3d.apps.yellow.controllers.densi_controller import DenSiController
 
-log = logging.getLogger("den_si") 
+# Default JSON channels (core/UI style)
+from steuerung3d.protocol.udp_channels import UdpCommandIn, UdpTelemetryOut
+
+log = logging.getLogger("den_si")
 
 
 def _parse_hostport(s: str) -> Tuple[str, int]:
@@ -30,11 +31,10 @@ def _parse_hostport(s: str) -> Tuple[str, int]:
     host = host.strip() or "127.0.0.1"
     return (host, int(port_s))
 
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--role", choices=("cfc",), default="cfc")   # if you already parse role, keep yours
-    # IMPORTANT: default must be empty when using action='append'. Otherwise argparse
-    # will append onto the default list and you end up with phantom axes like "X,Debby".
+    ap.add_argument("--role", choices=("cfc",), default="cfc")
     ap.add_argument("--axis", action="append", default=[], help="Axis id(s). Typically exactly one for DenSi.")
     ap.add_argument("--dt", type=float, default=0.01)
     ap.add_argument(
@@ -47,37 +47,63 @@ def main() -> int:
         default="127.0.0.1:52002",
         help="UDP target for TelemetryOut as host:port (default 127.0.0.1:52002).",
     )
+    # NEW: explicit device wire protocol selector
+    ap.add_argument(
+        "--wire-proto",
+        choices=("plc", "json"),
+        default="plc",
+        help="Device wire protocol for DenSi I/O. 'plc' = ; delimited telegrams, 'json' = internal snapshots.",
+    )
+
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
     args = ap.parse_args()
 
     logging.basicConfig(
-    level=getattr(logging, args.log_level.upper()),
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-)
-    # Provide consistent context fields on all log records (even if the format
-    # doesn't include them yet).
-    axis_ids = [a.strip() for a in args.axis if a and a.strip()] or ["X"]
+        level=getattr(logging, args.log_level.upper()),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+    axis_ids = [a.strip() for a in args.axis if a and a.strip()]
+    if not axis_ids:
+        inst = (os.environ.get("ST3D_INSTANCE") or "").strip()
+        if inst:
+            axis_ids = [inst]
+    if not axis_ids:
+        axis_ids = ["X"]
+
     install_log_context(role="den_si", axis=axis_ids[0])
     log.info("log level = %s", args.log_level.upper())
+
     cmd_in_addr = _parse_hostport(args.cmd_in)
     telem_out_addr = _parse_hostport(args.telem_out)
 
-    log.info("Den-Si bind CommandIn=%s  target TelemetryOut=%s", cmd_in_addr, telem_out_addr)
+    log.info(
+        "Den-Si bind CommandIn=%s  target TelemetryOut=%s  wire_proto=%s",
+        cmd_in_addr,
+        telem_out_addr,
+        args.wire_proto,
+    )
 
     app = QApplication(sys.argv)
     win = build_yellow_window(role="cfc")
 
-    # Make the window self-identifying (axis + ports) to reduce integration confusion.
     axis_label = ",".join(axis_ids)
     try:
         win.setWindowTitle(
-            f"HMI – DenSi ({axis_label})  cmd-in={cmd_in_addr[0]}:{cmd_in_addr[1]}  telem->{telem_out_addr[0]}:{telem_out_addr[1]}"
+            f"HMI – DenSi ({axis_label})  cmd-in={cmd_in_addr[0]}:{cmd_in_addr[1]}  telem->{telem_out_addr[0]}:{telem_out_addr[1]}  wire={args.wire_proto}"
         )
     except Exception:
         pass
 
-    command_in = UdpCommandIn.bind(cmd_in_addr)
-    telemetry_out = UdpTelemetryOut.connect(telem_out_addr)
+    # Choose channel implementations based on wire protocol.
+    if args.wire_proto == "plc":
+        from steuerung3d.protocol.udp_plc_channels import UdpPlcCommandIn, UdpPlcTelemetryOut
+
+        command_in = UdpPlcCommandIn.bind(cmd_in_addr)
+        telemetry_out = UdpPlcTelemetryOut.connect(telem_out_addr)
+    else:
+        command_in = UdpCommandIn.bind(cmd_in_addr)
+        telemetry_out = UdpTelemetryOut.connect(telem_out_addr)
 
     ctl = DenSiController(
         win=win,

@@ -164,12 +164,40 @@ def load_stack_profile(
     for key, tbl in services_tbl.items():
         if not isinstance(tbl, dict):
             continue
+
+        # --- Convenience sugar for "single" profiles ---
+        raw_args = list(tbl.get("args", []) or [])
+        module_s = str(tbl.get("module", ""))
+
+        # DenSi argument sugar: allow axis/cmd_in/telem_out/dt/wire_proto keys.
+        if module_s.endswith(".apps.den_si") or module_s.endswith(".den_si"):
+            args2 = list(raw_args)
+
+            def _has_flag(flag: str) -> bool:
+                return any(str(a) == flag for a in args2)
+
+            if (not _has_flag("--axis")) and tbl.get("axis"):
+                args2 += ["--axis", str(tbl["axis"])]
+            if (not _has_flag("--cmd-in")) and tbl.get("cmd_in"):
+                args2 += ["--cmd-in", str(tbl["cmd_in"])]
+            if (not _has_flag("--telem-out")) and tbl.get("telem_out"):
+                args2 += ["--telem-out", str(tbl["telem_out"])]
+            if (not _has_flag("--dt")) and tbl.get("dt") is not None:
+                args2 += ["--dt", str(tbl["dt"])]
+
+            # NEW: wire protocol selection for DenSi (plc|json). Defaults are enforced in app.
+            wire_proto = tbl.get("wire_proto", None)
+            if (not _has_flag("--wire-proto")) and wire_proto:
+                args2 += ["--wire-proto", str(wire_proto)]
+
+            raw_args = args2
+
         spec = ServiceSpec(
             enabled=bool(tbl.get("enabled", True)),
-            module=str(tbl.get("module", "")),
+            module=module_s,
             mode=str(tbl.get("mode", "single")),
             count=tbl.get("count", None),
-            args=list(tbl.get("args", []) or []),
+            args=raw_args,
             config=tbl.get("config"),
             env=dict(tbl.get("env", {}) or {}),
         )

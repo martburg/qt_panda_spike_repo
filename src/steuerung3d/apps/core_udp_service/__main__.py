@@ -22,8 +22,9 @@ from steuerung3d.protocol.core_runner import CoreRunner
 from steuerung3d.protocol.axis_router import AxisRouter
 from steuerung3d.protocol.udp_channels import (
     UdpIntentIn, UdpTelemetryOut,
-    UdpTelemetryIn, UdpCommandOut,
+    UdpCommandOut,
 )
+from steuerung3d.protocol.udp_plc_channels import UdpPlcTelemetryIn
 
 log = logging.getLogger("core_udp_service")
 
@@ -162,7 +163,7 @@ def main() -> int:
     op_telem_outs = [UdpTelemetryOut.connect(t) for t in ui_telem_targets]
 
     dev_telem_bind = _parse_hostport(args.dev_telem_in)
-    dev_telem_in = UdpTelemetryIn.bind(dev_telem_bind)
+    dev_telem_in = UdpPlcTelemetryIn.bind(dev_telem_bind)
 
     # Device command broadcast targets (N DenSi apps each binding a unique command port)
     dev_cmd_targets: List[Tuple[str, int]] = []
