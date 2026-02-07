@@ -90,14 +90,18 @@ _LIMIT_WIDGETS: dict[str, str] = {
 
 @dataclass
 class DenSiController:
+    # --- dataclass fields (MUST be here, at class scope) ---
+    win: QWidget
+    command_in: CommandIn
+    telemetry_out: TelemetryOut
+    axis_ids: list[str]
+
+    wire_proto: str = "json"  # json|plc
+    dt_s: float = 0.01
+    stale_after_ms: int = 500
 
     def _drain_command_frames_compat(self, limit: int = 100):
-        """Drain command frames from either JSON channels or PLC wire channels.
-
-        JSON path typically provides drain_command_frames(limit=...).
-        PLC path may provide drain(limit=...), recv_nowait(), or recv(timeout=0).
-        Returns a list of frames/messages.
-        """
+        """Drain command frames from either JSON channels or PLC wire channels."""
         cin = self.command_in
 
         fn = getattr(cin, "drain_command_frames", None)
@@ -127,45 +131,55 @@ class DenSiController:
                 out.append(msg)
             return out
 
+        if hasattr(cin, "drain_lines"):
+            list(cin.drain_lines(limit=limit))
+            return []
+
         raise AttributeError(f"CommandIn does not support draining: {type(cin).__name__}")
 
     def _publish_telemetry_compat(self, payload) -> None:
-        """Publish telemetry via either JSON channels or PLC wire channels.
-
-        JSON path expects publish_telemetry(TelemetrySnapshot).
-        PLC path usually expects send(str|bytes) of a pre-serialized telegram.
-        """
+        """Publish telemetry via either JSON channels or PLC wire channels."""
         out = self.telemetry_out
 
-        fn = getattr(out, "publish_telemetry", None)
-        if callable(fn):
-            fn(payload)
-            return
+        if getattr(self, "wire_proto", "json") == "plc":
+            from steuerung3d.protocol.plc_codec import encode_uplink_from_snapshot
 
-        for meth in ("send", "publish", "send_text", "send_bytes", "write", "sendto"):
-            f = getattr(out, meth, None)
-            if callable(f):
-                f(payload)
+            snap = payload
+            axis_name = (self.axis_ids[0] if self.axis_ids else "").strip()
+            data = encode_uplink_from_snapshot(snap, axis_name=axis_name)  # bytes
+
+            if hasattr(out, "publish_line"):
+                out.publish_line(data.decode("utf-8", errors="replace"))
                 return
 
+            link = getattr(out, "link", None)
+            if link is not None and hasattr(link, "send"):
+                link.send(data)
+                return
+
+            raise AttributeError(
+                f"TelemetryOut does not support PLC uplink sending: {type(out).__name__}"
+            )
+
+        if hasattr(out, "publish_telemetry"):
+            out.publish_telemetry(payload)
+            return
+
         link = getattr(out, "link", None)
-        if link is not None:
-            for meth in ("send", "publish", "send_text", "send_bytes", "write", "sendto"):
-                f = getattr(link, meth, None)
-                if callable(f):
-                    f(payload)
-                    return
+        if link is not None and hasattr(link, "send"):
+            try:
+                from steuerung3d.protocol.serde_telemetry import encode_telemetry
+                data = encode_telemetry(payload)
+            except Exception:
+                data = (repr(payload) + "\n").encode("utf-8")
+            link.send(data)
+            return
 
         raise AttributeError(f"TelemetryOut does not support publishing: {type(out).__name__}")
-    win: QWidget
-    command_in: CommandIn
-    telemetry_out: TelemetryOut
-    axis_ids: list[str]
-    dt_s: float = 0.01
-    stale_after_ms: int = 500
-
 
     def __post_init__(self) -> None:
+        # Normalize wire protocol selection
+        self.wire_proto = (getattr(self, 'wire_proto', 'json') or 'json').strip().lower()
         self.ui = YellowBindings.from_window(self.win)
 
         # Logging helpers (1 Hz heartbeat + edge logs)
@@ -260,18 +274,6 @@ class DenSiController:
         # Reset device-side tick display
         if self._txt_tick is not None:
             self._txt_tick.setText("--")
-
-    def _seed_params_from_ui(self) -> None:
-        for _grp, mapping in _PARAM_WIDGETS.items():
-            for key, wname in mapping.items():
-                w = self.win.findChild(QLineEdit, wname)
-                if w is None:
-                    continue
-                try:
-                    self.state.params[key] = float(w.text())
-                except Exception:
-                    # keep missing/invalid as-is
-                    continue
 
     def _ui_set_param(self, key: str, value: float) -> None:
         # Update UI field if we know its widget name.

@@ -14,15 +14,15 @@
         "--wire-proto",
         "plc"
       ],
-      "log_path": ".run\\only_densi_anton\\sessions\\20260206_184652\\densi.log",
-      "pid": 18088,
+      "log_path": ".run\\only_densi_anton\\sessions\\20260206_210344\\densi.log",
+      "pid": 772,
       "returncode": 1
     }
   },
   "profile_path": "",
-  "session_dir": ".run\\only_densi_anton\\sessions\\20260206_184652",
+  "session_dir": ".run\\only_densi_anton\\sessions\\20260206_210344",
   "stack_name": "only_densi_anton",
-  "started_at_s": 1770400027.3660574,
-  "stopped_at_s": 1770400027.3660574,
-  "supervisor_pid": 20168
+  "started_at_s": 1770408225.8840122,
+  "stopped_at_s": 1770408225.8840122,
+  "supervisor_pid": 1720
 }

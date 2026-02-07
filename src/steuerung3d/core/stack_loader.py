@@ -184,11 +184,8 @@ def load_stack_profile(
                 args2 += ["--telem-out", str(tbl["telem_out"])]
             if (not _has_flag("--dt")) and tbl.get("dt") is not None:
                 args2 += ["--dt", str(tbl["dt"])]
-
-            # NEW: wire protocol selection for DenSi (plc|json). Defaults are enforced in app.
-            wire_proto = tbl.get("wire_proto", None)
-            if (not _has_flag("--wire-proto")) and wire_proto:
-                args2 += ["--wire-proto", str(wire_proto)]
+            if (not _has_flag("--wire-proto")) and tbl.get("wire_proto"):
+                args2 += ["--wire-proto", str(tbl["wire_proto"])]
 
             raw_args = args2
 

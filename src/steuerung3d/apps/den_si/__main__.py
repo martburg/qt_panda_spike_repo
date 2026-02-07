@@ -112,7 +112,13 @@ def main() -> int:
         axis_ids=axis_ids,
         dt_s=args.dt,
     )
-    ctl.start()
+    # Start controller (timer + IO loop)
+    if hasattr(ctl, "start"):
+        ctl.start()
+    elif hasattr(ctl, "run"):
+        ctl.run()
+    else:
+        raise AttributeError(f"DenSiController has no start/run method: {type(ctl).__name__}")
 
     win.show()
     return app.exec()

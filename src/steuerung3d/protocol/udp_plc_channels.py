@@ -51,6 +51,61 @@ class UdpPlcTelemetryOut:
         self.link.send(_to_bytes(line))
 
 
+    def publish_telemetry(self, payload) -> None:
+        """Publish telemetry on the PLC wire.
+
+        Accepts either:
+          - a pre-serialized PLC telemetry line (str)
+          - a TelemetrySnapshot-like object (has .tick)
+          - a list/tuple of lines or snapshots (we send the first snapshot, or all lines)
+
+        This is intentionally defensive to keep the system running during the
+        transition from JSON telemetry to PLC semicolon telegrams.
+        """
+        if payload is None:
+            return
+
+        # If we received a batch, handle common cases.
+        if isinstance(payload, (list, tuple)):
+            if not payload:
+                return
+            # list of strings -> publish each
+            if all(isinstance(x, str) for x in payload):
+                for line in payload:
+                    self.publish_line(line)
+                return
+            # list containing a single snapshot
+            payload = payload[0]
+
+        if isinstance(payload, str):
+            self.publish_line(payload)
+            return
+
+        # Snapshot-like object: encode to PLC line.
+        tick = getattr(payload, "tick", None)
+        if tick is None:
+            # Last resort: send string representation (debug-friendly)
+            self.publish_line(str(payload))
+            return
+
+        # Import lazily to avoid circular imports at module import time.
+        try:
+            from steuerung3d.protocol.plc_wire import encode_plc_telemetry  # type: ignore
+        except Exception:
+            encode_plc_telemetry = None  # type: ignore
+
+        if encode_plc_telemetry is None:
+            self.publish_line(str(payload))
+            return
+
+        try:
+            line = encode_plc_telemetry(payload)
+        except Exception:
+            self.publish_line(str(payload))
+            return
+        self.publish_line(line)
+
+
 @dataclass
 class UdpPlcCommandIn:
     link: UdpLink
