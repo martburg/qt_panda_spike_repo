@@ -1,0 +1,56 @@
+{
+  "children": {
+    "core": {
+      "argv": [
+        "C:\\Users\\Martin\\anaconda3\\envs\\steuerung3d\\python.exe",
+        "-m",
+        "steuerung3d.apps.core_udp_service",
+        "--axis",
+        "Anton",
+        "--ui-telem-target",
+        "127.0.0.1:51002",
+        "--dev-cmd-base",
+        "52001",
+        "--dev-cmd-count",
+        "1",
+        "--dev-telem-in",
+        "127.0.0.1:52020",
+        "--dt",
+        "0.02",
+        "--log-level",
+        "info"
+      ],
+      "log_path": ".run\\anton_core_densi\\sessions\\20260207_141738\\core.log",
+      "pid": 19924,
+      "returncode": 1
+    },
+    "densi-Anton": {
+      "argv": [
+        "C:\\Users\\Martin\\anaconda3\\envs\\steuerung3d\\python.exe",
+        "-m",
+        "steuerung3d.apps.den_si",
+        "--axis",
+        "Anton",
+        "--cmd-in",
+        "127.0.0.1:52001",
+        "--telem-out",
+        "127.0.0.1:52020",
+        "--wire-proto",
+        "plc",
+        "--dt",
+        "0.01",
+        "--log-level",
+        "info"
+      ],
+      "log_path": ".run\\anton_core_densi\\sessions\\20260207_141738\\densi-Anton.log",
+      "pid": 7432,
+      "returncode": 0
+    }
+  },
+  "profile_path": "",
+  "session_dir": ".run\\anton_core_densi\\sessions\\20260207_141738",
+  "stack_name": "anton_core_densi",
+  "started_at_s": 1770470273.884232,
+  "stopped_at_s": 1770470273.884232,
+  "supervisor_pid": 2988
+}

@@ -99,7 +99,7 @@ def main() -> int:
     if args.wire_proto == "plc":
         from steuerung3d.protocol.udp_plc_channels import UdpPlcCommandIn, UdpPlcTelemetryOut
 
-        command_in = UdpPlcCommandIn.bind(cmd_in_addr)
+        command_in = UdpPlcCommandIn.bind(cmd_in_addr, axis_id=axis_ids[0] if axis_ids else None)
         telemetry_out = UdpPlcTelemetryOut.connect(telem_out_addr)
     else:
         command_in = UdpCommandIn.bind(cmd_in_addr)

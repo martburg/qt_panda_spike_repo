@@ -22,9 +22,8 @@ from steuerung3d.protocol.core_runner import CoreRunner
 from steuerung3d.protocol.axis_router import AxisRouter
 from steuerung3d.protocol.udp_channels import (
     UdpIntentIn, UdpTelemetryOut,
-    UdpCommandOut,
 )
-from steuerung3d.protocol.udp_plc_channels import UdpPlcTelemetryIn
+from steuerung3d.protocol.udp_plc_channels import UdpPlcTelemetryIn, UdpPlcCommandOut
 
 log = logging.getLogger("core_udp_service")
 
@@ -189,7 +188,7 @@ def main() -> int:
         else:
             dev_cmd_targets = []
 
-    dev_cmd_outs = [UdpCommandOut.connect(t) for t in dev_cmd_targets]
+    dev_cmd_outs = [UdpPlcCommandOut.connect(t) for t in dev_cmd_targets]
 
     stats = {
         "intents_in": 0,

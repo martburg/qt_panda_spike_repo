@@ -4,13 +4,19 @@ from __future__ import annotations
 
 These are intentionally *not* JSON. They carry plain ASCII lines like:
 
-    0;E;0;...;EOD\;...
+    0;20400;0;0;0.0;...;Anton;...;EOD\;...
 
 The canonical field order is defined in :mod:`steuerung3d.protocol.legacy_plc`.
+
+Design goal here: provide a *thin* transport wrapper around :class:`~steuerung3d.adapters.links.udp_link.UdpLink`,
+and expose methods that match the rest of the stack (``publish_command_frame`` / ``drain_telemetry`` etc.).
+
+We keep everything best-effort and defensive: these channels are used for debugging and bring-up, so
+we prefer “don’t crash” over “strict schema enforcement”.
 """
 
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from steuerung3d.adapters.links.udp_link import UdpLink
 
@@ -38,6 +44,25 @@ class UdpPlcTelemetryIn:
     def drain_lines(self, limit: int = 1000) -> List[str]:
         return [_from_bytes(b) for b in self.link.poll(limit=limit)]
 
+    def drain_telemetry(self, limit: int = 100) -> List[Any]:
+        """Drain and decode PLC uplink telegrams into TelemetrySnapshot objects."""
+        out: List[Any] = []
+        try:
+            from steuerung3d.protocol.plc_codec import decode_uplink_to_snapshot
+        except Exception:
+            decode_uplink_to_snapshot = None  # type: ignore
+
+        for raw in self.link.poll(limit=limit):
+            if decode_uplink_to_snapshot is None:
+                continue
+            try:
+                snap = decode_uplink_to_snapshot(raw)
+                if snap is not None:
+                    out.append(snap)
+            except Exception:
+                continue
+        return out
+
 
 @dataclass
 class UdpPlcTelemetryOut:
@@ -50,72 +75,109 @@ class UdpPlcTelemetryOut:
     def publish_line(self, line: str) -> None:
         self.link.send(_to_bytes(line))
 
-
-    def publish_telemetry(self, payload) -> None:
+    def publish_telemetry(self, payload: Any) -> None:
         """Publish telemetry on the PLC wire.
 
         Accepts either:
           - a pre-serialized PLC telemetry line (str)
-          - a TelemetrySnapshot-like object (has .tick)
-          - a list/tuple of lines or snapshots (we send the first snapshot, or all lines)
-
-        This is intentionally defensive to keep the system running during the
-        transition from JSON telemetry to PLC semicolon telegrams.
+          - a TelemetrySnapshot-like object (has .axes)
+          - a list/tuple of lines or snapshots
         """
         if payload is None:
             return
 
-        # If we received a batch, handle common cases.
+        # Batch handling
         if isinstance(payload, (list, tuple)):
             if not payload:
                 return
-            # list of strings -> publish each
             if all(isinstance(x, str) for x in payload):
                 for line in payload:
                     self.publish_line(line)
                 return
-            # list containing a single snapshot
             payload = payload[0]
 
         if isinstance(payload, str):
             self.publish_line(payload)
             return
 
-        # Snapshot-like object: encode to PLC line.
-        tick = getattr(payload, "tick", None)
-        if tick is None:
-            # Last resort: send string representation (debug-friendly)
-            self.publish_line(str(payload))
-            return
-
-        # Import lazily to avoid circular imports at module import time.
+        # Snapshot-like: use the existing conservative encoder.
         try:
-            from steuerung3d.protocol.plc_wire import encode_plc_telemetry  # type: ignore
-        except Exception:
-            encode_plc_telemetry = None  # type: ignore
-
-        if encode_plc_telemetry is None:
-            self.publish_line(str(payload))
-            return
-
-        try:
+            from steuerung3d.protocol.plc_wire import encode_plc_telemetry
             line = encode_plc_telemetry(payload)
+            self.publish_line(line)
         except Exception:
             self.publish_line(str(payload))
-            return
-        self.publish_line(line)
 
 
 @dataclass
 class UdpPlcCommandIn:
     link: UdpLink
+    axis_id: Optional[str] = None
 
     @staticmethod
-    def bind(addr: Tuple[str, int]) -> "UdpPlcCommandIn":
-        return UdpPlcCommandIn(link=UdpLink(bind=addr, target=addr))
+    def bind(addr: Tuple[str, int], axis_id: Optional[str] = None) -> "UdpPlcCommandIn":
+        return UdpPlcCommandIn(link=UdpLink(bind=addr, target=addr), axis_id=axis_id)
 
     def drain_lines(self, limit: int = 1000) -> List[str]:
         return [_from_bytes(b) for b in self.link.poll(limit=limit)]
+
+    def drain_command_frames(self, limit: int = 100) -> List[Any]:
+        """Drain and decode PLC downlink telegrams into CommandFrame objects.
+
+        The PLC downlink does not contain the axis name; we therefore bind the
+        channel to a specific axis via ``axis_id`` (DenSi is usually single-axis).
+        """
+        out: List[Any] = []
+        try:
+            from steuerung3d.protocol.plc_codec import decode_downlink
+            from steuerung3d.core.command_frame import CommandFrame, AxisSetpoint
+        except Exception:
+            return out
+
+        axis_id = (self.axis_id or "X").strip() or "X"
+
+        for raw in self.link.poll(limit=limit):
+            try:
+                dec = decode_downlink(raw)
+                if dec is None:
+                    continue
+                f = dec.fields
+
+                # Basic setpoint extraction
+                def _to_int(x: str, default: int = 0) -> int:
+                    try:
+                        return int(float(str(x).strip()))
+                    except Exception:
+                        return default
+
+                def _to_float(x: str, default: float = 0.0) -> float:
+                    try:
+                        return float(str(x).strip())
+                    except Exception:
+                        return default
+
+                tick_ui_rx = _to_int(f.get("LifetickUIrx", "0"), 0)
+                vel = _to_float(f.get("SpeedSollIN", "0"), 0.0)
+
+                # enable heuristic: ControlIN==0 -> disabled, else enabled
+                enable = bool(_to_int(f.get("ControlIN", "0"), 0))
+
+                cmd = CommandFrame(
+                    tick=tick_ui_rx,
+                    t_s=0.0,
+                    estop=False,
+                    fault=False,
+                    mode=str(f.get("Modus", "")) or "",
+                    axes={axis_id: AxisSetpoint(enable=enable, vel=vel)},
+                    estop_reset=bool(_to_int(f.get("EStopReset", "0"), 0)),
+                    lifetick_echo={axis_id: tick_ui_rx},
+                    param_ops=[],
+                )
+                out.append(cmd)
+            except Exception:
+                continue
+
+        return out
 
 
 @dataclass
@@ -128,3 +190,59 @@ class UdpPlcCommandOut:
 
     def publish_line(self, line: str) -> None:
         self.link.send(_to_bytes(line))
+
+    def publish_command_frame(self, frame: Any) -> None:
+        """Encode a CommandFrame and send it as a PLC downlink telegram."""
+        try:
+            from steuerung3d.protocol.plc_codec import encode_downlink
+        except Exception:
+            encode_downlink = None  # type: ignore
+
+        if encode_downlink is None:
+            # best-effort: stringify
+            self.publish_line(str(frame))
+            return
+
+        # Determine axis_id from the frame (router passes per-axis frames with a single key).
+        axis_id = "X"
+        try:
+            axes = getattr(frame, "axes", {}) or {}
+            if isinstance(axes, dict) and axes:
+                axis_id = str(next(iter(axes.keys())))
+        except Exception:
+            pass
+
+        lifetick_ui_rx = 0
+        try:
+            echo = getattr(frame, "lifetick_echo", {}) or {}
+            if isinstance(echo, dict) and axis_id in echo:
+                lifetick_ui_rx = int(echo[axis_id])
+        except Exception:
+            pass
+
+        # Param writes: CommandFrame.param_ops may contain ParamWriteOp objects.
+        params: Dict[str, float] = {}
+        try:
+            for op in list(getattr(frame, "param_ops", []) or []):
+                if getattr(op, "type", None) == "param_write":
+                    vals = getattr(op, "values", None) or {}
+                    for k, v in dict(vals).items():
+                        try:
+                            params[str(k)] = float(v)
+                        except Exception:
+                            continue
+        except Exception:
+            pass
+
+        try:
+            payload = encode_downlink(
+                axis_id=axis_id,
+                frame=frame,
+                pid="0",
+                lifetick_ui_rx=int(lifetick_ui_rx),
+                params=params or None,
+            )
+            self.link.send(payload)
+        except Exception:
+            # last resort: stringify
+            self.publish_line(str(frame))

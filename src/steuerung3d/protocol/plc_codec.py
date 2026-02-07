@@ -120,7 +120,9 @@ def encode_downlink(
 
     sp = frame.axes.get(axis_id)
     vel = float(sp.vel) if isinstance(sp, AxisSetpoint) else 0.0
-    pos = float(sp.pos) if isinstance(sp, AxisSetpoint) else 0.0
+    # AxisSetpoint currently models velocity setpoints only; older PLC code also had pos.
+    # Be defensive so PLC downlink encoding never crashes if the field is absent.
+    pos = float(getattr(sp, 'pos', 0.0)) if isinstance(sp, AxisSetpoint) else 0.0
 
     # crude: treat presence of param_ops as write-mode. Caller can override by setting frame.mode etc later.
     want_write = bool(getattr(frame, "param_ops", None))
@@ -218,7 +220,14 @@ def decode_uplink_to_snapshot(payload: bytes) -> Optional[TelemetrySnapshot]:
         vel = _to_float(upl.fields.get("SpeedIstUI", "0"), 0.0)
 
         # Status words
+        # EStop status word: primary key is EStopStatus. Some PLC variants place the word
+        # in RampenformUI (template-based uplink). Use a conservative fallback when
+        # EStopStatus is 0 but another field looks like a large bitmask.
         estop_status = _to_int(upl.fields.get("EStopStatus", "0"), 0)
+        if estop_status == 0:
+            alt = _to_int(upl.fields.get("RampenformUI", "0"), 0)
+            if abs(alt) > 65535:
+                estop_status = alt
         status_word = _to_int(upl.fields.get("Status", "0"), 0)
         guide_status_word = _to_int(upl.fields.get("GuideStatus", "0"), 0)
 

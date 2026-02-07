@@ -1,0 +1,51 @@
+# Core + DenSi for a single Anton axis, all local.
+# Use:
+#   python -m steuerung3d up --profile anton_core_densi
+#
+# Notes:
+# - core_udp_service currently binds IntentIn fixed at 127.0.0.1:51001 (no CLI flag).
+# - UI telemetry out uses --ui-telem-target / --ui-telem-base flags (not --telem-out).
+
+[stack]
+name = "anton_core_densi"
+description = "Core + DenSi (Anton) using PLC semicolon UDP"
+
+[rig]
+axes = ["Anton"]
+
+[net]
+bind_host = "127.0.0.1"
+intent_in = 51001
+ui_telem_out = 51002
+
+# Device-side (PLC wire)
+dev_cmd_base = 52001
+# DenSi telem-out should target this; core binds it
+# (keep it distinct from dev_cmd ports).
+dev_telem_in = "127.0.0.1:52020"
+
+[services.core]
+enabled = true
+module = "steuerung3d.apps.core_udp_service"
+args = [
+  "--axis", "Anton",
+  "--ui-telem-target", "127.0.0.1:51002",
+  "--dev-cmd-base", "52001",
+  "--dev-cmd-count", "1",
+  "--dev-telem-in", "127.0.0.1:52020",
+  "--dt", "0.02",
+  "--log-level", "info",
+]
+
+[services.densi]
+enabled = true
+module = "steuerung3d.apps.den_si"
+mode = "per_axis"
+args = [
+  "--axis", "Anton",
+  "--cmd-in", "127.0.0.1:52001",
+  "--telem-out", "127.0.0.1:52020",
+  "--wire-proto", "plc",
+  "--dt", "0.01",
+  "--log-level", "info",
+]
