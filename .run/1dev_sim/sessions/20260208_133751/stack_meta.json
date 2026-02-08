@@ -20,7 +20,7 @@
       ],
       "log_path": ".run\\1dev_sim\\sessions\\20260208_133751\\core.log",
       "pid": 20520,
-      "returncode": null
+      "returncode": 1
     },
     "densi-Anton": {
       "argv": [
@@ -36,7 +36,7 @@
       ],
       "log_path": ".run\\1dev_sim\\sessions\\20260208_133751\\densi-Anton.log",
       "pid": 19184,
-      "returncode": null
+      "returncode": 1
     },
     "hip": {
       "argv": [
@@ -48,7 +48,7 @@
       ],
       "log_path": ".run\\1dev_sim\\sessions\\20260208_133751\\hip.log",
       "pid": 16892,
-      "returncode": null
+      "returncode": 1
     },
     "inputd": {
       "argv": [
@@ -60,7 +60,7 @@
       ],
       "log_path": ".run\\1dev_sim\\sessions\\20260208_133751\\inputd.log",
       "pid": 18916,
-      "returncode": null
+      "returncode": 1
     },
     "joy2intent": {
       "argv": [
@@ -78,13 +78,13 @@
       ],
       "log_path": ".run\\1dev_sim\\sessions\\20260208_133751\\joy2intent.log",
       "pid": 8500,
-      "returncode": null
+      "returncode": 1
     }
   },
   "profile_path": "",
   "session_dir": ".run\\1dev_sim\\sessions\\20260208_133751",
   "stack_name": "1dev_sim",
-  "started_at_s": 1770554271.739708,
-  "stopped_at_s": null,
+  "started_at_s": 1770554866.4108562,
+  "stopped_at_s": 1770554866.4108562,
   "supervisor_pid": 16076
 }

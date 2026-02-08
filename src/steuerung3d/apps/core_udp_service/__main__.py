@@ -72,6 +72,11 @@ def main() -> int:
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
     ap.add_argument("--dt", type=float, default=0.02, help="Core tick (s)")
     ap.add_argument(
+        "--intent-in",
+        default="127.0.0.1:51001",
+        help="Operator IntentIn bind host:port (default 127.0.0.1:51001).",
+    )
+    ap.add_argument(
         "--axis",
         action="append",
         # Important: for action='append', argparse will *append to the default*.
@@ -147,7 +152,9 @@ def main() -> int:
     status = StatusEmitter.from_env(default_service="core")
 
     # --- UDP endpoints ---
-    op_intent_in = UdpIntentIn.bind(("127.0.0.1", 51001))
+    intent_in_bind = _parse_hostport(args.intent_in)
+
+    op_intent_in = UdpIntentIn.bind(intent_in_bind)
 
     # UI telemetry targets
     ui_telem_targets: List[Tuple[str, int]] = []
@@ -209,7 +216,7 @@ def main() -> int:
     state_ch = ChangeTracker()
 
     log.info("=== core_udp_service starting ===")
-    log.info("Operator: IntentIn  bind=%s", ("127.0.0.1", 51001))
+    log.info("Operator: IntentIn  bind=%s", intent_in_bind)
     if len(ui_telem_targets) == 1:
         log.info("Operator: TelemetryOut target=%s", ui_telem_targets[0])
     else:
