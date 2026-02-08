@@ -16,6 +16,7 @@ we prefer “don’t crash” over “strict schema enforcement”.
 """
 
 from dataclasses import dataclass
+import os
 from typing import Any, Dict, List, Optional, Tuple
 
 from steuerung3d.adapters.links.udp_link import UdpLink
@@ -109,6 +110,7 @@ class UdpPlcTelemetryOut:
             self.publish_line(str(payload))
 
 
+
 @dataclass
 class UdpPlcCommandIn:
     link: UdpLink
@@ -126,15 +128,38 @@ class UdpPlcCommandIn:
 
         The PLC downlink does not contain the axis name; we therefore bind the
         channel to a specific axis via ``axis_id`` (DenSi is usually single-axis).
+
+        ST semantics:
+        - Modus == 'w' means the write-extension fields are present (parameter write).
+        - Intent is a boolean string ('True'/'False') and is *not* used for param edit ops.
         """
         out: List[Any] = []
         try:
-            from steuerung3d.protocol.plc_codec import decode_downlink
-            from steuerung3d.core.command_frame import CommandFrame, AxisSetpoint
+            from steuerung3d.protocol.plc_codec import decode_downlink, _PARAM_KEYMAP
+            from steuerung3d.core.command_frame import CommandFrame, AxisSetpoint, ParamWriteOp
         except Exception:
             return out
 
         axis_id = (self.axis_id or "X").strip() or "X"
+
+        def _to_int(x: str, default: int = 0) -> int:
+            try:
+                return int(float(str(x).strip()))
+            except Exception:
+                return default
+
+        def _to_float(x: str, default: float = 0.0) -> float:
+            try:
+                return float(str(x).strip())
+            except Exception:
+                return default
+
+        group_defaults = {
+            "pos":    ["HardMax", "UserMax", "UserMin", "HardMin", "PosWin"],
+            "vel":    ["VelMax", "VelWin", "AccMax", "AccMove", "DccMax", "MaxAmp", "VelMaxMot"],
+            "filter": ["P", "I", "D", "IL", "RampForm"],
+            "guider": ["PosMax", "PosMin", "Pitch"],
+        }
 
         for raw in self.link.poll(limit=limit):
             try:
@@ -143,24 +168,23 @@ class UdpPlcCommandIn:
                     continue
                 f = dec.fields
 
-                # Basic setpoint extraction
-                def _to_int(x: str, default: int = 0) -> int:
-                    try:
-                        return int(float(str(x).strip()))
-                    except Exception:
-                        return default
-
-                def _to_float(x: str, default: float = 0.0) -> float:
-                    try:
-                        return float(str(x).strip())
-                    except Exception:
-                        return default
-
                 tick_ui_rx = _to_int(f.get("LifetickUIrx", "0"), 0)
                 vel = _to_float(f.get("SpeedSollIN", "0"), 0.0)
-
-                # enable heuristic: ControlIN==0 -> disabled, else enabled
                 enable = bool(_to_int(f.get("ControlIN", "0"), 0))
+
+                param_ops = []
+                modus = str(f.get("Modus", "") or "").strip().lower()
+                if modus == "w":
+                    for grp, keys in group_defaults.items():
+                        values = {}
+                        for k in keys:
+                            plc_k = _PARAM_KEYMAP.get(k)
+                            if not plc_k:
+                                continue
+                            if plc_k in f:
+                                values[str(k)] = _to_float(f.get(plc_k, "0"), 0.0)
+                        if values:
+                            param_ops.append(ParamWriteOp(group=str(grp), values=values))
 
                 cmd = CommandFrame(
                     tick=tick_ui_rx,
@@ -171,7 +195,7 @@ class UdpPlcCommandIn:
                     axes={axis_id: AxisSetpoint(enable=enable, vel=vel)},
                     estop_reset=bool(_to_int(f.get("EStopReset", "0"), 0)),
                     lifetick_echo={axis_id: tick_ui_rx},
-                    param_ops=[],
+                    param_ops=param_ops,
                 )
                 out.append(cmd)
             except Exception:
@@ -179,9 +203,9 @@ class UdpPlcCommandIn:
 
         return out
 
-
 @dataclass
 class UdpPlcCommandOut:
+
     link: UdpLink
 
     @staticmethod
@@ -238,7 +262,7 @@ class UdpPlcCommandOut:
             payload = encode_downlink(
                 axis_id=axis_id,
                 frame=frame,
-                pid="0",
+                pid=str(os.getpid()),
                 lifetick_ui_rx=int(lifetick_ui_rx),
                 params=params or None,
             )

@@ -18,8 +18,8 @@
         "--axis",
         "Anton"
       ],
-      "log_path": ".run\\1dev_sim\\sessions\\20260205_182725\\core.log",
-      "pid": 17576,
+      "log_path": ".run\\1dev_sim\\sessions\\20260208_120401\\core.log",
+      "pid": 20848,
       "returncode": 1
     },
     "densi-Anton": {
@@ -34,8 +34,8 @@
         "--telem-out",
         "127.0.0.1:52020"
       ],
-      "log_path": ".run\\1dev_sim\\sessions\\20260205_182725\\densi-Anton.log",
-      "pid": 11196,
+      "log_path": ".run\\1dev_sim\\sessions\\20260208_120401\\densi-Anton.log",
+      "pid": 11356,
       "returncode": 1
     },
     "hip": {
@@ -46,9 +46,9 @@
         "--telem-in",
         "127.0.0.1:51002"
       ],
-      "log_path": ".run\\1dev_sim\\sessions\\20260205_182725\\hip.log",
-      "pid": 18896,
-      "returncode": 1
+      "log_path": ".run\\1dev_sim\\sessions\\20260208_120401\\hip.log",
+      "pid": 17936,
+      "returncode": 0
     },
     "inputd": {
       "argv": [
@@ -58,8 +58,8 @@
         "--config",
         "configs/inputd_gamepad.toml"
       ],
-      "log_path": ".run\\1dev_sim\\sessions\\20260205_182725\\inputd.log",
-      "pid": 16628,
+      "log_path": ".run\\1dev_sim\\sessions\\20260208_120401\\inputd.log",
+      "pid": 712,
       "returncode": 1
     },
     "joy2intent": {
@@ -76,15 +76,15 @@
         "--config",
         "configs/joy2intent_bindings_gamepad.toml"
       ],
-      "log_path": ".run\\1dev_sim\\sessions\\20260205_182725\\joy2intent.log",
-      "pid": 20468,
+      "log_path": ".run\\1dev_sim\\sessions\\20260208_120401\\joy2intent.log",
+      "pid": 16848,
       "returncode": 1
     }
   },
   "profile_path": "",
-  "session_dir": ".run\\1dev_sim\\sessions\\20260205_182725",
+  "session_dir": ".run\\1dev_sim\\sessions\\20260208_120401",
   "stack_name": "1dev_sim",
-  "started_at_s": 1770312469.9063082,
-  "stopped_at_s": 1770312469.9063082,
-  "supervisor_pid": 5980
+  "started_at_s": 1770548712.6987286,
+  "stopped_at_s": 1770548712.6987286,
+  "supervisor_pid": 21292
 }

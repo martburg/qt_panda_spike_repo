@@ -174,17 +174,27 @@ def _update_param_commit_observation(state: MachineState, device_tick: int) -> N
 
 
 def apply_measured_snapshot(state: MachineState, snap: TelemetrySnapshot) -> None:
-    state.mode = Mode(snap.mode) if isinstance(snap.mode, str) else snap.mode
-    state.estop = bool(snap.estop)
-    state.fault = bool(snap.fault)
+    """Apply a device/DenSi measured snapshot to MachineState.
 
-    # NEW: carry the word through the core
+    Important: measured snapshots must NOT override core-owned workflow state such as
+    the mode/state-machine, or parameter edit session flags. They should only update
+    measured values (pos/vel, estop word, and measured params).
+    """
+    # Core mode is driven by intents + state machine; ignore snap.mode from PLC telemetry.
+    state.estop = bool(getattr(snap, "estop", False))
+    state.fault = bool(getattr(snap, "fault", False))
+
+    # Carry the raw estop status word through the core for bit-wrangling UI + reset_able.
     state.estop_status_word = int(getattr(snap, "estop_status_word", 0))
 
-    # parameters (optional on the wire)
-    state.param_edit_active = bool(getattr(snap, "param_edit_active", False))
-    state.param_edit_group = str(getattr(snap, "param_edit_group", ""))
-    state.params = dict(getattr(snap, "params", {}))
+    # Measured parameters (optional on the wire). Never clear on empty.
+    incoming_params = dict(getattr(snap, "params", {}) or {})
+    if incoming_params:
+        for k, v in incoming_params.items():
+            try:
+                state.params[str(k)] = float(v)
+            except Exception:
+                continue
 
     # Observe parameter commit acceptance by comparing requested values to measured params.
     _update_param_commit_observation(state, int(getattr(snap, "tick", 0)))
@@ -203,3 +213,4 @@ def apply_measured_snapshot(state: MachineState, snap: TelemetrySnapshot) -> Non
         ax.meta["lifetick_age"] = int(getattr(ax_t, "lifetick_age", 0)) & 0xFFFF
         ax.meta["status_word"] = int(getattr(ax_t, "status_word", 0))
         ax.meta["guide_status_word"] = int(getattr(ax_t, "guide_status_word", 0))
+

@@ -29,6 +29,16 @@ from steuerung3d.core.command_frame import ParamEditBeginOp, ParamWriteOp, Param
 from steuerung3d.core.state_machine import enforce_mode_actions, normalize_mode
 from steuerung3d.core.param_registry import normalize_group_values
 
+# PLC Modus 'w' expects the full parameter set on each write.
+# We merge partial UI writes with last-known params to avoid zeroing untouched fields.
+_PLC_WRITE_KEYS = {
+    'HardMax','UserMax','UserMin','HardMin',
+    'VelMax','AccMax','DccMax','MaxAmp',
+    'P','I','D','IL','RampForm',
+    'Pitch','PosMax','PosMin',
+    'PosWin','VelWin','AccMove','VelMaxMot',
+}
+
 
 def _txn_ack(state: MachineState, req_id: str) -> None:
     """Record a one-shot ack for HIP (emitted in telemetry)."""
@@ -199,7 +209,10 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             state.param_commit_observed_ticks = 0
             state.param_commit_match_streak = 0
 
-            op = ParamWriteOp(group=grp, values=cleaned)
+            # Merge with last-known params so PLC 'w' writes are full-snapshot.
+            wire_vals = {k: float(v) for k, v in (state.params or {}).items() if k in _PLC_WRITE_KEYS}
+            wire_vals.update({k: float(v) for k, v in cleaned.items()})
+            op = ParamWriteOp(group=grp, values=wire_vals)
 
             if axis_id and hasattr(state, "pending_param_ops_by_axis"):
                 owner = state.axis_claims.get(axis_id, "")

@@ -18,9 +18,9 @@
         "--axis",
         "Anton"
       ],
-      "log_path": ".run\\1dev_sim\\sessions\\20260205_191431\\core.log",
-      "pid": 3160,
-      "returncode": 1
+      "log_path": ".run\\1dev_sim\\sessions\\20260208_133751\\core.log",
+      "pid": 20520,
+      "returncode": null
     },
     "densi-Anton": {
       "argv": [
@@ -34,9 +34,9 @@
         "--telem-out",
         "127.0.0.1:52020"
       ],
-      "log_path": ".run\\1dev_sim\\sessions\\20260205_191431\\densi-Anton.log",
-      "pid": 1004,
-      "returncode": 0
+      "log_path": ".run\\1dev_sim\\sessions\\20260208_133751\\densi-Anton.log",
+      "pid": 19184,
+      "returncode": null
     },
     "hip": {
       "argv": [
@@ -46,9 +46,9 @@
         "--telem-in",
         "127.0.0.1:51002"
       ],
-      "log_path": ".run\\1dev_sim\\sessions\\20260205_191431\\hip.log",
-      "pid": 1556,
-      "returncode": 1
+      "log_path": ".run\\1dev_sim\\sessions\\20260208_133751\\hip.log",
+      "pid": 16892,
+      "returncode": null
     },
     "inputd": {
       "argv": [
@@ -58,9 +58,9 @@
         "--config",
         "configs/inputd_gamepad.toml"
       ],
-      "log_path": ".run\\1dev_sim\\sessions\\20260205_191431\\inputd.log",
-      "pid": 4896,
-      "returncode": 1
+      "log_path": ".run\\1dev_sim\\sessions\\20260208_133751\\inputd.log",
+      "pid": 18916,
+      "returncode": null
     },
     "joy2intent": {
       "argv": [
@@ -76,15 +76,15 @@
         "--config",
         "configs/joy2intent_bindings_gamepad.toml"
       ],
-      "log_path": ".run\\1dev_sim\\sessions\\20260205_191431\\joy2intent.log",
-      "pid": 1236,
-      "returncode": 1
+      "log_path": ".run\\1dev_sim\\sessions\\20260208_133751\\joy2intent.log",
+      "pid": 8500,
+      "returncode": null
     }
   },
   "profile_path": "",
-  "session_dir": ".run\\1dev_sim\\sessions\\20260205_191431",
+  "session_dir": ".run\\1dev_sim\\sessions\\20260208_133751",
   "stack_name": "1dev_sim",
-  "started_at_s": 1770315885.370898,
-  "stopped_at_s": 1770315885.370898,
-  "supervisor_pid": 10696
+  "started_at_s": 1770554271.739708,
+  "stopped_at_s": null,
+  "supervisor_pid": 16076
 }

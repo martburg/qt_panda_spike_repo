@@ -26,7 +26,7 @@ from steuerung3d.core.intents import (
     EchoLifeTick,
 )
 
-from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
+from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
 
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamOp, decode_param_ops
 
@@ -82,16 +82,36 @@ def encode_telemetry(snap: TelemetrySnapshot) -> Dict[str, Any]:
 
 
 def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
-    axes_in = payload["axes"]
-    axes_out = {axis_id: AxisTelemetry(**ax) for axis_id, ax in axes_in.items()}
+    # Axes
+    axes_in = payload.get("axes", {})
+    axes_out = {
+        str(axis_id): AxisTelemetry(**ax) for axis_id, ax in dict(axes_in).items()
+        if isinstance(ax, dict)
+    }
+
+    # DenSi registry (optional)
+    densis_out: Dict[str, DensiTelemetry] = {}
+    densis_in = payload.get("densis", {})
+    if isinstance(densis_in, dict):
+        for dev_id, d in densis_in.items():
+            if isinstance(d, dict):
+                try:
+                    densis_out[str(dev_id)] = DensiTelemetry(**d)
+                except Exception:
+                    continue
+
     return TelemetrySnapshot(
-        tick=int(payload["tick"]),
-        t_s=float(payload["t_s"]),
-        mode=str(payload["mode"]),
-        estop=bool(payload["estop"]),
-        fault=bool(payload["fault"]),
+        tick=int(payload.get("tick", 0)),
+        t_s=float(payload.get("t_s", 0.0)),
+        mode=str(payload.get("mode", "IDLE")),
+        estop=bool(payload.get("estop", False)),
+        fault=bool(payload.get("fault", False)),
         axes=axes_out,
-        estop_status_word=int(payload.get("estop_status_word", 0)),  # NEW
+        # rig workflow (optional)
+        rig_mode=str(payload.get("rig_mode", "DISCOVERY")),
+        densis=densis_out,
+        # NEW
+        estop_status_word=int(payload.get("estop_status_word", 0)),
         # parameters (optional)
         param_edit_active=bool(payload.get("param_edit_active", False)),
         param_edit_group=str(payload.get("param_edit_group", "")),
@@ -104,7 +124,6 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
         param_commit_age_ticks=int(payload.get("param_commit_age_ticks", 0)),
         param_commit_unmatched=[str(x) for x in list(payload.get("param_commit_unmatched", []))],
     )
-
 
 
 # ---------------------------

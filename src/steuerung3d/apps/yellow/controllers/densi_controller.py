@@ -705,14 +705,16 @@ class DenSiController:
                 vals = getattr(op, "values", None) or (op.get("values") if isinstance(op, dict) else {})
                 vals = {str(k): float(v) for k, v in dict(vals).items()}
 
-                # Simple policy: only accept if group matches current edit group.
+                # ST does *not* implement a param-edit session on the wire.
+                # In simulation we still *support* edit sessions, but we also accept
+                # direct writes when no session is active.
 
                 # enforce minimal device-side guards too
                 if str(grp) == 'pos':
                     vals = self._normalize_pos_chain(vals)
                 elif str(grp) == 'guider':
                     vals = self._normalize_guider_range(vals)
-                if (not self.state.param_edit_active) or (str(grp) != self.state.param_edit_group):
+                if self.state.param_edit_active and (str(grp) != self.state.param_edit_group):
                     log.warning(
                         "param_write rejected: group=%s active=%s active_group=%s",
                         grp,

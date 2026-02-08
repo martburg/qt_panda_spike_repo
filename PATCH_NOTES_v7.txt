@@ -1,0 +1,16 @@
+Patch v7: unify PLC uplink decoding so that params, estop bits, and livetick all work together.
+
+Changes:
+- protocol/plc_codec.py
+  * decode_uplink_to_snapshot now maps PLC token names -> internal param keys (HardMax/UserMax/... P/I/D/IL, PosWin/VelWin/AccMove).
+  * AxisTelemetry is constructed with device_tick/status_word/guide_status_word (no setattr on frozen dataclass).
+  * estop boolean is derived from CAUSE bits via decode_estop_word (still passes through estop_status_word).
+  * downlink write-mode only when actual write values are present (params dict non-empty).
+
+- core/telemetry.py
+  * apply_measured_snapshot no longer overwrites core-owned mode or param_edit flags from device telemetry.
+  * measured params update state.params without clearing on empty.
+
+How to apply:
+- unzip into repo root, overwriting files.
+- restart stack (core, hip, densi).
