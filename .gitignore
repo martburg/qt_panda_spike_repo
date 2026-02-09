@@ -37,3 +37,10 @@ src/logs/
 .pytest_cache/
 .mypy_cache/
 .venv/
+
+# runtime sessions / local runs
+.run/
+
+# local patch files kept outside repo (root only)
+ /*.patch
+ /*.rej
