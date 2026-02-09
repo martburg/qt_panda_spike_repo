@@ -16,6 +16,11 @@ class AxisTelemetry:
     enabled: bool
     fault: bool
 
+    # commanded (what core wants, echoed for UI/HiP)
+    vel_cmd: float = 0.0
+    enable_cmd: bool = False
+
+
     # legacy/layer-0 diagnostics (optional on the wire)
     device_tick: int = 0          # PLC/device lifetick (legacy LifetickUItx)
     lifetick_rx: int = 0          # echoed tick seen at device (legacy LifetickUIrx), if available
@@ -78,6 +83,8 @@ class TelemetrySnapshot:
                 vel=float(ax.vel),
                 enabled=bool(ax.enabled),
                 fault=bool(ax.fault),
+                vel_cmd=float(getattr(state.axis_cmd.get(axis_id, None), 'vel', 0.0)) if hasattr(state, 'axis_cmd') else 0.0,
+                enable_cmd=bool(getattr(state.axis_cmd.get(axis_id, None), 'enable', False)) if hasattr(state, 'axis_cmd') else False,
                 device_tick=int(getattr(ax, 'meta', {}).get('device_tick', 0)) & 0xFFFF,
                 lifetick_rx=int(getattr(ax, 'meta', {}).get('lifetick_rx', 0)) & 0xFFFF,
                 lifetick_age=int(getattr(ax, 'meta', {}).get('lifetick_age', 0)) & 0xFFFF,

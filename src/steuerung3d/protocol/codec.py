@@ -116,6 +116,8 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
         param_edit_active=bool(payload.get("param_edit_active", False)),
         param_edit_group=str(payload.get("param_edit_group", "")),
         params={k: float(v) for k, v in dict(payload.get("params", {})).items()},
+        plc_uplink_fields={str(k): str(v) for k, v in dict(payload.get("plc_uplink_fields", {})).items()},
+        plc_uplink_tail={str(k): str(v) for k, v in dict(payload.get("plc_uplink_tail", {})).items()},
         core_acks=[str(x) for x in list(payload.get("core_acks", []))],
         # observed param commit status (optional)
         param_commit_req_id=str(payload.get("param_commit_req_id", "")),

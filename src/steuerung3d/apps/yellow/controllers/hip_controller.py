@@ -9,6 +9,7 @@ import uuid
 from PySide6.QtCore import QLocale, QTimer
 from PySide6.QtGui import QDoubleValidator
 from PySide6.QtWidgets import (
+    QAbstractSlider,
     QCheckBox,
     QComboBox,
     QLineEdit,
@@ -176,6 +177,17 @@ class HiPController:
 
         # Legacy TimeTick display (ticks elapsed between telemetry updates)
         self._txt_tick: QLineEdit | None = self.win.findChild(QLineEdit, "txt_tick")
+
+        # Live readouts (same widgets exist in the HiP UI)
+        self._txt_pos: QLineEdit | None = self.win.findChild(QLineEdit, "txt_pos")
+        self._txt_vel: QLineEdit | None = self.win.findChild(QLineEdit, "txt_vel")
+        self._txt_amp: QLineEdit | None = self.win.findChild(QLineEdit, "txt_amp")
+        self._txt_temp: QLineEdit | None = self.win.findChild(QLineEdit, "txt_temp")
+
+
+        # Sliders used as live indicators
+        self._sld_vel_cmd: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldVelCmd")
+        self._sld_limit_range: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldLimitRange")
 
         # Legacy drive status fields (main + guider/slave)
         self._txt_main_amp_status: QLineEdit | None = self.win.findChild(QLineEdit, "txtMainAmpStatus")
@@ -1002,6 +1014,7 @@ class HiPController:
                 self._seen_first_telem = True
 
             self._render_tick_delta(snap)
+            self._render_live_readouts(snap)
             self._render_drive_status(snap)
             self._render_estop(snap)
             self._render_params_and_edit_state(snap)
@@ -1121,6 +1134,92 @@ class HiPController:
         self._set_led_by_name("dotHdrFbt", state=fbt_state)
         self._set_led_by_name("dotHdrBrake1", state=brk1_state)
         self._set_led_by_name("dotHdrBrake2", state=brk2_state)
+
+
+    def _render_live_readouts(self, snap: TelemetrySnapshot) -> None:
+        """Render position/velocity/current/temp into txt_* fields (read-only)."""
+        axis_id = self._selected_axis or self._fixed_axis
+        if not axis_id:
+            for w in (self._txt_pos, self._txt_vel, self._txt_amp, self._txt_temp):
+                if w is not None:
+                    w.setText("--")
+            return
+
+        axes = getattr(snap, "axes", None)
+        if not isinstance(axes, dict):
+            return
+        ax = axes.get(axis_id)
+        if ax is None:
+            return
+
+        try:
+            pos = float(getattr(ax, "pos", 0.0) or 0.0)
+        except Exception:
+            pos = 0.0
+        try:
+            vel = float(getattr(ax, "vel", 0.0) or 0.0)
+        except Exception:
+            vel = 0.0
+
+        params = getattr(snap, "params", {}) or {}
+        if not isinstance(params, dict):
+            params = {}
+
+        def _pf(key: str, default: float) -> float:
+            try:
+                return float(params.get(key, default))
+            except Exception:
+                return float(default)
+
+        amp = _pf("ActCur", _pf("Amp", 0.0))
+        tmp = _pf("Temp", 20.0)
+
+        # Fallback to raw PLC token dictionaries if present
+        try:
+            raw = getattr(snap, "plc_uplink_fields", None)
+            if isinstance(raw, dict):
+                if "ActCurUI" in raw and ("ActCur" not in params):
+                    amp = float(raw.get("ActCurUI", amp))
+                if "CabTemperatureUI" in raw and ("Temp" not in params):
+                    tmp = float(raw.get("CabTemperatureUI", tmp))
+        except Exception:
+            pass
+
+        if self._txt_pos is not None:
+            self._txt_pos.setText(f"{pos:.2f} m")
+        if self._txt_vel is not None:
+            self._txt_vel.setText(f"{vel:.2f} m/s")
+        if self._txt_amp is not None:
+            self._txt_amp.setText(f"{int(round(amp))} A")
+        if self._txt_temp is not None:
+            self._txt_temp.setText(f"{int(round(tmp))}°")
+
+        # --- slider indicators ---
+        vel_max = float(params.get("VelMax", 0.0) or 0.0)
+        if vel_max <= 0.0:
+            vel_max = 1.0
+        # commanded speed is provided by core as AxisTelemetry.vel_cmd (fallback: measured vel)
+        vel_cmd = float(getattr(ax, "vel_cmd", vel) if ax is not None else vel)
+        if self._sld_vel_cmd is not None:
+            scale = 1000.0  # m/s -> mm/s
+            self._sld_vel_cmd.blockSignals(True)
+            self._sld_vel_cmd.setMinimum(int(round(-vel_max * scale)))
+            self._sld_vel_cmd.setMaximum(int(round(+vel_max * scale)))
+            self._sld_vel_cmd.setValue(int(round(vel_cmd * scale)))
+            self._sld_vel_cmd.blockSignals(False)
+
+        user_min = float(params.get("UserMin", 0.0) or 0.0)
+        user_max = float(params.get("UserMax", 0.0) or 0.0)
+        if user_max < user_min:
+            user_min, user_max = user_max, user_min
+        if self._sld_limit_range is not None:
+            scale = 1000.0  # m -> mm
+            self._sld_limit_range.blockSignals(True)
+            self._sld_limit_range.setMinimum(int(round(user_min * scale)))
+            self._sld_limit_range.setMaximum(int(round(user_max * scale)))
+            self._sld_limit_range.setValue(int(round(pos * scale)))
+            self._sld_limit_range.blockSignals(False)
+
 
     def _render_tick_delta(self, snap: TelemetrySnapshot) -> None:
         """Render legacy TimeTick into txt_tick (delta of device_tick)."""

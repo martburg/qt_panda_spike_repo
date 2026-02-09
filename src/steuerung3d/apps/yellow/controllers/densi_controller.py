@@ -1,16 +1,16 @@
 # src/steuerung3d/apps/yellow/controllers/densi_controller.py
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import time
 
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QCheckBox, QWidget, QLineEdit, QComboBox
+from PySide6.QtWidgets import QAbstractSlider, QCheckBox, QWidget, QLineEdit, QComboBox
 
 from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
 from steuerung3d.adapters.sim.device import SimDevice
 from steuerung3d.common.timebase import Timebase
-from steuerung3d.core.command_frame import CommandFrame
+from steuerung3d.core.command_frame import CommandFrame, AxisSetpoint
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
@@ -142,24 +142,30 @@ class DenSiController:
         out = self.telemetry_out
 
         if getattr(self, "wire_proto", "json") == "plc":
-            from steuerung3d.protocol.plc_codec import encode_uplink_from_snapshot
+            # Prefer the PLC wire TelemetryOut implementation if available.
+            # UdpPlcTelemetryOut.publish_telemetry() encodes via protocol.plc_wire.encode_plc_telemetry()
+            if hasattr(out, "publish_telemetry"):
+                out.publish_telemetry(payload)
+                return
 
-            snap = payload
-            axis_name = (self.axis_ids[0] if self.axis_ids else "").strip()
-            data = encode_uplink_from_snapshot(snap, axis_name=axis_name)  # bytes
+            # Fallback: encode a canonical ST-compatible uplink line and send it.
+            from steuerung3d.protocol.plc_wire import encode_plc_telemetry
+
+            line = encode_plc_telemetry(payload)
 
             if hasattr(out, "publish_line"):
-                out.publish_line(data.decode("utf-8", errors="replace"))
+                out.publish_line(line)
                 return
 
             link = getattr(out, "link", None)
             if link is not None and hasattr(link, "send"):
-                link.send(data)
+                link.send(line.encode("utf-8"))
                 return
 
             raise AttributeError(
                 f"TelemetryOut does not support PLC uplink sending: {type(out).__name__}"
             )
+
 
         if hasattr(out, "publish_telemetry"):
             out.publish_telemetry(payload)
@@ -197,6 +203,17 @@ class DenSiController:
         # show (lifetick_tx - lifetick_rx) in milliseconds (WORD wrap).
         self._txt_tick: QLineEdit | None = self.win.findChild(QLineEdit, "txt_tick")
 
+        # Live readouts on device page (position/velocity/current/temp)
+        self._txt_pos: QLineEdit | None = self.win.findChild(QLineEdit, "txt_pos")
+        self._txt_vel: QLineEdit | None = self.win.findChild(QLineEdit, "txt_vel")
+        self._txt_amp: QLineEdit | None = self.win.findChild(QLineEdit, "txt_amp")
+        self._txt_temp: QLineEdit | None = self.win.findChild(QLineEdit, "txt_temp")
+
+
+        # Sliders used as live indicators
+        self._sld_vel_cmd: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldVelCmd")
+        self._sld_limit_range: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldLimitRange")
+
         # DenSi is normally bound to exactly one axis. To reduce confusion during
         # multi-window integration, show the axis name directly in cmb_axis.
         cmb = self.win.findChild(QComboBox, "cmb_axis")
@@ -229,6 +246,12 @@ class DenSiController:
         # initialize parameter bank from current UI text (if present)
         self._seed_params_from_ui()
 
+        # Plausible measured defaults so UI/HiP have stable values from tick 0
+        self.state.params.setdefault("ActCur", 0.0)  # A
+        self.state.params.setdefault("Temp", 20.0)   # °C
+        self.state.params.setdefault("CutPos", 0.0)  # m
+        self.state.params.setdefault("CutVel", 0.0)  # m/s
+
         # Render limit header fields (txtLimit*) from seeded params.
         self._render_limit_fields_from_params(self.state.params)
 
@@ -247,6 +270,15 @@ class DenSiController:
 
         # LOGICAL injected bits (invert handled by encode/decode)
         self._inj_bits = {k: False for k in ESTOP_SPECS.keys()}
+
+        # --- Startup / SafetyPLC handoff emulation ---
+        # Real-world flow (simplified): EStop reset -> operator presses Taster -> after a short delay
+        # the drives energize and brakes lift. We emulate that here so HiP sees plausible timing.
+        self._taster_prev: bool = False
+        self._taster_rise_t_s: float | None = None
+        self._taster_delay_s: float = 2.0
+        self._drive_ready: bool = False
+
 
         # Start in a "FAULT" state: show the full estop chain as broken until the operator
         # explicitly issues an E-Stop reset from HiP. Keep reset_able True so the reset
@@ -408,6 +440,175 @@ class DenSiController:
         self._inj_estop_word = encode_estop_word(self._inj_bits)
         self._estop_latched = False
         self._render_estop_word_to_ui(self._inj_estop_word)
+
+
+    def _apply_post_reset_state(self) -> None:
+        """Clear initial FAULT latch, but remain not-ready until Taster + delay."""
+        # Start from a clean slate
+        for k in self._inj_bits.keys():
+            self._inj_bits[k] = False
+
+        # OK keys True (green), cause keys False (green)
+        for k in ESTOP_OK_KEYS:
+            self._inj_bits[k] = True
+        for k in ESTOP_CAUSE_KEYS:
+            self._inj_bits[k] = False
+
+        # Post-reset we are *not* yet ready: operator must press the Taster and wait a bit.
+        for k in ("ready", "taster", "schuetz", "brk1_ok", "brk2_ok", "brk2kb_ok"):
+            if k in self._inj_bits:
+                self._inj_bits[k] = False
+
+        # Reset should no longer be "available" once we've just consumed it (mimics PLC behavior).
+        if "reset_able" in self._inj_bits:
+            self._inj_bits["reset_able"] = False
+
+        self._inj_estop_word = encode_estop_word(self._inj_bits)
+        self._estop_latched = False
+
+        # Reset startup timers/derived readiness
+        self._taster_prev = False
+        self._taster_rise_t_s = None
+        self._drive_ready = False
+
+        self._render_estop_word_to_ui(self._inj_estop_word)
+
+    def _apply_startup_logic(self) -> None:
+        """Emulate SafetyPLC timing: Taster -> (delay) -> drives ready & brakes lifted."""
+        bits = self._inj_bits
+        changed = False
+
+        # If the E-Stop chain is tripped/latching, never progress into READY.
+        trip_causes = any(bool(bits.get(k, False)) for k in ESTOP_CAUSE_KEYS)
+        if trip_causes or self._estop_latched:
+            if self._drive_ready:
+                log.info("startup: inhibit (trip/latched) -> drive_ready=False")
+            self._drive_ready = False
+            self._taster_rise_t_s = None
+            # force derived bits to a safe state
+            for k in ("ready", "schuetz", "brk1_ok", "brk2_ok", "brk2kb_ok"):
+                if bool(bits.get(k, False)):
+                    bits[k] = False
+                    changed = True
+            self._taster_prev = bool(bits.get("taster", False))
+            if changed:
+                self._inj_estop_word = encode_estop_word(bits)
+                self._render_estop_word_to_ui(self._inj_estop_word)
+            return
+
+        taster = bool(bits.get("taster", False))
+
+        # Track rising edge
+        if taster and (not self._taster_prev):
+            self._taster_rise_t_s = float(self.state.t_s)
+            log.info("startup: taster pressed -> arming timer started")
+        elif not taster:
+            if self._taster_prev:
+                log.info("startup: taster released -> brakes engage")
+            self._taster_rise_t_s = None
+
+        armed = False
+        if taster and (self._taster_rise_t_s is not None):
+            armed = (float(self.state.t_s) - float(self._taster_rise_t_s)) >= float(self._taster_delay_s)
+
+        # Derived outputs
+        desired_ready = bool(armed)
+        desired_brk_ok = bool(armed)  # raw brake bits represent "brakes lifted"
+        desired_schuetz = bool(armed)
+
+        if self._drive_ready != bool(armed):
+            log.info("startup: drive_ready=%s", bool(armed))
+        self._drive_ready = bool(armed)
+
+        for k, val in (
+            ("ready", desired_ready),
+            ("schuetz", desired_schuetz),
+            ("brk1_ok", desired_brk_ok),
+            ("brk2_ok", desired_brk_ok),
+            ("brk2kb_ok", desired_brk_ok),
+        ):
+            if k in bits and bool(bits.get(k, False)) != bool(val):
+                bits[k] = bool(val)
+                changed = True
+
+        self._taster_prev = taster
+
+        if changed:
+            self._inj_estop_word = encode_estop_word(bits)
+            self._render_estop_word_to_ui(self._inj_estop_word)
+
+    @staticmethod
+    def _make_drive_status_word(
+        *,
+        output_powered: bool,
+        amp_ready: bool,
+        referenced: bool,
+        in_position: bool,
+        brake_lifted: bool,
+        fault: bool,
+        zustand: int,
+    ) -> int:
+        w = 0
+        if output_powered:
+            w |= 1 << 0
+        if amp_ready:
+            w |= 1 << 1
+        if referenced:
+            w |= 1 << 2
+        if in_position:
+            w |= 1 << 3
+        if brake_lifted:
+            w |= 1 << 4
+        if fault:
+            w |= 1 << 5
+        w |= (int(zustand) & 0xFF) << 8
+        return int(w)
+
+    def _update_drive_status_words(self) -> None:
+        """Populate legacy Status/GuideStatus words so HiP can render AmpStatus lines."""
+        # These words are part of the PLC uplink in the legacy protocol; the HiP decodes them
+        # with protocol.drive_status.decode_drive_status().
+        bits = decode_estop_word(int(self._inj_estop_word))
+        taster = bool(bits.get("taster", False))
+
+        for axis_id, ax in self.state.axes.items():
+            vel = float(getattr(ax, "vel", 0.0) or 0.0)
+            in_pos = abs(vel) < 1e-3
+
+            if bool(self.state.estop):
+                # Faulted / tripped
+                main = self._make_drive_status_word(
+                    output_powered=False, amp_ready=False, referenced=False, in_position=False,
+                    brake_lifted=False, fault=True, zustand=14,
+                )
+                slave = self._make_drive_status_word(
+                    output_powered=False, amp_ready=False, referenced=False, in_position=False,
+                    brake_lifted=False, fault=True, zustand=14,
+                )
+            elif self._drive_ready and taster:
+                # Normal ready state (post-taster delay): powered, ready, brakes lifted
+                main = self._make_drive_status_word(
+                    output_powered=True, amp_ready=True, referenced=True, in_position=in_pos,
+                    brake_lifted=True, fault=False, zustand=10,
+                )
+                # Slave/guider typically reports a different zustand; keep it distinct.
+                slave = self._make_drive_status_word(
+                    output_powered=True, amp_ready=True, referenced=True, in_position=in_pos,
+                    brake_lifted=True, fault=False, zustand=5,
+                )
+            else:
+                # Post-reset but not yet armed: brakes on, not powered
+                main = self._make_drive_status_word(
+                    output_powered=False, amp_ready=False, referenced=False, in_position=False,
+                    brake_lifted=False, fault=False, zustand=0,
+                )
+                slave = self._make_drive_status_word(
+                    output_powered=False, amp_ready=False, referenced=False, in_position=False,
+                    brake_lifted=False, fault=False, zustand=0,
+                )
+
+            ax.meta["status_word"] = int(main)
+            ax.meta["guide_status_word"] = int(slave)
 
     def _set_led_state_by_name(self, object_name: str | None, state: str | None) -> None:
         if not object_name:
@@ -710,8 +911,8 @@ class DenSiController:
 
         # Reset => GO state (no flash)
         if bool(getattr(self._last_cmd, "estop_reset", False)):
-            log.info("estop_reset received -> GO state (no flash)")
-            self._apply_go_state()
+            log.info("estop_reset received -> POST-RESET state (await Taster)")
+            self._apply_post_reset_state()
 
         # ----- parameter ops (axis-agnostic v0.1) -----
         for op in list(getattr(self._last_cmd, "param_ops", []) or []):
@@ -767,6 +968,10 @@ class DenSiController:
                     self.state.param_edit_group = ""
                     log.info("param_write accepted: group=%s keys=%s", grp, sorted(vals.keys()))
 
+
+        # SafetyPLC/drive handoff emulation (taster -> ready/brakes after delay)
+        self._apply_startup_logic()
+
         estop_word = int(self._inj_estop_word)
         bits = decode_estop_word(estop_word)
 
@@ -778,7 +983,17 @@ class DenSiController:
         self.state.estop = bool(self._estop_latched)
         self.state.estop_status_word = estop_word
 
-        self.device.step(self.state, self._last_cmd, self.tb.dt_s)
+
+        # Clamp motion commands until the drive is actually ready (SafetyPLC handoff complete).
+        cmd_for_plant = self._last_cmd
+        if (not self._drive_ready) or self.state.estop:
+            # disable all axes; keep the original cmd frame for UI display / logging
+            cmd_for_plant = replace(
+                self._last_cmd,
+                axes={a: AxisSetpoint(enable=False, vel=0.0) for a in self.axis_ids},
+            )
+
+        self.device.step(self.state, cmd_for_plant, self.tb.dt_s)
 
         if self.state.estop:
             for ax in self.state.axes.values():
@@ -888,6 +1103,63 @@ class DenSiController:
             else:
                 if self._txt_tick.text() != "--":
                     self._txt_tick.setText("--")
+
+        # Render live readouts in the DenSi UI (plausible defaults at startup)
+        try:
+            axis_id = self.axis_ids[0] if self.axis_ids else ""
+            ax = self.state.axes.get(axis_id) if axis_id else None
+            pos = float(getattr(ax, "pos", 0.0)) if ax else 0.0
+            vel = float(getattr(ax, "vel", 0.0)) if ax else 0.0
+            amp = float(self.state.params.get("ActCur", 0.0))
+            tmp = float(self.state.params.get("Temp", 20.0))
+            if self._txt_pos is not None:
+                self._txt_pos.setText(f"{pos:.2f} m")
+            if self._txt_vel is not None:
+                self._txt_vel.setText(f"{vel:.2f} m/s")
+            if self._txt_amp is not None:
+                self._txt_amp.setText(f"{int(round(amp))} A")
+            if self._txt_temp is not None:
+                self._txt_temp.setText(f"{int(round(tmp))}°")
+
+            # --- slider indicators ---
+            # sldVelCmd: show commanded velocity (setpoint) with range ±VelMax
+            vel_max = float(self.state.params.get("VelMax", 0.0) or 0.0)
+            if vel_max <= 0.0:
+                vel_max = 1.0
+            vel_cmd = 0.0
+            try:
+                if self._last_cmd is not None and axis_id and hasattr(self._last_cmd, "axes"):
+                    sp = self._last_cmd.axes.get(axis_id)
+                    if sp is not None:
+                        vel_cmd = float(getattr(sp, "vel", 0.0))
+            except Exception:
+                vel_cmd = 0.0
+            if self._sld_vel_cmd is not None:
+                scale = 1000.0  # m/s -> mm/s for slider resolution
+                self._sld_vel_cmd.blockSignals(True)
+                self._sld_vel_cmd.setMinimum(int(round(-vel_max * scale)))
+                self._sld_vel_cmd.setMaximum(int(round(+vel_max * scale)))
+                self._sld_vel_cmd.setValue(int(round(vel_cmd * scale)))
+                self._sld_vel_cmd.blockSignals(False)
+
+            # sldLimitRange: show current position in [UserMin, UserMax]
+            user_min = float(self.state.params.get("UserMin", 0.0) or 0.0)
+            user_max = float(self.state.params.get("UserMax", 0.0) or 0.0)
+            if user_max < user_min:
+                user_min, user_max = user_max, user_min
+            if self._sld_limit_range is not None:
+                scale = 1000.0  # m -> mm for slider resolution
+                self._sld_limit_range.blockSignals(True)
+                self._sld_limit_range.setMinimum(int(round(user_min * scale)))
+                self._sld_limit_range.setMaximum(int(round(user_max * scale)))
+                self._sld_limit_range.setValue(int(round(pos * scale)))
+                self._sld_limit_range.blockSignals(False)
+
+        except Exception:
+            pass
+
+        # Provide plausible legacy drive status words so HiP's AmpStatus fields light up.
+        self._update_drive_status_words()
 
         snap = TelemetrySnapshot.from_state(self.state)
         self._publish_telemetry_compat(snap)

@@ -55,6 +55,12 @@ def encode_plc_telemetry(snapshot: Any) -> str:
     def p(name: str, default: float = 0.0) -> float:
         return _f(params.get(name, default), default)
 
+    def p_any(names: list[str], default: float = 0.0) -> float:
+        for n in names:
+            if n in params:
+                return _f(params.get(n, default), default)
+        return float(default)
+
     def ax_meta(name: str, default: int = 0) -> int:
         if ax is None:
             return int(default)
@@ -75,8 +81,8 @@ def encode_plc_telemetry(snapshot: Any) -> str:
     # Measured values
     pos = _f(getattr(ax, "pos", 0.0) if ax is not None else 0.0)
     vel = _f(getattr(ax, "vel", 0.0) if ax is not None else 0.0)
-    amp = _f(getattr(ax, "amp", 0.0) if ax is not None else 0.0)
-    temp = _f(getattr(ax, "temp", 0.0) if ax is not None else 0.0)
+    amp = p_any(["ActCur", "Amp", "ActCurUI"], 0.0)
+    temp = p_any(["Temp", "CabTemperatureUI"], 20.0)
 
     estop_word = _i(getattr(snapshot, "estop_status_word", 0))
 
@@ -115,7 +121,7 @@ def encode_plc_telemetry(snapshot: Any) -> str:
         "GuidePosIstUI": p("GuidePosIst", 0.0),
         "GuideIstSpeedUI": p("GuideIstSpeed", 0.0),
         "MotAuslastUI": p("MotAuslast", 0.0),
-        "ActCurUI": p("ActCur", 0.0),
+        "ActCurUI": amp,
         "SpeedMaxforUI": p("SpeedMaxfor", 0.0),
         "PosDiffForUI": p("PosDiffFor", 0.0),
         # IMPORTANT: #36 RampenformUI, #37 EStopStatus
