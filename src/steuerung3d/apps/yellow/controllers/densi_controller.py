@@ -248,9 +248,10 @@ class DenSiController:
         # LOGICAL injected bits (invert handled by encode/decode)
         self._inj_bits = {k: False for k in ESTOP_SPECS.keys()}
 
-        # Start in a stable "GO" state so HiP can always request a reset.
-        # (Otherwise btnEStopReset stays disabled and you can get stuck.)
-        self._apply_go_state()
+        # Start in a "FAULT" state: show the full estop chain as broken until the operator
+        # explicitly issues an E-Stop reset from HiP. Keep reset_able True so the reset
+        # button is available immediately.
+        self._apply_fault_state()
 
         self._estop_latched = False
         self._safety_ok = True  # placeholder
@@ -358,6 +359,38 @@ class DenSiController:
         return v
 
     # ----- UI helpers -----
+
+    def _apply_fault_state(self) -> None:
+        """Set injected bits to an initial 'FAULT' state.
+
+        Intent: when DenSi starts, HiP should immediately see a broken E-Stop/status
+        chain and the operator's first action should be issuing an E-Stop reset.
+
+        Policy:
+          - Trip-causes asserted (red): ESTOP_CAUSE_KEYS => True
+          - Status/OK chain broken (red): ESTOP_OK_KEYS => False
+          - Allow reset immediately: reset_able => True
+          - Other bits default False (off / warn only when asserted)
+        """
+        # default everything False
+        for k in self._inj_bits.keys():
+            self._inj_bits[k] = False
+
+        # Trip causes asserted (red)
+        for k in ESTOP_CAUSE_KEYS:
+            self._inj_bits[k] = True
+
+        # Break the OK chain (red)
+        for k in ESTOP_OK_KEYS:
+            self._inj_bits[k] = False
+
+        # But allow reset right away
+        self._inj_bits["reset_able"] = True
+
+        self._inj_estop_word = encode_estop_word(self._inj_bits)
+        self._estop_latched = True  # reflect 'trip' immediately in state.estop
+        self._render_estop_word_to_ui(self._inj_estop_word)
+
     def _apply_go_state(self) -> None:
         """Set injected bits to a stable 'GO' state (no flash)."""
         # default everything False
