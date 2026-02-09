@@ -278,6 +278,13 @@ class DenSiController:
         self._taster_rise_t_s: float | None = None
         self._taster_delay_s: float = 2.0
         self._drive_ready: bool = False
+        self._brake_override: bool = False  # set True if operator overrides BRK1/2 via checkboxes
+
+        # Match HiP brake-dot display semantics (equivalence + SafetyPLC grace)
+        self._BRAKE_HANDOFF_GRACE_S: float = 3.0
+        self._taster_prev_disp: bool = False
+        self._taster_pressed_s: float | None = None
+
 
 
         # Start in a "FAULT" state: show the full estop chain as broken until the operator
@@ -421,6 +428,7 @@ class DenSiController:
 
         self._inj_estop_word = encode_estop_word(self._inj_bits)
         self._estop_latched = True  # reflect 'trip' immediately in state.estop
+        self._brake_override = False
         self._render_estop_word_to_ui(self._inj_estop_word)
 
     def _apply_go_state(self) -> None:
@@ -455,7 +463,7 @@ class DenSiController:
             self._inj_bits[k] = False
 
         # Post-reset we are *not* yet ready: operator must press the Taster and wait a bit.
-        for k in ("ready", "taster", "schuetz", "brk1_ok", "brk2_ok", "brk2kb_ok"):
+        for k in ("ready", "taster", "schuetz", "brk1_ok", "brk2_ok"):
             if k in self._inj_bits:
                 self._inj_bits[k] = False
 
@@ -470,6 +478,7 @@ class DenSiController:
         self._taster_prev = False
         self._taster_rise_t_s = None
         self._drive_ready = False
+        self._brake_override = False
 
         self._render_estop_word_to_ui(self._inj_estop_word)
 
@@ -486,7 +495,7 @@ class DenSiController:
             self._drive_ready = False
             self._taster_rise_t_s = None
             # force derived bits to a safe state
-            for k in ("ready", "schuetz", "brk1_ok", "brk2_ok", "brk2kb_ok"):
+            for k in ("ready", "schuetz", "brk1_ok", "brk2_ok"):
                 if bool(bits.get(k, False)):
                     bits[k] = False
                     changed = True
@@ -520,16 +529,30 @@ class DenSiController:
             log.info("startup: drive_ready=%s", bool(armed))
         self._drive_ready = bool(armed)
 
+        # READY + Schuetz are always driven by timing logic.
         for k, val in (
             ("ready", desired_ready),
             ("schuetz", desired_schuetz),
-            ("brk1_ok", desired_brk_ok),
-            ("brk2_ok", desired_brk_ok),
-            ("brk2kb_ok", desired_brk_ok),
         ):
             if k in bits and bool(bits.get(k, False)) != bool(val):
                 bits[k] = bool(val)
                 changed = True
+
+        # If operator previously overrode BRK1/BRK2, automatically return to auto-mode
+        # once both raw brake bits match what the timing logic would set.
+        if bool(getattr(self, "_brake_override", False)):
+            b1 = bool(bits.get("brk1_ok", False))
+            b2 = bool(bits.get("brk2_ok", False))
+            if (b1 == bool(desired_brk_ok)) and (b2 == bool(desired_brk_ok)):
+                self._brake_override = False
+
+        # BRK1/BRK2 represent "brake lifted" state. Normally driven by timing logic,
+        # but allow operator override from the diagnostic checkboxes.
+        if not bool(getattr(self, "_brake_override", False)):
+            for k in ("brk1_ok", "brk2_ok"):
+                if k in bits and bool(bits.get(k, False)) != bool(desired_brk_ok):
+                    bits[k] = bool(desired_brk_ok)
+                    changed = True
 
         self._taster_prev = taster
 
@@ -763,6 +786,11 @@ class DenSiController:
 
             def _make_handler(key: str, checkbox_name: str):
                 def _on_toggled(checked: bool) -> None:
+                    # User-driven diagnostic override: if operator touches BRK1/BRK2, stop auto-forcing
+                    # them from the Taster timing logic until the next reset cycle.
+                    if key in ("brk1_ok", "brk2_ok"):
+                        setattr(self, "_brake_override", True)
+
                     self._inj_bits[key] = bool(checked)
                     self._inj_estop_word = encode_estop_word(self._inj_bits)
                     log.info("inject estop %s=%s (word=0x%08X)", key, checked, self._inj_estop_word)
@@ -787,13 +815,25 @@ class DenSiController:
             cb.blockSignals(was)
 
         # sync dots/LEDs using 'state'
+        taster = bool(bits.get("taster", False))
+        self._update_taster_edge_disp(taster)
+
         for spec in iter_specs():
             if not spec.dot:
                 continue
 
             v = bool(bits.get(spec.key, False))
 
-            if spec.key in ESTOP_CAUSE_KEYS:
+            if spec.key in ("brk1_ok", "brk2_ok"):
+                # Match HiP display semantics for brake dots
+                disp_ok = self._brake_ok_display_disp(brk_ok_raw=v, taster=taster)
+                state = "good" if disp_ok else "bad"
+
+            elif spec.key == "brk2kb_ok":
+                # Brake cable OK: normal logic, independent of taster
+                state = "good" if v else "bad"
+
+            elif spec.key in ESTOP_CAUSE_KEYS:
                 # trip causes: show red when active, otherwise green
                 state = "bad" if v else "good"
 
@@ -806,6 +846,35 @@ class DenSiController:
                 state = "warn" if v else None
 
             self._set_led_state_by_name(spec.dot, state)
+
+
+    # ----- brake display helpers (match HiP) -----
+
+    def _update_taster_edge_disp(self, taster: bool) -> None:
+        """Track taster rising edge (0->1) for brake handoff grace."""
+        prev = bool(getattr(self, "_taster_prev_disp", taster))
+        if (not prev) and bool(taster):
+            self._taster_pressed_s = time.monotonic()
+        self._taster_prev_disp = bool(taster)
+
+    def _within_brake_grace_disp(self) -> bool:
+        """True if within grace window after taster rose."""
+        t0 = getattr(self, "_taster_pressed_s", None)
+        if t0 is None:
+            return False
+        return (time.monotonic() - float(t0)) <= float(getattr(self, "_BRAKE_HANDOFF_GRACE_S", 3.0))
+
+    def _brake_ok_display_disp(self, *, brk_ok_raw: bool, taster: bool) -> bool:
+        """
+        Display 'brake state OK for current hold mode'.
+
+        Legacy meaning behaves like equivalence (NOT XOR): brk_ok_raw == taster.
+        Add SafetyPLC's grace after taster rises.
+        """
+        if bool(taster) and self._within_brake_grace_disp():
+            return True
+        return (bool(brk_ok_raw) == bool(taster))
+
 
     # ----- diagnostic actions -----
 

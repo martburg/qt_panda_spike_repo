@@ -1304,16 +1304,37 @@ class HiPController:
             f.setBold(key in active_keys)
             cb.setFont(f)
 
+        # Brake dots should match header brake logic:
+        # - BRK1/BRK2: equivalence with taster + grace window
+        # - BRK2KB: cable OK (normal logic, independent of taster)
+        taster = bool(logical.get("taster", False))
+        axis_id = self._selected_axis or self._fixed_axis
+        if (not axis_id) or (axis_id == NOT_ATTACHED):
+            try:
+                axes = getattr(snap, "axes", {}) or {}
+                axis_id = next(iter(axes.keys()))
+            except Exception:
+                axis_id = "X"
+
         for spec in ESTOP_SPECS.values():
             if not spec.dot:
                 continue
             v = bool(logical.get(spec.key, False))
-            if spec.key in ESTOP_CAUSE_KEYS:
+
+            if spec.key in ("brk1_ok", "brk2_ok"):
+                disp_ok = self._brake_ok_display(brk_ok_raw=v, taster=taster, axis_id=axis_id)
+                state = "good" if disp_ok else "bad"
+
+            elif spec.key == "brk2kb_ok":
+                state = "good" if v else "bad"
+
+            elif spec.key in ESTOP_CAUSE_KEYS:
                 state = "bad" if v else "good"
             elif spec.key in ESTOP_OK_KEYS:
                 state = "good" if v else "bad"
             else:
                 state = "warn" if v else None
+
             self._set_led_by_name(spec.dot, state=state)
 
     # ---------- axis selection / claims ----------
