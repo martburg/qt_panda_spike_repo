@@ -9,6 +9,11 @@ import threading
 from contextlib import closing
 
 import pytest
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SRC_DIR = REPO_ROOT / 'src'
+
 
 from steuerung3d.protocol.udp_channels import UdpTelemetryIn, UdpIntentOut
 from steuerung3d.core.intents import EchoLifeTick, ParamEditBegin, ParamWrite
@@ -46,8 +51,10 @@ def _start_core(*, axis: str, intent_port: int, ui_port: int, dev_telem_port: in
         f"127.0.0.1:{dev_telem_port}",
     ]
     # Quiet logs to keep pytest output clean.
-    return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
+    env = os.environ.copy()
+    py_path = str(SRC_DIR)
+    env['PYTHONPATH'] = py_path + (os.pathsep + env['PYTHONPATH'] if env.get('PYTHONPATH') else '')
+    return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=str(REPO_ROOT), env=env)
 
 def _wait_for(condition, timeout_s: float = 2.5, sleep_s: float = 0.02):
     t0 = time.time()

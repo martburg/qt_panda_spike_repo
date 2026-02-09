@@ -1,0 +1,156 @@
+digraph steuerung3d_stack_pruned {
+  rankdir=LR;
+  graph [fontsize=10];
+  node [shape=box, fontsize=9];
+  edge [fontsize=8];
+  subgraph cluster_core_udp_service {
+    style=rounded;
+    label="core_udp_service (CoreEngine tick)";
+    "steuerung3d.apps.core_udp_service.__main__.main" [label="core_udp_service.__main__.main"];
+    "steuerung3d.protocol.udp_channels.UdpIntentIn.bind" [label="udp_channels.UdpIntentIn.bind"];
+    "steuerung3d.protocol.udp_plc_channels.UdpPlcCommandOut.connect" [label="udp_plc_channels.UdpPlcCommandOut.connect"];
+    "steuerung3d.protocol.udp_plc_channels.UdpPlcTelemetryIn.bind" [label="udp_plc_channels.UdpPlcTelemetryIn.bind"];
+  }
+  subgraph cluster_den_si {
+    style=rounded;
+    label="den_si (device interface / sim)";
+    "steuerung3d.apps.den_si.__main__.main" [label="den_si.__main__.main"];
+    "steuerung3d.apps.yellow.controllers.densi_controller.DenSiController" [label="controllers.densi_controller.DenSiController"];
+    "steuerung3d.apps.yellow.controllers.densi_controller.DenSiController._publish_telemetry_compat" [label="densi_controller.DenSiController._publish_telemetry_compat"];
+    "steuerung3d.apps.yellow.controllers.densi_controller.DenSiController.step_once" [label="densi_controller.DenSiController.step_once"];
+    "steuerung3d.protocol.plc_codec.encode_uplink_from_snapshot" [label="steuerung3d.protocol.plc_codec.encode_uplink_from_snapshot"];
+    "steuerung3d.protocol.serde_telemetry.encode_telemetry" [label="steuerung3d.protocol.serde_telemetry.encode_telemetry"];
+    "steuerung3d.protocol.udp_channels.UdpCommandIn.bind" [label="udp_channels.UdpCommandIn.bind"];
+    "steuerung3d.protocol.udp_plc_channels.UdpPlcCommandIn.bind" [label="udp_plc_channels.UdpPlcCommandIn.bind"];
+    "steuerung3d.protocol.udp_plc_channels.UdpPlcTelemetryOut.connect" [label="udp_plc_channels.UdpPlcTelemetryOut.connect"];
+  }
+  subgraph cluster_hi_p {
+    style=rounded;
+    label="hi_p (UI / HiP)";
+    "steuerung3d.apps.hi_p.__main__.main" [label="hi_p.__main__.main"];
+    "steuerung3d.apps.yellow.controllers.hip_controller.HiPController" [label="controllers.hip_controller.HiPController"];
+    "steuerung3d.apps.yellow.controllers.hip_controller.HiPController._tx_lifetick_echo" [label="hip_controller.HiPController._tx_lifetick_echo"];
+    "steuerung3d.apps.yellow.controllers.hip_controller.HiPController.poll_once" [label="hip_controller.HiPController.poll_once"];
+    "steuerung3d.protocol.udp_channels.UdpIntentOut.connect" [label="udp_channels.UdpIntentOut.connect"];
+    "steuerung3d.protocol.udp_channels.UdpTelemetryIn.bind" [label="udp_channels.UdpTelemetryIn.bind"];
+  }
+  subgraph cluster_inputd {
+    style=rounded;
+    label="inputd (raw controls source)";
+    "steuerung3d.apps.inputd.__main__.main" [label="inputd.__main__.main"];
+    "steuerung3d.apps.inputd.__main__.run" [label="inputd.__main__.run"];
+    "steuerung3d.apps.inputd.config.load_inputd_config" [label="inputd.config.load_inputd_config"];
+    "steuerung3d.apps.inputd.pygame_backend.PygameJoystick" [label="inputd.pygame_backend.PygameJoystick"];
+    "steuerung3d.apps.inputd.pygame_backend.PygameJoystick.read" [label="pygame_backend.PygameJoystick.read"];
+    "steuerung3d.protocol.raw_controls.RawControls" [label="steuerung3d.protocol.raw_controls.RawControls"];
+    "steuerung3d.protocol.udp_channels.UdpRawControlsOut.connect" [label="udp_channels.UdpRawControlsOut.connect"];
+  }
+  subgraph cluster_joy2intent {
+    style=rounded;
+    label="joy2intent (map controls -> intents)";
+    "steuerung3d.apps.joy2intent.__main__.main" [label="joy2intent.__main__.main"];
+    "steuerung3d.apps.joy2intent.config.load_joy2intent_config" [label="joy2intent.config.load_joy2intent_config"];
+    "steuerung3d.apps.joy2intent.mapping.JoyBindings" [label="joy2intent.mapping.JoyBindings"];
+    "steuerung3d.apps.joy2intent.mapping.JoyLimits" [label="joy2intent.mapping.JoyLimits"];
+    "steuerung3d.apps.joy2intent.mapping.JoyRig" [label="joy2intent.mapping.JoyRig"];
+    "steuerung3d.apps.joy2intent.mapping.synthesize_intents" [label="joy2intent.mapping.synthesize_intents"];
+    "steuerung3d.apps.joy2intent.state.JoyState" [label="joy2intent.state.JoyState"];
+    "steuerung3d.protocol.udp_channels.UdpRawControlsIn.bind" [label="udp_channels.UdpRawControlsIn.bind"];
+  }
+  subgraph cluster_shared {
+    style=rounded;
+    label="shared (core/protocol/util)";
+    "steuerung3d.common.timebase.Timebase" [label="steuerung3d.common.timebase.Timebase"];
+    "steuerung3d.core.command_frame.CommandFrame" [label="steuerung3d.core.command_frame.CommandFrame"];
+    "steuerung3d.core.engine.CoreEngine" [label="steuerung3d.core.engine.CoreEngine"];
+    "steuerung3d.core.engine.CoreEngine.step_once" [label="engine.CoreEngine.step_once"];
+    "steuerung3d.core.executor.build_command_frame" [label="steuerung3d.core.executor.build_command_frame"];
+    "steuerung3d.core.intents.ClaimAxis" [label="steuerung3d.core.intents.ClaimAxis"];
+    "steuerung3d.core.intents.EchoLifeTick" [label="steuerung3d.core.intents.EchoLifeTick"];
+    "steuerung3d.core.intents.EnableAxis" [label="steuerung3d.core.intents.EnableAxis"];
+    "steuerung3d.core.intents.JogCartesian" [label="steuerung3d.core.intents.JogCartesian"];
+    "steuerung3d.core.intents.JogWinch" [label="steuerung3d.core.intents.JogWinch"];
+    "steuerung3d.core.intents.ParamCancel" [label="steuerung3d.core.intents.ParamCancel"];
+    "steuerung3d.core.intents.ParamEditBegin" [label="steuerung3d.core.intents.ParamEditBegin"];
+    "steuerung3d.core.intents.ParamWrite" [label="steuerung3d.core.intents.ParamWrite"];
+    "steuerung3d.core.intents.ReleaseAxis" [label="steuerung3d.core.intents.ReleaseAxis"];
+    "steuerung3d.core.intents.RequestEstopReset" [label="steuerung3d.core.intents.RequestEstopReset"];
+    "steuerung3d.core.rig_logic.enforce_rig_invariants" [label="steuerung3d.core.rig_logic.enforce_rig_invariants"];
+    "steuerung3d.core.state.MachineState" [label="steuerung3d.core.state.MachineState"];
+    "steuerung3d.core.state_machine.enforce_mode_actions" [label="steuerung3d.core.state_machine.enforce_mode_actions"];
+    "steuerung3d.core.status.StatusEmitter.from_env" [label="status.StatusEmitter.from_env"];
+    "steuerung3d.core.telemetry.TelemetrySnapshot.from_state" [label="telemetry.TelemetrySnapshot.from_state"];
+    "steuerung3d.core.telemetry.apply_measured_snapshot" [label="steuerung3d.core.telemetry.apply_measured_snapshot"];
+    "steuerung3d.protocol.axis_router.AxisRouter" [label="steuerung3d.protocol.axis_router.AxisRouter"];
+    "steuerung3d.protocol.axis_router.AxisRouter.publish_command_frames" [label="axis_router.AxisRouter.publish_command_frames"];
+    "steuerung3d.protocol.axis_router.AxisRouter.publish_ui_snapshot" [label="axis_router.AxisRouter.publish_ui_snapshot"];
+    "steuerung3d.protocol.core_runner.CoreRunner" [label="steuerung3d.protocol.core_runner.CoreRunner"];
+    "steuerung3d.protocol.estop_bits.decode_estop_word" [label="steuerung3d.protocol.estop_bits.decode_estop_word"];
+    "steuerung3d.protocol.udp_channels.UdpTelemetryOut.connect" [label="udp_channels.UdpTelemetryOut.connect"];
+    "steuerung3d.util.heartbeat.ChangeTracker" [label="steuerung3d.util.heartbeat.ChangeTracker"];
+    "steuerung3d.util.heartbeat.Heartbeat" [label="steuerung3d.util.heartbeat.Heartbeat"];
+    "steuerung3d.util.log_context.install_log_context" [label="steuerung3d.util.log_context.install_log_context"];
+  }
+  "steuerung3d.apps.core_udp_service.__main__.main" -> "steuerung3d.common.timebase.Timebase";
+  "steuerung3d.apps.core_udp_service.__main__.main" -> "steuerung3d.core.engine.CoreEngine";
+  "steuerung3d.apps.core_udp_service.__main__.main" -> "steuerung3d.core.state.MachineState";
+  "steuerung3d.apps.core_udp_service.__main__.main" -> "steuerung3d.core.status.StatusEmitter.from_env";
+  "steuerung3d.apps.core_udp_service.__main__.main" -> "steuerung3d.core.telemetry.apply_measured_snapshot";
+  "steuerung3d.apps.core_udp_service.__main__.main" -> "steuerung3d.protocol.axis_router.AxisRouter";
+  "steuerung3d.apps.core_udp_service.__main__.main" -> "steuerung3d.protocol.core_runner.CoreRunner";
+  "steuerung3d.apps.core_udp_service.__main__.main" -> "steuerung3d.protocol.udp_channels.UdpIntentIn.bind";
+  "steuerung3d.apps.core_udp_service.__main__.main" -> "steuerung3d.protocol.udp_channels.UdpTelemetryOut.connect";
+  "steuerung3d.apps.core_udp_service.__main__.main" -> "steuerung3d.protocol.udp_plc_channels.UdpPlcCommandOut.connect";
+  "steuerung3d.apps.core_udp_service.__main__.main" -> "steuerung3d.protocol.udp_plc_channels.UdpPlcTelemetryIn.bind";
+  "steuerung3d.apps.core_udp_service.__main__.main" -> "steuerung3d.util.heartbeat.ChangeTracker";
+  "steuerung3d.apps.core_udp_service.__main__.main" -> "steuerung3d.util.log_context.install_log_context";
+  "steuerung3d.apps.den_si.__main__.main" -> "steuerung3d.apps.yellow.controllers.densi_controller.DenSiController";
+  "steuerung3d.apps.den_si.__main__.main" -> "steuerung3d.protocol.udp_channels.UdpCommandIn.bind";
+  "steuerung3d.apps.den_si.__main__.main" -> "steuerung3d.protocol.udp_channels.UdpTelemetryOut.connect";
+  "steuerung3d.apps.den_si.__main__.main" -> "steuerung3d.protocol.udp_plc_channels.UdpPlcCommandIn.bind";
+  "steuerung3d.apps.den_si.__main__.main" -> "steuerung3d.protocol.udp_plc_channels.UdpPlcTelemetryOut.connect";
+  "steuerung3d.apps.den_si.__main__.main" -> "steuerung3d.util.log_context.install_log_context";
+  "steuerung3d.apps.hi_p.__main__.main" -> "steuerung3d.apps.yellow.controllers.hip_controller.HiPController";
+  "steuerung3d.apps.hi_p.__main__.main" -> "steuerung3d.protocol.udp_channels.UdpIntentOut.connect";
+  "steuerung3d.apps.hi_p.__main__.main" -> "steuerung3d.protocol.udp_channels.UdpTelemetryIn.bind";
+  "steuerung3d.apps.hi_p.__main__.main" -> "steuerung3d.util.log_context.install_log_context";
+  "steuerung3d.apps.inputd.__main__.main" -> "steuerung3d.apps.inputd.__main__.run";
+  "steuerung3d.apps.inputd.__main__.main" -> "steuerung3d.apps.inputd.config.load_inputd_config";
+  "steuerung3d.apps.inputd.__main__.main" -> "steuerung3d.util.log_context.install_log_context";
+  "steuerung3d.apps.inputd.__main__.run" -> "steuerung3d.apps.inputd.pygame_backend.PygameJoystick";
+  "steuerung3d.apps.inputd.__main__.run" -> "steuerung3d.core.status.StatusEmitter.from_env";
+  "steuerung3d.apps.inputd.__main__.run" -> "steuerung3d.protocol.raw_controls.RawControls";
+  "steuerung3d.apps.inputd.__main__.run" -> "steuerung3d.protocol.udp_channels.UdpRawControlsOut.connect";
+  "steuerung3d.apps.inputd.__main__.run" -> "steuerung3d.util.heartbeat.ChangeTracker";
+  "steuerung3d.apps.inputd.__main__.run" -> "steuerung3d.util.heartbeat.Heartbeat";
+  "steuerung3d.apps.joy2intent.__main__.main" -> "steuerung3d.apps.joy2intent.config.load_joy2intent_config";
+  "steuerung3d.apps.joy2intent.__main__.main" -> "steuerung3d.apps.joy2intent.mapping.JoyBindings";
+  "steuerung3d.apps.joy2intent.__main__.main" -> "steuerung3d.apps.joy2intent.mapping.JoyLimits";
+  "steuerung3d.apps.joy2intent.__main__.main" -> "steuerung3d.apps.joy2intent.mapping.JoyRig";
+  "steuerung3d.apps.joy2intent.__main__.main" -> "steuerung3d.apps.joy2intent.mapping.synthesize_intents";
+  "steuerung3d.apps.joy2intent.__main__.main" -> "steuerung3d.apps.joy2intent.state.JoyState";
+  "steuerung3d.apps.joy2intent.__main__.main" -> "steuerung3d.core.intents.JogCartesian";
+  "steuerung3d.apps.joy2intent.__main__.main" -> "steuerung3d.core.intents.JogWinch";
+  "steuerung3d.apps.joy2intent.__main__.main" -> "steuerung3d.core.status.StatusEmitter.from_env";
+  "steuerung3d.apps.joy2intent.__main__.main" -> "steuerung3d.protocol.udp_channels.UdpIntentOut.connect";
+  "steuerung3d.apps.joy2intent.__main__.main" -> "steuerung3d.protocol.udp_channels.UdpRawControlsIn.bind";
+  "steuerung3d.apps.joy2intent.__main__.main" -> "steuerung3d.util.heartbeat.ChangeTracker";
+  "steuerung3d.apps.joy2intent.__main__.main" -> "steuerung3d.util.heartbeat.Heartbeat";
+  "steuerung3d.apps.joy2intent.__main__.main" -> "steuerung3d.util.log_context.install_log_context";
+  "steuerung3d.apps.joy2intent.mapping.synthesize_intents" -> "steuerung3d.core.intents.EnableAxis";
+  "steuerung3d.apps.joy2intent.mapping.synthesize_intents" -> "steuerung3d.core.intents.JogWinch";
+  "steuerung3d.apps.yellow.controllers.densi_controller.DenSiController._publish_telemetry_compat" -> "steuerung3d.protocol.plc_codec.encode_uplink_from_snapshot";
+  "steuerung3d.apps.yellow.controllers.densi_controller.DenSiController._publish_telemetry_compat" -> "steuerung3d.protocol.serde_telemetry.encode_telemetry";
+  "steuerung3d.apps.yellow.controllers.densi_controller.DenSiController.step_once" -> "steuerung3d.apps.yellow.controllers.densi_controller.DenSiController._publish_telemetry_compat";
+  "steuerung3d.apps.yellow.controllers.densi_controller.DenSiController.step_once" -> "steuerung3d.core.command_frame.CommandFrame";
+  "steuerung3d.apps.yellow.controllers.densi_controller.DenSiController.step_once" -> "steuerung3d.core.telemetry.TelemetrySnapshot.from_state";
+  "steuerung3d.apps.yellow.controllers.densi_controller.DenSiController.step_once" -> "steuerung3d.protocol.estop_bits.decode_estop_word";
+  "steuerung3d.apps.yellow.controllers.hip_controller.HiPController._tx_lifetick_echo" -> "steuerung3d.core.intents.EchoLifeTick";
+  "steuerung3d.apps.yellow.controllers.hip_controller.HiPController.poll_once" -> "steuerung3d.apps.yellow.controllers.hip_controller.HiPController._tx_lifetick_echo";
+  "steuerung3d.core.engine.CoreEngine.step_once" -> "steuerung3d.core.executor.build_command_frame";
+  "steuerung3d.core.engine.CoreEngine.step_once" -> "steuerung3d.core.rig_logic.enforce_rig_invariants";
+  "steuerung3d.core.engine.CoreEngine.step_once" -> "steuerung3d.core.state_machine.enforce_mode_actions";
+  "steuerung3d.core.engine.CoreEngine.step_once" -> "steuerung3d.core.telemetry.TelemetrySnapshot.from_state";
+  "steuerung3d.core.executor.build_command_frame" -> "steuerung3d.core.command_frame.CommandFrame";
+  "steuerung3d.protocol.axis_router.AxisRouter.publish_command_frames" -> "steuerung3d.core.command_frame.CommandFrame";
+}

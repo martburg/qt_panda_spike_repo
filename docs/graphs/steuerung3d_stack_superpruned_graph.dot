@@ -1,0 +1,83 @@
+digraph steuerung3d_stack_superpruned {
+  rankdir=LR;
+  graph [fontsize=10, labelloc="t", label="Steuerung3D stack (super-pruned): inputd → joy2intent → core_udp_service → den_si ↔ core ↔ hi_p", splines=true];
+  node  [shape=box, fontsize=9];
+  edge  [fontsize=8];
+
+  // ---------- inputd ----------
+  subgraph cluster_inputd {
+    style=rounded; label="inputd";
+    i_main [label="inputd.__main__.main"];
+    i_run  [label="inputd.__main__.run"];
+    i_read [label="PygameJoystick.read"];
+    i_raw_out [label="UdpRawControlsOut.connect\n(send RawControls)"];
+    i_main -> i_run -> i_read -> i_raw_out;
+  }
+
+  // ---------- joy2intent ----------
+  subgraph cluster_joy2intent {
+    style=rounded; label="joy2intent";
+    j_main [label="joy2intent.__main__.main"];
+    j_raw_in [label="UdpRawControlsIn.bind\n(rx RawControls)"];
+    j_map [label="mapping.synthesize_intents"];
+    j_int_out [label="UdpIntentOut.connect\n(send Intents)"];
+    j_main -> j_raw_in -> j_map -> j_int_out;
+  }
+
+  // ---------- core_udp_service ----------
+  subgraph cluster_core {
+    style=rounded; label="core_udp_service";
+    c_main [label="core_udp_service.__main__.main"];
+    c_int_in [label="UdpIntentIn.bind\n(rx Intents)"];
+    c_runner [label="CoreRunner.start\n(thread loop)"];
+    c_step [label="CoreEngine.step_once\n(tick)"];
+    c_devstep [label="device_step hook\n(router + dev telem)"];
+    c_cmd_pub [label="AxisRouter.publish_command_frames"];
+    c_plc_cmd_out [label="UdpPlcCommandOut.connect\n(tx DeviceCmd)"];
+    c_plc_telem_in [label="UdpPlcTelemetryIn.bind\n(rx DeviceTelem)"];
+    c_apply [label="apply_measured_snapshot\n(update state)"];
+    c_snap [label="TelemetrySnapshot.from_state"];
+    c_ui_pub [label="AxisRouter.publish_ui_snapshot"];
+    c_ui_out [label="UdpTelemetryOut.connect\n(tx UI telem)"];
+
+    c_main -> c_int_in;
+    c_main -> c_runner -> c_step;
+    c_step -> c_devstep;
+    c_devstep -> c_cmd_pub -> c_plc_cmd_out;
+    c_devstep -> c_plc_telem_in -> c_apply;
+    c_step -> c_snap -> c_ui_pub -> c_ui_out;
+  }
+
+  // ---------- den_si ----------
+  subgraph cluster_den_si {
+    style=rounded; label="den_si";
+    d_main [label="den_si.__main__.main"];
+    d_plc_cmd_in [label="UdpPlcCommandIn.bind\n(rx DeviceCmd)"];
+    d_step [label="DenSiController.step_once\n(apply cmd + build telem)"];
+    d_enc [label="plc_codec.encode_uplink_from_snapshot"];
+    d_plc_telem_out [label="UdpPlcTelemetryOut.connect\n(tx DeviceTelem)"];
+
+    d_main -> d_plc_cmd_in -> d_step -> d_enc -> d_plc_telem_out;
+  }
+
+  // ---------- hi_p ----------
+  subgraph cluster_hi_p {
+    style=rounded; label="hi_p (Yellow UI / HiP)";
+    h_main [label="hi_p.__main__.main"];
+    h_ui_in [label="UdpTelemetryIn.bind\n(rx UI telem)"];
+    h_poll [label="HiPController.poll_once\n(render + acks)"];
+    h_int_out [label="UdpIntentOut.connect\n(send Intents)"];
+
+    h_main -> h_ui_in -> h_poll -> h_int_out;
+  }
+
+  // ---------- UDP wiring (conceptual) ----------
+  edge [style=dashed, color=gray50];
+
+  i_raw_out -> j_raw_in [label="UDP  raw_controls"];
+  j_int_out -> c_int_in [label="UDP  intents"];
+  h_int_out -> c_int_in [label="UDP  intents"];
+  c_plc_cmd_out -> d_plc_cmd_in [label="UDP  dev_cmd"];
+  d_plc_telem_out -> c_plc_telem_in [label="UDP  dev_telem"];
+  c_ui_out -> h_ui_in [label="UDP  ui_telem"];
+}

@@ -1,0 +1,17 @@
+digraph G {
+  rankdir=LR;
+  node [shape=box, style=rounded];
+  "apps" -> "protocol" [label="54 calls"];
+  "apps" -> "core" [label="53 calls"];
+  "apps" -> "adapters" [label="22 calls"];
+  "apps" -> "util" [label="16 calls"];
+  "cli" -> "core" [label="14 calls"];
+  "protocol" -> "core" [label="13 calls"];
+  "protocol" -> "adapters" [label="12 calls"];
+  "tools" -> "core" [label="9 calls"];
+  "apps" -> "common" [label="7 calls"];
+  "adapters" -> "core" [label="6 calls"];
+  "apps" -> "config" [label="4 calls"];
+  "tools" -> "common" [label="1 calls"];
+  "adapters" -> "protocol" [label="1 calls"];
+}
