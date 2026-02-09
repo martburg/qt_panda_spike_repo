@@ -1,4 +1,4 @@
-from __future__ import annotations
+# src/steuerung3d/protocol/codec.pyfrom __future__ import annotations
 
 from dataclasses import asdict
 from typing import Any, Dict, Union

@@ -56,6 +56,10 @@ class TelemetrySnapshot:
     param_edit_group: str = ""
     params: Dict[str, float] = field(default_factory=dict)
 
+    # Raw PLC uplink payload (so HiP can decide what to use without changing decode again)
+    plc_uplink_fields: Dict[str, str] = field(default_factory=dict)  # base fields (pre-EOD)
+    plc_uplink_tail: Dict[str, str] = field(default_factory=dict)    # tail fields (post-EOD)
+
     # HIP<->Core transactional acks (one-shot)
     core_acks: list[str] = field(default_factory=list)
 
