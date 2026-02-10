@@ -1231,7 +1231,7 @@ class HiPController:
         if self._txt_temp is not None:
             self._txt_temp.setText(f"{int(round(tmp))}°")
 
-        # --- Cut marker readouts (latched on E-Stop entry) ---
+        # --- Cut marker readouts 
         try:
             params = getattr(snap, "params", {}) or {}
             if not isinstance(params, dict):
@@ -1239,44 +1239,32 @@ class HiPController:
             cut_pos = float(params.get("CutPos", 0.0) or 0.0)
             cut_vel = float(params.get("CutVel", 0.0) or 0.0)
             posdiff = float(params.get("PosDiffFor", 0.0) or 0.0)
-
-            prev_estop = bool(self._prev_estop_by_axis.get(axis_id, False))
             cur_estop = bool(getattr(snap, "estop", False))
-
-            # Latch cut_time on E-Stop entry (use PLC SystemTime if available)
-            if cur_estop and (not prev_estop) and (not bool(self._cut_valid_by_axis.get(axis_id, False))):
-                tcut = float(getattr(snap, "t_s", 0.0) or 0.0)
-                try:
-                    tail = getattr(snap, "plc_uplink_tail", None)
-                    if isinstance(tail, dict) and ("SystemTime" in tail):
-                        tcut = float(tail.get("SystemTime", tcut))
-                except Exception:
-                    pass
-                self._cut_valid_by_axis[axis_id] = True
-                self._cut_time_by_axis[axis_id] = float(tcut)
-
-            # Auto-clear latch if not in estop and DenSi has cleared cut markers (resync)
-            if (not cur_estop) and bool(self._cut_valid_by_axis.get(axis_id, False)):
-                if (abs(cut_pos) < 1e-9) and (abs(cut_vel) < 1e-9) and (abs(posdiff) < 1e-9):
-                    self._cut_valid_by_axis[axis_id] = False
-                    self._cut_time_by_axis.pop(axis_id, None)
-
-            self._prev_estop_by_axis[axis_id] = cur_estop
-
-            if not bool(self._cut_valid_by_axis.get(axis_id, False)):
-                for w in (self._txt_cut_time, self._txt_cut_pos, self._txt_cut_vel, self._txt_posdiff):
-                    if w is not None:
-                        w.setText("--")
+            if not(cur_estop) :
+                if self._txt_cut_pos is not None:
+                    self._txt_cut_pos.setText('--')
+                if self._txt_cut_vel is not None:
+                    self._txt_cut_vel.setText('--')
+                if self._txt_posdiff is not None:
+                    self._txt_posdiff.setText('--')
             else:
-                tcut = float(self._cut_time_by_axis.get(axis_id, 0.0))
-                if self._txt_cut_time is not None:
-                    self._txt_cut_time.setText(f"{tcut:.2f} s")
                 if self._txt_cut_pos is not None:
                     self._txt_cut_pos.setText(f"{cut_pos:.2f} m")
                 if self._txt_cut_vel is not None:
                     self._txt_cut_vel.setText(f"{cut_vel:.2f} m/s")
                 if self._txt_posdiff is not None:
                     self._txt_posdiff.setText(f"{posdiff:.2f} m")
+            tail = getattr(snap, "plc_uplink_tail", {}) or {}
+#            if not isinstance(tail, dict):
+#                tail = {}
+
+            # Time token: prefer DenSi preformatted UI text, else fall back to PLC tail[0] SystemTime.
+            #t_tok = str(params.get("ui_cut_time_text", "") or "")
+            #if not t_tok:
+            t_tok = str(tail.get("SystemTime", "") or "kk")
+            if self._txt_cut_time is not None:
+                self._txt_cut_time.setText(t_tok if t_tok != "" else "--")
+
         except Exception:
             pass
 
