@@ -41,6 +41,10 @@ class AxisRouter:
     last_dev_param_edit_active_by_axis: Dict[str, bool] = field(default_factory=dict)
     last_dev_param_edit_group_by_axis: Dict[str, str] = field(default_factory=dict)
 
+    # Raw PLC uplink payload caches (per axis). HiP may consume these directly.
+    last_dev_plc_uplink_fields_by_axis: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    last_dev_plc_uplink_tail_by_axis: Dict[str, Dict[str, str]] = field(default_factory=dict)
+
     last_dev_param_commit_req_id_by_axis: Dict[str, str] = field(default_factory=dict)
     last_dev_param_commit_group_by_axis: Dict[str, str] = field(default_factory=dict)
     last_dev_param_commit_status_by_axis: Dict[str, str] = field(default_factory=dict)
@@ -119,6 +123,10 @@ class AxisRouter:
                 self.last_dev_param_edit_active_by_axis[k] = bool(getattr(s, "param_edit_active", False))
                 self.last_dev_param_edit_group_by_axis[k] = str(getattr(s, "param_edit_group", ""))
 
+                # Raw PLC uplink payload (pre/post EOD). Keep as strings.
+                self.last_dev_plc_uplink_fields_by_axis[k] = {str(a): str(b) for a, b in dict(getattr(s, "plc_uplink_fields", {}) or {}).items()}
+                self.last_dev_plc_uplink_tail_by_axis[k] = {str(a): str(b) for a, b in dict(getattr(s, "plc_uplink_tail", {}) or {}).items()}
+
                 self.last_dev_param_commit_req_id_by_axis[k] = str(getattr(s, "param_commit_req_id", ""))
                 self.last_dev_param_commit_group_by_axis[k] = str(getattr(s, "param_commit_group", ""))
                 self.last_dev_param_commit_status_by_axis[k] = str(getattr(s, "param_commit_status", "idle"))
@@ -150,6 +158,8 @@ class AxisRouter:
             param_edit_active=bool(self.last_dev_param_edit_active_by_axis.get(axis_id, bool(getattr(snap, "param_edit_active", False)))),
             param_edit_group=str(self.last_dev_param_edit_group_by_axis.get(axis_id, str(getattr(snap, "param_edit_group", "")))),
             params=dict(self.last_dev_params_by_axis.get(axis_id, dict(getattr(snap, "params", {})) or {})),
+            plc_uplink_fields=dict(self.last_dev_plc_uplink_fields_by_axis.get(axis_id, dict(getattr(snap, "plc_uplink_fields", {})) or {})),
+            plc_uplink_tail=dict(self.last_dev_plc_uplink_tail_by_axis.get(axis_id, dict(getattr(snap, "plc_uplink_tail", {})) or {})),
             core_acks=list(getattr(snap, "core_acks", [])),
             param_commit_req_id=str(self.last_dev_param_commit_req_id_by_axis.get(axis_id, str(getattr(snap, "param_commit_req_id", "")))),
             param_commit_group=str(self.last_dev_param_commit_group_by_axis.get(axis_id, str(getattr(snap, "param_commit_group", "")))),

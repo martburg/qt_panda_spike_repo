@@ -134,7 +134,7 @@ def encode_plc_telemetry(snapshot: Any) -> str:
     tail: Dict[str, object] = {
         # For SIM we keep it numeric so our decoder can derive t_s.
         # Real PLC uses N_/L_ prefixed strings; our decoder should not rely on parsing this.
-        "SystemTime": f"{t_s:.3f}",
+        "SystemTime": (str(snapshot.params.get("SystemTime","")) if isinstance(getattr(snapshot,"params",None), dict) and str(snapshot.params.get("SystemTime","")) else f"{t_s:.3f}"),
         "sCutPos": p("CutPos", 0.0),
         "sCutVel": p("CutVel", 0.0),
         "PosWinUI": p("PosWin", 0.01),

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 import time
+from datetime import datetime
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QAbstractSlider, QCheckBox, QWidget, QLineEdit, QComboBox, QPushButton
@@ -318,6 +319,8 @@ class DenSiController:
         self._cut_pos_m: float = 0.0
         self._cut_vel_mps: float = 0.0
         self._cut_time_s: float = 0.0
+        self._systemtime_tok: str = ""
+
         self._prev_estop_state: bool = False
 
 
@@ -976,6 +979,12 @@ class DenSiController:
 
     # --- Cut marker helpers -------------------------------------------------
 
+    def _now_token(self) -> str:
+        """DenSi wallclock token: 'DD-MM-YYYY HH:MM:SS 123 ms'."""
+        now = datetime.now()
+        ms = int(now.microsecond // 1000)
+        return now.strftime("%d-%m-%Y %H:%M:%S ") + f"{ms:03d} ms"
+
     def _clear_cut_markers(self) -> None:
         """Clear latched cut markers and reset exported params."""
         self._cut_valid = False
@@ -1000,15 +1009,32 @@ class DenSiController:
         self._render_cut_markers_to_ui(pos_m=None)
 
     def _render_cut_markers_to_ui(self, *, pos_m: float | None) -> None:
-        """Render cut marker readouts. When no cut is latched, show '--'."""
+        """Render cut marker readouts.
+
+        Policy:
+          - Before cut is latched: txt_cut_time shows live DenSi wallclock token (updates each tick)
+          - After latch: txt_cut_time freezes at the latch token
+        """
         if not bool(getattr(self, "_cut_valid", False)):
-            for w in (self._txt_cut_time, self._txt_cut_pos, self._txt_cut_vel, self._txt_posdiff):
+            # Live wallclock token until an E-Stop latch happens
+            try:
+                tok = self._now_token()
+                self._systemtime_tok = tok
+                self.state.params["SystemTime"] = tok
+                if self._txt_cut_time is not None:
+                    self._txt_cut_time.setText(tok)
+            except Exception:
+                if self._txt_cut_time is not None:
+                    self._txt_cut_time.setText("--")
+
+            for w in (self._txt_cut_pos, self._txt_cut_vel, self._txt_posdiff):
                 if w is not None:
                     w.setText("--")
             return
 
         if self._txt_cut_time is not None:
-            self._txt_cut_time.setText(f"{float(self._cut_time_s):.2f} s")
+            tok = str(self._systemtime_tok or self.state.params.get('SystemTime','') or '')
+            self._txt_cut_time.setText(tok if tok else "--")
         if self._txt_cut_pos is not None:
             self._txt_cut_pos.setText(f"{float(self._cut_pos_m):.2f} m")
         if self._txt_cut_vel is not None:
@@ -1173,6 +1199,13 @@ class DenSiController:
                 self._cut_pos_m = float(getattr(ax0, 'pos', 0.0) or 0.0)
                 self._cut_vel_mps = float(getattr(ax0, 'vel', 0.0) or 0.0)
                 self._cut_time_s = float(getattr(self.state, 't_s', 0.0) or 0.0)
+                # Freeze DenSi wallclock token at latch moment
+                try:
+                    self._systemtime_tok = self._now_token()
+                    self.state.params['SystemTime'] = self._systemtime_tok
+                except Exception:
+                    pass
+
                 self.state.params['CutPos'] = float(self._cut_pos_m)
                 self.state.params['CutVel'] = float(self._cut_vel_mps)
                 self.state.params['CutTime'] = float(self._cut_time_s)
