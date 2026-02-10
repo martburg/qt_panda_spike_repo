@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import logging
 import time
+import math
 import uuid
 
 from PySide6.QtCore import QLocale, QTimer
@@ -184,10 +185,32 @@ class HiPController:
         self._txt_amp: QLineEdit | None = self.win.findChild(QLineEdit, "txt_amp")
         self._txt_temp: QLineEdit | None = self.win.findChild(QLineEdit, "txt_temp")
 
+        # Cut markers (read-only fields)
+        self._txt_cut_pos: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_pos")
+        self._txt_cut_vel: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_vel")
+        self._txt_cut_time: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_time")
+        self._txt_posdiff: QLineEdit | None = self.win.findChild(QLineEdit, "txt_posdiff")
+
+        self._btn_diag_resync: QPushButton | None = (self.win.findChild(QPushButton, "btnReSync")
+            or self.win.findChild(QPushButton, "btnDiagResync"))
+        if self._btn_diag_resync is not None:
+            self._btn_diag_resync.clicked.connect(self._on_diag_resync_clicked)
+
 
         # Sliders used as live indicators
         self._sld_vel_cmd: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldVelCmd")
         self._sld_limit_range: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldLimitRange")
+        self._sld_guider_range: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldGuiderRange")
+        self._sld_guider_speed: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldGuiderSpeed")
+
+        # Guider readouts (DenSi-compatible names)
+        self._txt_guider_range_min: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMin")
+        self._txt_guider_range_max: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMax")
+        self._txt_guider_range_val: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeValue")
+        # renamed from txtGuiderPos_2 -> txtGuiderSpeed
+        self._txt_guider_speed: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderSpeed")
+        if self._txt_guider_speed is None:
+            self._txt_guider_speed = self.win.findChild(QLineEdit, "txtGuiderPos_2")
 
         # Legacy drive status fields (main + guider/slave)
         self._txt_main_amp_status: QLineEdit | None = self.win.findChild(QLineEdit, "txtMainAmpStatus")
@@ -1136,6 +1159,20 @@ class HiPController:
         self._set_led_by_name("dotHdrBrake2", state=brk2_state)
 
 
+    
+    def _on_diag_resync_clicked(self) -> None:
+        """Clear latched cut markers for the currently selected axis."""
+        axis_id = self._selected_axis or self._fixed_axis
+        if not axis_id:
+            return
+        self._cut_valid_by_axis[axis_id] = False
+        self._cut_time_by_axis.pop(axis_id, None)
+        self._prev_estop_by_axis[axis_id] = bool(getattr(self, "_prev_estop_by_axis", {}).get(axis_id, False))
+
+        for w in (self._txt_cut_time, self._txt_cut_pos, self._txt_cut_vel, self._txt_posdiff):
+            if w is not None:
+                w.setText("--")
+
     def _render_live_readouts(self, snap: TelemetrySnapshot) -> None:
         """Render position/velocity/current/temp into txt_* fields (read-only)."""
         axis_id = self._selected_axis or self._fixed_axis
@@ -1194,6 +1231,55 @@ class HiPController:
         if self._txt_temp is not None:
             self._txt_temp.setText(f"{int(round(tmp))}°")
 
+        # --- Cut marker readouts (latched on E-Stop entry) ---
+        try:
+            params = getattr(snap, "params", {}) or {}
+            if not isinstance(params, dict):
+                params = {}
+            cut_pos = float(params.get("CutPos", 0.0) or 0.0)
+            cut_vel = float(params.get("CutVel", 0.0) or 0.0)
+            posdiff = float(params.get("PosDiffFor", 0.0) or 0.0)
+
+            prev_estop = bool(self._prev_estop_by_axis.get(axis_id, False))
+            cur_estop = bool(getattr(snap, "estop", False))
+
+            # Latch cut_time on E-Stop entry (use PLC SystemTime if available)
+            if cur_estop and (not prev_estop) and (not bool(self._cut_valid_by_axis.get(axis_id, False))):
+                tcut = float(getattr(snap, "t_s", 0.0) or 0.0)
+                try:
+                    tail = getattr(snap, "plc_uplink_tail", None)
+                    if isinstance(tail, dict) and ("SystemTime" in tail):
+                        tcut = float(tail.get("SystemTime", tcut))
+                except Exception:
+                    pass
+                self._cut_valid_by_axis[axis_id] = True
+                self._cut_time_by_axis[axis_id] = float(tcut)
+
+            # Auto-clear latch if not in estop and DenSi has cleared cut markers (resync)
+            if (not cur_estop) and bool(self._cut_valid_by_axis.get(axis_id, False)):
+                if (abs(cut_pos) < 1e-9) and (abs(cut_vel) < 1e-9) and (abs(posdiff) < 1e-9):
+                    self._cut_valid_by_axis[axis_id] = False
+                    self._cut_time_by_axis.pop(axis_id, None)
+
+            self._prev_estop_by_axis[axis_id] = cur_estop
+
+            if not bool(self._cut_valid_by_axis.get(axis_id, False)):
+                for w in (self._txt_cut_time, self._txt_cut_pos, self._txt_cut_vel, self._txt_posdiff):
+                    if w is not None:
+                        w.setText("--")
+            else:
+                tcut = float(self._cut_time_by_axis.get(axis_id, 0.0))
+                if self._txt_cut_time is not None:
+                    self._txt_cut_time.setText(f"{tcut:.2f} s")
+                if self._txt_cut_pos is not None:
+                    self._txt_cut_pos.setText(f"{cut_pos:.2f} m")
+                if self._txt_cut_vel is not None:
+                    self._txt_cut_vel.setText(f"{cut_vel:.2f} m/s")
+                if self._txt_posdiff is not None:
+                    self._txt_posdiff.setText(f"{posdiff:.2f} m")
+        except Exception:
+            pass
+
         # --- slider indicators ---
         vel_max = float(params.get("VelMax", 0.0) or 0.0)
         if vel_max <= 0.0:
@@ -1220,6 +1306,86 @@ class HiPController:
             self._sld_limit_range.setValue(int(round(pos * scale)))
             self._sld_limit_range.blockSignals(False)
 
+
+        # --- guider slider indicators (mirror axis sliders) ---
+        # limits derived from guider params (PosMin/PosMax), position from GuidePosIst if available
+        g_pos_min = float(params.get("PosMin", 0.0) or 0.0)
+        g_pos_max = float(params.get("PosMax", 0.0) or 0.0)
+        if g_pos_max < g_pos_min:
+            g_pos_min, g_pos_max = g_pos_max, g_pos_min
+
+        # Guider position: prefer decoded param, fallback to raw PLC uplink field if present
+        g_pos = float(params.get("GuidePosIst", 0.0) or 0.0)
+        try:
+            raw = getattr(snap, "plc_uplink_fields", None)
+            if (g_pos == 0.0) and isinstance(raw, dict) and ("GuidePosIstUI" in raw):
+                g_pos = float(raw.get("GuidePosIstUI", "0") or 0.0)
+        except Exception:
+            pass
+
+        if self._sld_guider_range is not None:
+            scale = 1000.0  # m -> mm
+            self._sld_guider_range.blockSignals(True)
+            self._sld_guider_range.setMinimum(int(round(g_pos_min * scale)))
+            self._sld_guider_range.setMaximum(int(round(g_pos_max * scale)))
+            self._sld_guider_range.setValue(int(round(g_pos * scale)))
+            self._sld_guider_range.blockSignals(False)
+
+
+        # Guider range readouts
+        try:
+            if self._txt_guider_range_min is not None:
+                self._txt_guider_range_min.setText(f"{g_pos_min:.3f} m")
+            if self._txt_guider_range_max is not None:
+                self._txt_guider_range_max.setText(f"{g_pos_max:.3f} m")
+            if self._txt_guider_range_val is not None:
+                self._txt_guider_range_val.setText(f"{g_pos:.3f} m")
+        except Exception:
+            pass
+
+        # Guider speed slider shows MEASURED guider speed (GuideIstSpeed),
+        # but its range is derived from drum max rope speed VelMax + pitch + drum diameter:
+        #   v_rope = omega * (pi*D)
+        #   v_guide = omega * pitch
+        # => v_guide = v_rope * pitch / (pi*D)
+        drum_diam = 0.5  # meters
+        pitch = float(params.get("Pitch", 0.0) or 0.0)  # meters per revolution
+        denom = math.pi * drum_diam
+        ratio = (pitch / denom) if (denom > 0.0 and pitch > 0.0) else 0.0
+
+        g_vel_meas = float(params.get("GuideIstSpeed", 0.0) or 0.0)
+        try:
+            raw = getattr(snap, "plc_uplink_fields", None)
+            if (g_vel_meas == 0.0) and isinstance(raw, dict) and ("GuideIstSpeedUI" in raw):
+                g_vel_meas = float(raw.get("GuideIstSpeedUI", "0") or 0.0)
+        except Exception:
+            pass
+
+        g_vel_max = abs(vel_max) * ratio
+        if g_vel_max <= 0.0:
+            g_vel_max = 1.0  # keep slider usable even if pitch not configured
+
+        # clamp displayed value into range for slider
+        if g_vel_meas > g_vel_max:
+            g_vel_meas = g_vel_max
+        elif g_vel_meas < -g_vel_max:
+            g_vel_meas = -g_vel_max
+
+        if self._sld_guider_speed is not None:
+            scale = 1000.0  # m/s -> mm/s
+            self._sld_guider_speed.blockSignals(True)
+            self._sld_guider_speed.setMinimum(int(round(-g_vel_max * scale)))
+            self._sld_guider_speed.setMaximum(int(round(+g_vel_max * scale)))
+            self._sld_guider_speed.setValue(int(round(g_vel_meas * scale)))
+            self._sld_guider_speed.blockSignals(False)
+
+
+        # Guider speed readout (measured)
+        try:
+            if self._txt_guider_speed is not None:
+                self._txt_guider_speed.setText(f"{g_vel_meas:.3f} m/s")
+        except Exception:
+            pass
 
     def _render_tick_delta(self, snap: TelemetrySnapshot) -> None:
         """Render legacy TimeTick into txt_tick (delta of device_tick)."""

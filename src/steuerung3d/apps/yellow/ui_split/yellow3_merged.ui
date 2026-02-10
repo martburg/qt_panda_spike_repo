@@ -2104,7 +2104,7 @@
                    </property>
                    <layout class="QHBoxLayout" name="horizontalLayout_10">
                     <item>
-                     <widget class="QLineEdit" name="txtGuiderPos_2">
+                     <widget class="QLineEdit" name="txtGuiderSpeed">
                       <property name="maximumSize">
                        <size>
                         <width>70</width>

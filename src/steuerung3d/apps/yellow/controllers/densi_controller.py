@@ -5,7 +5,7 @@ from dataclasses import dataclass, replace
 import time
 
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QAbstractSlider, QCheckBox, QWidget, QLineEdit, QComboBox
+from PySide6.QtWidgets import QAbstractSlider, QCheckBox, QWidget, QLineEdit, QComboBox, QPushButton
 
 from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
 from steuerung3d.adapters.sim.device import SimDevice
@@ -209,6 +209,31 @@ class DenSiController:
         self._txt_amp: QLineEdit | None = self.win.findChild(QLineEdit, "txt_amp")
         self._txt_temp: QLineEdit | None = self.win.findChild(QLineEdit, "txt_temp")
 
+        # Cut markers / diagnostics readouts (line edits on the UI)
+        self._txt_cut_pos: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_pos")
+        self._txt_cut_vel: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_vel")
+        self._txt_cut_time: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_time")
+        self._txt_posdiff: QLineEdit | None = self.win.findChild(QLineEdit, "txt_posdiff")
+
+        # Resync clears cut markers (operator action after E-Stop / re-sync)
+        self._btn_diag_resync: QPushButton | None = (self.win.findChild(QPushButton, "btnReSync")
+            or self.win.findChild(QPushButton, "btnReSync")
+            or self.win.findChild(QPushButton, "btnDiagResync"))
+        if self._btn_diag_resync is not None:
+            self._btn_diag_resync.clicked.connect(self._on_diag_resync_clicked)
+
+        # Guider readouts (range min/max/value and measured guider speed)
+        self._txt_guider_range_min: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMin")
+        self._txt_guider_range_max: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMax")
+        # Note: user typo sometimes "Ranfe"; actual UI name is txtGuiderRangeValue
+        self._txt_guider_range_val: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeValue")
+        # Renamed from txtGuiderPos_2 -> txtGuiderSpeed
+        self._txt_guider_speed: QLineEdit | None = (
+            self.win.findChild(QLineEdit, "txtGuiderSpeed")
+            or self.win.findChild(QLineEdit, "txtGuiderPos_2")
+        )
+
+
 
         # Sliders used as live indicators
         self._sld_vel_cmd: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldVelCmd")
@@ -252,6 +277,14 @@ class DenSiController:
         self.state.params.setdefault("CutPos", 0.0)  # m
         self.state.params.setdefault("CutVel", 0.0)  # m/s
 
+        # Plausible guider defaults (so HiP and DenSi show sane numbers from tick 0)
+        # Note: PosMin/PosMax are guider range limits in the legacy UI.
+        self.state.params.setdefault("PosMin", 0.0)       # m
+        self.state.params.setdefault("PosMax", 0.966)     # m
+        self.state.params.setdefault("GuidePosIst", 0.011)    # m
+        self.state.params.setdefault("GuideIstSpeed", 0.0)    # m/s
+
+
         # Render limit header fields (txtLimit*) from seeded params.
         self._render_limit_fields_from_params(self.state.params)
 
@@ -279,6 +312,14 @@ class DenSiController:
         self._taster_delay_s: float = 2.0
         self._drive_ready: bool = False
         self._brake_override: bool = False  # set True if operator overrides BRK1/2 via checkboxes
+
+        # --- Cut markers (latched on E-Stop entry) ---
+        self._cut_valid: bool = False
+        self._cut_pos_m: float = 0.0
+        self._cut_vel_mps: float = 0.0
+        self._cut_time_s: float = 0.0
+        self._prev_estop_state: bool = False
+
 
         # Match HiP brake-dot display semantics (equivalence + SafetyPLC grace)
         self._BRAKE_HANDOFF_GRACE_S: float = 3.0
@@ -933,6 +974,61 @@ class DenSiController:
 
     # ----- runtime -----
 
+    # --- Cut marker helpers -------------------------------------------------
+
+    def _clear_cut_markers(self) -> None:
+        """Clear latched cut markers and reset exported params."""
+        self._cut_valid = False
+        self._cut_pos_m = 0.0
+        self._cut_vel_mps = 0.0
+        self._cut_time_s = 0.0
+        # Prevent immediate re-latch if we're still in estop
+        self._prev_estop_state = bool(getattr(self.state, "estop", False))
+
+        try:
+            self.state.params["CutPos"] = 0.0
+            self.state.params["CutVel"] = 0.0
+            self.state.params["CutTime"] = 0.0
+            self.state.params["PosDiffFor"] = 0.0
+        except Exception:
+            pass
+
+    def _on_diag_resync_clicked(self) -> None:
+        """Operator pressed ReSync: clear cut markers."""
+        self._clear_cut_markers()
+        # paint immediately
+        self._render_cut_markers_to_ui(pos_m=None)
+
+    def _render_cut_markers_to_ui(self, *, pos_m: float | None) -> None:
+        """Render cut marker readouts. When no cut is latched, show '--'."""
+        if not bool(getattr(self, "_cut_valid", False)):
+            for w in (self._txt_cut_time, self._txt_cut_pos, self._txt_cut_vel, self._txt_posdiff):
+                if w is not None:
+                    w.setText("--")
+            return
+
+        if self._txt_cut_time is not None:
+            self._txt_cut_time.setText(f"{float(self._cut_time_s):.2f} s")
+        if self._txt_cut_pos is not None:
+            self._txt_cut_pos.setText(f"{float(self._cut_pos_m):.2f} m")
+        if self._txt_cut_vel is not None:
+            self._txt_cut_vel.setText(f"{float(self._cut_vel_mps):.2f} m/s")
+
+        if pos_m is None:
+            if self._txt_posdiff is not None:
+                self._txt_posdiff.setText("--")
+            return
+
+        pd = float(pos_m) - float(self._cut_pos_m)
+        try:
+            self.state.params["PosDiffFor"] = float(pd)
+        except Exception:
+            pass
+        if self._txt_posdiff is not None:
+            self._txt_posdiff.setText(f"{pd:.2f} m")
+
+
+
     def start(self) -> None:
         t = QTimer(self.win)
         t.setInterval(int(self.dt_s * 1000))
@@ -982,6 +1078,8 @@ class DenSiController:
         if bool(getattr(self._last_cmd, "estop_reset", False)):
             log.info("estop_reset received -> POST-RESET state (await Taster)")
             self._apply_post_reset_state()
+            self._clear_cut_markers()
+            self._render_cut_markers_to_ui(pos_m=None)
 
         # ----- parameter ops (axis-agnostic v0.1) -----
         for op in list(getattr(self._last_cmd, "param_ops", []) or []):
@@ -1051,7 +1149,9 @@ class DenSiController:
 
         self.state.estop = bool(self._estop_latched)
         self.state.estop_status_word = estop_word
-
+        # --- Cut markers: latch on E-Stop ENTRY ---
+        # We compute the edge here, but latch AFTER the plant step so we use the freshest measurement.
+        estop_edge = bool(self.state.estop) and (not bool(self._prev_estop_state))
 
         # Clamp motion commands until the drive is actually ready (SafetyPLC handoff complete).
         cmd_for_plant = self._last_cmd
@@ -1064,6 +1164,21 @@ class DenSiController:
 
         self.device.step(self.state, cmd_for_plant, self.tb.dt_s)
 
+        # Latch cut markers on the *edge* using the freshest post-step measurement (before estop clamping).
+        if bool(estop_edge) and (not bool(self._cut_valid)):
+            axis_id = self.axis_ids[0] if self.axis_ids else ""
+            ax0 = self.state.axes.get(axis_id) if axis_id else None
+            if ax0 is not None:
+                self._cut_valid = True
+                self._cut_pos_m = float(getattr(ax0, 'pos', 0.0) or 0.0)
+                self._cut_vel_mps = float(getattr(ax0, 'vel', 0.0) or 0.0)
+                self._cut_time_s = float(getattr(self.state, 't_s', 0.0) or 0.0)
+                self.state.params['CutPos'] = float(self._cut_pos_m)
+                self.state.params['CutVel'] = float(self._cut_vel_mps)
+                self.state.params['CutTime'] = float(self._cut_time_s)
+                self.state.params['PosDiffFor'] = 0.0
+
+
         if self.state.estop:
             for ax in self.state.axes.values():
                 ax.enabled = False
@@ -1071,6 +1186,9 @@ class DenSiController:
 
         self.state.tick += 1
         self.state.t_s += self.tb.dt_s
+
+        # Remember for next tick
+        self._prev_estop_state = bool(self.state.estop)
 
         # --- LiveTick semantics (device-origin) ---
         # tx: incrementing device tick (DenSi sim, ms-based 16-bit counter)
@@ -1189,6 +1307,25 @@ class DenSiController:
                 self._txt_amp.setText(f"{int(round(amp))} A")
             if self._txt_temp is not None:
                 self._txt_temp.setText(f"{int(round(tmp))}°")
+
+
+            # Cut marker readouts
+            self._render_cut_markers_to_ui(pos_m=pos)
+
+
+            # Guider readouts (defaults if not yet modeled)
+            g_min = float(self.state.params.get("PosMin", 0.0) or 0.0)
+            g_max = float(self.state.params.get("PosMax", 0.0) or 0.0)
+            g_val = float(self.state.params.get("GuidePosIst", 0.0) or 0.0)
+            g_spd = float(self.state.params.get("GuideIstSpeed", 0.0) or 0.0)
+            if self._txt_guider_range_min is not None:
+                self._txt_guider_range_min.setText(f"{g_min:.3f} m")
+            if self._txt_guider_range_max is not None:
+                self._txt_guider_range_max.setText(f"{g_max:.3f} m")
+            if self._txt_guider_range_val is not None:
+                self._txt_guider_range_val.setText(f"{g_val:.3f} m")
+            if self._txt_guider_speed is not None:
+                self._txt_guider_speed.setText(f"{g_spd:.3f} m/s")
 
             # --- slider indicators ---
             # sldVelCmd: show commanded velocity (setpoint) with range ±VelMax
