@@ -191,6 +191,12 @@ class HiPController:
         self._txt_cut_time: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_time")
         self._txt_posdiff: QLineEdit | None = self.win.findChild(QLineEdit, "txt_posdiff")
 
+        # HiP should not show DenSi-only SafetyPLC Start button
+        _esstart = self.win.findChild(QPushButton, "btnESStart")
+        if _esstart is not None:
+            _esstart.hide()
+            _esstart.setEnabled(False)
+
         self._btn_diag_resync: QPushButton | None = (self.win.findChild(QPushButton, "btnReSync")
             or self.win.findChild(QPushButton, "btnDiagResync"))
         if self._btn_diag_resync is not None:

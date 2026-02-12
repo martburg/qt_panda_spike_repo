@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from enum import Enum, auto
 import time
 from datetime import datetime
 
@@ -39,6 +40,26 @@ import logging
 
 
 log = logging.getLogger("den_si")
+
+
+class L0Top(Enum):
+    """DenSi (device-local) top-level connection state.
+
+    We model whether the device has seen at least one command frame.
+    Connection arbitration/ownership is handled elsewhere in the legacy stack;
+    for now we accept any incoming connection.
+    """
+
+    START = auto()       # no command frames seen yet
+    CONNECTED = auto()   # at least one command frame seen recently
+
+
+class L0Sub(Enum):
+    """DenSi (device-local) connected substates."""
+
+    IDLE = auto()
+    RESETTING_ESTOP = auto()
+    EDIT_PARAMETER = auto()
 
 # --- Lifetick tracing (DenSi -> Core -> HiP -> Core -> DenSi) ---
 # Keep logging useful (avoid per-tick spam): throttle to at most once per 0.5s.
@@ -292,6 +313,16 @@ class DenSiController:
         self.device = SimDevice(plant=SimAxisPlant())
         self._last_cmd: CommandFrame | None = None
 
+        # --- L0 (device-local) state machine ---
+        # DenSi sim is a self-contained "device". For now we accept any incoming
+        # connection: once we see at least one command frame we consider the
+        # device connected, and we remain connected until command frames go stale.
+        self._l0_top: L0Top = L0Top.START
+        self._l0_sub: L0Sub = L0Sub.IDLE
+        # Optional disconnect-on-stale (purely device-local). Keep generous to
+        # avoid flapping during debug.
+        self._disconnect_after_s: float = 2.0
+
         # Online heuristics: DenSi is considered "online" once we've seen at least one
         # command frame from Core/HiP recently.
         self._seen_first_cmd: bool = False
@@ -312,6 +343,7 @@ class DenSiController:
         self._taster_rise_t_s: float | None = None
         self._taster_delay_s: float = 2.0
         self._drive_ready: bool = False
+        self._es_start_armed: bool = False  # SafetyPLC Start pressed (simulated by btnESStart)
         self._brake_override: bool = False  # set True if operator overrides BRK1/2 via checkboxes
 
         # --- Cut markers (latched on E-Stop entry) ---
@@ -336,10 +368,21 @@ class DenSiController:
         # button is available immediately.
         self._apply_fault_state()
 
+        # Prevent spurious cut-latch on first tick (startup begins in FAULT/estop)
+        self._prev_estop_state = bool(getattr(self.state, "estop", False))
+
         self._estop_latched = False
         self._safety_ok = True  # placeholder
 
         # buttons
+
+        # DenSi-only: SafetyPLC Start simulator button
+        self._btn_es_start: QPushButton | None = self.win.findChild(QPushButton, "btnESStart")
+        if self._btn_es_start is not None:
+            self._btn_es_start.show()
+            self._btn_es_start.setEnabled(True)
+            self._btn_es_start.clicked.connect(self._on_es_start_clicked)
+
         if self.ui.btn_estop_all_set is not None:
             self.ui.btn_estop_all_set.clicked.connect(self._set_inj_estop_all)
         if self.ui.btn_estop_all_clear is not None:
@@ -522,6 +565,7 @@ class DenSiController:
         self._taster_prev = False
         self._taster_rise_t_s = None
         self._drive_ready = False
+        self._es_start_armed = False
         self._brake_override = False
 
         self._render_estop_word_to_ui(self._inj_estop_word)
@@ -536,6 +580,24 @@ class DenSiController:
         if trip_causes or self._estop_latched:
             if self._drive_ready:
                 log.info("startup: inhibit (trip/latched) -> drive_ready=False")
+            self._drive_ready = False
+            self._es_start_armed = False
+            self._taster_rise_t_s = None
+            # force derived bits to a safe state
+            for k in ("ready", "schuetz", "brk1_ok", "brk2_ok"):
+                if bool(bits.get(k, False)):
+                    bits[k] = False
+                    changed = True
+            self._taster_prev = bool(bits.get("taster", False))
+            if changed:
+                self._inj_estop_word = encode_estop_word(bits)
+                self._render_estop_word_to_ui(self._inj_estop_word)
+            return
+
+        # Require explicit SafetyPLC Start (btnESStart) before we allow Taster to arm the drives.
+        if not bool(getattr(self, "_es_start_armed", False)):
+            if self._drive_ready:
+                log.info("startup: ESStart not armed -> drive_ready=False")
             self._drive_ready = False
             self._taster_rise_t_s = None
             # force derived bits to a safe state
@@ -1002,6 +1064,22 @@ class DenSiController:
         except Exception:
             pass
 
+    def _on_es_start_clicked(self) -> None:
+        """Simulate SafetyPLC Start: arm the Taster->(2s)->Ready/brakes handoff."""
+        # Only arm if we are not currently tripped/latched
+        if bool(self._estop_latched) or bool(getattr(self.state, "estop", False)):
+            return
+        self._es_start_armed = True
+        # If Taster is already held, start the timer now
+        try:
+            bits = decode_estop_word(int(self._inj_estop_word))
+            if bool(bits.get("taster", False)):
+                self._taster_rise_t_s = float(self.state.t_s)
+        except Exception:
+            pass
+        log.info("ESStart pressed -> armed safety handoff")
+
+
     def _on_diag_resync_clicked(self) -> None:
         """Operator pressed ReSync: clear cut markers."""
         self._clear_cut_markers()
@@ -1053,6 +1131,27 @@ class DenSiController:
         if self._txt_posdiff is not None:
             self._txt_posdiff.setText(f"{pd:.2f} m")
 
+    @staticmethod
+    def _reset_able_from_estop_word(word: int) -> bool:
+        """Return the reset_able bit, which is packed into EStopStatusWord."""
+        try:
+            bits = decode_estop_word(int(word))
+            return bool(bits.get("reset_able", False))
+        except Exception:
+            return False
+
+    @staticmethod
+    def _ready_from_estop_word(word: int) -> bool:
+        """Return the READY indicator from EStopStatusWord.
+
+        In the legacy UI this indicates the system is ready to accept SollVel.
+        """
+        try:
+            bits = decode_estop_word(int(word))
+            return bool(bits.get("ready", False))
+        except Exception:
+            return False
+
 
 
     def start(self) -> None:
@@ -1088,6 +1187,29 @@ class DenSiController:
                 estop_reset=False,
             )
 
+        # --- L0 connection state (accept-any policy) ---
+        if not bool(getattr(self, "_seen_first_cmd", False)):
+            self._l0_top = L0Top.START
+            self._l0_sub = L0Sub.IDLE
+        else:
+            # Optional disconnect-on-stale: purely for device-local realism.
+            if self._last_cmd_ns is not None:
+                age_s = (time.monotonic_ns() - self._last_cmd_ns) / 1e9
+                if age_s > float(getattr(self, "_disconnect_after_s", 2.0)):
+                    self._l0_top = L0Top.START
+                    self._l0_sub = L0Sub.IDLE
+                else:
+                    self._l0_top = L0Top.CONNECTED
+            else:
+                self._l0_top = L0Top.CONNECTED
+
+        # Export state for diagnostics / bird-eye; harmless for PLC wire.
+        try:
+            self.state.params["DenSiL0Top"] = self._l0_top.name
+            self.state.params["DenSiL0Sub"] = self._l0_sub.name
+        except Exception:
+            pass
+
         # Header online dot: green when we are receiving command frames, amber when stale.
         self._render_header_online_dot()
 
@@ -1100,15 +1222,61 @@ class DenSiController:
         except Exception:
             pass
 
-        # Reset => GO state (no flash)
-        if bool(getattr(self._last_cmd, "estop_reset", False)):
-            log.info("estop_reset received -> POST-RESET state (await Taster)")
+        # Derive packed estop bits (reset_able and ready are embedded here)
+        estop_word = int(self._inj_estop_word)
+        reset_able = self._reset_able_from_estop_word(estop_word)
+        ready_for_sollvel = self._ready_from_estop_word(estop_word)
+
+        # Moving guard: no parameter changes while moving
+        axis_id0 = self.axis_ids[0] if self.axis_ids else ""
+        ax0 = self.state.axes.get(axis_id0) if axis_id0 else None
+        moving = False
+        try:
+            moving = ax0 is not None and abs(float(getattr(ax0, "vel", 0.0) or 0.0)) > 1e-3
+        except Exception:
+            moving = False
+
+        # Reset => POST-RESET state (only if reset_able bit is set)
+        if (
+            self._l0_top == L0Top.CONNECTED
+            and bool(getattr(self._last_cmd, "estop_reset", False))
+            and bool(reset_able)
+        ):
+            self._l0_sub = L0Sub.RESETTING_ESTOP
+
+        if self._l0_sub == L0Sub.RESETTING_ESTOP:
+            log.info("estop_reset accepted (reset_able=1) -> POST-RESET state (await Taster)")
             self._apply_post_reset_state()
-            self._clear_cut_markers()
+            # Remain in EStop workflow: keep cut markers frozen until HiP ReSync.
+            self._es_start_armed = False
             self._render_cut_markers_to_ui(pos_m=None)
+            # one-shot
+            self._l0_sub = L0Sub.IDLE
+        elif bool(getattr(self._last_cmd, "estop_reset", False)) and not bool(reset_able):
+            # Helpful debug: show why reset was ignored
+            if self._ch.changed("cmd_estop_reset_ignored", True):
+                log.info("estop_reset ignored (reset_able=0; packed in EStopStatusWord)")
 
         # ----- parameter ops (axis-agnostic v0.1) -----
+        # Guard policy:
+        #   - When READY (system can accept SollVel), parameters are locked.
+        #   - When moving, parameters are locked.
+        allow_param_ops = (
+            self._l0_top == L0Top.CONNECTED
+            and (not bool(ready_for_sollvel))
+            and (not bool(moving))
+        )
+        if (getattr(self._last_cmd, "param_ops", None) and not allow_param_ops):
+            log.info(
+                "param_ops blocked: connected=%s ready=%s moving=%s",
+                self._l0_top == L0Top.CONNECTED,
+                bool(ready_for_sollvel),
+                bool(moving),
+            )
+
         for op in list(getattr(self._last_cmd, "param_ops", []) or []):
+            if not allow_param_ops:
+                continue
             try:
                 op_type = getattr(op, "type", None) or (op.get("type") if isinstance(op, dict) else None)
             except Exception:
@@ -1165,6 +1333,7 @@ class DenSiController:
         # SafetyPLC/drive handoff emulation (taster -> ready/brakes after delay)
         self._apply_startup_logic()
 
+        # refresh estop_word/bits after startup logic may have updated derived bits
         estop_word = int(self._inj_estop_word)
         bits = decode_estop_word(estop_word)
 
