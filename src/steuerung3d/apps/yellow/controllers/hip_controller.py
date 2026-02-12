@@ -1168,20 +1168,36 @@ class HiPController:
 
     
     def _on_diag_resync_clicked(self) -> None:
-        """Request a legacy ReSync pulse for the selected axis and clear local cut markers."""
-        axis_id = self._selected_axis or self._fixed_axis
-        if not axis_id:
-            return
+        """Request a legacy ReSync pulse and clear local cut markers.
+
+        If an axis is selected/attached we send an axis-scoped pulse.
+        If no axis is attached we still send a *global* pulse (axis_id=""),
+        which Core will translate into a one-shot CommandFrame.resync for all devices.
+        """
+        axis_id = (self._selected_axis or self._fixed_axis or "").strip()
+        hip_id = str(getattr(self, "hip_id", "") or getattr(self, "_hip_id", "") or "")
 
         # Propagate to Core -> DenSi/PLC downlink.
         try:
-            self.intent_out.send(RequestResync(axis_id=axis_id, hip_id=str(self.hip_id or "")))
+            intent = RequestResync(axis_id=axis_id, hip_id=hip_id)
+            if hasattr(self.intent_out, "publish_intent"):
+                self.intent_out.publish_intent(intent)  # type: ignore[attr-defined]
+            elif hasattr(self.intent_out, "send_intent"):
+                self.intent_out.send_intent(intent)  # type: ignore[attr-defined]
+            else:
+                raise AttributeError("IntentOut has no publish_intent/send_intent")
+            log.info("sent RequestResync axis_id=%r hip_id=%r", axis_id, hip_id)
         except Exception:
-            log.exception("failed to send RequestResync")
+            log.exception("failed to send RequestResync axis_id=%r", axis_id)
 
-        self._cut_valid_by_axis[axis_id] = False
-        self._cut_time_by_axis.pop(axis_id, None)
-        self._prev_estop_by_axis[axis_id] = bool(getattr(self, "_prev_estop_by_axis", {}).get(axis_id, False))
+        # Clear local cut markers (UI side). If no axis is attached, clear all.
+        if axis_id:
+            self._cut_valid_by_axis[axis_id] = False
+            self._cut_time_by_axis.pop(axis_id, None)
+            self._prev_estop_by_axis[axis_id] = bool(getattr(self, "_prev_estop_by_axis", {}).get(axis_id, False))
+        else:
+            self._cut_valid_by_axis.clear()
+            self._cut_time_by_axis.clear()
 
         for w in (self._txt_cut_time, self._txt_cut_pos, self._txt_cut_vel, self._txt_posdiff):
             if w is not None:
