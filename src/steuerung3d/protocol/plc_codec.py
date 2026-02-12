@@ -119,6 +119,7 @@ def encode_downlink(
     axis_id = str(axis_id or "")
 
     sp = frame.axes.get(axis_id)
+    enable_cmd = bool(sp.enable) if isinstance(sp, AxisSetpoint) else False
     vel = float(sp.vel) if isinstance(sp, AxisSetpoint) else 0.0
     # AxisSetpoint currently models velocity setpoints only; older PLC code also had pos.
     # Be defensive so PLC downlink encoding never crashes if the field is absent.
@@ -129,20 +130,25 @@ def encode_downlink(
     modus = "w" if want_write else "E"
 
     # base fields
+    # Apply global safety gating to the legacy ControlIN and setpoints.
+    enable = bool(enable_cmd) and (not bool(frame.estop)) and (not bool(frame.fault))
+    vel_eff = float(vel) if enable else 0.0
+
+    intent = bool(getattr(frame, "intent", True))
     base: Dict[str, str] = {
         "LifetickUIrx": str(int(lifetick_ui_rx)),
         "Modus": modus,
         "OwnPID": str(pid),
         "ControlPIDTx": str(pid),
-        "Intent": "",                 # not yet modeled
-        "ControlIN": "0",
+        "Intent": "True" if intent else "False",
+        "ControlIN": "1" if enable else "0",
         "GuideControlUI": "0",
-        "SpeedSollIN": _fmt(vel),
+        "SpeedSollIN": _fmt(vel_eff),
         "GuideSollSpeedUI": "0",
         "PosSoll": _fmt(pos),
         "EStopReset": "1" if bool(getattr(frame, "estop_reset", False)) else "0",
         "ReSync": "1" if bool(getattr(frame, "resync", False)) else "0",
-        "GUINotHaltIN": "0",
+        "GUINotHaltIN": "1" if bool(getattr(frame, "gui_not_halt", False)) else "0",
     }
 
     parts: List[str] = [base.get(k, "0") for k in DOWNLINK_BASE_FIELDS]

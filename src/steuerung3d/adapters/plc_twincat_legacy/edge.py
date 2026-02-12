@@ -121,26 +121,32 @@ class TwinCATLegacyWinchEdge:
             self._pos_soll += vel * float(self.dt_s)
         self._last_enable = enable
 
+        # Downlink legacy knobs can be driven by higher layers via CommandFrame
+        # (defaults keep stable behavior when absent).
         control_in = 1 if enable else 0
         estop_reset_word = int(self.estop_reset_word)
         if bool(getattr(cmd, "estop_reset", False)):
             # Momentary request from core. The PLC expects a DWORD; keep it simple here.
             estop_reset_word = 1
 
+        intent = bool(getattr(cmd, "intent", self.intent))
+        resync = float(1.0 if bool(getattr(cmd, "resync", False)) else float(self.resync))
+        gui_not_halt = int(1 if bool(getattr(cmd, "gui_not_halt", False)) else int(self.gui_not_halt))
+
         down = TwinCATLegacyWinchDownlink(
             lifetick=lifetick,
             modus=self.modus,
             own_pid=self.own_pid,
             control_pid_tx=int(self.control_pid_tx),
-            intent=bool(self.intent),
+            intent=bool(intent),
             control_in=int(control_in),
             guide_control_ui=int(self.guide_control_ui),
             speed_soll=float(vel),
             guide_soll_speed=float(self.guide_soll_speed),
             pos_soll=float(self._pos_soll),
             estop_reset=int(estop_reset_word),
-            resync=float(self.resync),
-            gui_not_halt=int(self.gui_not_halt),
+            resync=float(resync),
+            gui_not_halt=int(gui_not_halt),
             write_params=None,
         )
 

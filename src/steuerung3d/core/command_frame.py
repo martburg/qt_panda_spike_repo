@@ -74,7 +74,16 @@ class CommandFrame:
     fault: bool
     mode: str
     axes: Dict[str, AxisSetpoint]
-    estop_reset: bool  = False  # NEW: momentary request to clear device latch
+    # --- legacy downlink knobs (TwinCAT PLC protocol) ---
+    # Keep defaults so existing callers/tests remain stable.
+    # intent: controller "claim" bit (PLC expects "True"/"False" string)
+    intent: bool = True
+    # resync: legacy ReSync signal (clears cut markers / recover flow)
+    resync: bool = False
+    # gui_not_halt: legacy GUI Not-Halt input (placeholder until verified)
+    gui_not_halt: bool = False
+
+    estop_reset: bool  = False  # momentary request to clear device latch
     # NEW: parameter editing/writing operations (axis-agnostic v0.1)
     param_ops: List[ParamOp] = field(default_factory=list)
 

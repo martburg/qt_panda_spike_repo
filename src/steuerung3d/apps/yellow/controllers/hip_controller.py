@@ -28,6 +28,7 @@ from steuerung3d.core.intents import (
     ParamWrite,
     ReleaseAxis,
     RequestEstopReset,
+    RequestResync,
 )
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import (
@@ -1167,10 +1168,17 @@ class HiPController:
 
     
     def _on_diag_resync_clicked(self) -> None:
-        """Clear latched cut markers for the currently selected axis."""
+        """Request a legacy ReSync pulse for the selected axis and clear local cut markers."""
         axis_id = self._selected_axis or self._fixed_axis
         if not axis_id:
             return
+
+        # Propagate to Core -> DenSi/PLC downlink.
+        try:
+            self.intent_out.send(RequestResync(axis_id=axis_id, hip_id=str(self.hip_id or "")))
+        except Exception:
+            log.exception("failed to send RequestResync")
+
         self._cut_valid_by_axis[axis_id] = False
         self._cut_time_by_axis.pop(axis_id, None)
         self._prev_estop_by_axis[axis_id] = bool(getattr(self, "_prev_estop_by_axis", {}).get(axis_id, False))

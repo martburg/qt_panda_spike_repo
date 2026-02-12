@@ -25,5 +25,12 @@ def slice_command_frame(cmd: CommandFrame, axis_ids: Iterable[str]) -> CommandFr
         fault=cmd.fault,
         mode=cmd.mode,
         axes=sliced_axes,
-        estop_reset=src.estop_reset
+        intent=getattr(cmd, "intent", True),
+        resync=bool(getattr(cmd, "resync", False)),
+        gui_not_halt=bool(getattr(cmd, "gui_not_halt", False)),
+        estop_reset=bool(getattr(cmd, "estop_reset", False)),
+        # Keep param ops global (not axis-scoped yet)
+        param_ops=list(getattr(cmd, "param_ops", []) or []),
+        # Slice livetick echoes to the requested axes.
+        lifetick_echo={k: v for k, v in dict(getattr(cmd, "lifetick_echo", {}) or {}).items() if k in axis_set},
     )

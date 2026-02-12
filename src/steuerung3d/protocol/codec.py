@@ -20,6 +20,7 @@ from steuerung3d.core.intents import (
     ReleaseAxis,
     SetEstop,
     RequestEstopReset,   # NEW
+    RequestResync,
     ParamEditBegin,
     ParamWrite,
     ParamCancel,
@@ -47,6 +48,7 @@ _INTENT_TYPE_MAP = {
     "release_axis": ReleaseAxis,
     "set_estop": SetEstop,
     "estop_reset": RequestEstopReset,   # NEW
+    "resync": RequestResync,
     "arm_live_mode": ArmLiveMode,
     "disarm_to_idle": DisarmToIdle,
     "clear_fault": ClearFault,
@@ -159,6 +161,13 @@ def encode_command_frame(frame: CommandFrame) -> Dict[str, Any]:
     # omit empty optional keys
     if not d.get("lifetick_echo"):
         d.pop("lifetick_echo", None)
+    # keep hashes stable: omit legacy knobs when at default values
+    if d.get("intent", True) is True:
+        d.pop("intent", None)
+    if not d.get("resync", False):
+        d.pop("resync", None)
+    if not d.get("gui_not_halt", False):
+        d.pop("gui_not_halt", None)
     return d
 
 
@@ -174,6 +183,9 @@ def decode_command_frame(payload: Dict[str, Any]) -> CommandFrame:
         fault=bool(payload["fault"]),
         mode=str(payload["mode"]),
         axes=axes_out,
+        intent=bool(payload.get("intent", True)),
+        resync=bool(payload.get("resync", False)),
+        gui_not_halt=bool(payload.get("gui_not_halt", False)),
         estop_reset=bool(payload.get("estop_reset", False)),  # NEW
         param_ops=decode_param_ops(payload.get("param_ops", [])),
         lifetick_echo={k: int(v) for k, v in dict(payload.get("lifetick_echo", {})).items()},

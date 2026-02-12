@@ -41,6 +41,15 @@ def build_command_frame(state: MachineState) -> CommandFrame:
                 int(v) & 0xFFFF if isinstance(v, int) else v,
             )
 
+    resync_any = bool(getattr(state, "resync_req", False))
+    try:
+        if not resync_any:
+            m = getattr(state, "resync_req_by_axis", {})
+            if isinstance(m, dict):
+                resync_any = any(bool(v) for v in m.values())
+    except Exception:
+        resync_any = bool(getattr(state, "resync_req", False))
+
     return CommandFrame(
         tick=state.tick,
         t_s=state.t_s,
@@ -49,6 +58,7 @@ def build_command_frame(state: MachineState) -> CommandFrame:
         mode=state.mode.value,
         axes=axes,
         estop_reset=state.estop_reset_req,  # pulse from HI-P intent
+        resync=resync_any,  # legacy ReSync pulse
         param_ops=list(getattr(state, "pending_param_ops", [])),
         lifetick_echo=lifetick_echo,
     )

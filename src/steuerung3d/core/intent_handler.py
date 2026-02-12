@@ -17,6 +17,7 @@ from steuerung3d.core.intents import (
     SmoothStop,
     SetEstop,
     RequestEstopReset,
+    RequestResync,
     ParamEditBegin,
     ParamWrite,
     ParamCancel,
@@ -166,6 +167,24 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
 
             normalize_mode(state)
             enforce_mode_actions(state)
+            return
+
+        case RequestResync(axis_id=axis_id, hip_id=hip_id):
+            # Legacy ReSync pulse request.
+            axis_id = str(axis_id or "")
+            hip_id = str(hip_id or "")
+
+            if axis_id:
+                owner = state.axis_claims.get(axis_id, "")
+                if owner and hip_id and owner != hip_id:
+                    return
+                if hasattr(state, "resync_req_by_axis"):
+                    state.resync_req_by_axis[axis_id] = True
+                else:
+                    state.resync_req = True
+            else:
+                # Backward-compat (single-axis): allow global pulse.
+                state.resync_req = True
             return
 
         case ParamEditBegin(axis_id=axis_id, hip_id=hip_id, group=grp, req_id=req_id, session_id=session_id):

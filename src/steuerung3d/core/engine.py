@@ -74,6 +74,11 @@ class CoreEngine:
         self.state.estop_reset_req = False
         if hasattr(self.state, 'estop_reset_req_by_axis'):
             self.state.estop_reset_req_by_axis.clear()
+
+        # legacy resync pulse (one-shot)
+        self.state.resync_req = False
+        if hasattr(self.state, 'resync_req_by_axis'):
+            self.state.resync_req_by_axis.clear()
         # parameter ops are also one-shot (they can be re-issued by the UI if needed)
         self.state.pending_param_ops.clear()
         if hasattr(self.state, 'pending_param_ops_by_axis'):

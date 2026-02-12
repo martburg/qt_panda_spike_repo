@@ -55,6 +55,19 @@ class RequestEstopReset:
 
 
 @dataclass(frozen=True)
+class RequestResync:
+    """Request legacy ReSync pulse for an axis.
+
+    TwinCAT legacy downlink has a ReSync field that is typically pulsed to
+    clear latched cut markers and to participate in post-E-Stop recovery.
+    """
+
+    type: Literal["resync"] = "resync"
+    axis_id: str = ""
+    hip_id: str = ""
+
+
+@dataclass(frozen=True)
 class ArmLiveMode:
     type: Literal["arm_live_mode"] = "arm_live_mode"
 
@@ -199,6 +212,7 @@ Intent = Union[
     ReleaseAxis,
     SetEstop,
     RequestEstopReset,  # NEW
+    RequestResync,
     ArmLiveMode,
     DisarmToIdle,
     ClearFault,

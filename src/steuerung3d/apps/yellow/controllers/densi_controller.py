@@ -1257,6 +1257,26 @@ class DenSiController:
             if self._ch.changed("cmd_estop_reset_ignored", True):
                 log.info("estop_reset ignored (reset_able=0; packed in EStopStatusWord)")
 
+        # ----- legacy downlink: ReSync -----
+        # In the legacy workflow this clears cut marker latches and is often used
+        # during recover after an E-Stop. We implement it device-locally as a
+        # one-shot clear of the captured Cut* fields.
+        if self._l0_top == L0Top.CONNECTED and bool(getattr(self._last_cmd, "resync", False)):
+            if self._ch.changed("cmd_resync", True):
+                log.info("resync=1 -> clear cut marker latches")
+            self._clear_cut_markers()
+        else:
+            # reset edge tracker
+            self._ch.changed("cmd_resync", False)
+
+        # ----- legacy downlink: GUINotHaltIN (placeholder) -----
+        # Kept for protocol completeness. No device-side effect is modeled yet.
+        try:
+            if self._ch.changed("cmd_gui_not_halt", bool(getattr(self._last_cmd, "gui_not_halt", False))):
+                log.info("gui_not_halt=%s", bool(getattr(self._last_cmd, "gui_not_halt", False)))
+        except Exception:
+            pass
+
         # ----- parameter ops (axis-agnostic v0.1) -----
         # Guard policy:
         #   - When READY (system can accept SollVel), parameters are locked.

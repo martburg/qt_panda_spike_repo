@@ -171,6 +171,9 @@ class UdpPlcCommandIn:
                 tick_ui_rx = _to_int(f.get("LifetickUIrx", "0"), 0)
                 vel = _to_float(f.get("SpeedSollIN", "0"), 0.0)
                 enable = bool(_to_int(f.get("ControlIN", "0"), 0))
+                intent = str(f.get("Intent", "True")).strip().lower() not in ("false", "0", "", "none")
+                resync = bool(_to_int(f.get("ReSync", "0"), 0))
+                gui_not_halt = bool(_to_int(f.get("GUINotHaltIN", "0"), 0))
 
                 param_ops = []
                 modus = str(f.get("Modus", "") or "").strip().lower()
@@ -193,6 +196,9 @@ class UdpPlcCommandIn:
                     fault=False,
                     mode=str(f.get("Modus", "")) or "",
                     axes={axis_id: AxisSetpoint(enable=enable, vel=vel)},
+                    intent=bool(intent),
+                    resync=bool(resync),
+                    gui_not_halt=bool(gui_not_halt),
                     estop_reset=bool(_to_int(f.get("EStopReset", "0"), 0)),
                     lifetick_echo={axis_id: tick_ui_rx},
                     param_ops=param_ops,
