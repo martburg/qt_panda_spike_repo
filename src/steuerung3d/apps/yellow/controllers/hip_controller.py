@@ -103,6 +103,37 @@ _LIMIT_WIDGETS: dict[str, str] = {
     "UserMax": "txtLimitUserMax",
     "HardMax": "txtLimitHardMax",
 }
+# --- Header banner: EsState (from EStopStatus word only) -----------------------
+_BANNER_COLORS: dict[str, tuple[str, str]] = {
+    "ESTOP": ("#F9E547", "#000000"),  # yellow
+    "IDLE": ("#FFB300", "#000000"),   # amber
+    "ARMED": ("#1B5E20", "#FFFFFF"),  # dark green
+    "READY": ("#2E7D32", "#FFFFFF"),  # green
+}
+
+_BANNER_DYNAMIC_EXCLUDE: set[str] = {
+    # exclude dynamic bits from OK-chain trip evaluation (except brakes, handled separately)
+    "ready",
+    "taster",
+    "schuetz",
+    "reset_able",
+    "steuerwort",
+    "key1_ok",
+    "key2_ok",
+}
+
+
+def _parse_estop_word_from_snapshot(snap: TelemetrySnapshot) -> int:
+    # Prefer raw field if present (string), fallback to typed field.
+    fields = getattr(snap, "plc_uplink_fields", None)
+    if isinstance(fields, dict):
+        v = fields.get("EStopStatus")
+        if v is not None:
+            try:
+                return int(str(v).strip())
+            except Exception:
+                pass
+    return int(getattr(snap, "estop_status_word", 0) or 0)
 
 
 @dataclass
@@ -132,6 +163,59 @@ class HiPController:
         if t0 is None:
             return False
         return (time.monotonic() - t0) <= float(self._BRAKE_HANDOFF_GRACE_S)
+
+
+    def _within_banner_brake_grace(self, axis_id: str) -> bool:
+        """True if within 2 seconds after taster rose (for banner trip/estate decode)."""
+        t0 = self._taster_pressed_s.get(axis_id)
+        if t0 is None:
+            return False
+        return (time.monotonic() - t0) <= 2.0
+
+    def _banner_estate_from_word(self, *, axis_id: str, word: int) -> str:
+        # Default is ESTOP (startup, or unknown)
+        w = int(word) & 0xFFFFFFFF
+        if w == 0:
+            return "ESTOP"
+
+        bits = decode_estop_word(w)
+
+        # Trip cause bits always force ESTOP
+        trip_cause = any(bool(bits.get(k, False)) for k in ESTOP_CAUSE_KEYS)
+
+        # OK-chain trip evaluation: exclude dynamic bits, handle brake bits separately
+        ok_keys = [k for k in ESTOP_OK_KEYS if (k not in _BANNER_DYNAMIC_EXCLUDE) and (k not in ("brk1_ok", "brk2_ok"))]
+        ok_chain_fault = any(not bool(bits.get(k, True)) for k in ok_keys)
+
+        taster = bool(bits.get("taster", False))
+        schuetz = bool(bits.get("schuetz", False))
+        brk_ok = bool(bits.get("brk1_ok", True)) and bool(bits.get("brk2_ok", True))
+
+        # Brake bits: only become a trip after grace when taster is ON.
+        # When taster is OFF, brake OK must be true (brakes applied and watchers OK) => trip if false.
+        if taster:
+            brake_trip = (not brk_ok) and (not self._within_banner_brake_grace(axis_id))
+        else:
+            brake_trip = (not brk_ok)
+
+        trip_active = trip_cause or ok_chain_fault or brake_trip
+        if trip_active:
+            return "ESTOP"
+
+        # Ladder: Schuetz -> IDLE, Taster -> ARMED, Brakes lifted -> READY
+        if not schuetz:
+            return "ESTOP"
+        if not taster:
+            return "IDLE"
+        return "READY" if brk_ok else "ARMED"
+
+    def _apply_banner_estate(self, estate: str) -> None:
+        bg, fg = _BANNER_COLORS.get(estate, ("#F9E547", "#000000"))
+        for w in (self._txt_hdr_banner_left, self._txt_hdr_banner_right):
+            if w is None:
+                continue
+            w.setText(estate)
+            w.setStyleSheet(f"background-color: {bg}; color: {fg}; font-weight: 700;")
 
     def _brake_ok_display(self, *, brk_ok_raw: bool, taster: bool, axis_id: str) -> bool:
         """
@@ -1126,11 +1210,14 @@ class HiPController:
             self._txt_slave_amp_status.setText(slave.summary())
 
         age = int(getattr(ax, "lifetick_age", 0) or 0)
-        banner = f"{main.summary()}   |   age {age}"
-        if self._txt_hdr_banner_left is not None:
-            self._txt_hdr_banner_left.setText(banner)
-        if self._txt_hdr_banner_right is not None:
-            self._txt_hdr_banner_right.setText(banner)
+
+        # Header banner: EsState derived from EStopStatus word (ladder: ESTOP->IDLE->ARMED->READY)
+        word = _parse_estop_word_from_snapshot(snap)
+        # ensure banner grace uses the correct taster rising edge
+        taster_banner = bool(decode_estop_word(int(word) & 0xFFFFFFFF).get("taster", False))
+        self._update_taster_edge(axis_id, taster_banner)
+        estate = self._banner_estate_from_word(axis_id=axis_id, word=word)
+        self._apply_banner_estate(estate)
 
         # Header ONLINE dot should represent the *link/connection* to Core/PLC telemetry.
         # 30 is an empirically-derived threshold to allow for some jitter but still indicate staleness reasonably quickly.

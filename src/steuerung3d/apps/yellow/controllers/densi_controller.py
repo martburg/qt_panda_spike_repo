@@ -42,6 +42,27 @@ import logging
 log = logging.getLogger("den_si")
 
 
+# --- Header banner: EsState (from EStopStatus word only) -----------------------
+_BANNER_COLORS: dict[str, tuple[str, str]] = {
+    "ESTOP": ("#F9E547", "#000000"),  # yellow
+    "IDLE": ("#FFB300", "#000000"),   # amber
+    "ARMED": ("#1B5E20", "#FFFFFF"),  # dark green
+    "READY": ("#2E7D32", "#FFFFFF"),  # green
+}
+
+_BANNER_DYNAMIC_EXCLUDE: set[str] = {
+    # exclude dynamic bits from OK-chain trip evaluation (except brakes, handled separately)
+    "ready",
+    "taster",
+    "schuetz",
+    "reset_able",
+    "steuerwort",
+    "key1_ok",
+    "key2_ok",
+}
+
+
+
 class L0Top(Enum):
     """DenSi (device-local) top-level connection state.
 
@@ -224,6 +245,16 @@ class DenSiController:
         # Legacy TimeTick display on device side:
         # show (lifetick_tx - lifetick_rx) in milliseconds (WORD wrap).
         self._txt_tick: QLineEdit | None = self.win.findChild(QLineEdit, "txt_tick")
+
+
+        # Header state banner (shared with HiP): show ESTOP/IDLE/ARMED/READY with background color
+        self._txt_hdr_banner_left: QLineEdit | None = self.win.findChild(QLineEdit, "txtHdrBannerLeft")
+        # tolerate historical typo in some .ui files
+        self._txt_hdr_banner_right: QLineEdit | None = (
+            self.win.findChild(QLineEdit, "txtHdrBannerRight")
+            or self.win.findChild(QLineEdit, "txtHdrBannnerRight")
+        )
+
 
         # Live readouts on device page (position/velocity/current/temp)
         self._txt_pos: QLineEdit | None = self.win.findChild(QLineEdit, "txt_pos")
@@ -951,15 +982,21 @@ class DenSiController:
 
         # Dots (including header brake dots) are updated via a separate helper so we can refresh
         # them each tick without re-writing checkboxes.
-        self._render_estop_dots_from_bits(bits)
+        self._render_estop_dots_from_bits(bits, word)
 
-    def _render_estop_dots_from_bits(self, bits: dict[str, bool]) -> None:
+    def _render_estop_dots_from_bits(self, bits: dict[str, bool], word: int) -> None:
         """Render estop-related dots (without touching checkboxes)."""
 
         taster = bool(bits.get("taster", False))
         ready = bool(bits.get("ready", False))
 
         self._update_taster_edge_disp(taster)
+
+
+        # Header banner: EsState derived from EStopStatus word only
+        estate = self._banner_estate_from_word_disp(word)
+        self._apply_banner_estate_disp(estate)
+
 
         # --- Header dots ---
         self._set_led_state_by_name("dotHdrFbt", "good" if taster else "warn")
@@ -1018,6 +1055,47 @@ class DenSiController:
         if t0 is None:
             return False
         return (time.monotonic() - float(t0)) <= float(getattr(self, "_BRAKE_HANDOFF_GRACE_S", 2.0))
+
+
+    def _banner_estate_from_word_disp(self, word: int) -> str:
+        """Derive ESTOP/IDLE/ARMED/READY from EStopStatus word (and taster grace)."""
+        w = int(word) & 0xFFFFFFFF
+        if w == 0:
+            return "ESTOP"
+
+        bits = decode_estop_word(w)
+
+        trip_cause = any(bool(bits.get(k, False)) for k in ESTOP_CAUSE_KEYS)
+
+        ok_keys = [k for k in ESTOP_OK_KEYS if (k not in _BANNER_DYNAMIC_EXCLUDE) and (k not in ("brk1_ok", "brk2_ok"))]
+        ok_chain_fault = any(not bool(bits.get(k, True)) for k in ok_keys)
+
+        taster = bool(bits.get("taster", False))
+        schuetz = bool(bits.get("schuetz", False))
+        brk_ok = bool(bits.get("brk1_ok", True)) and bool(bits.get("brk2_ok", True))
+
+        # Brake bits: trip only after grace when taster is ON; immediate when taster is OFF.
+        if taster:
+            brake_trip = (not brk_ok) and (not self._within_brake_grace_disp())
+        else:
+            brake_trip = (not brk_ok)
+
+        if trip_cause or ok_chain_fault or brake_trip:
+            return "ESTOP"
+
+        if not schuetz:
+            return "ESTOP"
+        if not taster:
+            return "IDLE"
+        return "READY" if brk_ok else "ARMED"
+
+    def _apply_banner_estate_disp(self, estate: str) -> None:
+        bg, fg = _BANNER_COLORS.get(estate, ("#F9E547", "#000000"))
+        for w in (getattr(self, "_txt_hdr_banner_left", None), getattr(self, "_txt_hdr_banner_right", None)):
+            if w is None:
+                continue
+            w.setText(estate)
+            w.setStyleSheet(f"background-color: {bg}; color: {fg}; font-weight: 700;")
 
     def _brake_ok_display_disp(self, *, brk_ok_raw: bool, taster: bool) -> bool:
         """
@@ -1408,7 +1486,7 @@ class DenSiController:
 
         # Refresh estop-related dots every tick (brake grace / header indicators).
         try:
-            self._render_estop_dots_from_bits(bits)
+            self._render_estop_dots_from_bits(bits, estop_word)
         except Exception:
             pass
 
