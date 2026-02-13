@@ -226,7 +226,7 @@ class HiPController:
         """
         if taster and self._within_brake_grace(axis_id):
             return True
-        return (bool(brk_ok_raw) == bool(taster))
+        return bool(brk_ok_raw)
 
     # ---------- init ----------
 

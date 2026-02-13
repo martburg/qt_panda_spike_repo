@@ -59,8 +59,18 @@ _BANNER_DYNAMIC_EXCLUDE: set[str] = {
     "steuerwort",
     "key1_ok",
     "key2_ok",
-}
+    "schluessel1",
+    "schluessel2",}
 
+
+
+class EStopState(Enum):
+    """Device-local Safety/EStop ladder state."""
+
+    ESTOP = auto()
+    IDLE = auto()
+    ARMED = auto()
+    READY = auto()
 
 
 class L0Top(Enum):
@@ -374,6 +384,8 @@ class DenSiController:
         self._taster_rise_t_s: float | None = None
         self._taster_delay_s: float = 2.0
         self._drive_ready: bool = False
+        self._estate: EStopState = EStopState.ESTOP
+        self._BRAKE_SWITCH_S: float = 1.5
         self._es_start_armed: bool = False  # SafetyPLC Start pressed (simulated by btnESStart)
         # Per-brake override: allow simulating "one brake faults" while the other still follows
         # the timing model (Taster -> after 2s -> brakes lifted).
@@ -605,6 +617,112 @@ class DenSiController:
         self._brake_override_b2 = False
 
         self._render_estop_word_to_ui(self._inj_estop_word)
+    def _apply_estop_state_machine(self) -> None:
+        """Authoritative ESTOP/IDLE/ARMED/READY ladder + brake timing.
+
+        Ladder (authoritative):
+          ESTOP (default) -> IDLE -> ARMED -> READY
+
+        Inputs (from injected bits / diagnostic UI):
+          - schuetz: ESStart (encoded)
+          - taster: operator taster
+
+        Outputs (derived, written back into injected bits):
+          - ready: true only in READY
+          - brk1_ok/brk2_ok: OK-for-current-mode (not raw lifted/applied)
+
+        Timing model:
+          - If schuetz=1 and taster rises, brakes become OK-for-mode after _BRAKE_SWITCH_S
+          - Brake mismatch is tolerated for _BRAKE_HANDOFF_GRACE_S after taster rises;
+            after grace it becomes a trip and latches ESTOP.
+        """
+
+        bits = self._inj_bits
+        changed = False
+
+        schuetz = bool(bits.get('schuetz', False))
+        taster = bool(bits.get('taster', False))
+
+        # Track taster edge in device timebase (deterministic)
+        if taster and (not bool(self._taster_prev)):
+            self._taster_rise_t_s = float(self.state.t_s)
+        if not taster:
+            self._taster_rise_t_s = None
+        self._taster_prev = bool(taster)
+
+        elapsed = None
+        if self._taster_rise_t_s is not None:
+            try:
+                elapsed = float(self.state.t_s) - float(self._taster_rise_t_s)
+            except Exception:
+                elapsed = None
+
+        brake_switch_s = float(getattr(self, '_BRAKE_SWITCH_S', 1.5))
+        grace_s = float(getattr(self, '_BRAKE_HANDOFF_GRACE_S', 2.0))
+
+        # Desired brake OK-for-mode
+        if bool(getattr(self, '_estop_latched', False)) or (not schuetz):
+            desired_brk_ok = (not taster)
+        else:
+            if not taster:
+                desired_brk_ok = True
+            else:
+                desired_brk_ok = (elapsed is not None) and (elapsed >= brake_switch_s)
+
+        for k in ('brk1_ok', 'brk2_ok'):
+            if k in bits and bool(bits.get(k, False)) != bool(desired_brk_ok):
+                bits[k] = bool(desired_brk_ok)
+                changed = True
+
+        # Trip evaluation
+        trip_cause = any(bool(bits.get(k, False)) for k in ESTOP_CAUSE_KEYS)
+        ok_keys = [k for k in ESTOP_OK_KEYS if (k not in _BANNER_DYNAMIC_EXCLUDE) and (k not in ('brk1_ok', 'brk2_ok'))]
+        ok_chain_fault = any(not bool(bits.get(k, True)) for k in ok_keys)
+
+        brk_ok = bool(bits.get('brk1_ok', True)) and bool(bits.get('brk2_ok', True))
+        if taster:
+            brake_trip = (not brk_ok) and ((elapsed is None) or (elapsed >= grace_s))
+        else:
+            brake_trip = (not brk_ok)
+
+        trip_active = trip_cause or ok_chain_fault or brake_trip or (not bool(getattr(self, '_safety_ok', True)))
+
+        if trip_active:
+            if not bool(getattr(self, '_estop_latched', False)):
+                log.info('ESTOP trip latched (cause=%s ok_chain=%s brake=%s)', trip_cause, ok_chain_fault, brake_trip)
+            self._estop_latched = True
+            # Require reset + ESStart again
+            if bool(bits.get('ready', False)):
+                bits['ready'] = False
+                changed = True
+            if bool(bits.get('schuetz', False)):
+                bits['schuetz'] = False
+                changed = True
+            self._drive_ready = False
+            self._estate = EStopState.ESTOP
+
+        else:
+            if not schuetz:
+                self._estate = EStopState.ESTOP
+            elif not taster:
+                self._estate = EStopState.IDLE
+            else:
+                self._estate = EStopState.READY if brk_ok else EStopState.ARMED
+
+            desired_ready = (self._estate == EStopState.READY)
+            if 'ready' in bits and bool(bits.get('ready', False)) != bool(desired_ready):
+                bits['ready'] = bool(desired_ready)
+                changed = True
+            self._drive_ready = bool(desired_ready)
+
+        # Keep packed word aligned with bits
+        new_word = int(encode_estop_word(bits))
+        if new_word != int(getattr(self, '_inj_estop_word', 0)):
+            self._inj_estop_word = new_word
+            changed = True
+
+        if changed:
+            self._render_estop_word_to_ui(self._inj_estop_word)
 
     def _apply_startup_logic(self) -> None:
         """Emulate SafetyPLC timing: Taster -> (delay) -> drives ready & brakes lifted."""
@@ -1106,7 +1224,7 @@ class DenSiController:
         """
         if bool(taster) and self._within_brake_grace_disp():
             return True
-        return (bool(brk_ok_raw) == bool(taster))
+        return bool(brk_ok_raw)
 
 
     # ----- diagnostic actions -----
@@ -1192,19 +1310,24 @@ class DenSiController:
             pass
 
     def _on_es_start_clicked(self) -> None:
-        """Simulate SafetyPLC Start: arm the Taster->(2s)->Ready/brakes handoff."""
-        # Only arm if we are not currently tripped/latched
-        if bool(self._estop_latched) or bool(getattr(self.state, "estop", False)):
+        """Simulate SafetyPLC Start (ESStart).
+
+        In the legacy stack ESStart arms the safety handoff and is represented
+        on the wire as the 'schuetz' bit in EStopStatusWord.
+        """
+        # Allow ESStart even if we are in default ESTOP (not started),
+        # but never when a trip is latched (requires EStopReset first).
+        if bool(getattr(self, '_estop_latched', False)):
             return
+
         self._es_start_armed = True
+        self._inj_bits['schuetz'] = True
         # If Taster is already held, start the timer now
-        try:
-            bits = decode_estop_word(int(self._inj_estop_word))
-            if bool(bits.get("taster", False)):
-                self._taster_rise_t_s = float(self.state.t_s)
-        except Exception:
-            pass
-        log.info("ESStart pressed -> armed safety handoff")
+        if bool(self._inj_bits.get('taster', False)):
+            self._taster_rise_t_s = float(self.state.t_s)
+        self._inj_estop_word = encode_estop_word(self._inj_bits)
+        self._render_estop_word_to_ui(self._inj_estop_word)
+        log.info('ESStart pressed -> schuetz=1')
 
 
     def _on_diag_resync_clicked(self) -> None:
@@ -1478,7 +1601,7 @@ class DenSiController:
 
 
         # SafetyPLC/drive handoff emulation (taster -> ready/brakes after delay)
-        self._apply_startup_logic()
+        self._apply_estop_state_machine()
 
         # refresh estop_word/bits after startup logic may have updated derived bits
         estop_word = int(self._inj_estop_word)
@@ -1489,13 +1612,9 @@ class DenSiController:
             self._render_estop_dots_from_bits(bits, estop_word)
         except Exception:
             pass
-
-        # trip only on actual "cause" bits (NOT on OK/status bits)
-        trip = any(bool(bits.get(k, False)) for k in ESTOP_CAUSE_KEYS) or (not self._safety_ok)
-        if trip:
-            self._estop_latched = True
-
-        self.state.estop = bool(self._estop_latched)
+        # EStop ladder state machine is authoritative; it already updated injected bits/word
+        # and the internal latch. 'state.estop' tracks the ladder ESTOP state (default).
+        self.state.estop = bool(getattr(self, '_estate', EStopState.ESTOP) == EStopState.ESTOP)
         self.state.estop_status_word = estop_word
         # --- Cut markers: latch on E-Stop ENTRY ---
         # We compute the edge here, but latch AFTER the plant step so we use the freshest measurement.
