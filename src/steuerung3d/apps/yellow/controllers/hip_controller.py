@@ -1256,11 +1256,21 @@ class HiPController:
         self._apply_banner_estate(estate)
 
         # Header ONLINE dot should represent the *link/connection* to Core/PLC telemetry.
-        # 30 is an empirically-derived threshold to allow for some jitter but still indicate staleness reasonably quickly.
-        # 500 is a sanity cap to avoid showing "good" for wildly stale telemetry 
-        # (e.g. if lifetick_age is erroneously large due to a bug or overflow).
-        # both numbers are somewhat arbitrary and should be adjusted based on real-world experience.
-        online_state = "good" if (age <= 500) and (age > 30) else "bad"
+        # We treat "fresh" as green, "stale" as amber, and "offline" as red.
+        #
+        # age is the device lifetick age (in device ticks). Empirically:
+        #   - <= 30 ticks: healthy/fresh updates (green)
+        #   - 31..500 ticks: updates are stale but we still see life (amber)
+        #   - > 500 ticks: effectively offline (red)
+        #
+        # Thresholds are intentionally conservative and can be tuned once we have
+        # real-world timing with the full stack.
+        if age <= 30:
+            online_state = "good"
+        elif age <= 500:
+            online_state = "warn"
+        else:
+            online_state = "bad"
 
         estop_word = int(getattr(snap, "estop_status_word", 0) or 0)
         estop_logical = decode_estop_word(estop_word)

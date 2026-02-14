@@ -554,18 +554,18 @@ class DenSiController:
         chain and the operator's first action should be issuing an E-Stop reset.
 
         Policy:
-          - Trip-causes asserted (red): ESTOP_CAUSE_KEYS => True
+          - Trip-causes NOT asserted (startup should not show a latched cause): ESTOP_CAUSE_KEYS => False
           - Status/OK chain broken (red): ESTOP_OK_KEYS => False
-          - Allow reset immediately: reset_able => True
+          - ResetAble is derived (see _sync_reset_able_bit) and will become True when causes are clear
           - Other bits default False (off / warn only when asserted)
         """
         # default everything False
         for k in self._inj_bits.keys():
             self._inj_bits[k] = False
 
-        # Trip causes asserted (red)
+        # Trip causes clear at startup (no explicit cause latched)
         for k in ESTOP_CAUSE_KEYS:
-            self._inj_bits[k] = True
+            self._inj_bits[k] = False
 
         # Break the OK chain (red)
         for k in ESTOP_OK_KEYS:

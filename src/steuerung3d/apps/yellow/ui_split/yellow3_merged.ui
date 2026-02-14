@@ -309,7 +309,7 @@
          <property name="frameShadow">
           <enum>QFrame::Shadow::Raised</enum>
          </property>
-         <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="0,0,1,0,0">
+         <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="2,2,8,2,2">
           <property name="topMargin">
            <number>0</number>
           </property>
@@ -326,7 +326,7 @@
             </property>
             <property name="maximumSize">
              <size>
-              <width>70</width>
+              <width>16777215</width>
               <height>16777215</height>
              </size>
             </property>
@@ -348,7 +348,7 @@
             </property>
             <property name="maximumSize">
              <size>
-              <width>70</width>
+              <width>16777215</width>
               <height>16777215</height>
              </size>
             </property>
@@ -395,7 +395,7 @@
             </property>
             <property name="maximumSize">
              <size>
-              <width>70</width>
+              <width>16777215</width>
               <height>16777215</height>
              </size>
             </property>
@@ -417,7 +417,7 @@
             </property>
             <property name="maximumSize">
              <size>
-              <width>70</width>
+              <width>16777215</width>
               <height>16777215</height>
              </size>
             </property>
@@ -440,7 +440,7 @@
          <property name="frameShadow">
           <enum>QFrame::Shadow::Raised</enum>
          </property>
-         <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="3,0,1,1,1,1,1,0,0,3">
+         <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="3,1,1,1,1,1,3">
           <property name="topMargin">
            <number>0</number>
           </property>
@@ -459,19 +459,6 @@
              <set>Qt::AlignmentFlag::AlignCenter</set>
             </property>
            </widget>
-          </item>
-          <item>
-           <spacer name="horizontalSpacer">
-            <property name="orientation">
-             <enum>Qt::Orientation::Horizontal</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>40</width>
-              <height>20</height>
-             </size>
-            </property>
-           </spacer>
           </item>
           <item>
            <layout class="QHBoxLayout" name="layoutLedFBT">
@@ -682,22 +669,6 @@
              </spacer>
             </item>
            </layout>
-          </item>
-          <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_livetick"/>
-          </item>
-          <item>
-           <spacer name="horizontalSpacer_2">
-            <property name="orientation">
-             <enum>Qt::Orientation::Horizontal</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>40</width>
-              <height>20</height>
-             </size>
-            </property>
-           </spacer>
           </item>
           <item>
            <widget class="QLineEdit" name="txtHdrBannerRight">
