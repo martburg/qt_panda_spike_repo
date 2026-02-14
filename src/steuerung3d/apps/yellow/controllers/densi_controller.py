@@ -285,6 +285,21 @@ class DenSiController:
         if self._btn_diag_resync is not None:
             self._btn_diag_resync.clicked.connect(self._on_diag_resync_clicked)
 
+        # Fine-tuning: DenSi role must not expose/reset/recover/resync controls.
+        # These belong to the HiP / operator workflow.
+        for _name in ("btn_reset", "btnRecover"):
+            _b = self.win.findChild(QPushButton, _name)
+            if _b is not None:
+                try:
+                    _b.setEnabled(False)
+                except Exception:
+                    pass
+        if self._btn_diag_resync is not None:
+            try:
+                self._btn_diag_resync.setEnabled(False)
+            except Exception:
+                pass
+
         # Guider readouts (range min/max/value and measured guider speed)
         self._txt_guider_range_min: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMin")
         self._txt_guider_range_max: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMax")
@@ -556,10 +571,12 @@ class DenSiController:
         for k in ESTOP_OK_KEYS:
             self._inj_bits[k] = False
 
-        # But allow reset right away
-        self._inj_bits["reset_able"] = True
+        # Reset is only allowed once the main trip causes are cleared (Master/Slave/Network/EStop1/EStop2).
+        # While any of those are active, ResetAble must stay low.
+        self._inj_bits["reset_able"] = False
 
         self._inj_estop_word = encode_estop_word(self._inj_bits)
+        self._sync_reset_able_bit()
         self._estop_latched = True  # reflect 'trip' immediately in state.estop
         self._brake_override_b1 = False
         self._brake_override_b2 = False
@@ -583,6 +600,38 @@ class DenSiController:
         self._estop_latched = False
         self._render_estop_word_to_ui(self._inj_estop_word)
 
+
+    def _sync_reset_able_bit(self) -> bool:
+        """Derive ResetAble from trip-cause bits.
+
+        Contract requested:
+          - ResetAble becomes TRUE once (Master, Slave/Guider, Network, EStop1, EStop2) are cleared.
+          - ResetAble is only meaningful while the ladder is in ESTOP.
+
+        Note: reset_able does *not* participate in trip evaluation (excluded from OK-chain),
+        so using the current word to derive banner state is safe.
+
+        Returns True if the packed word changed.
+        """
+        if 'reset_able' not in self._inj_bits:
+            return False
+
+        trip_causes = any(bool(self._inj_bits.get(k, False)) for k in ESTOP_CAUSE_KEYS)
+
+        # Only surface ResetAble while we are in ESTOP (system idle/ready doesn't need it).
+        try:
+            estate = self._banner_estate_from_word_disp(int(getattr(self, '_inj_estop_word', 0) or 0))
+        except Exception:
+            estate = 'ESTOP'
+        in_estop = (estate == 'ESTOP')
+
+        desired = (not trip_causes) and bool(in_estop)
+        if bool(self._inj_bits.get('reset_able', False)) == bool(desired):
+            return False
+
+        self._inj_bits['reset_able'] = bool(desired)
+        self._inj_estop_word = encode_estop_word(self._inj_bits)
+        return True
 
     def _apply_post_reset_state(self) -> None:
         """Clear initial FAULT latch, but remain not-ready until Taster + delay."""
@@ -1055,6 +1104,15 @@ class DenSiController:
             current_bits = decode_estop_word(self._inj_estop_word)
             cb.setChecked(bool(current_bits.get(spec.key, False)))
 
+            # ResetAble is an output of the safety ladder; it is derived from trip-cause bits.
+            # Make it read-only so operator overrides cannot violate the contract.
+            if spec.key == 'reset_able':
+                try:
+                    cb.setEnabled(False)
+                except Exception:
+                    pass
+                continue
+
             def _make_handler(key: str, checkbox_name: str):
                 def _on_toggled(checked: bool) -> None:
                     # User-driven diagnostic override for brake feedback bits.
@@ -1076,7 +1134,9 @@ class DenSiController:
                                 self._brake_override_b2 = True
 
                     self._inj_bits[key] = bool(checked)
+                    # Encode first, then enforce derived ResetAble policy.
                     self._inj_estop_word = encode_estop_word(self._inj_bits)
+                    self._sync_reset_able_bit()
                     log.info("inject estop %s=%s (word=0x%08X)", key, checked, self._inj_estop_word)
                     self._render_estop_word_to_ui(self._inj_estop_word)
                 return _on_toggled
@@ -1340,17 +1400,27 @@ class DenSiController:
         """Render cut marker readouts.
 
         Policy:
-          - Before cut is latched: txt_cut_time shows live DenSi wallclock token (updates each tick)
+          - Before cut is latched: txt_cut_time shows DenSi wallclock token; it only advances when NOT in ESTOP
           - After latch: txt_cut_time freezes at the latch token
         """
         if not bool(getattr(self, "_cut_valid", False)):
-            # Live wallclock token until an E-Stop latch happens
+            # Live wallclock token until an E-Stop latch happens.
+            # Fine-tuning: the token may only *advance* while NOT in ESTOP.
+            estop_now = bool(getattr(self.state, "estop", False))
             try:
-                tok = self._now_token()
-                self._systemtime_tok = tok
-                self.state.params["SystemTime"] = tok
+                if estop_now:
+                    tok = str(self._systemtime_tok or self.state.params.get("SystemTime", "") or "")
+                    if not tok:
+                        tok = self._now_token()
+                        self._systemtime_tok = tok
+                        self.state.params["SystemTime"] = tok
+                else:
+                    tok = self._now_token()
+                    self._systemtime_tok = tok
+                    self.state.params["SystemTime"] = tok
+
                 if self._txt_cut_time is not None:
-                    self._txt_cut_time.setText(tok)
+                    self._txt_cut_time.setText(tok if tok else "--")
             except Exception:
                 if self._txt_cut_time is not None:
                     self._txt_cut_time.setText("--")
@@ -1602,6 +1672,13 @@ class DenSiController:
 
         # SafetyPLC/drive handoff emulation (taster -> ready/brakes after delay)
         self._apply_estop_state_machine()
+
+        # ResetAble policy: becomes true once Master/Slave/Network/EStop1/EStop2 are cleared (while in ESTOP).
+        if self._sync_reset_able_bit():
+            try:
+                self._render_estop_word_to_ui(self._inj_estop_word)
+            except Exception:
+                pass
 
         # refresh estop_word/bits after startup logic may have updated derived bits
         estop_word = int(self._inj_estop_word)

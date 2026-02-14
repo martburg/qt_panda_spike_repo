@@ -252,6 +252,7 @@ class HiPController:
         self._last_mode: str = ""
         self._last_estop: bool = False
         self._last_fault: bool = False
+        self._last_estate: str = "ESTOP"
 
         self._seen_first_telem = False
         self._last_rx_ns: int | None = None
@@ -286,6 +287,9 @@ class HiPController:
             or self.win.findChild(QPushButton, "btnDiagResync"))
         if self._btn_diag_resync is not None:
             self._btn_diag_resync.clicked.connect(self._on_diag_resync_clicked)
+            # Fine-tuning: Resync may only be pressed in core Mode.IDLE.
+            # (poll_once will re-enable it when appropriate)
+            self._btn_diag_resync.setEnabled(False)
 
 
         # Sliders used as live indicators
@@ -485,6 +489,13 @@ class HiPController:
         if btn_rec is not None:
             try:
                 btn_rec.setEnabled(False)
+            except Exception:
+                pass
+
+        # ReSync button is only usable in Mode.IDLE (poll_once drives it).
+        if self._btn_diag_resync is not None:
+            try:
+                self._btn_diag_resync.setEnabled(bool(attached) and (not self._modal_locked) and (str(self._last_mode).upper() == "IDLE") and (str(getattr(self, "_last_estate", "")).upper() == "IDLE"))
             except Exception:
                 pass
 
@@ -1138,6 +1149,31 @@ class HiPController:
             mode_v = str(getattr(snap, "mode", ""))
             estop_v = bool(getattr(snap, "estop", False))
             fault_v = bool(getattr(snap, "fault", False))
+            # Cache for status emitter and UI gating
+            self._last_mode = mode_v
+            self._last_estop = estop_v
+            self._last_fault = fault_v
+
+            # Determine SafetyPLC ladder state (banner estate) from EStopStatus word.
+            try:
+                axis_id_for_estate = (self._selected_axis or self._fixed_axis or "").strip()
+                if (not axis_id_for_estate) or (axis_id_for_estate == NOT_ATTACHED):
+                    axes_map = getattr(snap, "axes", {}) or {}
+                    if isinstance(axes_map, dict) and axes_map:
+                        axis_id_for_estate = next(iter(axes_map.keys()))
+                word = _parse_estop_word_from_snapshot(snap)
+                self._last_estate = self._banner_estate_from_word(axis_id=axis_id_for_estate or "X", word=word)
+            except Exception:
+                self._last_estate = "ESTOP"
+
+            # Fine-tuning: HiP ReSync is only allowed when the *system* is idle:
+            # - Core rig mode is IDLE
+            # - SafetyPLC ladder estate is IDLE (Schuetz OK, Taster released, no trip)
+            if self._btn_diag_resync is not None:
+                try:
+                    self._btn_diag_resync.setEnabled((mode_v.upper() == "IDLE") and (str(getattr(self, "_last_estate", "")).upper() == "IDLE") and (not self._modal_locked))
+                except Exception:
+                    pass
             if self._ch.changed("mode", mode_v):
                 log.info("mode=%s", mode_v)
             if self._ch.changed("estop", estop_v):
@@ -1261,6 +1297,14 @@ class HiPController:
         If no axis is attached we still send a *global* pulse (axis_id=""),
         which Core will translate into a one-shot CommandFrame.resync for all devices.
         """
+        # Fine-tuning guard: ReSync is only allowed when the *system* is idle.
+        # System idle == Core mode IDLE AND SafetyPLC ladder estate IDLE (Taster released).
+        mode_now = str(getattr(self, "_last_mode", "") or "").upper()
+        estate_now = str(getattr(self, "_last_estate", "") or "").upper()
+        if (mode_now != "IDLE") or (estate_now != "IDLE"):
+            log.warning("ignored RequestResync (allowed only when system idle), mode=%s estate=%s", mode_now, estate_now)
+            return
+
         axis_id = (self._selected_axis or self._fixed_axis or "").strip()
         hip_id = str(getattr(self, "hip_id", "") or getattr(self, "_hip_id", "") or "")
 
@@ -1276,16 +1320,7 @@ class HiPController:
             log.info("sent RequestResync axis_id=%r hip_id=%r", axis_id, hip_id)
         except Exception:
             log.exception("failed to send RequestResync axis_id=%r", axis_id)
-
-        # Clear local cut markers (UI side). If no axis is attached, clear all.
-        if axis_id:
-            self._cut_valid_by_axis[axis_id] = False
-            self._cut_time_by_axis.pop(axis_id, None)
-            self._prev_estop_by_axis[axis_id] = bool(getattr(self, "_prev_estop_by_axis", {}).get(axis_id, False))
-        else:
-            self._cut_valid_by_axis.clear()
-            self._cut_time_by_axis.clear()
-
+        # Clear local cut markers (UI side)
         for w in (self._txt_cut_time, self._txt_cut_pos, self._txt_cut_vel, self._txt_posdiff):
             if w is not None:
                 w.setText("--")
@@ -1372,15 +1407,13 @@ class HiPController:
                 if self._txt_posdiff is not None:
                     self._txt_posdiff.setText(f"{posdiff:.2f} m")
             tail = getattr(snap, "plc_uplink_tail", {}) or {}
-#            if not isinstance(tail, dict):
-#                tail = {}
-
-            # Time token: prefer DenSi preformatted UI text, else fall back to PLC tail[0] SystemTime.
-            #t_tok = str(params.get("ui_cut_time_text", "") or "")
-            #if not t_tok:
-            t_tok = str(tail.get("SystemTime", "") or "kk")
+            if not isinstance(tail, dict):
+                tail = {}
+            # CutTime comes from DenSi/PLC tail token (SystemTime).
+            # Policy: HiP does **not** freeze it; DenSi is authoritative for when it advances.
+            t_tok = str(tail.get("SystemTime", "") or "")
             if self._txt_cut_time is not None:
-                self._txt_cut_time.setText(t_tok if t_tok != "" else "--")
+                self._txt_cut_time.setText(t_tok if t_tok else "--")
 
         except Exception:
             pass

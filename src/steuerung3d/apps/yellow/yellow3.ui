@@ -448,7 +448,17 @@
            <number>0</number>
           </property>
           <item>
-           <widget class="QLineEdit" name="txtHdrBannerLeft"/>
+           <widget class="QLineEdit" name="txtHdrBannerLeft">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
           </item>
           <item>
            <spacer name="horizontalSpacer">
@@ -687,7 +697,17 @@
            </spacer>
           </item>
           <item>
-           <widget class="QLineEdit" name="txtHdrBannerRight"/>
+           <widget class="QLineEdit" name="txtHdrBannerRight">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
           </item>
          </layout>
         </widget>
