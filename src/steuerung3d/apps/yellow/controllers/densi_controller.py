@@ -49,7 +49,8 @@ from .bindings import YellowBindings
 from .ports import CommandIn, TelemetryOut
 from .widget_cache import WidgetCache
 from .ui_watchdog import PerfWatchdog
-from .ui_contract import log_missing_optional_once
+from .ui_params import apply_param_values_to_line_edits, set_single_param_in_ui
+from .ui_contract import log_missing_optional_once, log_missing_required_once
 from .ui_update import set_checked, set_enabled, set_state_by_object_name, set_state_property, set_text, update_slider
 from .ui_estop import (
     age_to_online_state,
@@ -236,7 +237,7 @@ class DenSiController:
                 cmb.clear()
                 cmb.addItems([label])
                 cmb.setCurrentText(label)
-                cmset_enabled(b, False)
+                set_enabled(cmb, False)
                 cmb.blockSignals(was)
             except Exception:
                 pass
@@ -250,6 +251,19 @@ class DenSiController:
 
         # Non-fatal UI contract check (helps diagnose mismatched .ui variants)
         # Grouped by feature and logged once per process (DEBUG only).
+        # Required widgets (warn once).
+        log_missing_required_once(
+            log,
+            self._wcache,
+            [
+                (QComboBox, "cmb_axis"),
+                (QLineEdit, "txt_tick"),
+                (QLineEdit, "txtHdrBannerLeft"),
+                (QLineEdit, "txtHdrBannerRight"),
+            ],
+            context="den_si:required",
+        )
+
         log_missing_optional_once(
             log,
             self._wcache,
@@ -376,20 +390,10 @@ class DenSiController:
 
     def _ui_set_param(self, key: str, value: float) -> None:
         # Update UI field if we know its widget name.
-        for _grp, mapping in _PARAM_WIDGETS.items():
-            wname = mapping.get(key)
-            if not wname:
-                continue
-            w = self.win.findChild(QLineEdit, wname)
-            if w is None:
-                continue
-            # avoid unnecessary signal churn
-            txt = f"{value:g}"
-            if w.text() == txt:
-                return
-            was = w.blockSignals(True)
-            set_text(w, txt)
-            w.blockSignals(was)
+        # Keep formatting consistent with HiP (numbers use :g).
+        try:
+            set_single_param_in_ui(key, value, _PARAM_WIDGETS, self._find_line_edit, block_signals=True)
+        except Exception:
             return
 
     def _disable_param_edit_buttons(self) -> None:
@@ -911,15 +915,15 @@ class DenSiController:
         self.state.params = params
 
     def _apply_param_values_to_ui(self, values: dict[str, float]) -> None:
-        # Push updated values to any known widgets.
-        for _grp, mapping in _PARAM_WIDGETS.items():
-            for key, obj_name in mapping.items():
-                if key not in values:
-                    continue
-                le = self._find_line_edit(obj_name)
-                if le is None:
-                    continue
-                set_text(le, str(values[key]))
+        # Push updated values to known widgets (shared renderer).
+        apply_param_values_to_line_edits(
+            values,
+            _PARAM_WIDGETS,
+            self._find_line_edit,
+            freeze_group="",
+            skip_focused=True,
+            block_signals=True,
+        )
 
         # Also update the compact header limit fields if those values are present.
         self._render_limit_fields_from_params(values)

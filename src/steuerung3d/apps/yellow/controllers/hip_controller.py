@@ -57,7 +57,8 @@ from .ports import IntentOut, TelemetryIn
 from .param_txn import ParamEditTxnClient
 from .widget_cache import WidgetCache
 from .ui_watchdog import PerfWatchdog
-from .ui_contract import log_missing_optional_once
+from .ui_params import apply_param_values_to_line_edits
+from .ui_contract import log_missing_optional_once, log_missing_required_once
 from .ui_update import (
     set_checked,
     set_enabled,
@@ -304,6 +305,19 @@ class HiPController:
 
         # Non-fatal UI contract check (helps diagnose mismatched .ui variants)
         # Grouped by feature and logged once per process (DEBUG only).
+        # Required widgets (warn once).
+        log_missing_required_once(
+            log,
+            self._wcache,
+            [
+                (QComboBox, "cmb_axis"),
+                (QLineEdit, "txt_tick"),
+                (QLineEdit, "txtHdrBannerLeft"),
+                (QLineEdit, "txtHdrBannerRight"),
+            ],
+            context="hi_p:required",
+        )
+
         log_missing_optional_once(
             log,
             self._wcache,
@@ -328,6 +342,16 @@ class HiPController:
             ],
             context="hi_p:readouts",
         )
+
+        # Cache widgets used for modal param lock/unlock (avoid repeated findChildren() scans).
+        try:
+            self._modal_widgets = [
+                w
+                for w in self.win.findChildren(QWidget)
+                if isinstance(w, (QPushButton, QLineEdit))
+            ]
+        except Exception:
+            self._modal_widgets = []
 
     def _init_observability(self) -> None:
         """Set up lightweight logs + optional structured status heartbeat."""
@@ -792,7 +816,7 @@ class HiPController:
                 self._modal_prev_tabbar_enabled = bool(tabs.tabBar().isEnabled())
                 set_enabled(tabs.tabBar(), False)
 
-            for w in self.win.findChildren(QWidget):
+            for w in (getattr(self, "_modal_widgets", None) or self.win.findChildren(QWidget)):
                 if isinstance(w, (QPushButton, QLineEdit)):
                     self._modal_prev_enabled[w] = bool(w.isEnabled())
                     set_enabled(w, False)
@@ -907,6 +931,7 @@ class HiPController:
             self._set_param_group_enabled(g, False)
             self._set_param_button_state(g, editing=False, busy=busy)
 
+    
     def _render_params_from_telemetry(self, snap: TelemetrySnapshot) -> None:
         params = getattr(snap, "params", None)
         if not isinstance(params, dict) or not params:
@@ -914,22 +939,15 @@ class HiPController:
 
         freeze_group = self._param_txn.local_edit_group if self._param_txn.local_edit_active else ""
 
-        for grp, mapping in _PARAM_WIDGETS.items():
-            if freeze_group and grp == freeze_group:
-                continue
-            for key, obj_name in mapping.items():
-                if key not in params:
-                    continue
-                le = self._find_line_edit(obj_name)
-                if le is None or le.hasFocus():
-                    continue
-                val = params[key]
-                txt = f"{val:g}" if isinstance(val, (int, float)) else str(val)
-                if le.text() == txt:
-                    continue
-                was = le.blockSignals(True)
-                set_text(le, txt)
-                le.blockSignals(was)
+        # Shared renderer ensures consistent formatting (+ blocks signals).
+        apply_param_values_to_line_edits(
+            params,
+            _PARAM_WIDGETS,
+            self._find_line_edit,
+            freeze_group=freeze_group,
+            skip_focused=True,
+            block_signals=True,
+        )
 
         try:
             self._render_limit_fields({k: float(params[k]) for k in ("HardMin", "UserMin", "UserMax", "HardMax") if k in params})

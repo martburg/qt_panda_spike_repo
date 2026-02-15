@@ -22,6 +22,53 @@ from .widget_cache import WidgetCache
 _LOGGED_CONTEXTS: set[str] = set()
 
 
+_LOGGED_REQUIRED_CONTEXTS: set[str] = set()
+
+
+def missing_required(cache: WidgetCache, specs: Iterable[tuple[type[QWidget], str]]) -> list[str]:
+    """Return a list of missing *required* objectNames for the given specs."""
+    # Implementation is the same as missing_optional; intent differs.
+    return missing_optional(cache, specs)
+
+
+def log_missing_required_once(
+    logger,
+    cache: WidgetCache,
+    specs: Iterable[tuple[type[QWidget], str]],
+    *,
+    context: str,
+) -> None:
+    """Log missing required widgets at most once per process+context (WARNING)."""
+    try:
+        key = str(context)
+        if key in _LOGGED_REQUIRED_CONTEXTS:
+            return
+        _LOGGED_REQUIRED_CONTEXTS.add(key)
+        log_missing_required(logger, cache, specs, context=context)
+    except Exception:
+        return
+
+
+def log_missing_required(
+    logger,
+    cache: WidgetCache,
+    specs: Iterable[tuple[type[QWidget], str]],
+    *,
+    context: str,
+) -> None:
+    """Log missing required widgets at WARNING level.
+
+    Required widgets are those that the controller expects to exist for safe operation.
+    We still keep this non-fatal because some deployments use partial UIs.
+    """
+    try:
+        missing = missing_optional(cache, specs)
+        if missing:
+            logger.warning("UI contract (%s): missing REQUIRED widgets: %s", context, ", ".join(missing))
+    except Exception:
+        return
+
+
 def missing_optional(cache: WidgetCache, specs: Iterable[tuple[type[QWidget], str]]) -> list[str]:
     """Return a list of missing objectNames for the given specs."""
     out: list[str] = []
