@@ -65,6 +65,18 @@ from .ui_banner import (
 from .ui_format import fmt_f_unit, fmt_i_unit
 from .yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 
+from ..panels.densi_readouts_vm import compute_densi_readouts_vm
+from ..panels.densi_readouts_render import DenSiReadoutsBindings, apply_densi_readouts_vm
+from ..panels.densi_header_online_vm import compute_densi_header_online_vm
+from ..panels.densi_header_online_render import apply_densi_header_online_vm
+from ..panels.densi_banner_vm import compute_densi_banner_vm
+from ..panels.densi_banner_render import DenSiBannerBindings, apply_densi_banner_vm
+from ..panels.densi_taster_edge_state import TasterEdgeState, update_taster_edge_state, within_brake_grace
+from ..panels.densi_estop_dots_vm import compute_densi_estop_dots_vm
+from ..panels.densi_estop_dots_render import apply_densi_estop_dots_vm
+from ..panels.densi_cut_markers_vm import compute_densi_cut_markers_vm
+from ..panels.densi_cut_markers_render import DenSiCutMarkersBindings, apply_densi_cut_markers_vm
+
 import logging
 
 
@@ -227,6 +239,20 @@ class DenSiController:
         # Sliders used as live indicators
         self._sld_vel_cmd: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldVelCmd")
         self._sld_limit_range: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldLimitRange")
+
+        # Panel bindings (north refactor): keep widget ownership explicit.
+        self._b_readouts = DenSiReadoutsBindings(
+            txt_pos=self._txt_pos,
+            txt_vel=self._txt_vel,
+            txt_amp=self._txt_amp,
+            txt_temp=self._txt_temp,
+            txt_guider_range_min=self._txt_guider_range_min,
+            txt_guider_range_max=self._txt_guider_range_max,
+            txt_guider_range_val=self._txt_guider_range_val,
+            txt_guider_speed=self._txt_guider_speed,
+            sld_vel_cmd=self._sld_vel_cmd,
+            sld_limit_range=self._sld_limit_range,
+        )
 
         # DenSi is normally bound to exactly one axis. Make that explicit in cmb_axis.
         cmb = self.win.findChild(QComboBox, "cmb_axis")
@@ -871,25 +897,18 @@ class DenSiController:
     def _render_header_online_dot(self) -> None:
         """Drive the header 'Online' dot (dotHdrOnline).
 
-        On the DenSi side we don't have a drive status-word like HiP.
-        Instead we treat the device as 'online' once it is actively
-        receiving command frames from Core/HiP.
+        Semantics:
+        - dot off until we see the first command frame
+        - green while frames flow, amber when stale
         """
-
-        if not self._seen_first_cmd:
-            self._set_dot("dotHdrOnline", None)
-            return
-
         now_ns = time.monotonic_ns()
-        last_ns = self._last_cmd_ns or 0
-        age_s = (now_ns - last_ns) / 1e9 if last_ns else 1e9
-
-        # Green while frames are flowing, amber when stale.
-        # (Tune threshold as needed; 1s is a good first cut for dt=10ms.)
-        state = age_to_online_state(age=float(age_s), good_max=1.0, warn_max=None)
-        self._set_dot("dotHdrOnline", state)
-
-    # ----- parameter helpers -----
+        vm = compute_densi_header_online_vm(
+            seen_first_cmd=bool(getattr(self, "_seen_first_cmd", False)),
+            now_ns=int(now_ns),
+            last_cmd_ns=getattr(self, "_last_cmd_ns", None),
+            good_max_s=1.0,
+        )
+        apply_densi_header_online_vm(vm, set_dot=self._set_dot)
     def _find_line_edit(self, object_name: str) -> QLineEdit | None:
         try:
             return self._wcache.line_edit(object_name)
@@ -1087,48 +1106,43 @@ class DenSiController:
         set_state_by_object_name(self.win, object_name, state)
 
     def _render_estop_dots_from_bits(self, bits: dict[str, bool], word: int) -> None:
-        """Render estop-related dots (without touching checkboxes)."""
+        """Render estop-related dots (without touching checkboxes).
+
+        North refactor: compute Qt-free VMs (banner + dot map), then apply.
+        We keep the controller responsible for maintaining the small taster-edge
+        state used for brake grace timing.
+        """
 
         taster = bool(bits.get("taster", False))
         ready = bool(bits.get("ready", False))
 
-        self._update_taster_edge_disp(taster)
+        # --- update taster-edge tracker (preserve legacy grace semantics) ---
+        prev = bool(getattr(self, "_taster_prev_disp", taster))
+        pressed_s = getattr(self, "_taster_pressed_s", None)
+        st0 = TasterEdgeState(prev=prev, pressed_s=pressed_s if pressed_s is None else float(pressed_s))
+        st1 = update_taster_edge_state(state=st0, taster=taster, now_s=float(time.monotonic()))
+        self._taster_prev_disp = bool(st1.prev)
+        self._taster_pressed_s = st1.pressed_s
 
+        within_grace = within_brake_grace(
+            state=st1,
+            now_s=float(time.monotonic()),
+            grace_s=float(getattr(self, "_BRAKE_HANDOFF_GRACE_S", 2.0)),
+        )
 
-        # Header banner: EsState derived from EStopStatus word only
-        estate = self._banner_estate_from_word_disp(word)
-        self._apply_banner_estate_disp(estate)
-
-
-        # --- Header dots ---
-        hdr = compute_header_estop_dot_states(
-            taster=taster,
-            ready=ready,
-            brk1_raw=bool(bits.get("brk1_ok", False)),
-            brk2_raw=bool(bits.get("brk2_ok", False)),
-            brake_ok_display=lambda raw: self._brake_ok_display_disp(
-                brk_ok_raw=raw, taster=taster
+        # --- banner ---
+        bvm = compute_densi_banner_vm(estop_word=int(word), within_brake_grace=within_grace)
+        apply_densi_banner_vm(
+            bvm,
+            DenSiBannerBindings(
+                left=getattr(self, "_txt_hdr_banner_left", None),
+                right=getattr(self, "_txt_hdr_banner_right", None),
             ),
         )
-        self._set_dot("dotHdrFbt", hdr["dotHdrFbt"])
-        self._set_dot("dotHdrReady", hdr["dotHdrReady"])
-        self._set_dot("dotHdrBrake1", hdr["dotHdrBrake1"])
-        self._set_dot("dotHdrBrake2", hdr["dotHdrBrake2"])
 
-        # --- Per-bit dots in diagnostic groups ---
-        states = compute_estop_dot_states(
-            bits=bits,
-            taster=taster,
-            specs=iter_specs(),
-            brake_ok_display=lambda raw: self._brake_ok_display_disp(
-                brk_ok_raw=raw, taster=taster
-            ),
-        )
-        for dot, state in states.items():
-            self._set_dot(dot, state)
-
-    # ----- brake display helpers (match HiP) -----
-
+        # --- dots ---
+        dvm = compute_densi_estop_dots_vm(bits=bits, taster=taster, ready=ready, within_brake_grace=within_grace)
+        apply_densi_estop_dots_vm(dvm, set_dot=self._set_dot)
     def _update_taster_edge_disp(self, taster: bool) -> None:
         """Track taster rising edge (0->1) for brake handoff grace."""
         prev = bool(getattr(self, "_taster_prev_disp", taster))
@@ -1283,57 +1297,49 @@ class DenSiController:
     def _render_cut_markers_to_ui(self, *, pos_m: float | None) -> None:
         """Render cut marker readouts.
 
-        Policy:
+        Policy (semantics preserved):
           - Before cut is latched: txt_cut_time shows DenSi wallclock token; it only advances when NOT in ESTOP
           - After latch: txt_cut_time freezes at the latch token
+
+        North refactor: compute a Qt-free VM + *effects* (writes into state.params).
         """
-        if not bool(getattr(self, "_cut_valid", False)):
-            # Live wallclock token until an E-Stop latch happens.
-            # Fine-tuning: the token may only *advance* while NOT in ESTOP.
-            estop_now = bool(getattr(self.state, "estop", False))
-            try:
-                if estop_now:
-                    tok = str(self._systemtime_tok or self.state.params.get("SystemTime", "") or "")
-                    if not tok:
-                        tok = self._now_token()
-                        self._systemtime_tok = tok
-                        self.state.params["SystemTime"] = tok
-                else:
-                    tok = self._now_token()
-                    self._systemtime_tok = tok
-                    self.state.params["SystemTime"] = tok
+        try:
+            vm = compute_densi_cut_markers_vm(
+                cut_valid=bool(getattr(self, "_cut_valid", False)),
+                estop_now=bool(getattr(self.state, "estop", False)),
+                now_token=str(self._now_token()),
+                systemtime_tok=str(getattr(self, "_systemtime_tok", "") or "") or None,
+                systemtime_param=str(self.state.params.get("SystemTime", "") or "") or None,
+                cut_pos_m=float(getattr(self, "_cut_pos_m", 0.0) or 0.0) if bool(getattr(self, "_cut_valid", False)) else None,
+                cut_vel_mps=float(getattr(self, "_cut_vel_mps", 0.0) or 0.0) if bool(getattr(self, "_cut_valid", False)) else None,
+                pos_m=pos_m,
+            )
 
-                if self._txt_cut_time is not None:
-                    set_text(self._txt_cut_time, tok if tok else "--")
-            except Exception:
-                if self._txt_cut_time is not None:
-                    set_text(self._txt_cut_time, "--")
+            # --- apply effects (state.params + controller token) ---
+            if vm.effects.systemtime_tok is not None:
+                self._systemtime_tok = vm.effects.systemtime_tok
+                self.state.params["SystemTime"] = vm.effects.systemtime_tok
 
-            for w in (self._txt_cut_pos, self._txt_cut_vel, self._txt_posdiff):
+            if vm.effects.posdiff_for is not None:
+                try:
+                    self.state.params["PosDiffFor"] = float(vm.effects.posdiff_for)
+                except Exception:
+                    pass
+
+            apply_densi_cut_markers_vm(
+                vm,
+                DenSiCutMarkersBindings(
+                    cut_time=getattr(self, "_txt_cut_time", None),
+                    cut_pos=getattr(self, "_txt_cut_pos", None),
+                    cut_vel=getattr(self, "_txt_cut_vel", None),
+                    posdiff=getattr(self, "_txt_posdiff", None),
+                ),
+            )
+        except Exception:
+            # Fail-safe UI display
+            for w in (getattr(self, "_txt_cut_time", None), getattr(self, "_txt_cut_pos", None), getattr(self, "_txt_cut_vel", None), getattr(self, "_txt_posdiff", None)):
                 if w is not None:
                     set_text(w, "--")
-            return
-
-        if self._txt_cut_time is not None:
-            tok = str(self._systemtime_tok or self.state.params.get('SystemTime','') or '')
-            set_text(self._txt_cut_time, tok if tok else "--")
-        if self._txt_cut_pos is not None:
-            set_text(self._txt_cut_pos, fmt_f_unit(float(self._cut_pos_m), "m", ndigits=2))
-        if self._txt_cut_vel is not None:
-            set_text(self._txt_cut_vel, fmt_f_unit(float(self._cut_vel_mps), "m/s", ndigits=2))
-
-        if pos_m is None:
-            if self._txt_posdiff is not None:
-                set_text(self._txt_posdiff, "--")
-            return
-
-        pd = float(pos_m) - float(self._cut_pos_m)
-        try:
-            self.state.params["PosDiffFor"] = float(pd)
-        except Exception:
-            pass
-        if self._txt_posdiff is not None:
-            set_text(self._txt_posdiff, fmt_f_unit(pd, "m", ndigits=2))
 
     @staticmethod
     def _reset_able_from_estop_word(word: int) -> bool:
@@ -1475,79 +1481,23 @@ class DenSiController:
 
 
     def _render_live_readouts_ui(self) -> None:
-        # Render live readouts in the DenSi UI (plausible defaults at startup)
+        """Render the DenSi live readouts.
+
+        Semantics note:
+        This function used to be an inlined sequence of widget writes.
+        We now compute a Qt-free VM and apply it, but we intentionally keep the
+        same formatting and slider scaling.
+        """
         try:
             axis_id = self.axis_ids[0] if self.axis_ids else ""
-            ax = self.state.axes.get(axis_id) if axis_id else None
-            pos = float(getattr(ax, "pos", 0.0)) if ax else 0.0
-            vel = float(getattr(ax, "vel", 0.0)) if ax else 0.0
-            amp = float(self.state.params.get("ActCur", 0.0))
-            tmp = float(self.state.params.get("Temp", 20.0))
-            if self._txt_pos is not None:
-                set_text(self._txt_pos, fmt_f_unit(pos, "m", ndigits=2))
-            if self._txt_vel is not None:
-                set_text(self._txt_vel, fmt_f_unit(vel, "m/s", ndigits=2))
-            if self._txt_amp is not None:
-                set_text(self._txt_amp, fmt_i_unit(int(round(amp)), "A"))
-            if self._txt_temp is not None:
-                set_text(self._txt_temp, fmt_i_unit(int(round(tmp)), "°"))
+            vm = compute_densi_readouts_vm(state=self.state, axis_id=axis_id, last_cmd=self._last_cmd)
+            apply_densi_readouts_vm(vm, getattr(self, "_b_readouts", DenSiReadoutsBindings()))
 
-
-            # Cut marker readouts
-            self._render_cut_markers_to_ui(pos_m=pos)
-
-
-            # Guider readouts (defaults if not yet modeled)
-            g_min = float(self.state.params.get("PosMin", 0.0) or 0.0)
-            g_max = float(self.state.params.get("PosMax", 0.0) or 0.0)
-            g_val = float(self.state.params.get("GuidePosIst", 0.0) or 0.0)
-            g_spd = float(self.state.params.get("GuideIstSpeed", 0.0) or 0.0)
-            if self._txt_guider_range_min is not None:
-                set_text(self._txt_guider_range_min, fmt_f_unit(g_min, "m", ndigits=3))
-            if self._txt_guider_range_max is not None:
-                set_text(self._txt_guider_range_max, fmt_f_unit(g_max, "m", ndigits=3))
-            if self._txt_guider_range_val is not None:
-                set_text(self._txt_guider_range_val, fmt_f_unit(g_val, "m", ndigits=3))
-            if self._txt_guider_speed is not None:
-                set_text(self._txt_guider_speed, f"{g_spd:.3f} m/s")
-
-            # --- slider indicators ---
-            # sldVelCmd: show commanded velocity (setpoint) with range ±VelMax
-            vel_max = float(self.state.params.get("VelMax", 0.0) or 0.0)
-            if vel_max <= 0.0:
-                vel_max = 1.0
-            vel_cmd = 0.0
-            try:
-                if self._last_cmd is not None and axis_id and hasattr(self._last_cmd, "axes"):
-                    sp = self._last_cmd.axes.get(axis_id)
-                    if sp is not None:
-                        vel_cmd = float(getattr(sp, "vel", 0.0))
-            except Exception:
-                vel_cmd = 0.0
-            if self._sld_vel_cmd is not None:
-                scale = 1000.0  # m/s -> mm/s for slider resolution
-                update_slider(
-                    self._sld_vel_cmd,
-                    minimum=int(round(-vel_max * scale)),
-                    maximum=int(round(+vel_max * scale)),
-                    value=int(round(vel_cmd * scale)),
-                )
-
-            # sldLimitRange: show current position in [UserMin, UserMax]
-            user_min = float(self.state.params.get("UserMin", 0.0) or 0.0)
-            user_max = float(self.state.params.get("UserMax", 0.0) or 0.0)
-            if user_max < user_min:
-                user_min, user_max = user_max, user_min
-            if self._sld_limit_range is not None:
-                scale = 1000.0  # m -> mm for slider resolution
-                self._sld_limit_range.blockSignals(True)
-                self._sld_limit_range.setMinimum(int(round(user_min * scale)))
-                self._sld_limit_range.setMaximum(int(round(user_max * scale)))
-                self._sld_limit_range.setValue(int(round(pos * scale)))
-                self._sld_limit_range.blockSignals(False)
-
+            # Cut marker readouts (kept controller-local for now; it mutates state.params SystemTime)
+            self._render_cut_markers_to_ui(pos_m=vm.pos_m)
         except Exception:
-            pass
+            # Keep DenSi robust: a UI error must not stop sim/telemetry.
+            return
 
 
 
