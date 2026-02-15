@@ -154,89 +154,6 @@ class DenSiController:
     dt_s: float = 0.01
     stale_after_ms: int = 500
 
-    def _drain_command_frames_compat(self, limit: int = 100):
-        """Drain command frames from either JSON channels or PLC wire channels."""
-        cin = self.command_in
-
-        fn = getattr(cin, "drain_command_frames", None)
-        if callable(fn):
-            return fn(limit=limit)
-
-        fn = getattr(cin, "drain", None)
-        if callable(fn):
-            return fn(limit=limit)
-
-        out = []
-        fn = getattr(cin, "recv_nowait", None)
-        if callable(fn):
-            for _ in range(limit):
-                msg = fn()
-                if msg is None:
-                    break
-                out.append(msg)
-            return out
-
-        fn = getattr(cin, "recv", None)
-        if callable(fn):
-            for _ in range(limit):
-                msg = fn(timeout=0)
-                if msg is None:
-                    break
-                out.append(msg)
-            return out
-
-        if hasattr(cin, "drain_lines"):
-            list(cin.drain_lines(limit=limit))
-            return []
-
-        raise AttributeError(f"CommandIn does not support draining: {type(cin).__name__}")
-
-    def _publish_telemetry_compat(self, payload) -> None:
-        """Publish telemetry via either JSON channels or PLC wire channels."""
-        out = self.telemetry_out
-
-        if getattr(self, "wire_proto", "json") == "plc":
-            # Prefer the PLC wire TelemetryOut implementation if available.
-            # UdpPlcTelemetryOut.publish_telemetry() encodes via protocol.plc_wire.encode_plc_telemetry()
-            if hasattr(out, "publish_telemetry"):
-                out.publish_telemetry(payload)
-                return
-
-            # Fallback: encode a canonical ST-compatible uplink line and send it.
-            from steuerung3d.protocol.plc_wire import encode_plc_telemetry
-
-            line = encode_plc_telemetry(payload)
-
-            if hasattr(out, "publish_line"):
-                out.publish_line(line)
-                return
-
-            link = getattr(out, "link", None)
-            if link is not None and hasattr(link, "send"):
-                link.send(line.encode("utf-8"))
-                return
-
-            raise AttributeError(
-                f"TelemetryOut does not support PLC uplink sending: {type(out).__name__}"
-            )
-
-
-        if hasattr(out, "publish_telemetry"):
-            out.publish_telemetry(payload)
-            return
-
-        link = getattr(out, "link", None)
-        if link is not None and hasattr(link, "send"):
-            try:
-                from steuerung3d.protocol.serde_telemetry import encode_telemetry
-                data = encode_telemetry(payload)
-            except Exception:
-                data = (repr(payload) + "\n").encode("utf-8")
-            link.send(data)
-            return
-
-        raise AttributeError(f"TelemetryOut does not support publishing: {type(out).__name__}")
-
     def __post_init__(self) -> None:
         """Bind widgets and initialize the DenSi device-side simulator.
 
@@ -1618,7 +1535,7 @@ class DenSiController:
 
 
     def step_once(self) -> None:
-        frames = self._drain_command_frames_compat(limit=100)
+        frames = self.command_in.drain_command_frames(limit=100)
         if frames:
             self._last_cmd = frames[-1]
             self._last_cmd_ns = time.monotonic_ns()
@@ -1885,7 +1802,7 @@ class DenSiController:
         self._update_drive_status_words()
 
         snap = TelemetrySnapshot.from_state(self.state)
-        self._publish_telemetry_compat(snap)
+        self.telemetry_out.publish_telemetry(snap)
 
         # Edge logs for key state changes.
         if self._ch.changed("mode", str(getattr(snap, "mode", ""))):

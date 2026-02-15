@@ -1319,12 +1319,7 @@ class HiPController:
         # Propagate to Core -> DenSi/PLC downlink.
         try:
             intent = RequestResync(axis_id=axis_id, hip_id=hip_id)
-            if hasattr(self.intent_out, "publish_intent"):
-                self.intent_out.publish_intent(intent)  # type: ignore[attr-defined]
-            elif hasattr(self.intent_out, "send_intent"):
-                self.intent_out.send_intent(intent)  # type: ignore[attr-defined]
-            else:
-                raise AttributeError("IntentOut has no publish_intent/send_intent")
+            self.intent_out.publish_intent(intent)
             log.info("sent RequestResync axis_id=%r hip_id=%r", axis_id, hip_id)
         except Exception:
             log.exception("failed to send RequestResync axis_id=%r", axis_id)

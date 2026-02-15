@@ -9,7 +9,7 @@ from steuerung3d.core.telemetry import TelemetrySnapshot
 
 @runtime_checkable
 class IntentOut(Protocol):
-    def send_intent(self, intent: Intent) -> None: ...
+    def publish_intent(self, intent: Intent) -> None: ...
 
 
 @runtime_checkable
