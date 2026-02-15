@@ -1,0 +1,30 @@
+diff --git a/src/steuerung3d/apps/yellow/controllers/densi_controller.py b/src/steuerung3d/apps/yellow/controllers/densi_controller.py
+--- a/src/steuerung3d/apps/yellow/controllers/densi_controller.py
++++ b/src/steuerung3d/apps/yellow/controllers/densi_controller.py
+@@ -56,8 +56,9 @@ from .ui_banner import (
+     BANNER_COLORS,
+     BANNER_DYNAMIC_EXCLUDE,
+     derive_banner_estate_from_word,
+ )
+ from .ui_format import fmt_f_unit, fmt_i_unit
+ from .yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
++from .widget_cache import WidgetCache
+ 
+ import logging
+ 
+ 
+ log = logging.getLogger("den_si")
+diff --git a/src/steuerung3d/apps/yellow/controllers/hip_controller.py b/src/steuerung3d/apps/yellow/controllers/hip_controller.py
+--- a/src/steuerung3d/apps/yellow/controllers/hip_controller.py
++++ b/src/steuerung3d/apps/yellow/controllers/hip_controller.py
+@@ -62,7 +62,8 @@ from .ui_estop import (
+     compute_header_estop_dot_states,
+ )
+ from .ui_banner import BANNER_COLORS, derive_banner_estate_from_word
+ from .ui_format import fmt_f_unit, fmt_i_unit
+ from .yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
++from .widget_cache import WidgetCache
+ 
+ # NOTE: You MUST have this decoder somewhere in your codebase.
+ # If the import path differs, adjust it here.
+ # The object returned must have:

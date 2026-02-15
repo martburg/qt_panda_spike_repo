@@ -155,3 +155,57 @@ def age_to_online_state(
     if warn_max is None:
         return "warn"
     return "warn" if age <= warn_max else "bad"
+
+def infer_estop_profile(bits: dict[str, bool]) -> str:
+    """Infer active E-Stop wiring/profile from decoded bits.
+
+    Profiles:
+      - 'schluessel1' if schluessel1 bit is set
+      - 'schluessel2' if schluessel2 bit is set
+      - otherwise 'integrated'
+
+    This matches the legacy HiP behavior.
+    """
+    try:
+        if bool(bits.get("schluessel1", False)):
+            return "schluessel1"
+        if bool(bits.get("schluessel2", False)):
+            return "schluessel2"
+        return "integrated"
+    except Exception:
+        return "integrated"
+
+
+def active_estop_keys_for_profile(profile: str, all_keys: Iterable[str]) -> set[str]:
+    """Return which E-Stop keys should be emphasized for a given profile.
+
+    This is used by HiP to bold the relevant diagnostic checkboxes.
+    DenSi typically shows all bits, but can reuse this policy if needed.
+    """
+    p = str(profile or "integrated")
+    if p == "schluessel1":
+        return {
+            "master",
+            "estop1", "estop2",
+            "steuerwort",
+            "kw30_ok",
+            "brk1_ok",
+            "sps_ok",
+            "brk2kb_ok",
+            "pos_win", "vel_win", "endlage",
+        }
+    if p == "schluessel2":
+        return {
+            "master", "guider",
+            "estop1", "estop2",
+            "steuerwort",
+            "kw30_ok", "kw05_ok",
+            "brk1_ok", "brk2_ok",
+            "dcs_ok", "sps_ok",
+            "brk2kb_ok",
+            "pos_win", "vel_win", "endlage",
+        }
+    try:
+        return set(str(k) for k in all_keys)
+    except Exception:
+        return set()

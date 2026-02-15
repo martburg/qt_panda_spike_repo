@@ -55,11 +55,14 @@ except Exception:  # pragma: no cover
 from .bindings import YellowBindings
 from .ports import IntentOut, TelemetryIn
 from .param_txn import ParamEditTxnClient
-from .ui_update import set_state_by_object_name, set_text
+from .widget_cache import WidgetCache
+from .ui_update import set_state_by_object_name, set_state_property, set_text
 from .ui_estop import (
     age_to_online_state,
     compute_estop_dot_states,
     compute_header_estop_dot_states,
+    infer_estop_profile,
+    active_estop_keys_for_profile,
 )
 from .ui_banner import BANNER_COLORS, derive_banner_estate_from_word
 from .ui_format import fmt_f_unit, fmt_i_unit
@@ -206,6 +209,9 @@ class HiPController:
           - missing widgets are easy to diagnose
           - controller logic reads like controller logic (not like Qt plumbing)
         """
+
+        # Cached widget lookup (prevents repeated findChild() in hot paths)
+        self._wcache = WidgetCache(self.win)
         # Estop diagnostics checkboxes (read-only in HiP).
         self._estop_checks: dict[str, QCheckBox] = {}
         for spec in ESTOP_SPECS.values():
@@ -481,10 +487,25 @@ class HiPController:
             # Restore param button availability to whatever our local state is
             self._apply_param_ui_state(edit_active=self._param_txn.local_edit_active, edit_group=self._param_txn.local_edit_group)
 
+    def _set_dot(self, object_name: str, state) -> None:
+        """Set a dot state using cached lookup when possible."""
+        if not object_name:
+            return
+        try:
+            wcache = getattr(self, "_wcache", None)
+            if wcache is not None:
+                ww = wcache.widget(object_name)
+                if ww is not None:
+                    set_state_property(ww, state)
+                    return
+        except Exception:
+            pass
+        set_state_by_object_name(self.win, object_name, state)
+
     def _set_all_estop_unknown(self) -> None:
         for spec in ESTOP_SPECS.values():
             if spec.dot:
-                set_state_by_object_name(self.win, spec.dot, "warn")
+                self._set_dot(spec.dot, "warn")
 
     def _mark_disconnected(self) -> None:
         if self._seen_first_telem:
@@ -510,12 +531,18 @@ class HiPController:
     # ----- parameters (axis-agnostic v0.1) -----
 
     def _find_button(self, object_name: str) -> QPushButton | None:
-        w = self.win.findChild(QPushButton, object_name)
-        return w if isinstance(w, QPushButton) else None
+        try:
+            return self._wcache.button(object_name)
+        except Exception:
+            w = self.win.findChild(QPushButton, object_name)
+            return w if isinstance(w, QPushButton) else None
 
     def _find_line_edit(self, object_name: str) -> QLineEdit | None:
-        w = self.win.findChild(QLineEdit, object_name)
-        return w if isinstance(w, QLineEdit) else None
+        try:
+            return self._wcache.line_edit(object_name)
+        except Exception:
+            w = self.win.findChild(QLineEdit, object_name)
+            return w if isinstance(w, QLineEdit) else None
 
     def _init_param_inputs(self) -> None:
         loc = QLocale.system()
@@ -1550,52 +1577,35 @@ class HiPController:
         delta, new_prev = compute_time_tick(self._prev_device_tick, cur)
         self._txt_tick.setText(str(delta))
         self._prev_device_tick = new_prev
-
     def _render_estop(self, snap: TelemetrySnapshot) -> None:
         word = int(getattr(snap, "estop_status_word", 0))
         logical = decode_estop_word(word)
 
-        if bool(logical.get("schluessel1", False)):
-            profile = "schluessel1"
-        elif bool(logical.get("schluessel2", False)):
-            profile = "schluessel2"
-        else:
-            profile = "integrated"
-
-        if profile == "schluessel1":
-            active_keys = {
-                "master",
-                "estop1", "estop2",
-                "steuerwort",
-                "kw30_ok",
-                "brk1_ok",
-                "sps_ok",
-                "brk2kb_ok",
-                "pos_win", "vel_win", "endlage",
-            }
-        elif profile == "schluessel2":
-            active_keys = {
-                "master", "guider",
-                "estop1", "estop2",
-                "steuerwort",
-                "kw30_ok", "kw05_ok",
-                "brk1_ok", "brk2_ok",
-                "dcs_ok", "sps_ok",
-                "brk2kb_ok",
-                "pos_win", "vel_win", "endlage",
-            }
-        else:
-            active_keys = set(ESTOP_SPECS.keys())
+        profile = infer_estop_profile(logical)
+        active_keys = active_estop_keys_for_profile(profile, ESTOP_SPECS.keys())
+        profile_changed = (getattr(self, "_last_estop_profile", None) != profile)
+        self._last_estop_profile = profile
 
         if self.ui.btn_estop_reset:
             self.ui.btn_estop_reset.setEnabled(bool(logical.get("reset_able", False)))
 
+        # Sync read-only diagnostic checkboxes. Keep this cheap: only touch the UI if
+        # something actually changed, and only re-bold the active profile keys when the
+        # profile itself changes.
         for key, cb in getattr(self, "_estop_checks", {}).items():
             v = bool(logical.get(key, False))
-            cb.setChecked(v)
-            f = cb.font()
-            f.setBold(key in active_keys)
-            cb.setFont(f)
+            try:
+                if cb.isChecked() != v:
+                    cb.setChecked(v)
+            except Exception:
+                pass
+            if profile_changed:
+                try:
+                    f = cb.font()
+                    f.setBold(key in active_keys)
+                    cb.setFont(f)
+                except Exception:
+                    pass
 
         # Brake dots should match header brake logic:
         # - BRK1/BRK2: equivalence with taster + grace window
@@ -1608,6 +1618,7 @@ class HiPController:
                 axis_id = next(iter(axes.keys()))
             except Exception:
                 axis_id = "X"
+
         states = compute_estop_dot_states(
             bits=logical,
             taster=taster,
@@ -1617,7 +1628,8 @@ class HiPController:
             ),
         )
         for dot, state in states.items():
-            set_state_by_object_name(self.win, dot, state)
+            self._set_dot(dot, state)
+
 
     # ---------- axis selection / claims ----------
 

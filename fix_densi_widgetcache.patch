@@ -1,0 +1,28 @@
+diff --git a/src/steuerung3d/apps/yellow/controllers/densi_controller.py b/src/steuerung3d/apps/yellow/controllers/densi_controller.py
+--- a/src/steuerung3d/apps/yellow/controllers/densi_controller.py
++++ b/src/steuerung3d/apps/yellow/controllers/densi_controller.py
+@@
+ from .ui_format import fmt_f_unit, fmt_i_unit
+ from .yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
++from .widget_cache import WidgetCache
+ 
+ import logging
+@@
+     def _disable_param_edit_buttons(self) -> None:
+         """Disable parameter Edit/Write/Cancel buttons on DenSi UI.
+@@
+-        # Cached widget lookup (prevents repeated findChild() in hot paths)
+-        self._wcache = WidgetCache(self.win)
+-        from PySide6.QtWidgets import QPushButton
+-
+         btn_names = [
+             'btnPosEdit','btnPosWrite','btnPosCancel',
+             'btnVelEdit','btnVelWrite','btnVelCancel',
+             'btnFilterEdit','btnFilterWrite','btnFilterCancel',
+             'btnGuiderEdit','btnGuiderWrite','btnGuiderCancel',
+         ]
+         for name in btn_names:
+-            b = self.win.findChild(QPushButton, name)
++            b = self._wcache.get(QPushButton, name)
+             if b is not None:
+                 b.setEnabled(False)

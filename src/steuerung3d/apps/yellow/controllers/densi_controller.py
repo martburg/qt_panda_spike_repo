@@ -27,7 +27,7 @@ from steuerung3d.core.command_frame import CommandFrame, AxisSetpoint
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
-from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
+from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker, RateLimiter
 from steuerung3d.util.ratelimit import rl_log_exc
 
 # Optional structured status heartbeat (used by stack supervisor birds-eye)
@@ -47,7 +47,7 @@ from steuerung3d.protocol.estop_bits import (
 
 from .bindings import YellowBindings
 from .ports import CommandIn, TelemetryOut
-from .ui_update import set_state_by_object_name, set_text
+from .ui_update import set_state_by_object_name, set_state_property, set_text
 from .ui_estop import (
     age_to_online_state,
     compute_estop_dot_states,
@@ -150,6 +150,7 @@ class DenSiController:
     def _init_observability(self) -> None:
         # 1 Hz heartbeat + edge logs
         self._hb = Heartbeat("den_si", interval_s=1.0)
+        self._dbg_rl = RateLimiter(1.0)
         self._ch = ChangeTracker()
         self._last_cmd_ns: int | None = None
 
@@ -166,6 +167,9 @@ class DenSiController:
 
     def _init_widget_refs(self) -> None:
         """Find and store all widgets we touch frequently."""
+
+        # Cached widget lookup (prevents repeated findChild() in hot paths)
+        self._wcache = WidgetCache(self.win)
         # Device-side TimeTick display:
         # show (lifetick_tx - lifetick_rx) in milliseconds (WORD wrap).
         self._txt_tick: QLineEdit | None = self.win.findChild(QLineEdit, "txt_tick")
@@ -369,6 +373,9 @@ class DenSiController:
 
         DenSi is the device side; operators should not change parameters locally.
         """
+
+        # Cached widget lookup (prevents repeated findChild() in hot paths)
+        self._wcache = WidgetCache(self.win)
         from PySide6.QtWidgets import QPushButton
 
         btn_names = [
@@ -1021,16 +1028,40 @@ class DenSiController:
         for spec in iter_specs():
             if not spec.checkbox:
                 continue
-            cb = self.win.findChild(QCheckBox, spec.checkbox)
+            cb = None
+            try:
+                cb = self._wcache.checkbox(spec.checkbox)
+            except Exception:
+                cb = self.win.findChild(QCheckBox, spec.checkbox)
             if cb is None:
                 continue
             was = cb.blockSignals(True)
-            cb.setChecked(bool(bits.get(spec.key, False)))
+            v = bool(bits.get(spec.key, False))
+            try:
+                if cb.isChecked() != v:
+                    cb.setChecked(v)
+            except Exception:
+                cb.setChecked(v)
             cb.blockSignals(was)
 
         # Dots (including header brake dots) are updated via a separate helper so we can refresh
         # them each tick without re-writing checkboxes.
         self._render_estop_dots_from_bits(bits, word)
+
+    def _set_dot(self, object_name: str, state) -> None:
+        """Set a dot state using cached lookup when possible."""
+        if not object_name:
+            return
+        try:
+            wcache = getattr(self, "_wcache", None)
+            if wcache is not None:
+                ww = wcache.widget(object_name)
+                if ww is not None:
+                    set_state_property(ww, state)
+                    return
+        except Exception:
+            pass
+        set_state_by_object_name(self.win, object_name, state)
 
     def _render_estop_dots_from_bits(self, bits: dict[str, bool], word: int) -> None:
         """Render estop-related dots (without touching checkboxes)."""
@@ -1056,10 +1087,10 @@ class DenSiController:
                 brk_ok_raw=raw, taster=taster
             ),
         )
-        set_state_by_object_name(self.win, "dotHdrFbt", hdr["dotHdrFbt"])
-        set_state_by_object_name(self.win, "dotHdrReady", hdr["dotHdrReady"])
-        set_state_by_object_name(self.win, "dotHdrBrake1", hdr["dotHdrBrake1"])
-        set_state_by_object_name(self.win, "dotHdrBrake2", hdr["dotHdrBrake2"])
+        self._set_dot("dotHdrFbt", hdr["dotHdrFbt"])
+        self._set_dot("dotHdrReady", hdr["dotHdrReady"])
+        self._set_dot("dotHdrBrake1", hdr["dotHdrBrake1"])
+        self._set_dot("dotHdrBrake2", hdr["dotHdrBrake2"])
 
         # --- Per-bit dots in diagnostic groups ---
         states = compute_estop_dot_states(
@@ -1071,7 +1102,7 @@ class DenSiController:
             ),
         )
         for dot, state in states.items():
-            set_state_by_object_name(self.win, dot, state)
+            self._set_dot(dot, state)
 
     # ----- brake display helpers (match HiP) -----
 
@@ -1799,12 +1830,25 @@ class DenSiController:
         self._last_estop = bool(getattr(self._last_cmd, "estop", False))
         self._last_fault = bool(getattr(self._last_cmd, "fault", False))
         self._emit_status(time.monotonic_ns())
-
-        log.debug("device_tick=%s", self.state.axes[next(iter(self.state.axes))].meta.get("device_tick"))
-        log.debug(
-            "tx telem: tick=%s estop=%s fault=%s estop_word=%s",
-            snap.tick, snap.estop, snap.fault, hex(snap.estop_status_word),
-        )
+        if log.isEnabledFor(logging.DEBUG) and getattr(self, "_dbg_rl", None) is not None:
+            try:
+                now_s = time.monotonic()
+                if self._dbg_rl.due(now_s):
+                    self._dbg_rl.mark(now_s)
+                    try:
+                        dt = None
+                        if getattr(self.state, 'axes', None):
+                            ax0 = next(iter(self.state.axes.values()))
+                            dt = ax0.meta.get('device_tick')
+                    except Exception:
+                        dt = None
+                    log.debug("device_tick=%s", dt)
+                    log.debug(
+                        "tx telem: tick=%s estop=%s fault=%s estop_word=%s",
+                        snap.tick, snap.estop, snap.fault, hex(snap.estop_status_word),
+                    )
+            except Exception:
+                pass
 
     def step_once(self) -> None:
         # Phase 1: RX command frames / defaults
