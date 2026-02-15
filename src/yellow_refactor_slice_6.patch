@@ -1,0 +1,212 @@
+--- a/src/steuerung3d/apps/yellow/controllers/densi_controller.py
++++ b/src/steuerung3d/apps/yellow/controllers/densi_controller.py
+@@ -1496,7 +1496,9 @@
+ 
+ 
+ 
+-    def step_once(self) -> None:
++    # --- Step pipeline -----------------------------------------------------
++
++    def _rx_command_frames(self) -> None:
+         frames = self.command_in.drain_command_frames(limit=100)
+         if frames:
+             self._last_cmd = frames[-1]
+@@ -1511,6 +1513,7 @@
+                 self._last_cmd.mode,
+             )
+ 
++    def _ensure_last_cmd(self) -> None:
+         if self._last_cmd is None:
+             self._last_cmd = CommandFrame(
+                 tick=self.state.tick,
+@@ -1522,6 +1525,7 @@
+                 estop_reset=False,
+             )
+ 
++    def _update_l0_connection_state(self) -> None:
+         # --- L0 connection state (accept-any policy) ---
+         if not bool(getattr(self, "_seen_first_cmd", False)):
+             self._l0_top = L0Top.START
+@@ -1545,9 +1549,7 @@
+         except Exception:
+             pass
+ 
+-        # Header online dot: green when we are receiving command frames, amber when stale.
+-        self._render_header_online_dot()
+-
++    def _edge_log_cmd_changes(self) -> None:
+         # Edge logs: command mode / reset changes
+         try:
+             if self._ch.changed("cmd_mode", str(getattr(self._last_cmd, "mode", ""))):
+@@ -1557,12 +1559,14 @@
+         except Exception:
+             pass
+ 
++    def _derive_estop_inputs(self) -> tuple[int, bool, bool]:
+         # Derive packed estop bits (reset_able and ready are embedded here)
+         estop_word = int(self._inj_estop_word)
+-        reset_able = self._reset_able_from_estop_word(estop_word)
+-        ready_for_sollvel = self._ready_from_estop_word(estop_word)
++        reset_able = bool(self._reset_able_from_estop_word(estop_word))
++        ready_for_sollvel = bool(self._ready_from_estop_word(estop_word))
++        return estop_word, reset_able, ready_for_sollvel
+ 
+-        # Moving guard: no parameter changes while moving
++    def _compute_moving_guard(self) -> bool:
+         axis_id0 = self.axis_ids[0] if self.axis_ids else ""
+         ax0 = self.state.axes.get(axis_id0) if axis_id0 else None
+         moving = False
+@@ -1570,7 +1574,9 @@
+             moving = ax0 is not None and abs(float(getattr(ax0, "vel", 0.0) or 0.0)) > 1e-3
+         except Exception:
+             moving = False
++        return bool(moving)
+ 
++    def _handle_estop_reset_cmd(self, reset_able: bool) -> None:
+         # Reset => POST-RESET state (only if reset_able bit is set)
+         if (
+             self._l0_top == L0Top.CONNECTED
+@@ -1592,6 +1598,7 @@
+             if self._ch.changed("cmd_estop_reset_ignored", True):
+                 log.info("estop_reset ignored (reset_able=0; packed in EStopStatusWord)")
+ 
++    def _handle_resync_cmd(self) -> None:
+         # ----- legacy downlink: ReSync -----
+         # In the legacy workflow this clears cut marker latches and is often used
+         # during recover after an E-Stop. We implement it device-locally as a
+@@ -1604,6 +1611,7 @@
+             # reset edge tracker
+             self._ch.changed("cmd_resync", False)
+ 
++    def _handle_gui_not_halt_cmd(self) -> None:
+         # ----- legacy downlink: GUINotHaltIN (placeholder) -----
+         # Kept for protocol completeness. No device-side effect is modeled yet.
+         try:
+@@ -1612,6 +1620,7 @@
+         except Exception:
+             pass
+ 
++    def _apply_param_ops(self, ready_for_sollvel: bool, moving: bool) -> None:
+         # ----- parameter ops (axis-agnostic v0.1) -----
+         # Guard policy:
+         #   - When READY (system can accept SollVel), parameters are locked.
+@@ -1684,7 +1693,7 @@
+                     self.state.param_edit_group = ""
+                     log.info("param_write accepted: group=%s keys=%s", grp, sorted(vals.keys()))
+ 
+-
++    def _apply_safety_and_refresh_estop_word(self) -> tuple[int, dict]:
+         # SafetyPLC/drive handoff emulation (taster -> ready/brakes after delay)
+         self._apply_estop_state_machine()
+ 
+@@ -1698,7 +1707,9 @@
+         # refresh estop_word/bits after startup logic may have updated derived bits
+         estop_word = int(self._inj_estop_word)
+         bits = decode_estop_word(estop_word)
++        return estop_word, bits
+ 
++    def _render_estop_and_compute_edge(self, bits: dict, estop_word: int) -> bool:
+         # Refresh estop-related dots every tick (brake grace / header indicators).
+         try:
+             self._render_estop_dots_from_bits(bits, estop_word)
+@@ -1707,11 +1718,12 @@
+         # EStop ladder state machine is authoritative; it already updated injected bits/word
+         # and the internal latch. 'state.estop' tracks the ladder ESTOP state (default).
+         self.state.estop = bool(getattr(self, '_estate', EStopState.ESTOP) == EStopState.ESTOP)
+-        self.state.estop_status_word = estop_word
++        self.state.estop_status_word = int(estop_word)
+         # --- Cut markers: latch on E-Stop ENTRY ---
+         # We compute the edge here, but latch AFTER the plant step so we use the freshest measurement.
+-        estop_edge = bool(self.state.estop) and (not bool(self._prev_estop_state))
++        return bool(self.state.estop) and (not bool(self._prev_estop_state))
+ 
++    def _step_plant_with_clamp(self) -> None:
+         # Clamp motion commands until the drive is actually ready (SafetyPLC handoff complete).
+         cmd_for_plant = self._last_cmd
+         if (not self._drive_ready) or self.state.estop:
+@@ -1720,9 +1732,9 @@
+                 self._last_cmd,
+                 axes={a: AxisSetpoint(enable=False, vel=0.0) for a in self.axis_ids},
+             )
+-
+         self.device.step(self.state, cmd_for_plant, self.tb.dt_s)
+ 
++    def _maybe_latch_cut_markers(self, estop_edge: bool) -> None:
+         # Latch cut markers on the *edge* using the freshest post-step measurement (before estop clamping).
+         if bool(estop_edge) and (not bool(self._cut_valid)):
+             axis_id = self.axis_ids[0] if self.axis_ids else ""
+@@ -1744,25 +1756,28 @@
+                 self.state.params['CutTime'] = float(self._cut_time_s)
+                 self.state.params['PosDiffFor'] = 0.0
+ 
+-
++    def _apply_estop_clamp_to_state(self) -> None:
+         if self.state.estop:
+             for ax in self.state.axes.values():
+                 ax.enabled = False
+                 ax.vel = 0.0
+ 
++    def _advance_tick(self) -> None:
+         self.state.tick += 1
+         self.state.t_s += self.tb.dt_s
+ 
+         # Remember for next tick
+         self._prev_estop_state = bool(self.state.estop)
+ 
+-                # --- LiveTick + local UI readouts (device-side) ---
++    def _post_tick_ui_updates(self) -> None:
++        # --- LiveTick + local UI readouts (device-side) ---
+         self._step_lifetick()
+         self._render_live_readouts_ui()
+ 
+-# Provide plausible legacy drive status words so HiP's AmpStatus fields light up.
++        # Provide plausible legacy drive status words so HiP's AmpStatus fields light up.
+         self._update_drive_status_words()
+ 
++    def _publish_telemetry_and_heartbeat(self) -> None:
+         snap = TelemetrySnapshot.from_state(self.state)
+         self.telemetry_out.publish_telemetry(snap)
+ 
+@@ -1791,8 +1806,41 @@
+         self._emit_status(time.monotonic_ns())
+ 
+         log.debug("device_tick=%s", self.state.axes[next(iter(self.state.axes))].meta.get("device_tick"))
+-
+         log.debug(
+             "tx telem: tick=%s estop=%s fault=%s estop_word=%s",
+             snap.tick, snap.estop, snap.fault, hex(snap.estop_status_word),
+         )
++
++    def step_once(self) -> None:
++        # Phase 1: RX command frames / defaults
++        self._rx_command_frames()
++        self._ensure_last_cmd()
++
++        # Phase 2: connection state, header dots, and edge logs
++        self._update_l0_connection_state()
++        self._render_header_online_dot()
++        self._edge_log_cmd_changes()
++
++        # Phase 3: derive inputs used for device-local policies
++        _estop_word0, reset_able, ready_for_sollvel = self._derive_estop_inputs()
++        moving = self._compute_moving_guard()
++
++        # Phase 4: downlink one-shots / parameter ops
++        self._handle_estop_reset_cmd(reset_able)
++        self._handle_resync_cmd()
++        self._handle_gui_not_halt_cmd()
++        self._apply_param_ops(ready_for_sollvel=ready_for_sollvel, moving=moving)
++
++        # Phase 5: authoritative ladder + estop word refresh / dots
++        estop_word, bits = self._apply_safety_and_refresh_estop_word()
++        estop_edge = self._render_estop_and_compute_edge(bits, estop_word)
++
++        # Phase 6: plant step, cut latching, clamp, and tick advance
++        self._step_plant_with_clamp()
++        self._maybe_latch_cut_markers(estop_edge)
++        self._apply_estop_clamp_to_state()
++        self._advance_tick()
++
++        # Phase 7: local UI + telemetry publish
++        self._post_tick_ui_updates()
++        self._publish_telemetry_and_heartbeat()

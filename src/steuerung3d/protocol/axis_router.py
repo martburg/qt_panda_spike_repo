@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Mapping, Optional, Protocol
 
-from steuerung3d.core.command_frame import CommandFrame, ParamOp
+from steuerung3d.core.command_frame import CommandFrame, ParamOp, coerce_param_ops
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
 
@@ -96,7 +96,7 @@ class AxisRouter:
                 gui_not_halt=bool(getattr(cmd_frame, "gui_not_halt", False)),
                 lifetick_echo=lifetick_echo_axis,
                 estop_reset=bool(estop_reset_by_axis.get(axis_id, False)),
-                param_ops=list(param_ops_by_axis.get(axis_id, [])),
+                param_ops=coerce_param_ops(param_ops_by_axis.get(axis_id, [])),
             )
 
             out = self.dev_cmd_out_by_axis.get(axis_id)

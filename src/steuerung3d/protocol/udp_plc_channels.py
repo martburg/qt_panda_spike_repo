@@ -250,13 +250,14 @@ class UdpPlcCommandOut:
         except Exception:
             pass
 
-        # Param writes: CommandFrame.param_ops may contain ParamWriteOp objects.
+        # Param writes: CommandFrame.param_ops are canonical ParamOp objects.
         params: Dict[str, float] = {}
         try:
-            for op in list(getattr(frame, "param_ops", []) or []):
-                if getattr(op, "type", None) == "param_write":
-                    vals = getattr(op, "values", None) or {}
-                    for k, v in dict(vals).items():
+            from steuerung3d.core.command_frame import ParamWriteOp, coerce_param_ops
+
+            for op in coerce_param_ops(getattr(frame, "param_ops", []) or []):
+                if isinstance(op, ParamWriteOp):
+                    for k, v in dict(op.values or {}).items():
                         try:
                             params[str(k)] = float(v)
                         except Exception:

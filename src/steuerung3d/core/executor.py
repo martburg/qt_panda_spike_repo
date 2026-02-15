@@ -10,7 +10,7 @@ log = logging.getLogger("core")
 _LT_LOG_EVERY_S = 0.5
 _lt_last_cmd_log_by_axis: dict[str, float] = {}
 
-from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
+from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, coerce_param_ops
 from steuerung3d.core.state import MachineState
 
 
@@ -59,6 +59,6 @@ def build_command_frame(state: MachineState) -> CommandFrame:
         axes=axes,
         estop_reset=state.estop_reset_req,  # pulse from HI-P intent
         resync=resync_any,  # legacy ReSync pulse
-        param_ops=list(getattr(state, "pending_param_ops", [])),
+        param_ops=coerce_param_ops(getattr(state, "pending_param_ops", [])),
         lifetick_echo=lifetick_echo,
     )

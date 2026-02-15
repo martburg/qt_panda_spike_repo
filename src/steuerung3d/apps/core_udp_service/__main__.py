@@ -15,7 +15,7 @@ from steuerung3d.core.status import StatusEmitter
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.command_frame import CommandFrame
+from steuerung3d.core.command_frame import CommandFrame, coerce_param_ops
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapshot
 from steuerung3d.protocol.core_runner import CoreRunner
@@ -334,14 +334,14 @@ def main() -> int:
         multi_axis = len(axis_ids) > 1
         if multi_axis:
             estop_reset_by_axis = dict(getattr(state, "estop_reset_req_by_axis", {}) or {})
-            param_ops_by_axis = {k: list(v) for k, v in dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).items()}
+            param_ops_by_axis = {k: coerce_param_ops(v) for k, v in dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).items()}
         else:
             axis0 = axis_ids[0]
             estop_reset_by_axis = {
                 axis0: bool(dict(getattr(state, "estop_reset_req_by_axis", {}) or {}).get(axis0, False) or getattr(state, "estop_reset_req", False))
             }
-            per_axis_ops = list(dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).get(axis0, []))
-            global_ops = list(getattr(state, "pending_param_ops", []) or [])
+            per_axis_ops = coerce_param_ops(dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).get(axis0, []))
+            global_ops = coerce_param_ops(getattr(state, "pending_param_ops", []) or [])
             param_ops_by_axis = {axis0: (per_axis_ops or global_ops)}
 
         sent = router.publish_command_frames(

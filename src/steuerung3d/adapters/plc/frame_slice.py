@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from steuerung3d.core.command_frame import CommandFrame
+from steuerung3d.core.command_frame import CommandFrame, coerce_param_ops
 
 
 def slice_command_frame(cmd: CommandFrame, axis_ids: Iterable[str]) -> CommandFrame:
@@ -30,7 +30,7 @@ def slice_command_frame(cmd: CommandFrame, axis_ids: Iterable[str]) -> CommandFr
         gui_not_halt=bool(getattr(cmd, "gui_not_halt", False)),
         estop_reset=bool(getattr(cmd, "estop_reset", False)),
         # Keep param ops global (not axis-scoped yet)
-        param_ops=list(getattr(cmd, "param_ops", []) or []),
+        param_ops=coerce_param_ops(getattr(cmd, "param_ops", []) or []),
         # Slice livetick echoes to the requested axes.
         lifetick_echo={k: v for k, v in dict(getattr(cmd, "lifetick_echo", {}) or {}).items() if k in axis_set},
     )

@@ -1,0 +1,261 @@
+--- a/src/steuerung3d/core/command_frame.py
++++ b/src/steuerung3d/core/command_frame.py
+@@ -66,6 +66,33 @@
+     return out
+ 
+ 
++def coerce_param_ops(ops: Any) -> List[ParamOp]:
++    """Coerce a mixed/legacy param-ops container into canonical ParamOp objects.
++
++    In the codebase, param_ops should be a list[ParamOp]. Historically,
++    some paths used JSON-like dicts (e.g. recordings, older emitters).
++
++    This helper centralizes tolerance so consumers don't need ad-hoc
++    getattr/op.get branches. Unknown items are ignored.
++    """
++    if ops is None:
++        return []
++    if not isinstance(ops, list):
++        return []
++
++    out: List[ParamOp] = []
++    for item in ops:
++        if isinstance(item, (ParamEditBeginOp, ParamWriteOp, ParamCancelOp)):
++            out.append(item)
++            continue
++        if isinstance(item, dict):
++            # decode_param_ops expects a list of dicts
++            out.extend(decode_param_ops([item]))
++            continue
++        # ignore unknown
++    return out
++
++
+ @dataclass(frozen=True)
+ class CommandFrame:
+     tick: int
+--- a/src/steuerung3d/core/executor.py
++++ b/src/steuerung3d/core/executor.py
+@@ -10,7 +10,7 @@
+ _LT_LOG_EVERY_S = 0.5
+ _lt_last_cmd_log_by_axis: dict[str, float] = {}
+ 
+-from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
++from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, coerce_param_ops
+ from steuerung3d.core.state import MachineState
+ 
+ 
+@@ -59,6 +59,6 @@
+         axes=axes,
+         estop_reset=state.estop_reset_req,  # pulse from HI-P intent
+         resync=resync_any,  # legacy ReSync pulse
+-        param_ops=list(getattr(state, "pending_param_ops", [])),
++        param_ops=coerce_param_ops(getattr(state, "pending_param_ops", [])),
+         lifetick_echo=lifetick_echo,
+     )
+\ No newline at end of file
+--- a/src/steuerung3d/adapters/plc/frame_slice.py
++++ b/src/steuerung3d/adapters/plc/frame_slice.py
+@@ -2,7 +2,7 @@
+ 
+ from typing import Iterable
+ 
+-from steuerung3d.core.command_frame import CommandFrame
++from steuerung3d.core.command_frame import CommandFrame, coerce_param_ops
+ 
+ 
+ def slice_command_frame(cmd: CommandFrame, axis_ids: Iterable[str]) -> CommandFrame:
+@@ -30,7 +30,7 @@
+         gui_not_halt=bool(getattr(cmd, "gui_not_halt", False)),
+         estop_reset=bool(getattr(cmd, "estop_reset", False)),
+         # Keep param ops global (not axis-scoped yet)
+-        param_ops=list(getattr(cmd, "param_ops", []) or []),
++        param_ops=coerce_param_ops(getattr(cmd, "param_ops", []) or []),
+         # Slice livetick echoes to the requested axes.
+         lifetick_echo={k: v for k, v in dict(getattr(cmd, "lifetick_echo", {}) or {}).items() if k in axis_set},
+     )
+--- a/src/steuerung3d/protocol/axis_router.py
++++ b/src/steuerung3d/protocol/axis_router.py
+@@ -3,7 +3,7 @@
+ from dataclasses import dataclass, field
+ from typing import Dict, Iterable, List, Mapping, Optional, Protocol
+ 
+-from steuerung3d.core.command_frame import CommandFrame, ParamOp
++from steuerung3d.core.command_frame import CommandFrame, ParamOp, coerce_param_ops
+ from steuerung3d.core.telemetry import TelemetrySnapshot
+ 
+ 
+@@ -96,7 +96,7 @@
+                 gui_not_halt=bool(getattr(cmd_frame, "gui_not_halt", False)),
+                 lifetick_echo=lifetick_echo_axis,
+                 estop_reset=bool(estop_reset_by_axis.get(axis_id, False)),
+-                param_ops=list(param_ops_by_axis.get(axis_id, [])),
++                param_ops=coerce_param_ops(param_ops_by_axis.get(axis_id, [])),
+             )
+ 
+             out = self.dev_cmd_out_by_axis.get(axis_id)
+--- a/src/steuerung3d/protocol/udp_plc_channels.py
++++ b/src/steuerung3d/protocol/udp_plc_channels.py
+@@ -250,13 +250,14 @@
+         except Exception:
+             pass
+ 
+-        # Param writes: CommandFrame.param_ops may contain ParamWriteOp objects.
++        # Param writes: CommandFrame.param_ops are canonical ParamOp objects.
+         params: Dict[str, float] = {}
+         try:
+-            for op in list(getattr(frame, "param_ops", []) or []):
+-                if getattr(op, "type", None) == "param_write":
+-                    vals = getattr(op, "values", None) or {}
+-                    for k, v in dict(vals).items():
++            from steuerung3d.core.command_frame import ParamWriteOp, coerce_param_ops
++
++            for op in coerce_param_ops(getattr(frame, "param_ops", []) or []):
++                if isinstance(op, ParamWriteOp):
++                    for k, v in dict(op.values or {}).items():
+                         try:
+                             params[str(k)] = float(v)
+                         except Exception:
+--- a/src/steuerung3d/apps/core_udp_service/__main__.py
++++ b/src/steuerung3d/apps/core_udp_service/__main__.py
+@@ -15,7 +15,7 @@
+ from steuerung3d.common.timebase import Timebase
+ from steuerung3d.core.engine import CoreEngine
+ from steuerung3d.core.intent_handler import apply_intent
+-from steuerung3d.core.command_frame import CommandFrame
++from steuerung3d.core.command_frame import CommandFrame, coerce_param_ops
+ from steuerung3d.core.state import MachineState
+ from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapshot
+ from steuerung3d.protocol.core_runner import CoreRunner
+@@ -334,14 +334,14 @@
+         multi_axis = len(axis_ids) > 1
+         if multi_axis:
+             estop_reset_by_axis = dict(getattr(state, "estop_reset_req_by_axis", {}) or {})
+-            param_ops_by_axis = {k: list(v) for k, v in dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).items()}
++            param_ops_by_axis = {k: coerce_param_ops(v) for k, v in dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).items()}
+         else:
+             axis0 = axis_ids[0]
+             estop_reset_by_axis = {
+                 axis0: bool(dict(getattr(state, "estop_reset_req_by_axis", {}) or {}).get(axis0, False) or getattr(state, "estop_reset_req", False))
+             }
+-            per_axis_ops = list(dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).get(axis0, []))
+-            global_ops = list(getattr(state, "pending_param_ops", []) or [])
++            per_axis_ops = coerce_param_ops(dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).get(axis0, []))
++            global_ops = coerce_param_ops(getattr(state, "pending_param_ops", []) or [])
+             param_ops_by_axis = {axis0: (per_axis_ops or global_ops)}
+ 
+         sent = router.publish_command_frames(
+--- a/src/steuerung3d/apps/yellow/controllers/densi_controller.py
++++ b/src/steuerung3d/apps/yellow/controllers/densi_controller.py
+@@ -1637,43 +1637,38 @@
+                 bool(ready_for_sollvel),
+                 bool(moving),
+             )
++        from steuerung3d.core.command_frame import ParamEditBeginOp, ParamCancelOp, ParamWriteOp, coerce_param_ops
+ 
+-        for op in list(getattr(self._last_cmd, "param_ops", []) or []):
++        for op in coerce_param_ops(getattr(self._last_cmd, "param_ops", []) or []):
+             if not allow_param_ops:
+                 continue
+-            try:
+-                op_type = getattr(op, "type", None) or (op.get("type") if isinstance(op, dict) else None)
+-            except Exception:
+-                op_type = None
+-
+-            if op_type == "param_edit_begin":
+-                grp = getattr(op, "group", "") or (op.get("group") if isinstance(op, dict) else "")
++            if isinstance(op, ParamEditBeginOp):
++                grp = str(op.group or "")
+                 self.state.param_edit_active = True
+-                self.state.param_edit_group = str(grp)
++                self.state.param_edit_group = grp
+                 log.info("param_edit_begin: group=%s", grp)
+ 
+-            elif op_type == "param_cancel":
+-                grp = getattr(op, "group", "") or (op.get("group") if isinstance(op, dict) else "")
+-                if (not grp) or (str(grp) == self.state.param_edit_group):
++            elif isinstance(op, ParamCancelOp):
++                grp = str(op.group or "")
++                if (not grp) or (grp == self.state.param_edit_group):
+                     self.state.param_edit_active = False
+                     self.state.param_edit_group = ""
+                 log.info("param_cancel: group=%s", grp)
+ 
+-            elif op_type == "param_write":
+-                grp = getattr(op, "group", "") or (op.get("group") if isinstance(op, dict) else "")
+-                vals = getattr(op, "values", None) or (op.get("values") if isinstance(op, dict) else {})
+-                vals = {str(k): float(v) for k, v in dict(vals).items()}
++            elif isinstance(op, ParamWriteOp):
++                grp = str(op.group or "")
++                vals = {str(k): float(v) for k, v in dict(op.values or {}).items()}
+ 
+                 # ST does *not* implement a param-edit session on the wire.
+                 # In simulation we still *support* edit sessions, but we also accept
+                 # direct writes when no session is active.
+ 
+                 # enforce minimal device-side guards too
+-                if str(grp) == 'pos':
++                if grp == 'pos':
+                     vals = self._normalize_pos_chain(vals)
+-                elif str(grp) == 'guider':
++                elif grp == 'guider':
+                     vals = self._normalize_guider_range(vals)
+-                if self.state.param_edit_active and (str(grp) != self.state.param_edit_group):
++                if self.state.param_edit_active and (grp != self.state.param_edit_group):
+                     log.warning(
+                         "param_write rejected: group=%s active=%s active_group=%s",
+                         grp,
+@@ -1681,9 +1676,9 @@
+                         self.state.param_edit_group,
+                     )
+                 else:
+-                    if str(grp) == 'pos':
++                    if grp == 'pos':
+                         vals = self._enforce_pos_chain(vals)
+-                    elif str(grp) == 'guider':
++                    elif grp == 'guider':
+                         vals = self._enforce_guider_minmax(vals)
+ 
+                     self.state.params.update(vals)
+--- a/tests/test_param_ops_coerce.py
++++ b/tests/test_param_ops_coerce.py
+@@ -0,0 +1,39 @@
++from __future__ import annotations
++
++from steuerung3d.core.command_frame import (
++    ParamEditBeginOp,
++    ParamCancelOp,
++    ParamWriteOp,
++    coerce_param_ops,
++)
++
++
++def test_coerce_param_ops_none_and_nonlist():
++    assert coerce_param_ops(None) == []
++    assert coerce_param_ops({}) == []
++
++
++def test_coerce_param_ops_dicts_to_dataclasses():
++    ops = coerce_param_ops([
++        {"type": "param_edit_begin", "group": "pos"},
++        {"type": "param_write", "group": "pos", "values": {"UserMax": 1, "UserMin": -2.5}},
++        {"type": "param_cancel", "group": "pos"},
++    ])
++    assert len(ops) == 3
++    assert isinstance(ops[0], ParamEditBeginOp)
++    assert isinstance(ops[1], ParamWriteOp)
++    assert isinstance(ops[2], ParamCancelOp)
++    assert ops[1].values["UserMax"] == 1.0
++    assert ops[1].values["UserMin"] == -2.5
++
++
++def test_coerce_param_ops_mixed_list_keeps_objects():
++    in_ops = [
++        ParamEditBeginOp(group="vel"),
++        {"type": "param_write", "group": "vel", "values": {"VelMax": 3}},
++    ]
++    ops = coerce_param_ops(in_ops)
++    assert len(ops) == 2
++    assert isinstance(ops[0], ParamEditBeginOp)
++    assert isinstance(ops[1], ParamWriteOp)
++    assert ops[1].values["VelMax"] == 3.0

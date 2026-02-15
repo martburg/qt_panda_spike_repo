@@ -66,6 +66,33 @@ def decode_param_ops(payload: Any) -> List[ParamOp]:
     return out
 
 
+def coerce_param_ops(ops: Any) -> List[ParamOp]:
+    """Coerce a mixed/legacy param-ops container into canonical ParamOp objects.
+
+    In the codebase, param_ops should be a list[ParamOp]. Historically,
+    some paths used JSON-like dicts (e.g. recordings, older emitters).
+
+    This helper centralizes tolerance so consumers don't need ad-hoc
+    getattr/op.get branches. Unknown items are ignored.
+    """
+    if ops is None:
+        return []
+    if not isinstance(ops, list):
+        return []
+
+    out: List[ParamOp] = []
+    for item in ops:
+        if isinstance(item, (ParamEditBeginOp, ParamWriteOp, ParamCancelOp)):
+            out.append(item)
+            continue
+        if isinstance(item, dict):
+            # decode_param_ops expects a list of dicts
+            out.extend(decode_param_ops([item]))
+            continue
+        # ignore unknown
+    return out
+
+
 @dataclass(frozen=True)
 class CommandFrame:
     tick: int
