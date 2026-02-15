@@ -1,4 +1,15 @@
 # src/steuerung3d/apps/yellow/controllers/densi_controller.py
+"""DenSi (device-side simulator) controller.
+
+DenSi emulates a single axis device for the setup stack:
+- receives CommandFrame from the core (UDP, JSON or PLC wire)
+- steps a small plant model (SimAxisPlant)
+- publishes TelemetrySnapshot back to the core
+
+It also provides a few safety/ladder timing behaviours (Taster -> brakes -> READY)
+so HiP can be tested without a real SafetyPLC.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
@@ -17,6 +28,7 @@ from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
 from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
+from steuerung3d.util.ratelimit import rl_log_exc
 
 # Optional structured status heartbeat (used by stack supervisor birds-eye)
 try:
@@ -35,34 +47,23 @@ from steuerung3d.protocol.estop_bits import (
 
 from .bindings import YellowBindings
 from .ports import CommandIn, TelemetryOut
+from .ui_update import set_state_by_object_name, set_text
+from .ui_estop import (
+    age_to_online_state,
+    compute_estop_dot_states,
+    compute_header_estop_dot_states,
+)
+from .ui_banner import (
+    BANNER_COLORS,
+    BANNER_DYNAMIC_EXCLUDE,
+    derive_banner_estate_from_word,
+)
+from .ui_format import fmt_f_unit, fmt_i_unit
 
 import logging
 
 
 log = logging.getLogger("den_si")
-
-
-# --- Header banner: EsState (from EStopStatus word only) -----------------------
-_BANNER_COLORS: dict[str, tuple[str, str]] = {
-    "ESTOP": ("#F9E547", "#000000"),  # yellow
-    "IDLE": ("#FFB300", "#000000"),   # amber
-    "ARMED": ("#1B5E20", "#FFFFFF"),  # dark green
-    "READY": ("#2E7D32", "#FFFFFF"),  # green
-}
-
-_BANNER_DYNAMIC_EXCLUDE: set[str] = {
-    # exclude dynamic bits from OK-chain trip evaluation (except brakes, handled separately)
-    "ready",
-    "taster",
-    "schuetz",
-    "reset_able",
-    "steuerwort",
-    "key1_ok",
-    "key2_ok",
-    "schluessel1",
-    "schluessel2",}
-
-
 
 class EStopState(Enum):
     """Device-local Safety/EStop ladder state."""
@@ -237,11 +238,38 @@ class DenSiController:
         raise AttributeError(f"TelemetryOut does not support publishing: {type(out).__name__}")
 
     def __post_init__(self) -> None:
+        """Bind widgets and initialize the DenSi device-side simulator.
+
+        DenSi plays the *device-side* role in the setup stack:
+          - receives CommandFrame from core (over UDP, JSON or PLC wire)
+          - publishes TelemetrySnapshot back to core
+          - does **not** allow local parameter editing (that is HiP's job)
+
+        This controller also emulates a small part of the SafetyPLC handoff
+        (Taster -> brakes -> READY) so HiP can be tested end-to-end without
+        the real rig.
+        """
+        self._init_wire_proto_and_ui()
+        self._init_observability()
+        self._init_widget_refs()
+        self._init_state_and_sim()
+        self._init_l0_connection_state()
+        self._init_estop_and_startup_emulation()
+        self._wire_buttons_and_estop_controls()
+        self._lock_param_ui_device_side()
+        self._reset_ui_startup()
+
+    # -------------------------------------------------------------------------
+    # Initialization helpers
+    # -------------------------------------------------------------------------
+
+    def _init_wire_proto_and_ui(self) -> None:
         # Normalize wire protocol selection
-        self.wire_proto = (getattr(self, 'wire_proto', 'json') or 'json').strip().lower()
+        self.wire_proto = (getattr(self, "wire_proto", "json") or "json").strip().lower()
         self.ui = YellowBindings.from_window(self.win)
 
-        # Logging helpers (1 Hz heartbeat + edge logs)
+    def _init_observability(self) -> None:
+        # 1 Hz heartbeat + edge logs
         self._hb = Heartbeat("den_si", interval_s=1.0)
         self._ch = ChangeTracker()
         self._last_cmd_ns: int | None = None
@@ -252,12 +280,18 @@ class DenSiController:
         self._last_estop: bool = False
         self._last_fault: bool = False
 
-        # Legacy TimeTick display on device side:
+        # Lifetick tracing / log throttling
+        self._lt_last_telem_log_s: float = 0.0
+        self._lt_last_cmd_log_s: float = 0.0
+        self._lt_last_echo_by_axis: dict[str, int | None] = {}
+
+    def _init_widget_refs(self) -> None:
+        """Find and store all widgets we touch frequently."""
+        # Device-side TimeTick display:
         # show (lifetick_tx - lifetick_rx) in milliseconds (WORD wrap).
         self._txt_tick: QLineEdit | None = self.win.findChild(QLineEdit, "txt_tick")
 
-
-        # Header state banner (shared with HiP): show ESTOP/IDLE/ARMED/READY with background color
+        # Header state banner (shared with HiP)
         self._txt_hdr_banner_left: QLineEdit | None = self.win.findChild(QLineEdit, "txtHdrBannerLeft")
         # tolerate historical typo in some .ui files
         self._txt_hdr_banner_right: QLineEdit | None = (
@@ -265,60 +299,51 @@ class DenSiController:
             or self.win.findChild(QLineEdit, "txtHdrBannnerRight")
         )
 
-
-        # Live readouts on device page (position/velocity/current/temp)
+        # Live readouts
         self._txt_pos: QLineEdit | None = self.win.findChild(QLineEdit, "txt_pos")
         self._txt_vel: QLineEdit | None = self.win.findChild(QLineEdit, "txt_vel")
         self._txt_amp: QLineEdit | None = self.win.findChild(QLineEdit, "txt_amp")
         self._txt_temp: QLineEdit | None = self.win.findChild(QLineEdit, "txt_temp")
 
-        # Cut markers / diagnostics readouts (line edits on the UI)
+        # Cut markers / diagnostics readouts
         self._txt_cut_pos: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_pos")
         self._txt_cut_vel: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_vel")
         self._txt_cut_time: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_time")
         self._txt_posdiff: QLineEdit | None = self.win.findChild(QLineEdit, "txt_posdiff")
 
         # Resync clears cut markers (operator action after E-Stop / re-sync)
-        self._btn_diag_resync: QPushButton | None = (self.win.findChild(QPushButton, "btnReSync")
-            or self.win.findChild(QPushButton, "btnReSync")
-            or self.win.findChild(QPushButton, "btnDiagResync"))
+        self._btn_diag_resync: QPushButton | None = (
+            self.win.findChild(QPushButton, "btnReSync")
+            or self.win.findChild(QPushButton, "btnDiagResync")
+        )
         if self._btn_diag_resync is not None:
             self._btn_diag_resync.clicked.connect(self._on_diag_resync_clicked)
+            # DenSi role must not expose/enable ReSync (HiP owns workflow)
+            self._btn_diag_resync.setEnabled(False)
 
-        # Fine-tuning: DenSi role must not expose/reset/recover/resync controls.
-        # These belong to the HiP / operator workflow.
-        for _name in ("btn_reset", "btnRecover"):
-            _b = self.win.findChild(QPushButton, _name)
-            if _b is not None:
+        # Disable operator-only buttons on DenSi
+        for name in ("btn_reset", "btnRecover"):
+            b = self.win.findChild(QPushButton, name)
+            if b is not None:
                 try:
-                    _b.setEnabled(False)
+                    b.setEnabled(False)
                 except Exception:
                     pass
-        if self._btn_diag_resync is not None:
-            try:
-                self._btn_diag_resync.setEnabled(False)
-            except Exception:
-                pass
 
-        # Guider readouts (range min/max/value and measured guider speed)
+        # Guider readouts
         self._txt_guider_range_min: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMin")
         self._txt_guider_range_max: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMax")
-        # Note: user typo sometimes "Ranfe"; actual UI name is txtGuiderRangeValue
         self._txt_guider_range_val: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeValue")
-        # Renamed from txtGuiderPos_2 -> txtGuiderSpeed
         self._txt_guider_speed: QLineEdit | None = (
             self.win.findChild(QLineEdit, "txtGuiderSpeed")
             or self.win.findChild(QLineEdit, "txtGuiderPos_2")
         )
 
-
-
         # Sliders used as live indicators
         self._sld_vel_cmd: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldVelCmd")
         self._sld_limit_range: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldLimitRange")
 
-        # DenSi is normally bound to exactly one axis. To reduce confusion during
-        # multi-window integration, show the axis name directly in cmb_axis.
+        # DenSi is normally bound to exactly one axis. Make that explicit in cmb_axis.
         cmb = self.win.findChild(QComboBox, "cmb_axis")
         if cmb is not None:
             label = self.axis_ids[0] if self.axis_ids else "?"
@@ -332,36 +357,33 @@ class DenSiController:
             except Exception:
                 pass
 
-        # DEBUG: list which estop checkboxes are actually found
-        from steuerung3d.protocol.estop_bits import iter_specs
+        # DEBUG visibility: which EStop checkboxes exist in the .ui
         for spec in iter_specs():
             if not spec.checkbox:
                 continue
             w = self.win.findChild(QCheckBox, spec.checkbox)
-            log.info("estop checkbox %-16s key=%-10s found=%s", spec.checkbox, spec.key, bool(w))
+            log.debug("estop checkbox %-16s key=%-10s found=%s", spec.checkbox, spec.key, bool(w))
 
-
+    def _init_state_and_sim(self) -> None:
         self.tb = Timebase(dt_s=self.dt_s)
         self.state = MachineState()
         for a in self.axis_ids:
             self.state.ensure_axis(a)
 
-        # initialize parameter bank from current UI text (if present)
+        # Initialize parameter bank from current UI text (if present)
         self._seed_params_from_ui()
 
         # Plausible measured defaults so UI/HiP have stable values from tick 0
-        self.state.params.setdefault("ActCur", 0.0)  # A
-        self.state.params.setdefault("Temp", 20.0)   # °C
-        self.state.params.setdefault("CutPos", 0.0)  # m
-        self.state.params.setdefault("CutVel", 0.0)  # m/s
+        self.state.params.setdefault("ActCur", 0.0)   # A
+        self.state.params.setdefault("Temp", 20.0)    # °C
+        self.state.params.setdefault("CutPos", 0.0)   # m
+        self.state.params.setdefault("CutVel", 0.0)   # m/s
 
         # Plausible guider defaults (so HiP and DenSi show sane numbers from tick 0)
-        # Note: PosMin/PosMax are guider range limits in the legacy UI.
-        self.state.params.setdefault("PosMin", 0.0)       # m
-        self.state.params.setdefault("PosMax", 0.966)     # m
-        self.state.params.setdefault("GuidePosIst", 0.011)    # m
-        self.state.params.setdefault("GuideIstSpeed", 0.0)    # m/s
-
+        self.state.params.setdefault("PosMin", 0.0)        # m
+        self.state.params.setdefault("PosMax", 0.966)      # m
+        self.state.params.setdefault("GuidePosIst", 0.011) # m
+        self.state.params.setdefault("GuideIstSpeed", 0.0) # m/s
 
         # Render limit header fields (txtLimit*) from seeded params.
         self._render_limit_fields_from_params(self.state.params)
@@ -369,74 +391,53 @@ class DenSiController:
         self.device = SimDevice(plant=SimAxisPlant())
         self._last_cmd: CommandFrame | None = None
 
-        # --- L0 (device-local) state machine ---
-        # DenSi sim is a self-contained "device". For now we accept any incoming
-        # connection: once we see at least one command frame we consider the
-        # device connected, and we remain connected until command frames go stale.
-        self._l0_top: L0Top = L0Top.START
-        self._l0_sub: L0Sub = L0Sub.IDLE
-        # Optional disconnect-on-stale (purely device-local). Keep generous to
-        # avoid flapping during debug.
-        self._disconnect_after_s: float = 2.0
+    def _init_l0_connection_state(self) -> None:
+        """Device-local connection state (seen command frames recently?)."""
+        self._l0_top = L0Top.START
+        self._l0_sub = L0Sub.IDLE
+        self._disconnect_after_s = 2.0  # generous to avoid flapping during debug
+        self._seen_first_cmd = False
 
-        # Online heuristics: DenSi is considered "online" once we've seen at least one
-        # command frame from Core/HiP recently.
-        self._seen_first_cmd: bool = False
-
-        # Lifetick tracing / log throttling
-        self._lt_last_telem_log_s: float = 0.0
-        self._lt_last_cmd_log_s: float = 0.0
-        # last echoed lifetick seen in cmd frames (per axis)
-        self._lt_last_echo_by_axis: dict[str, int | None] = {}
-
-        # LOGICAL injected bits (invert handled by encode/decode)
+    def _init_estop_and_startup_emulation(self) -> None:
+        """Initialize injected EStop bits and the simplified SafetyPLC handoff."""
+        # Logical injected bits (invert handled by encode/decode)
         self._inj_bits = {k: False for k in ESTOP_SPECS.keys()}
 
-        # --- Startup / SafetyPLC handoff emulation ---
-        # Real-world flow (simplified): EStop reset -> operator presses Taster -> after a short delay
-        # the drives energize and brakes lift. We emulate that here so HiP sees plausible timing.
-        self._taster_prev: bool = False
+        # Startup / SafetyPLC handoff emulation
+        self._taster_prev = False
         self._taster_rise_t_s: float | None = None
-        self._taster_delay_s: float = 2.0
-        self._drive_ready: bool = False
-        self._estate: EStopState = EStopState.ESTOP
-        self._BRAKE_SWITCH_S: float = 1.5
-        self._es_start_armed: bool = False  # SafetyPLC Start pressed (simulated by btnESStart)
-        # Per-brake override: allow simulating "one brake faults" while the other still follows
-        # the timing model (Taster -> after 2s -> brakes lifted).
-        self._brake_override_b1: bool = False
-        self._brake_override_b2: bool = False
+        self._taster_delay_s = 2.0
+        self._drive_ready = False
+        self._estate = EStopState.ESTOP
+        self._BRAKE_SWITCH_S = 1.5
+        self._es_start_armed = False  # SafetyPLC Start pressed (simulated by btnESStart)
 
-        # --- Cut markers (latched on E-Stop entry) ---
-        self._cut_valid: bool = False
-        self._cut_pos_m: float = 0.0
-        self._cut_vel_mps: float = 0.0
-        self._cut_time_s: float = 0.0
-        self._systemtime_tok: str = ""
+        # Per-brake override (simulate one brake fault)
+        self._brake_override_b1 = False
+        self._brake_override_b2 = False
 
-        self._prev_estop_state: bool = False
-
+        # Cut markers (latched on E-Stop entry)
+        self._cut_valid = False
+        self._cut_pos_m = 0.0
+        self._cut_vel_mps = 0.0
+        self._cut_time_s = 0.0
+        self._systemtime_tok = ""
+        self._prev_estop_state = False
 
         # Match HiP brake-dot display semantics (equivalence + SafetyPLC grace)
-        self._BRAKE_HANDOFF_GRACE_S: float = 2.0
-        self._taster_prev_disp: bool = False
+        self._BRAKE_HANDOFF_GRACE_S = 2.0
+        self._taster_prev_disp = False
         self._taster_pressed_s: float | None = None
 
-
-
-        # Start in a "FAULT" state: show the full estop chain as broken until the operator
-        # explicitly issues an E-Stop reset from HiP. Keep reset_able True so the reset
-        # button is available immediately.
+        # Start in a "FAULT" state: show full estop chain broken until HiP reset.
         self._apply_fault_state()
-
-        # Prevent spurious cut-latch on first tick (startup begins in FAULT/estop)
         self._prev_estop_state = bool(getattr(self.state, "estop", False))
 
         self._estop_latched = False
         self._safety_ok = True  # placeholder
 
-        # buttons
-
+    def _wire_buttons_and_estop_controls(self) -> None:
+        """Wire DenSi-only controls and EStop injection helpers."""
         # DenSi-only: SafetyPLC Start simulator button
         self._btn_es_start: QPushButton | None = self.win.findChild(QPushButton, "btnESStart")
         if self._btn_es_start is not None:
@@ -444,24 +445,27 @@ class DenSiController:
             self._btn_es_start.setEnabled(True)
             self._btn_es_start.clicked.connect(self._on_es_start_clicked)
 
+        # Convenience: set/clear full estop word (test tool)
         if self.ui.btn_estop_all_set is not None:
             self.ui.btn_estop_all_set.clicked.connect(self._set_inj_estop_all)
         if self.ui.btn_estop_all_clear is not None:
             self.ui.btn_estop_all_clear.clicked.connect(self._clear_inj_estop_all)
 
-        # auto-wire ALL per-bit checkboxes that exist
+        # Auto-wire all per-bit checkboxes that exist
         self._wire_all_estop_bit_checkboxes()
 
-        # initial paint
+        # Initial paint
         self._render_estop_word_to_ui(self._inj_estop_word)
 
-        # DenSi is the remote endpoint: parameter edit/write/cancel is driven from HiP
+    def _lock_param_ui_device_side(self) -> None:
+        """DenSi is device-side: parameters are displayed but not editable locally."""
         self._disable_param_edit_buttons()
         self._disable_param_fields()
 
+    def _reset_ui_startup(self) -> None:
         # Reset device-side tick display
         if self._txt_tick is not None:
-            self._txt_tick.setText("--")
+            set_text(self._txt_tick, "--")
 
     def _ui_set_param(self, key: str, value: float) -> None:
         # Update UI field if we know its widget name.
@@ -477,7 +481,7 @@ class DenSiController:
             if w.text() == txt:
                 return
             was = w.blockSignals(True)
-            w.setText(txt)
+            set_text(w, txt)
             w.blockSignals(was)
             return
 
@@ -725,7 +729,7 @@ class DenSiController:
 
         # Trip evaluation
         trip_cause = any(bool(bits.get(k, False)) for k in ESTOP_CAUSE_KEYS)
-        ok_keys = [k for k in ESTOP_OK_KEYS if (k not in _BANNER_DYNAMIC_EXCLUDE) and (k not in ('brk1_ok', 'brk2_ok'))]
+        ok_keys = [k for k in ESTOP_OK_KEYS if (k not in BANNER_DYNAMIC_EXCLUDE) and (k not in ('brk1_ok', 'brk2_ok'))]
         ok_chain_fault = any(not bool(bits.get(k, True)) for k in ok_keys)
 
         brk_ok = bool(bits.get('brk1_ok', True)) and bool(bits.get('brk2_ok', True))
@@ -953,19 +957,6 @@ class DenSiController:
             ax.meta["status_word"] = int(main)
             ax.meta["guide_status_word"] = int(slave)
 
-    def _set_led_state_by_name(self, object_name: str | None, state: str | None) -> None:
-        if not object_name:
-            return
-        w = self.win.findChild(QWidget, object_name)
-        if w is None:
-            return
-        if w.property("state") == state:
-            return
-        w.setProperty("state", state)
-        w.style().unpolish(w)
-        w.style().polish(w)
-        w.update()
-
     def _render_header_online_dot(self) -> None:
         """Drive the header 'Online' dot (dotHdrOnline).
 
@@ -975,7 +966,7 @@ class DenSiController:
         """
 
         if not self._seen_first_cmd:
-            self._set_led_state_by_name("dotHdrOnline", None)
+            set_state_by_object_name(self.win, "dotHdrOnline", None)
             return
 
         now_ns = time.monotonic_ns()
@@ -984,8 +975,8 @@ class DenSiController:
 
         # Green while frames are flowing, amber when stale.
         # (Tune threshold as needed; 1s is a good first cut for dt=10ms.)
-        state = "good" if age_s <= 1.0 else "warn"
-        self._set_led_state_by_name("dotHdrOnline", state)
+        state = age_to_online_state(age=float(age_s), good_max=1.0, warn_max=None)
+        set_state_by_object_name(self.win, "dotHdrOnline", state)
 
     # ----- parameter helpers -----
     def _find_line_edit(self, object_name: str) -> QLineEdit | None:
@@ -1018,7 +1009,7 @@ class DenSiController:
                 le = self._find_line_edit(obj_name)
                 if le is None:
                     continue
-                le.setText(str(values[key]))
+                set_text(le, str(values[key]))
 
         # Also update the compact header limit fields if those values are present.
         self._render_limit_fields_from_params(values)
@@ -1044,7 +1035,7 @@ class DenSiController:
             if le.text() == txt:
                 continue
             was = le.blockSignals(True)
-            le.setText(txt)
+            set_text(le, txt)
             le.blockSignals(was)
             # Ensure these are display-only on DenSi.
             try:
@@ -1177,46 +1168,31 @@ class DenSiController:
 
 
         # --- Header dots ---
-        self._set_led_state_by_name("dotHdrFbt", "good" if taster else "warn")
-        self._set_led_state_by_name("dotHdrReady", "good" if ready else "warn")
-
-        brk1_raw = bool(bits.get("brk1_ok", False))
-        brk2_raw = bool(bits.get("brk2_ok", False))
-        brk1_ok = self._brake_ok_display_disp(brk_ok_raw=brk1_raw, taster=taster)
-        brk2_ok = self._brake_ok_display_disp(brk_ok_raw=brk2_raw, taster=taster)
-
-        self._set_led_state_by_name("dotHdrBrake1", "good" if brk1_ok else "bad")
-        self._set_led_state_by_name("dotHdrBrake2", "good" if brk2_ok else "bad")
+        hdr = compute_header_estop_dot_states(
+            taster=taster,
+            ready=ready,
+            brk1_raw=bool(bits.get("brk1_ok", False)),
+            brk2_raw=bool(bits.get("brk2_ok", False)),
+            brake_ok_display=lambda raw: self._brake_ok_display_disp(
+                brk_ok_raw=raw, taster=taster
+            ),
+        )
+        set_state_by_object_name(self.win, "dotHdrFbt", hdr["dotHdrFbt"])
+        set_state_by_object_name(self.win, "dotHdrReady", hdr["dotHdrReady"])
+        set_state_by_object_name(self.win, "dotHdrBrake1", hdr["dotHdrBrake1"])
+        set_state_by_object_name(self.win, "dotHdrBrake2", hdr["dotHdrBrake2"])
 
         # --- Per-bit dots in diagnostic groups ---
-        for spec in iter_specs():
-            if not spec.dot:
-                continue
-
-            v = bool(bits.get(spec.key, False))
-
-            if spec.key in ("brk1_ok", "brk2_ok"):
-                # Match HiP display semantics for brake dots
-                disp_ok = self._brake_ok_display_disp(brk_ok_raw=v, taster=taster)
-                state = "good" if disp_ok else "bad"
-
-            elif spec.key == "brk2kb_ok":
-                # Brake cable OK: normal logic, independent of taster
-                state = "good" if v else "bad"
-
-            elif spec.key in ESTOP_CAUSE_KEYS:
-                # trip causes: show red when active, otherwise green
-                state = "bad" if v else "good"
-
-            elif spec.key in ESTOP_OK_KEYS:
-                # ok chain: green when ok, red when broken
-                state = "good" if v else "bad"
-
-            else:
-                # other: amber only when asserted, otherwise off
-                state = "warn" if v else None
-
-            self._set_led_state_by_name(spec.dot, state)
+        states = compute_estop_dot_states(
+            bits=bits,
+            taster=taster,
+            specs=iter_specs(),
+            brake_ok_display=lambda raw: self._brake_ok_display_disp(
+                brk_ok_raw=raw, taster=taster
+            ),
+        )
+        for dot, state in states.items():
+            set_state_by_object_name(self.win, dot, state)
 
     # ----- brake display helpers (match HiP) -----
 
@@ -1237,42 +1213,17 @@ class DenSiController:
 
     def _banner_estate_from_word_disp(self, word: int) -> str:
         """Derive ESTOP/IDLE/ARMED/READY from EStopStatus word (and taster grace)."""
-        w = int(word) & 0xFFFFFFFF
-        if w == 0:
-            return "ESTOP"
-
-        bits = decode_estop_word(w)
-
-        trip_cause = any(bool(bits.get(k, False)) for k in ESTOP_CAUSE_KEYS)
-
-        ok_keys = [k for k in ESTOP_OK_KEYS if (k not in _BANNER_DYNAMIC_EXCLUDE) and (k not in ("brk1_ok", "brk2_ok"))]
-        ok_chain_fault = any(not bool(bits.get(k, True)) for k in ok_keys)
-
-        taster = bool(bits.get("taster", False))
-        schuetz = bool(bits.get("schuetz", False))
-        brk_ok = bool(bits.get("brk1_ok", True)) and bool(bits.get("brk2_ok", True))
-
-        # Brake bits: trip only after grace when taster is ON; immediate when taster is OFF.
-        if taster:
-            brake_trip = (not brk_ok) and (not self._within_brake_grace_disp())
-        else:
-            brake_trip = (not brk_ok)
-
-        if trip_cause or ok_chain_fault or brake_trip:
-            return "ESTOP"
-
-        if not schuetz:
-            return "ESTOP"
-        if not taster:
-            return "IDLE"
-        return "READY" if brk_ok else "ARMED"
+        return derive_banner_estate_from_word(
+            int(word),
+            within_brake_grace=self._within_brake_grace_disp,
+        )
 
     def _apply_banner_estate_disp(self, estate: str) -> None:
-        bg, fg = _BANNER_COLORS.get(estate, ("#F9E547", "#000000"))
+        bg, fg = BANNER_COLORS.get(estate, ("#F9E547", "#000000"))
         for w in (getattr(self, "_txt_hdr_banner_left", None), getattr(self, "_txt_hdr_banner_right", None)):
             if w is None:
                 continue
-            w.setText(estate)
+            set_text(w, estate)
             w.setStyleSheet(f"background-color: {bg}; color: {fg}; font-weight: 700;")
 
     def _brake_ok_display_disp(self, *, brk_ok_raw: bool, taster: bool) -> bool:
@@ -1339,7 +1290,7 @@ class DenSiController:
                 },
             )
         except Exception:
-            pass
+            rl_log_exc("densi.status.emit", "DenSi status emission failed", logger=log)
 
 
     # ----- runtime -----
@@ -1420,27 +1371,27 @@ class DenSiController:
                     self.state.params["SystemTime"] = tok
 
                 if self._txt_cut_time is not None:
-                    self._txt_cut_time.setText(tok if tok else "--")
+                    set_text(self._txt_cut_time, tok if tok else "--")
             except Exception:
                 if self._txt_cut_time is not None:
                     self._txt_cut_time.setText("--")
 
             for w in (self._txt_cut_pos, self._txt_cut_vel, self._txt_posdiff):
                 if w is not None:
-                    w.setText("--")
+                    set_text(w, "--")
             return
 
         if self._txt_cut_time is not None:
             tok = str(self._systemtime_tok or self.state.params.get('SystemTime','') or '')
-            self._txt_cut_time.setText(tok if tok else "--")
+            set_text(self._txt_cut_time, tok if tok else "--")
         if self._txt_cut_pos is not None:
-            self._txt_cut_pos.setText(f"{float(self._cut_pos_m):.2f} m")
+            set_text(self._txt_cut_pos, fmt_f_unit(float(self._cut_pos_m), "m", ndigits=2))
         if self._txt_cut_vel is not None:
-            self._txt_cut_vel.setText(f"{float(self._cut_vel_mps):.2f} m/s")
+            set_text(self._txt_cut_vel, fmt_f_unit(float(self._cut_vel_mps), "m/s", ndigits=2))
 
         if pos_m is None:
             if self._txt_posdiff is not None:
-                self._txt_posdiff.setText("--")
+                set_text(self._txt_posdiff, "--")
             return
 
         pd = float(pos_m) - float(self._cut_pos_m)
@@ -1449,7 +1400,7 @@ class DenSiController:
         except Exception:
             pass
         if self._txt_posdiff is not None:
-            self._txt_posdiff.setText(f"{pd:.2f} m")
+            set_text(self._txt_posdiff, fmt_f_unit(pd, "m", ndigits=2))
 
     @staticmethod
     def _reset_able_from_estop_word(word: int) -> bool:
@@ -1480,6 +1431,191 @@ class DenSiController:
         t.timeout.connect(self.step_once)
         t.start()
         self._timer = t
+
+
+    # ---------------------------------------------------------------------
+    # UI rendering helpers (extracted from step_once for readability)
+    # ---------------------------------------------------------------------
+
+    def _step_lifetick(self) -> None:
+        # --- LiveTick semantics (device-origin) ---
+        # tx: incrementing device tick (DenSi sim, ms-based 16-bit counter)
+        # rx: echo value received from HiP/Core in last command frame
+        now_s = time.monotonic()
+        _echo_map = getattr(self._last_cmd, "lifetick_echo", {}) if self._last_cmd is not None else {}
+
+        # LIFETICK (core -> DenSi): log echo changes immediately; otherwise throttle.
+        if self._last_cmd is not None and self.axis_ids:
+            for axis_id in self.axis_ids:
+                echo_val = dict(_echo_map).get(axis_id, None)
+                prev = self._lt_last_echo_by_axis.get(axis_id)
+                if prev != echo_val:
+                    self._lt_last_echo_by_axis[axis_id] = echo_val
+                    # LifeTick is useful while debugging connectivity, but too chatty
+                    # for everyday use. Keep it at DEBUG (edge-triggered).
+                    log.debug(
+                        "LIFETICK DenSi rx cmd echo: axis=%s value=%s cmd_tick=%s",
+                        axis_id,
+                        echo_val,
+                        getattr(self._last_cmd, "tick", None),
+                    )
+
+            if _lt_should_log(now_s, self._lt_last_cmd_log_s):
+                axis0 = self.axis_ids[0]
+                log.debug(
+                    "DenSi rx cmd: tick=%s lifetick_echo[%s]=%s (map=%s)",
+                    getattr(self._last_cmd, "tick", None),
+                    axis0,
+                    dict(_echo_map).get(axis0, None),
+                    _echo_map,
+                )
+                self._lt_last_cmd_log_s = now_s
+        else:
+            if _lt_should_log(now_s, self._lt_last_cmd_log_s):
+                log.debug("DenSi rx cmd: <no cmd yet>")
+                self._lt_last_cmd_log_s = now_s
+
+        inc_ms = max(1, int(round(self.tb.dt_s * 1000.0)))
+        for _axis_id, _ax in self.state.axes.items():
+            # Legacy PLC analogue: LifetickUItx is a WORD that increments in (roughly) milliseconds.
+            # This drives the GUI's TimeTick display (delta between successive received lifeticks).
+            prev = int(_ax.meta.get("device_tick", 0)) & 0xFFFF
+            dev_tick = (prev + inc_ms) & 0xFFFF
+            _ax.meta["device_tick"] = dev_tick
+
+            # Keep livetick_tx aligned with device_tick for echo/watchdog semantics.
+            _ax.meta["lifetick_tx"] = int(dev_tick)
+            try:
+                _ax.meta["lifetick_rx"] = int(dict(_echo_map).get(_axis_id, 0) or 0)
+            except Exception:
+                _ax.meta["lifetick_rx"] = 0
+            # Cycle time indicator for debugging/UX.
+            _ax.meta["timetick_ms"] = inc_ms
+
+            # Debug log the tick values
+            tx = int(_ax.meta.get("lifetick_tx", 0)) & 0xFFFF
+            rx = int(_ax.meta.get("lifetick_rx", 0)) & 0xFFFF
+            diff = (tx - rx) & 0xFFFF
+
+            # Heartbeat focuses on the primary axis (first configured axis).
+            if self.axis_ids and _axis_id == self.axis_ids[0]:
+                self._hb.set("tx", int(tx))
+                self._hb.set("rx", int(rx))
+                self._hb.set("diff", int(diff))
+                if self._last_cmd_ns is not None:
+                    self._hb.set("cmd_age_ms", int((time.monotonic_ns() - self._last_cmd_ns) / 1_000_000.0))
+
+            # LifeTick is noisy during normal operation. Keep a throttled trace at DEBUG.
+            if self.axis_ids and _axis_id == self.axis_ids[0] and _lt_should_log(now_s, self._lt_last_telem_log_s):
+                self._lt_last_telem_log_s = now_s
+                log.debug(
+                    "LIFETICK DenSi device: axis=%s tx=%d rx=%d diff=%d",
+                    _axis_id,
+                    tx,
+                    rx,
+                    diff,
+                )
+
+        # Render device-side tick staleness like PLC does:
+        # diff = LifetickUItx - LifetickUIrx (WORD wrap)
+        if self._txt_tick is not None and self.axis_ids:
+            axis_id = self.axis_ids[0]
+            ax = self.state.axes.get(axis_id)
+            if ax is not None:
+                try:
+                    tx = int(ax.meta.get("lifetick_tx", 0)) & 0xFFFF
+                except Exception:
+                    tx = 0
+                try:
+                    rx = int(ax.meta.get("lifetick_rx", 0)) & 0xFFFF
+                except Exception:
+                    rx = 0
+                diff = (tx - rx) & 0xFFFF
+                # avoid repaint churn
+                s = str(diff)
+                if self._txt_tick.text() != s:
+                    set_text(self._txt_tick, s)
+            else:
+                if self._txt_tick.text() != "--":
+                    set_text(self._txt_tick, "--")
+
+
+
+    def _render_live_readouts_ui(self) -> None:
+        # Render live readouts in the DenSi UI (plausible defaults at startup)
+        try:
+            axis_id = self.axis_ids[0] if self.axis_ids else ""
+            ax = self.state.axes.get(axis_id) if axis_id else None
+            pos = float(getattr(ax, "pos", 0.0)) if ax else 0.0
+            vel = float(getattr(ax, "vel", 0.0)) if ax else 0.0
+            amp = float(self.state.params.get("ActCur", 0.0))
+            tmp = float(self.state.params.get("Temp", 20.0))
+            if self._txt_pos is not None:
+                set_text(self._txt_pos, fmt_f_unit(pos, "m", ndigits=2))
+            if self._txt_vel is not None:
+                set_text(self._txt_vel, fmt_f_unit(vel, "m/s", ndigits=2))
+            if self._txt_amp is not None:
+                set_text(self._txt_amp, fmt_i_unit(int(round(amp)), "A"))
+            if self._txt_temp is not None:
+                set_text(self._txt_temp, fmt_i_unit(int(round(tmp)), "°"))
+
+
+            # Cut marker readouts
+            self._render_cut_markers_to_ui(pos_m=pos)
+
+
+            # Guider readouts (defaults if not yet modeled)
+            g_min = float(self.state.params.get("PosMin", 0.0) or 0.0)
+            g_max = float(self.state.params.get("PosMax", 0.0) or 0.0)
+            g_val = float(self.state.params.get("GuidePosIst", 0.0) or 0.0)
+            g_spd = float(self.state.params.get("GuideIstSpeed", 0.0) or 0.0)
+            if self._txt_guider_range_min is not None:
+                set_text(self._txt_guider_range_min, fmt_f_unit(g_min, "m", ndigits=3))
+            if self._txt_guider_range_max is not None:
+                set_text(self._txt_guider_range_max, fmt_f_unit(g_max, "m", ndigits=3))
+            if self._txt_guider_range_val is not None:
+                set_text(self._txt_guider_range_val, fmt_f_unit(g_val, "m", ndigits=3))
+            if self._txt_guider_speed is not None:
+                self._txt_guider_speed.setText(f"{g_spd:.3f} m/s")
+
+            # --- slider indicators ---
+            # sldVelCmd: show commanded velocity (setpoint) with range ±VelMax
+            vel_max = float(self.state.params.get("VelMax", 0.0) or 0.0)
+            if vel_max <= 0.0:
+                vel_max = 1.0
+            vel_cmd = 0.0
+            try:
+                if self._last_cmd is not None and axis_id and hasattr(self._last_cmd, "axes"):
+                    sp = self._last_cmd.axes.get(axis_id)
+                    if sp is not None:
+                        vel_cmd = float(getattr(sp, "vel", 0.0))
+            except Exception:
+                vel_cmd = 0.0
+            if self._sld_vel_cmd is not None:
+                scale = 1000.0  # m/s -> mm/s for slider resolution
+                self._sld_vel_cmd.blockSignals(True)
+                self._sld_vel_cmd.setMinimum(int(round(-vel_max * scale)))
+                self._sld_vel_cmd.setMaximum(int(round(+vel_max * scale)))
+                self._sld_vel_cmd.setValue(int(round(vel_cmd * scale)))
+                self._sld_vel_cmd.blockSignals(False)
+
+            # sldLimitRange: show current position in [UserMin, UserMax]
+            user_min = float(self.state.params.get("UserMin", 0.0) or 0.0)
+            user_max = float(self.state.params.get("UserMax", 0.0) or 0.0)
+            if user_max < user_min:
+                user_min, user_max = user_max, user_min
+            if self._sld_limit_range is not None:
+                scale = 1000.0  # m -> mm for slider resolution
+                self._sld_limit_range.blockSignals(True)
+                self._sld_limit_range.setMinimum(int(round(user_min * scale)))
+                self._sld_limit_range.setMaximum(int(round(user_max * scale)))
+                self._sld_limit_range.setValue(int(round(pos * scale)))
+                self._sld_limit_range.blockSignals(False)
+
+        except Exception:
+            pass
+
+
 
     def step_once(self) -> None:
         frames = self._drain_command_frames_compat(limit=100)
@@ -1741,181 +1877,11 @@ class DenSiController:
         # Remember for next tick
         self._prev_estop_state = bool(self.state.estop)
 
-        # --- LiveTick semantics (device-origin) ---
-        # tx: incrementing device tick (DenSi sim, ms-based 16-bit counter)
-        # rx: echo value received from HiP/Core in last command frame
-        now_s = time.monotonic()
-        _echo_map = getattr(self._last_cmd, "lifetick_echo", {}) if self._last_cmd is not None else {}
+                # --- LiveTick + local UI readouts (device-side) ---
+        self._step_lifetick()
+        self._render_live_readouts_ui()
 
-        # LIFETICK (core -> DenSi): log echo changes immediately; otherwise throttle.
-        if self._last_cmd is not None and self.axis_ids:
-            for axis_id in self.axis_ids:
-                echo_val = dict(_echo_map).get(axis_id, None)
-                prev = self._lt_last_echo_by_axis.get(axis_id)
-                if prev != echo_val:
-                    self._lt_last_echo_by_axis[axis_id] = echo_val
-                    # LifeTick is useful while debugging connectivity, but too chatty
-                    # for everyday use. Keep it at DEBUG (edge-triggered).
-                    log.debug(
-                        "LIFETICK DenSi rx cmd echo: axis=%s value=%s cmd_tick=%s",
-                        axis_id,
-                        echo_val,
-                        getattr(self._last_cmd, "tick", None),
-                    )
-
-            if _lt_should_log(now_s, self._lt_last_cmd_log_s):
-                axis0 = self.axis_ids[0]
-                log.debug(
-                    "DenSi rx cmd: tick=%s lifetick_echo[%s]=%s (map=%s)",
-                    getattr(self._last_cmd, "tick", None),
-                    axis0,
-                    dict(_echo_map).get(axis0, None),
-                    _echo_map,
-                )
-                self._lt_last_cmd_log_s = now_s
-        else:
-            if _lt_should_log(now_s, self._lt_last_cmd_log_s):
-                log.debug("DenSi rx cmd: <no cmd yet>")
-                self._lt_last_cmd_log_s = now_s
-
-        inc_ms = max(1, int(round(self.tb.dt_s * 1000.0)))
-        for _axis_id, _ax in self.state.axes.items():
-            # Legacy PLC analogue: LifetickUItx is a WORD that increments in (roughly) milliseconds.
-            # This drives the GUI's TimeTick display (delta between successive received lifeticks).
-            prev = int(_ax.meta.get("device_tick", 0)) & 0xFFFF
-            dev_tick = (prev + inc_ms) & 0xFFFF
-            _ax.meta["device_tick"] = dev_tick
-
-            # Keep livetick_tx aligned with device_tick for echo/watchdog semantics.
-            _ax.meta["lifetick_tx"] = int(dev_tick)           
-            try:
-                _ax.meta["lifetick_rx"] = int(dict(_echo_map).get(_axis_id, 0) or 0)
-            except Exception:
-                _ax.meta["lifetick_rx"] = 0
-            # Cycle time indicator for debugging/UX.
-            _ax.meta["timetick_ms"] = inc_ms
-
-            # Debug log the tick values
-            tx = int(_ax.meta.get("lifetick_tx", 0)) & 0xFFFF
-            rx = int(_ax.meta.get("lifetick_rx", 0)) & 0xFFFF
-            diff = (tx - rx) & 0xFFFF
-
-            # Heartbeat focuses on the primary axis (first configured axis).
-            if self.axis_ids and _axis_id == self.axis_ids[0]:
-                self._hb.set("tx", int(tx))
-                self._hb.set("rx", int(rx))
-                self._hb.set("diff", int(diff))
-                if self._last_cmd_ns is not None:
-                    self._hb.set("cmd_age_ms", int((time.monotonic_ns() - self._last_cmd_ns) / 1_000_000.0))
-
-            # LifeTick is noisy during normal operation. Keep a throttled trace at DEBUG.
-            if self.axis_ids and _axis_id == self.axis_ids[0] and _lt_should_log(now_s, self._lt_last_telem_log_s):
-                self._lt_last_telem_log_s = now_s
-                log.debug(
-                    "LIFETICK DenSi device: axis=%s tx=%d rx=%d diff=%d",
-                    _axis_id,
-                    tx,
-                    rx,
-                    diff,
-                )
-
-        # Render device-side tick staleness like PLC does:
-        # diff = LifetickUItx - LifetickUIrx (WORD wrap)
-        if self._txt_tick is not None and self.axis_ids:
-            axis_id = self.axis_ids[0]
-            ax = self.state.axes.get(axis_id)
-            if ax is not None:
-                try:
-                    tx = int(ax.meta.get("lifetick_tx", 0)) & 0xFFFF
-                except Exception:
-                    tx = 0
-                try:
-                    rx = int(ax.meta.get("lifetick_rx", 0)) & 0xFFFF
-                except Exception:
-                    rx = 0
-                diff = (tx - rx) & 0xFFFF
-                # avoid repaint churn
-                s = str(diff)
-                if self._txt_tick.text() != s:
-                    self._txt_tick.setText(s)
-            else:
-                if self._txt_tick.text() != "--":
-                    self._txt_tick.setText("--")
-
-        # Render live readouts in the DenSi UI (plausible defaults at startup)
-        try:
-            axis_id = self.axis_ids[0] if self.axis_ids else ""
-            ax = self.state.axes.get(axis_id) if axis_id else None
-            pos = float(getattr(ax, "pos", 0.0)) if ax else 0.0
-            vel = float(getattr(ax, "vel", 0.0)) if ax else 0.0
-            amp = float(self.state.params.get("ActCur", 0.0))
-            tmp = float(self.state.params.get("Temp", 20.0))
-            if self._txt_pos is not None:
-                self._txt_pos.setText(f"{pos:.2f} m")
-            if self._txt_vel is not None:
-                self._txt_vel.setText(f"{vel:.2f} m/s")
-            if self._txt_amp is not None:
-                self._txt_amp.setText(f"{int(round(amp))} A")
-            if self._txt_temp is not None:
-                self._txt_temp.setText(f"{int(round(tmp))}°")
-
-
-            # Cut marker readouts
-            self._render_cut_markers_to_ui(pos_m=pos)
-
-
-            # Guider readouts (defaults if not yet modeled)
-            g_min = float(self.state.params.get("PosMin", 0.0) or 0.0)
-            g_max = float(self.state.params.get("PosMax", 0.0) or 0.0)
-            g_val = float(self.state.params.get("GuidePosIst", 0.0) or 0.0)
-            g_spd = float(self.state.params.get("GuideIstSpeed", 0.0) or 0.0)
-            if self._txt_guider_range_min is not None:
-                self._txt_guider_range_min.setText(f"{g_min:.3f} m")
-            if self._txt_guider_range_max is not None:
-                self._txt_guider_range_max.setText(f"{g_max:.3f} m")
-            if self._txt_guider_range_val is not None:
-                self._txt_guider_range_val.setText(f"{g_val:.3f} m")
-            if self._txt_guider_speed is not None:
-                self._txt_guider_speed.setText(f"{g_spd:.3f} m/s")
-
-            # --- slider indicators ---
-            # sldVelCmd: show commanded velocity (setpoint) with range ±VelMax
-            vel_max = float(self.state.params.get("VelMax", 0.0) or 0.0)
-            if vel_max <= 0.0:
-                vel_max = 1.0
-            vel_cmd = 0.0
-            try:
-                if self._last_cmd is not None and axis_id and hasattr(self._last_cmd, "axes"):
-                    sp = self._last_cmd.axes.get(axis_id)
-                    if sp is not None:
-                        vel_cmd = float(getattr(sp, "vel", 0.0))
-            except Exception:
-                vel_cmd = 0.0
-            if self._sld_vel_cmd is not None:
-                scale = 1000.0  # m/s -> mm/s for slider resolution
-                self._sld_vel_cmd.blockSignals(True)
-                self._sld_vel_cmd.setMinimum(int(round(-vel_max * scale)))
-                self._sld_vel_cmd.setMaximum(int(round(+vel_max * scale)))
-                self._sld_vel_cmd.setValue(int(round(vel_cmd * scale)))
-                self._sld_vel_cmd.blockSignals(False)
-
-            # sldLimitRange: show current position in [UserMin, UserMax]
-            user_min = float(self.state.params.get("UserMin", 0.0) or 0.0)
-            user_max = float(self.state.params.get("UserMax", 0.0) or 0.0)
-            if user_max < user_min:
-                user_min, user_max = user_max, user_min
-            if self._sld_limit_range is not None:
-                scale = 1000.0  # m -> mm for slider resolution
-                self._sld_limit_range.blockSignals(True)
-                self._sld_limit_range.setMinimum(int(round(user_min * scale)))
-                self._sld_limit_range.setMaximum(int(round(user_max * scale)))
-                self._sld_limit_range.setValue(int(round(pos * scale)))
-                self._sld_limit_range.blockSignals(False)
-
-        except Exception:
-            pass
-
-        # Provide plausible legacy drive status words so HiP's AmpStatus fields light up.
+# Provide plausible legacy drive status words so HiP's AmpStatus fields light up.
         self._update_drive_status_words()
 
         snap = TelemetrySnapshot.from_state(self.state)

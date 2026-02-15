@@ -1,4 +1,14 @@
 # src/steuerung3d/apps/yellow/controllers/hip_controller.py
+"""HiP (operator-side HMI) controller.
+
+This module binds a Yellow .ui window to HiP behavior:
+- receive TelemetrySnapshot (UDP) from core
+- render per-axis state, E-Stop chain, and drive status
+- send operator Intents back to core (enable/jog, parameter editing, resync, etc.)
+
+Design goal: keep UI plumbing localized and keep runtime logic in poll_once.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -32,13 +42,12 @@ from steuerung3d.core.intents import (
 )
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import (
-    ESTOP_CAUSE_KEYS,
-    ESTOP_OK_KEYS,
     ESTOP_SPECS,
     decode_estop_word,
 )
 from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 from steuerung3d.util.tick import compute_time_tick
+from steuerung3d.util.ratelimit import rl_log_exc
 
 # Optional structured status heartbeat (used by stack supervisor birds-eye)
 try:
@@ -48,6 +57,14 @@ except Exception:  # pragma: no cover
 
 from .bindings import YellowBindings
 from .ports import IntentOut, TelemetryIn
+from .ui_update import set_state_by_object_name, set_text
+from .ui_estop import (
+    age_to_online_state,
+    compute_estop_dot_states,
+    compute_header_estop_dot_states,
+)
+from .ui_banner import BANNER_COLORS, derive_banner_estate_from_word
+from .ui_format import fmt_f_unit, fmt_i_unit
 
 # NOTE: You MUST have this decoder somewhere in your codebase.
 # If the import path differs, adjust it here.
@@ -103,26 +120,6 @@ _LIMIT_WIDGETS: dict[str, str] = {
     "UserMax": "txtLimitUserMax",
     "HardMax": "txtLimitHardMax",
 }
-# --- Header banner: EsState (from EStopStatus word only) -----------------------
-_BANNER_COLORS: dict[str, tuple[str, str]] = {
-    "ESTOP": ("#F9E547", "#000000"),  # yellow
-    "IDLE": ("#FFB300", "#000000"),   # amber
-    "ARMED": ("#1B5E20", "#FFFFFF"),  # dark green
-    "READY": ("#2E7D32", "#FFFFFF"),  # green
-}
-
-_BANNER_DYNAMIC_EXCLUDE: set[str] = {
-    # exclude dynamic bits from OK-chain trip evaluation (except brakes, handled separately)
-    "ready",
-    "taster",
-    "schuetz",
-    "reset_able",
-    "steuerwort",
-    "key1_ok",
-    "key2_ok",
-}
-
-
 def _parse_estop_word_from_snapshot(snap: TelemetrySnapshot) -> int:
     # Prefer raw field if present (string), fallback to typed field.
     fields = getattr(snap, "plc_uplink_fields", None)
@@ -173,48 +170,17 @@ class HiPController:
         return (time.monotonic() - t0) <= 2.0
 
     def _banner_estate_from_word(self, *, axis_id: str, word: int) -> str:
-        # Default is ESTOP (startup, or unknown)
-        w = int(word) & 0xFFFFFFFF
-        if w == 0:
-            return "ESTOP"
-
-        bits = decode_estop_word(w)
-
-        # Trip cause bits always force ESTOP
-        trip_cause = any(bool(bits.get(k, False)) for k in ESTOP_CAUSE_KEYS)
-
-        # OK-chain trip evaluation: exclude dynamic bits, handle brake bits separately
-        ok_keys = [k for k in ESTOP_OK_KEYS if (k not in _BANNER_DYNAMIC_EXCLUDE) and (k not in ("brk1_ok", "brk2_ok"))]
-        ok_chain_fault = any(not bool(bits.get(k, True)) for k in ok_keys)
-
-        taster = bool(bits.get("taster", False))
-        schuetz = bool(bits.get("schuetz", False))
-        brk_ok = bool(bits.get("brk1_ok", True)) and bool(bits.get("brk2_ok", True))
-
-        # Brake bits: only become a trip after grace when taster is ON.
-        # When taster is OFF, brake OK must be true (brakes applied and watchers OK) => trip if false.
-        if taster:
-            brake_trip = (not brk_ok) and (not self._within_banner_brake_grace(axis_id))
-        else:
-            brake_trip = (not brk_ok)
-
-        trip_active = trip_cause or ok_chain_fault or brake_trip
-        if trip_active:
-            return "ESTOP"
-
-        # Ladder: Schuetz -> IDLE, Taster -> ARMED, Brakes lifted -> READY
-        if not schuetz:
-            return "ESTOP"
-        if not taster:
-            return "IDLE"
-        return "READY" if brk_ok else "ARMED"
+        return derive_banner_estate_from_word(
+            int(word),
+            within_brake_grace=lambda: self._within_banner_brake_grace(axis_id),
+        )
 
     def _apply_banner_estate(self, estate: str) -> None:
-        bg, fg = _BANNER_COLORS.get(estate, ("#F9E547", "#000000"))
+        bg, fg = BANNER_COLORS.get(estate, ("#F9E547", "#000000"))
         for w in (self._txt_hdr_banner_left, self._txt_hdr_banner_right):
             if w is None:
                 continue
-            w.setText(estate)
+            set_text(w, estate)
             w.setStyleSheet(f"background-color: {bg}; color: {fg}; font-weight: 700;")
 
     def _brake_ok_display(self, *, brk_ok_raw: bool, taster: bool, axis_id: str) -> bool:
@@ -231,9 +197,54 @@ class HiPController:
     # ---------- init ----------
 
     def __post_init__(self) -> None:
+        """Bind widgets, wire signals, and initialize controller state.
+
+        HiP is the *operator-side* HMI:
+          - consumes TelemetrySnapshot (UDP) from core_udp_service
+          - emits Intents (UDP) back to core_udp_service
+          - drives all parameter editing (DenSi is device-side echo)
+
+        Keep this initializer focused on wiring and local bookkeeping.
+        All runtime work happens in :meth:`poll_once`.
+        """
         self.ui = YellowBindings.from_window(self.win)
 
-        # Estop diagnostics checkboxes (present in the HiP UI but *read-only*).
+        # --- UI elements (widget lookup) ---
+        self._init_widget_refs()
+
+        # --- Observability (logging + optional supervisor heartbeat) ---
+        self._init_observability()
+
+        # --- Axis attachment / pooled UI behaviour ---
+        self._init_axis_selection()
+
+        # --- Parameter edit & transactional intents bookkeeping ---
+        self._init_param_txn_state()
+
+        # --- Wire signals (buttons, combo-box, etc.) ---
+        self._wire_signals()
+
+        # Validators for numeric parameter fields
+        self._init_param_inputs()
+
+        # Parameter UI starts locked until a ParamEditBegin happens.
+        self._apply_param_ui_state(edit_active=False, edit_group="")
+
+        # Paint an explicit startup state (unknown dots, no tick, etc.)
+        self._reset_ui_startup()
+
+    # -------------------------------------------------------------------------
+    # Initialization helpers
+    # -------------------------------------------------------------------------
+
+    def _init_widget_refs(self) -> None:
+        """Find and store all widgets we touch frequently.
+
+        We keep the widget lookups in one place so:
+          - missing widgets are easy to diagnose
+          - controller logic reads like controller logic (not like Qt plumbing)
+        """
+        # Estop diagnostics checkboxes (read-only in HiP).
         self._estop_checks: dict[str, QCheckBox] = {}
         for spec in ESTOP_SPECS.values():
             if not spec.checkbox:
@@ -243,54 +254,40 @@ class HiPController:
                 w.setEnabled(False)
                 self._estop_checks[spec.key] = w
 
-        # Logging helpers: 1 Hz heartbeat + edge logs.
-        self._hb = Heartbeat("hi_p", interval_s=1.0)
-        self._ch = ChangeTracker()
-
-        # Structured status heartbeat (side-channel for supervisor birds-eye; PLC packets unchanged)
-        self._status = StatusEmitter.from_env(default_service="hi_p") if StatusEmitter else None
-        self._last_mode: str = ""
-        self._last_estop: bool = False
-        self._last_fault: bool = False
-        self._last_estate: str = "ESTOP"
-
+        # Telemetry staleness bookkeeping
         self._seen_first_telem = False
         self._last_rx_ns: int | None = None
         self._timer: QTimer | None = None
 
-        # HiP identity and current axis selection
-        self._hip_id: str = f"hip-{uuid.uuid4().hex[:8]}"
+        # Axis selection UI (only present in pooled HiP variants)
         self._cmb_axis: QComboBox | None = self.win.findChild(QComboBox, "cmb_axis")
 
-        # Legacy TimeTick display (ticks elapsed between telemetry updates)
+        # Legacy tick delta display
         self._txt_tick: QLineEdit | None = self.win.findChild(QLineEdit, "txt_tick")
 
-        # Live readouts (same widgets exist in the HiP UI)
+        # Live readouts
         self._txt_pos: QLineEdit | None = self.win.findChild(QLineEdit, "txt_pos")
         self._txt_vel: QLineEdit | None = self.win.findChild(QLineEdit, "txt_vel")
         self._txt_amp: QLineEdit | None = self.win.findChild(QLineEdit, "txt_amp")
         self._txt_temp: QLineEdit | None = self.win.findChild(QLineEdit, "txt_temp")
 
-        # Cut markers (read-only fields)
+        # Cut markers (latched in core; rendered here)
         self._txt_cut_pos: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_pos")
         self._txt_cut_vel: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_vel")
         self._txt_cut_time: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_time")
         self._txt_posdiff: QLineEdit | None = self.win.findChild(QLineEdit, "txt_posdiff")
 
-        # HiP should not show DenSi-only SafetyPLC Start button
+        # HiP must not show DenSi-only SafetyPLC Start button
         _esstart = self.win.findChild(QPushButton, "btnESStart")
         if _esstart is not None:
             _esstart.hide()
             _esstart.setEnabled(False)
 
-        self._btn_diag_resync: QPushButton | None = (self.win.findChild(QPushButton, "btnReSync")
-            or self.win.findChild(QPushButton, "btnDiagResync"))
-        if self._btn_diag_resync is not None:
-            self._btn_diag_resync.clicked.connect(self._on_diag_resync_clicked)
-            # Fine-tuning: Resync may only be pressed in core Mode.IDLE.
-            # (poll_once will re-enable it when appropriate)
-            self._btn_diag_resync.setEnabled(False)
-
+        # Diagnostic ReSync button (present in some UI variants)
+        self._btn_diag_resync: QPushButton | None = (
+            self.win.findChild(QPushButton, "btnReSync")
+            or self.win.findChild(QPushButton, "btnDiagResync")
+        )
 
         # Sliders used as live indicators
         self._sld_vel_cmd: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldVelCmd")
@@ -298,47 +295,63 @@ class HiPController:
         self._sld_guider_range: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldGuiderRange")
         self._sld_guider_speed: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldGuiderSpeed")
 
-        # Guider readouts (DenSi-compatible names)
+        # Guider readouts
         self._txt_guider_range_min: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMin")
         self._txt_guider_range_max: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMax")
         self._txt_guider_range_val: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeValue")
-        # renamed from txtGuiderPos_2 -> txtGuiderSpeed
-        self._txt_guider_speed: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderSpeed")
-        if self._txt_guider_speed is None:
-            self._txt_guider_speed = self.win.findChild(QLineEdit, "txtGuiderPos_2")
+        self._txt_guider_speed: QLineEdit | None = (
+            self.win.findChild(QLineEdit, "txtGuiderSpeed")
+            or self.win.findChild(QLineEdit, "txtGuiderPos_2")  # legacy name
+        )
 
-        # Legacy drive status fields (main + guider/slave)
+        # Drive status fields (legacy text lines)
         self._txt_main_amp_status: QLineEdit | None = self.win.findChild(QLineEdit, "txtMainAmpStatus")
         self._txt_slave_amp_status: QLineEdit | None = self.win.findChild(QLineEdit, "txtSlaveAmpStatus")
         self._txt_hdr_banner_left: QLineEdit | None = self.win.findChild(QLineEdit, "txtHdrBannerLeft")
         self._txt_hdr_banner_right: QLineEdit | None = self.win.findChild(QLineEdit, "txtHdrBannerRight")
 
+        # Tick delta bookkeeping (legacy 'TimeTick' display)
         self._prev_device_tick: int | None = None
 
         # Last EchoLifeTick sent per axis (avoid spamming duplicates)
         self._last_lifetick_echo_sent: dict[str, int] = {}
 
+    def _init_observability(self) -> None:
+        """Set up lightweight logs + optional structured status heartbeat."""
+        self._hb = Heartbeat("hi_p", interval_s=1.0)
+        self._ch = ChangeTracker()
+
+        # Structured supervisor heartbeat (side-channel; PLC packets unchanged)
+        self._status = StatusEmitter.from_env(default_service="hi_p") if StatusEmitter else None
+        self._last_mode: str = ""
+        self._last_estop: bool = False
+        self._last_fault: bool = False
+        self._last_estate: str = "ESTOP"
+
+        # HiP identity (used for ClaimAxis/ReleaseAxis, etc.)
+        self._hip_id: str = f"hip-{uuid.uuid4().hex[:8]}"
+
+    def _init_axis_selection(self) -> None:
+        """Initialize pooled axis selection / fixed-axis pinning."""
         self._selected_axis: str = ""
         self._fixed_axis: str = ""
         self._lock_axis_combo: bool = False
         self._fixed_axis_applied: bool = False
+
         if self._cmb_axis is not None:
             self._cmb_axis.currentTextChanged.connect(self._on_axis_selected)
-        # --- controller state used by UI gating (must exist before _set_attach_ui_state) ---
-        # Pending transactions keyed by req_id -> info (used by _is_group_busy / param UI state)
-        self._pending_txn: dict[str, object] = {}
-        # Local edit state (mirrors telemetry but must be safe at startup)
-        self._local_edit_active: bool = False
-        self._local_edit_group: str = ""
 
-        # Modal param edit lock bookkeeping (used by _set_modal_param_lock)
+        # Start in 'unattached' visual state for pooled HiP panels.
         self._modal_locked: bool = False
         self._modal_prev_enabled: dict[QWidget, bool] = {}
         self._modal_prev_tabbar_enabled: bool | None = None
+        self._set_attach_ui_state(attached=False)
 
-        # Start in 'unattached' visual state for pooled HiP panels.
-        self._set_attach_ui_state(attached=bool(self._fixed_axis))
-
+    def _init_param_txn_state(self) -> None:
+        """Initialize parameter edit state and transactional resend bookkeeping."""
+        # Local edit state (mirrors telemetry but must be safe at startup)
+        self._local_edit_active: bool = False
+        self._local_edit_group: str = ""
 
         # After write/cancel, ignore remote edit flags briefly to avoid UI flicker
         self._ignore_remote_edit_until_ns: int = 0
@@ -360,10 +373,9 @@ class HiPController:
         self._resend_after_ms: int = 250
         self._max_retries: int = 8
 
-        # Local UI-driven edit state
-        self._local_edit_group: str = ""
-        self._local_edit_active: bool = False
-
+    def _wire_signals(self) -> None:
+        """Connect UI actions to intent transmissions."""
+        # E-Stop reset is enabled via telemetry; start disabled
         if self.ui.btn_estop_reset is not None:
             self.ui.btn_estop_reset.clicked.connect(self._on_estop_reset)
             log.info("wired: btnEStopReset -> RequestEstopReset intent")
@@ -371,22 +383,20 @@ class HiPController:
         else:
             log.warning("btnEStopReset not found in UI")
 
-        # parameter buttons (axis-agnostic v0.1)
+        if self._btn_diag_resync is not None:
+            self._btn_diag_resync.clicked.connect(self._on_diag_resync_clicked)
+            # Only enabled when attached + in core Mode.IDLE (poll_once enforces)
+            self._btn_diag_resync.setEnabled(False)
+
+        # Parameter buttons (axis-agnostic v0.1)
         self._wire_param_buttons()
 
-        # validators
-        self._init_param_inputs()
-
-        # Parameter UI starts locked
-        self._apply_param_ui_state(edit_active=False, edit_group="")
-
-        # paint all known dots as "unknown"
+    def _reset_ui_startup(self) -> None:
+        """Paint a deterministic startup state (no stale visuals)."""
         self._set_all_estop_unknown()
         if self._txt_tick is not None:
-            self._txt_tick.setText("--")
+            set_text(self._txt_tick, "--")
         self._prev_device_tick = None
-
-    # ---------- public helpers ----------
 
     def set_fixed_axis(self, axis_id: str, *, lock_combo: bool = True) -> None:
         self._fixed_axis = (axis_id or "").strip()
@@ -399,21 +409,6 @@ class HiPController:
                 pass
 
     # ---------- LED helpers ----------
-
-    def _set_led(self, w: QWidget | None, *, state: str | None) -> None:
-        if w is None:
-            return
-        if w.property("state") != state:
-            w.setProperty("state", state)
-            w.style().unpolish(w)
-            w.style().polish(w)
-            w.update()
-
-    def _set_led_by_name(self, object_name: str | None, *, state: str | None) -> None:
-        if not object_name:
-            return
-        w = self.win.findChild(QWidget, object_name)
-        self._set_led(w, state=state)
 
     def _attached_axis(self) -> str:
         return (self._selected_axis or self._fixed_axis or "").strip()
@@ -430,18 +425,18 @@ class HiPController:
             try:
                 if le is self._txt_tick:
                     continue
-                le.setText("")
+                set_text(le, "")
             except Exception:
                 pass
         if self._txt_tick is not None:
-            self._txt_tick.setText("--")
+            set_text(self._txt_tick, "--")
         self._prev_device_tick = None
 
         # Clear a few known header/status fields if present
         for w in (self._txt_main_amp_status, self._txt_slave_amp_status, self._txt_hdr_banner_left, self._txt_hdr_banner_right):
             if w is not None:
                 try:
-                    w.setText("")
+                    set_text(w, "")
                 except Exception:
                     pass
 
@@ -508,12 +503,12 @@ class HiPController:
 
             # Neutralize header dots
             for n in ("dotHdrOnline", "dotHdrReady", "dotHdrFbt", "dotHdrBrake1", "dotHdrBrake2"):
-                self._set_led_by_name(n, state=None)
+                set_state_by_object_name(self.win, n, None)
 
             # Neutralize estop dots and checkboxes (no stale state)
             for spec in ESTOP_SPECS.values():
                 if spec.dot:
-                    self._set_led_by_name(spec.dot, state=None)
+                    set_state_by_object_name(self.win, spec.dot, None)
             for cb in getattr(self, "_estop_checks", {}).values():
                 try:
                     cb.setChecked(False)
@@ -532,7 +527,7 @@ class HiPController:
     def _set_all_estop_unknown(self) -> None:
         for spec in ESTOP_SPECS.values():
             if spec.dot:
-                self._set_led_by_name(spec.dot, state="warn")
+                set_state_by_object_name(self.win, spec.dot, "warn")
 
     def _mark_disconnected(self) -> None:
         if self._seen_first_telem:
@@ -542,7 +537,7 @@ class HiPController:
             self.ui.btn_estop_reset.setEnabled(False)
         self._set_all_estop_unknown()
         if self._txt_tick is not None:
-            self._txt_tick.setText("--")
+            set_text(self._txt_tick, "--")
         self._prev_device_tick = None
 
     # ---------- intents ----------
@@ -613,7 +608,7 @@ class HiPController:
             if le.text() == txt:
                 continue
             was = le.blockSignals(True)
-            le.setText(txt)
+            set_text(le, txt)
             le.blockSignals(was)
 
         if group == "pos":
@@ -637,7 +632,7 @@ class HiPController:
             if le.text() == txt:
                 continue
             was = le.blockSignals(True)
-            le.setText(txt)
+            set_text(le, txt)
             le.blockSignals(was)
             try:
                 le.setEnabled(False)
@@ -952,12 +947,18 @@ class HiPController:
                 bc.setEnabled(False)
             return
 
+        # Safety policy: do not allow starting (or committing) parameter edits once the
+        # SafetyPLC ladder estate has progressed to ARMED/READY.
+        # (Cancel stays available so the operator can exit an edit session.)
+        estate = str(getattr(self, "_last_estate", "") or "").upper()
+        edits_allowed = estate not in ("ARMED", "READY")
+
         if be is not None:
-            be.setEnabled(not editing)
+            be.setEnabled((not editing) and edits_allowed)
         if bw is not None:
-            bw.setEnabled(editing)
+            bw.setEnabled(bool(editing) and edits_allowed)
         if bc is not None:
-            bc.setEnabled(editing)
+            bc.setEnabled(bool(editing))
 
     def _apply_param_ui_state(self, *, edit_active: bool, edit_group: str) -> None:
         groups = ("pos", "vel", "filter", "guider")
@@ -1001,7 +1002,7 @@ class HiPController:
                 if le.text() == txt:
                     continue
                 was = le.blockSignals(True)
-                le.setText(txt)
+                set_text(le, txt)
                 le.blockSignals(was)
 
         try:
@@ -1093,7 +1094,7 @@ class HiPController:
             )
         except Exception:
             # Never let status emission break the UI loop.
-            pass
+            rl_log_exc("hip.status.emit", "HiP status emission failed", logger=log)
 
 
     # ---------- polling ----------
@@ -1188,7 +1189,7 @@ class HiPController:
                 self._hb.set("axis", self._selected_axis)
             self._hb.emit(log)
         except Exception:
-            log.exception("HiP poll_once crashed (continuing).")
+            rl_log_exc("hip.poll_once", "HiP poll_once crashed (continuing).", logger=log, level="error")
 
     # ---------- render logic ----------
 
@@ -1219,12 +1220,12 @@ class HiPController:
         if not axis_id:
             for w in (self._txt_main_amp_status, self._txt_slave_amp_status, self._txt_hdr_banner_left, self._txt_hdr_banner_right):
                 if w is not None:
-                    w.setText("")
-            self._set_led_by_name("dotHdrOnline", state=None)
-            self._set_led_by_name("dotHdrReady", state=None)
-            self._set_led_by_name("dotHdrFbt", state=None)
-            self._set_led_by_name("dotHdrBrake1", state=None)
-            self._set_led_by_name("dotHdrBrake2", state=None)
+                    set_text(w, "")
+            set_state_by_object_name(self.win, "dotHdrOnline", None)
+            set_state_by_object_name(self.win, "dotHdrReady", None)
+            set_state_by_object_name(self.win, "dotHdrFbt", None)
+            set_state_by_object_name(self.win, "dotHdrBrake1", None)
+            set_state_by_object_name(self.win, "dotHdrBrake2", None)
             return
 
         axes = getattr(snap, "axes", None)
@@ -1241,9 +1242,9 @@ class HiPController:
         slave = decode_drive_status(slave_word)
 
         if self._txt_main_amp_status is not None:
-            self._txt_main_amp_status.setText(main.summary())
+            set_text(self._txt_main_amp_status, main.summary())
         if self._txt_slave_amp_status is not None:
-            self._txt_slave_amp_status.setText(slave.summary())
+            set_text(self._txt_slave_amp_status, slave.summary())
 
         age = int(getattr(ax, "lifetick_age", 0) or 0)
 
@@ -1265,12 +1266,7 @@ class HiPController:
         #
         # Thresholds are intentionally conservative and can be tuned once we have
         # real-world timing with the full stack.
-        if age <= 30:
-            online_state = "good"
-        elif age <= 500:
-            online_state = "warn"
-        else:
-            online_state = "bad"
+        online_state = age_to_online_state(age=float(age), good_max=30.0, warn_max=500.0)
 
         estop_word = int(getattr(snap, "estop_status_word", 0) or 0)
         estop_logical = decode_estop_word(estop_word)
@@ -1279,27 +1275,29 @@ class HiPController:
         ready = bool(estop_logical.get("ready", False))
 
         self._update_taster_edge(axis_id, taster)
+        hdr = compute_header_estop_dot_states(
+            taster=taster,
+            ready=ready,
+            brk1_raw=bool(estop_logical.get("brk1_ok", False)),
+            brk2_raw=bool(estop_logical.get("brk2_ok", False)),
+            brake_ok_display=lambda raw: self._brake_ok_display(
+                brk_ok_raw=raw, taster=taster, axis_id=axis_id
+            ),
+        )
 
-        fbt_state = "good" if taster else "warn"
-        ready_state = "good" if ready else "warn"
+        fbt_state = hdr["dotHdrFbt"]
+        ready_state = hdr["dotHdrReady"]
+        brk1_state = hdr["dotHdrBrake1"]
+        brk2_state = hdr["dotHdrBrake2"]
 
-        brk1_raw = bool(estop_logical.get("brk1_ok", False))
-        brk2_raw = bool(estop_logical.get("brk2_ok", False))
-
-        brk1_ok = self._brake_ok_display(brk_ok_raw=brk1_raw, taster=taster, axis_id=axis_id)
-        brk2_ok = self._brake_ok_display(brk_ok_raw=brk2_raw, taster=taster, axis_id=axis_id)
-
-        brk1_state = "good" if brk1_ok else "bad"
-        brk2_state = "good" if brk2_ok else "bad"
-
-        self._set_led_by_name("dotHdrOnline", state=online_state)
-        self._set_led_by_name("dotHdrReady", state=ready_state)
-        self._set_led_by_name("dotHdrFbt", state=fbt_state)
-        self._set_led_by_name("dotHdrBrake1", state=brk1_state)
-        self._set_led_by_name("dotHdrBrake2", state=brk2_state)
+        set_state_by_object_name(self.win, "dotHdrOnline", online_state)
+        set_state_by_object_name(self.win, "dotHdrReady", ready_state)
+        set_state_by_object_name(self.win, "dotHdrFbt", fbt_state)
+        set_state_by_object_name(self.win, "dotHdrBrake1", brk1_state)
+        set_state_by_object_name(self.win, "dotHdrBrake2", brk2_state)
 
 
-    
+
     def _on_diag_resync_clicked(self) -> None:
         """Request a legacy ReSync pulse and clear local cut markers.
 
@@ -1333,24 +1331,53 @@ class HiPController:
         # Clear local cut markers (UI side)
         for w in (self._txt_cut_time, self._txt_cut_pos, self._txt_cut_vel, self._txt_posdiff):
             if w is not None:
-                w.setText("--")
+                set_text(w, "--")
 
     def _render_live_readouts(self, snap: TelemetrySnapshot) -> None:
-        """Render position/velocity/current/temp into txt_* fields (read-only)."""
+        """Render live readouts and slider indicators.
+
+        Keep this method as a small orchestrator: each UI section gets its own
+        helper, which makes future maintenance (and diffs) much easier.
+        """
         axis_id = self._selected_axis or self._fixed_axis
         if not axis_id:
-            for w in (self._txt_pos, self._txt_vel, self._txt_amp, self._txt_temp):
-                if w is not None:
-                    w.setText("--")
+            self._render_axis_readouts_unattached()
             return
 
-        axes = getattr(snap, "axes", None)
-        if not isinstance(axes, dict):
-            return
-        ax = axes.get(axis_id)
+        ax = self._get_axis_telemetry(snap, axis_id)
         if ax is None:
             return
 
+        params = self._params_dict(snap)
+
+        pos, vel = self._read_axis_pos_vel(ax)
+        amp, tmp = self._read_amp_and_temp(params, snap)
+
+        self._apply_basic_readouts(pos=pos, vel=vel, amp=amp, temp=tmp)
+        self._render_cut_marker_readouts(snap, params)
+        self._render_axis_slider_indicators(ax=ax, pos=pos, vel_meas=vel, params=params)
+        self._render_guider_indicators(params=params, snap=snap)
+
+    # ---------------------------------------------------------------------
+    # Live readouts helpers (UI-only; must never raise)
+    # ---------------------------------------------------------------------
+
+    def _render_axis_readouts_unattached(self) -> None:
+        for w in (self._txt_pos, self._txt_vel, self._txt_amp, self._txt_temp):
+            if w is not None:
+                set_text(w, "--")
+
+    def _get_axis_telemetry(self, snap: TelemetrySnapshot, axis_id: str):
+        axes = getattr(snap, "axes", None)
+        if not isinstance(axes, dict):
+            return None
+        return axes.get(axis_id)
+
+    def _params_dict(self, snap: TelemetrySnapshot) -> dict:
+        params = getattr(snap, "params", {}) or {}
+        return params if isinstance(params, dict) else {}
+
+    def _read_axis_pos_vel(self, ax) -> tuple[float, float]:
         try:
             pos = float(getattr(ax, "pos", 0.0) or 0.0)
         except Exception:
@@ -1359,10 +1386,30 @@ class HiPController:
             vel = float(getattr(ax, "vel", 0.0) or 0.0)
         except Exception:
             vel = 0.0
+        return pos, vel
 
-        params = getattr(snap, "params", {}) or {}
-        if not isinstance(params, dict):
-            params = {}
+    def _raw_uplink_float(self, snap: TelemetrySnapshot, key: str, default: float) -> float:
+        """Best-effort float from raw PLC uplink fields."""
+        try:
+            raw = getattr(snap, "plc_uplink_fields", None)
+            if isinstance(raw, dict) and key in raw:
+                return float(raw.get(key, default) or default)
+        except Exception:
+            pass
+        return float(default)
+
+    def _raw_tail_token(self, snap: TelemetrySnapshot, key: str) -> str:
+        try:
+            tail = getattr(snap, "plc_uplink_tail", {}) or {}
+            if isinstance(tail, dict):
+                v = tail.get(key, "") or ""
+                return str(v)
+        except Exception:
+            pass
+        return ""
+
+    def _read_amp_and_temp(self, params: dict, snap: TelemetrySnapshot) -> tuple[float, float]:
+        """Return (amp, temp) using params with raw PLC fallbacks."""
 
         def _pf(key: str, default: float) -> float:
             try:
@@ -1374,66 +1421,92 @@ class HiPController:
         tmp = _pf("Temp", 20.0)
 
         # Fallback to raw PLC token dictionaries if present
-        try:
-            raw = getattr(snap, "plc_uplink_fields", None)
-            if isinstance(raw, dict):
-                if "ActCurUI" in raw and ("ActCur" not in params):
-                    amp = float(raw.get("ActCurUI", amp))
-                if "CabTemperatureUI" in raw and ("Temp" not in params):
-                    tmp = float(raw.get("CabTemperatureUI", tmp))
-        except Exception:
-            pass
+        if "ActCur" not in params:
+            amp = self._raw_uplink_float(snap, "ActCurUI", amp)
+        if "Temp" not in params:
+            tmp = self._raw_uplink_float(snap, "CabTemperatureUI", tmp)
 
+        return amp, tmp
+
+    def _apply_basic_readouts(self, pos: float, vel: float, amp: float, temp: float) -> None:
         if self._txt_pos is not None:
-            self._txt_pos.setText(f"{pos:.2f} m")
+            set_text(self._txt_pos, fmt_f_unit(pos, "m", ndigits=2))
         if self._txt_vel is not None:
             self._txt_vel.setText(f"{vel:.2f} m/s")
         if self._txt_amp is not None:
-            self._txt_amp.setText(f"{int(round(amp))} A")
+            set_text(self._txt_amp, fmt_i_unit(int(round(amp)), "A"))
         if self._txt_temp is not None:
-            self._txt_temp.setText(f"{int(round(tmp))}°")
+            self._txt_temp.setText(f"{int(round(temp))}°")
 
-        # --- Cut marker readouts 
+    def _render_cut_marker_readouts(self, snap: TelemetrySnapshot, params: dict) -> None:
+        """Update cut marker readouts (position/velocity/posdiff/time).
+
+        These values are meaningful while in E-Stop. Historically the UI gated them
+        using `snap.estop`. Some telemetry paths, however, may provide the E-Stop
+        status only via the status word (the same one that drives dots/banner).
+        To avoid confusing the operator, we gate cut markers using the *word* first,
+        with `snap.estop` as a fallback.
+        """
         try:
-            params = getattr(snap, "params", {}) or {}
-            if not isinstance(params, dict):
-                params = {}
             cut_pos = float(params.get("CutPos", 0.0) or 0.0)
             cut_vel = float(params.get("CutVel", 0.0) or 0.0)
             posdiff = float(params.get("PosDiffFor", 0.0) or 0.0)
-            cur_estop = bool(getattr(snap, "estop", False))
-            if not(cur_estop) :
+
+            # Prefer the decoded status word (same source as dots/banner).
+            in_estop = bool(getattr(snap, "estop", False))
+            try:
+                word = _parse_estop_word_from_snapshot(snap)
+                bits = decode_estop_word(int(word))
+                in_estop = any(bool(bits.get(k, False)) for k in ("master", "slave", "network", "estop1", "estop2"))
+            except Exception:
+                pass
+
+            # Final fallback: if the banner estate is ESTOP, treat it as estop.
+            if not in_estop:
+                estate = str(getattr(self, "_last_estate", "") or "").upper()
+                if estate == "ESTOP":
+                    in_estop = True
+
+            if not in_estop:
                 if self._txt_cut_pos is not None:
-                    self._txt_cut_pos.setText('--')
+                    set_text(self._txt_cut_pos, "--")
                 if self._txt_cut_vel is not None:
-                    self._txt_cut_vel.setText('--')
+                    set_text(self._txt_cut_vel, "--")
                 if self._txt_posdiff is not None:
-                    self._txt_posdiff.setText('--')
+                    set_text(self._txt_posdiff, "--")
             else:
                 if self._txt_cut_pos is not None:
-                    self._txt_cut_pos.setText(f"{cut_pos:.2f} m")
+                    set_text(self._txt_cut_pos, fmt_f_unit(cut_pos, "m", ndigits=2))
                 if self._txt_cut_vel is not None:
-                    self._txt_cut_vel.setText(f"{cut_vel:.2f} m/s")
+                    set_text(self._txt_cut_vel, fmt_f_unit(cut_vel, "m/s", ndigits=2))
                 if self._txt_posdiff is not None:
-                    self._txt_posdiff.setText(f"{posdiff:.2f} m")
-            tail = getattr(snap, "plc_uplink_tail", {}) or {}
-            if not isinstance(tail, dict):
-                tail = {}
+                    set_text(self._txt_posdiff, fmt_f_unit(posdiff, "m", ndigits=2))
+
             # CutTime comes from DenSi/PLC tail token (SystemTime).
             # Policy: HiP does **not** freeze it; DenSi is authoritative for when it advances.
-            t_tok = str(tail.get("SystemTime", "") or "")
+            t_tok = self._raw_tail_token(snap, "SystemTime")
             if self._txt_cut_time is not None:
-                self._txt_cut_time.setText(t_tok if t_tok else "--")
-
+                set_text(self._txt_cut_time, t_tok if t_tok else "--")
         except Exception:
             pass
 
-        # --- slider indicators ---
-        vel_max = float(params.get("VelMax", 0.0) or 0.0)
+
+    def _render_axis_slider_indicators(self, ax, pos: float, vel_meas: float, params: dict) -> None:
+        """Update axis slider indicators (commanded vel and position within limits)."""
+        # VelMax is used as slider range. Guard against invalid/zero values.
+        try:
+            vel_max = float(params.get("VelMax", 0.0) or 0.0)
+        except Exception:
+            vel_max = 0.0
         if vel_max <= 0.0:
             vel_max = 1.0
+
         # commanded speed is provided by core as AxisTelemetry.vel_cmd (fallback: measured vel)
-        vel_cmd = float(getattr(ax, "vel_cmd", vel) if ax is not None else vel)
+        try:
+            vel_cmd = float(getattr(ax, "vel_cmd", vel_meas) if ax is not None else vel_meas)
+        except Exception:
+            vel_cmd = vel_meas
+
         if self._sld_vel_cmd is not None:
             scale = 1000.0  # m/s -> mm/s
             self._sld_vel_cmd.blockSignals(True)
@@ -1442,10 +1515,17 @@ class HiPController:
             self._sld_vel_cmd.setValue(int(round(vel_cmd * scale)))
             self._sld_vel_cmd.blockSignals(False)
 
-        user_min = float(params.get("UserMin", 0.0) or 0.0)
-        user_max = float(params.get("UserMax", 0.0) or 0.0)
+        try:
+            user_min = float(params.get("UserMin", 0.0) or 0.0)
+        except Exception:
+            user_min = 0.0
+        try:
+            user_max = float(params.get("UserMax", 0.0) or 0.0)
+        except Exception:
+            user_max = 0.0
         if user_max < user_min:
             user_min, user_max = user_max, user_min
+
         if self._sld_limit_range is not None:
             scale = 1000.0  # m -> mm
             self._sld_limit_range.blockSignals(True)
@@ -1454,22 +1534,27 @@ class HiPController:
             self._sld_limit_range.setValue(int(round(pos * scale)))
             self._sld_limit_range.blockSignals(False)
 
-
-        # --- guider slider indicators (mirror axis sliders) ---
+    def _render_guider_indicators(self, params: dict, snap: TelemetrySnapshot) -> None:
+        """Update guider range + speed readouts and sliders."""
         # limits derived from guider params (PosMin/PosMax), position from GuidePosIst if available
-        g_pos_min = float(params.get("PosMin", 0.0) or 0.0)
-        g_pos_max = float(params.get("PosMax", 0.0) or 0.0)
+        try:
+            g_pos_min = float(params.get("PosMin", 0.0) or 0.0)
+        except Exception:
+            g_pos_min = 0.0
+        try:
+            g_pos_max = float(params.get("PosMax", 0.0) or 0.0)
+        except Exception:
+            g_pos_max = 0.0
         if g_pos_max < g_pos_min:
             g_pos_min, g_pos_max = g_pos_max, g_pos_min
 
         # Guider position: prefer decoded param, fallback to raw PLC uplink field if present
-        g_pos = float(params.get("GuidePosIst", 0.0) or 0.0)
         try:
-            raw = getattr(snap, "plc_uplink_fields", None)
-            if (g_pos == 0.0) and isinstance(raw, dict) and ("GuidePosIstUI" in raw):
-                g_pos = float(raw.get("GuidePosIstUI", "0") or 0.0)
+            g_pos = float(params.get("GuidePosIst", 0.0) or 0.0)
         except Exception:
-            pass
+            g_pos = 0.0
+        if g_pos == 0.0:
+            g_pos = self._raw_uplink_float(snap, "GuidePosIstUI", g_pos)
 
         if self._sld_guider_range is not None:
             scale = 1000.0  # m -> mm
@@ -1478,7 +1563,6 @@ class HiPController:
             self._sld_guider_range.setMaximum(int(round(g_pos_max * scale)))
             self._sld_guider_range.setValue(int(round(g_pos * scale)))
             self._sld_guider_range.blockSignals(False)
-
 
         # Guider range readouts
         try:
@@ -1496,18 +1580,28 @@ class HiPController:
         #   v_rope = omega * (pi*D)
         #   v_guide = omega * pitch
         # => v_guide = v_rope * pitch / (pi*D)
+        try:
+            vel_max = float(params.get("VelMax", 0.0) or 0.0)
+        except Exception:
+            vel_max = 0.0
+        if vel_max <= 0.0:
+            vel_max = 1.0
+
         drum_diam = 0.5  # meters
-        pitch = float(params.get("Pitch", 0.0) or 0.0)  # meters per revolution
+        try:
+            pitch = float(params.get("Pitch", 0.0) or 0.0)  # meters per revolution
+        except Exception:
+            pitch = 0.0
+
         denom = math.pi * drum_diam
         ratio = (pitch / denom) if (denom > 0.0 and pitch > 0.0) else 0.0
 
-        g_vel_meas = float(params.get("GuideIstSpeed", 0.0) or 0.0)
         try:
-            raw = getattr(snap, "plc_uplink_fields", None)
-            if (g_vel_meas == 0.0) and isinstance(raw, dict) and ("GuideIstSpeedUI" in raw):
-                g_vel_meas = float(raw.get("GuideIstSpeedUI", "0") or 0.0)
+            g_vel_meas = float(params.get("GuideIstSpeed", 0.0) or 0.0)
         except Exception:
-            pass
+            g_vel_meas = 0.0
+        if g_vel_meas == 0.0:
+            g_vel_meas = self._raw_uplink_float(snap, "GuideIstSpeedUI", g_vel_meas)
 
         g_vel_max = abs(vel_max) * ratio
         if g_vel_max <= 0.0:
@@ -1527,14 +1621,12 @@ class HiPController:
             self._sld_guider_speed.setValue(int(round(g_vel_meas * scale)))
             self._sld_guider_speed.blockSignals(False)
 
-
         # Guider speed readout (measured)
         try:
             if self._txt_guider_speed is not None:
                 self._txt_guider_speed.setText(f"{g_vel_meas:.3f} m/s")
         except Exception:
             pass
-
     def _render_tick_delta(self, snap: TelemetrySnapshot) -> None:
         """Render legacy TimeTick into txt_tick (delta of device_tick)."""
         if self._txt_tick is None:
@@ -1542,20 +1634,20 @@ class HiPController:
 
         axis_id = self._selected_axis or self._fixed_axis
         if not axis_id:
-            self._txt_tick.setText("--")
+            set_text(self._txt_tick, "--")
             self._prev_device_tick = None
             return
 
         axes = getattr(snap, "axes", None)
         if not isinstance(axes, dict):
             log.info("HiP tick: snap.axes not dict (%s) -> %r", type(axes).__name__, axes)
-            self._txt_tick.setText("--")
+            set_text(self._txt_tick, "--")
             self._prev_device_tick = None
             return
 
         ax = axes.get(axis_id)
         if ax is None:
-            self._txt_tick.setText("--")
+            set_text(self._txt_tick, "--")
             self._prev_device_tick = None
             return
 
@@ -1564,7 +1656,7 @@ class HiPController:
             cur = int(cur_raw)
         except Exception:
             log.info("HiP tick: axis %s device_tick not int-coercible: %r", axis_id, cur_raw)
-            self._txt_tick.setText("--")
+            set_text(self._txt_tick, "--")
             self._prev_device_tick = None
             return
 
@@ -1629,27 +1721,16 @@ class HiPController:
                 axis_id = next(iter(axes.keys()))
             except Exception:
                 axis_id = "X"
-
-        for spec in ESTOP_SPECS.values():
-            if not spec.dot:
-                continue
-            v = bool(logical.get(spec.key, False))
-
-            if spec.key in ("brk1_ok", "brk2_ok"):
-                disp_ok = self._brake_ok_display(brk_ok_raw=v, taster=taster, axis_id=axis_id)
-                state = "good" if disp_ok else "bad"
-
-            elif spec.key == "brk2kb_ok":
-                state = "good" if v else "bad"
-
-            elif spec.key in ESTOP_CAUSE_KEYS:
-                state = "bad" if v else "good"
-            elif spec.key in ESTOP_OK_KEYS:
-                state = "good" if v else "bad"
-            else:
-                state = "warn" if v else None
-
-            self._set_led_by_name(spec.dot, state=state)
+        states = compute_estop_dot_states(
+            bits=logical,
+            taster=taster,
+            specs=ESTOP_SPECS.values(),
+            brake_ok_display=lambda raw: self._brake_ok_display(
+                brk_ok_raw=raw, taster=taster, axis_id=axis_id
+            ),
+        )
+        for dot, state in states.items():
+            set_state_by_object_name(self.win, dot, state)
 
     # ---------- axis selection / claims ----------
 
