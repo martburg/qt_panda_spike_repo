@@ -56,6 +56,7 @@ from .bindings import YellowBindings
 from .ports import IntentOut, TelemetryIn
 from .param_txn import ParamEditTxnClient
 from .widget_cache import WidgetCache
+from .ui_watchdog import PerfWatchdog
 from .ui_contract import log_missing_optional_once
 from .ui_update import set_checked, set_enabled, set_state_by_object_name, set_state_property, set_text, update_slider
 from .ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
@@ -214,6 +215,7 @@ class HiPController:
 
         # Cached widget lookup (prevents repeated findChild() in hot paths)
         self._wcache = WidgetCache(self.win)
+        self._wd = PerfWatchdog(log, name='hi_p')
         # Estop diagnostics checkboxes (read-only in HiP).
         self._estop_checks: dict[str, QCheckBox] = {}
         for spec in ESTOP_SPECS.values():
@@ -1019,91 +1021,95 @@ class HiPController:
         t.timeout.connect(self.poll_once)
         t.start()
         self._timer = t
-
     def poll_once(self) -> None:
-        snaps = self.telemetry_in.drain_telemetry(limit=50)
-        now_ns = time.monotonic_ns()
+        with self._wd.tick():
+            snaps = self.telemetry_in.drain_telemetry(limit=50)
+            self._wd.mark('rx')
+            now_ns = time.monotonic_ns()
 
-        self._retry_pending(now_ns)
+            self._retry_pending(now_ns)
+            self._wd.mark('retry')
 
-        if not snaps:
-            if self._last_rx_ns is not None:
-                age_ms = (now_ns - self._last_rx_ns) / 1_000_000.0
-                if age_ms >= float(self.stale_after_ms):
-                    self._last_rx_ns = None
-                    self._mark_disconnected()
-            self._emit_status(now_ns)
-            return
-
-        for _s in snaps:
-            self._handle_core_acks(_s)
-
-        snap = snaps[-1]
-        self._last_rx_ns = now_ns
-
-        try:
-            self._update_axis_combo(snap)
-            # In pooled mode we ignore telemetry rendering until user attaches to a device.
-            if not self._attached_axis():
+            if not snaps:
+                if self._last_rx_ns is not None:
+                    age_ms = (now_ns - self._last_rx_ns) / 1_000_000.0
+                    if age_ms >= float(self.stale_after_ms):
+                        self._last_rx_ns = None
+                        self._mark_disconnected()
                 self._emit_status(now_ns)
                 return
 
+            for _s in snaps:
+                self._handle_core_acks(_s)
 
-            if not self._seen_first_telem:
-                log.info("rx first telemetry: tick=%s estop=%s fault=%s", getattr(snap, "tick", None), getattr(snap, "estop", None), getattr(snap, "fault", None))
-                self._seen_first_telem = True
+            snap = snaps[-1]
+            self._wd.mark('acks')
+            self._last_rx_ns = now_ns
 
-            self._render_tick_delta(snap)
-            self._render_live_readouts(snap)
-            self._render_drive_status(snap)
-            self._render_estop(snap)
-            self._render_params_and_edit_state(snap)
-            self._tx_lifetick_echo(snap)
-
-            self._hb.inc("rx_telem", len(snaps))
-            mode_v = str(getattr(snap, "mode", ""))
-            estop_v = bool(getattr(snap, "estop", False))
-            fault_v = bool(getattr(snap, "fault", False))
-            # Cache for status emitter and UI gating
-            self._last_mode = mode_v
-            self._last_estop = estop_v
-            self._last_fault = fault_v
-
-            # Determine SafetyPLC ladder state (banner estate) from EStopStatus word.
             try:
-                axis_id_for_estate = (self._selected_axis or self._fixed_axis or "").strip()
-                if (not axis_id_for_estate) or (axis_id_for_estate == NOT_ATTACHED):
-                    axes_map = getattr(snap, "axes", {}) or {}
-                    if isinstance(axes_map, dict) and axes_map:
-                        axis_id_for_estate = next(iter(axes_map.keys()))
-                word = _parse_estop_word_from_snapshot(snap)
-                self._last_estate = self._banner_estate_from_word(axis_id=axis_id_for_estate or "X", word=word)
-            except Exception:
-                self._last_estate = "ESTOP"
+                self._update_axis_combo(snap)
+                # In pooled mode we ignore telemetry rendering until user attaches to a device.
+                if not self._attached_axis():
+                    self._emit_status(now_ns)
+                    return
 
-            # Fine-tuning: HiP ReSync is only allowed when the *system* is idle:
-            # - Core rig mode is IDLE
-            # - SafetyPLC ladder estate is IDLE (Schuetz OK, Taster released, no trip)
-            if self._btn_diag_resync is not None:
+                if not self._seen_first_telem:
+                    log.info("rx first telemetry: tick=%s estop=%s fault=%s", getattr(snap, "tick", None), getattr(snap, "estop", None), getattr(snap, "fault", None))
+                    self._seen_first_telem = True
+
+                self._render_tick_delta(snap)
+                self._render_live_readouts(snap)
+                self._render_drive_status(snap)
+                self._render_estop(snap)
+                self._render_params_and_edit_state(snap)
+                self._tx_lifetick_echo(snap)
+                self._wd.mark('render')
+
+                self._hb.inc("rx_telem", len(snaps))
+                mode_v = str(getattr(snap, "mode", ""))
+                estop_v = bool(getattr(snap, "estop", False))
+                fault_v = bool(getattr(snap, "fault", False))
+                # Cache for status emitter and UI gating
+                self._last_mode = mode_v
+                self._last_estop = estop_v
+                self._last_fault = fault_v
+
+                # Determine SafetyPLC ladder state (banner estate) from EStopStatus word.
                 try:
-                    self._btn_diag_resync.setEnabled((mode_v.upper() == "IDLE") and (str(getattr(self, "_last_estate", "")).upper() == "IDLE") and (not self._modal_locked))
+                    axis_id_for_estate = (self._selected_axis or self._fixed_axis or "").strip()
+                    if (not axis_id_for_estate) or (axis_id_for_estate == NOT_ATTACHED):
+                        axes_map = getattr(snap, "axes", {}) or {}
+                        if isinstance(axes_map, dict) and axes_map:
+                            axis_id_for_estate = next(iter(axes_map.keys()))
+                    word = _parse_estop_word_from_snapshot(snap)
+                    self._last_estate = self._banner_estate_from_word(axis_id=axis_id_for_estate or "X", word=word)
                 except Exception:
-                    pass
-            if self._ch.changed("mode", mode_v):
-                log.info("mode=%s", mode_v)
-            if self._ch.changed("estop", estop_v):
-                log.info("estop=%s", estop_v)
-            if self._ch.changed("fault", fault_v):
-                log.info("fault=%s", fault_v)
-            self._hb.set("tick", int(getattr(snap, "tick", 0) or 0))
-            self._hb.set("mode", mode_v)
-            self._hb.set("estop", estop_v)
-            self._hb.set("fault", fault_v)
-            if self._selected_axis:
-                self._hb.set("axis", self._selected_axis)
-            self._hb.emit(log)
-        except Exception:
-            rl_log_exc("hip.poll_once", "HiP poll_once crashed (continuing).", logger=log, level="error")
+                    self._last_estate = "ESTOP"
+
+                # Fine-tuning: HiP ReSync is only allowed when the *system* is idle:
+                # - Core rig mode is IDLE
+                # - SafetyPLC ladder estate is IDLE (Schuetz OK, Taster released, no trip)
+                if self._btn_diag_resync is not None:
+                    try:
+                        self._btn_diag_resync.setEnabled((mode_v.upper() == "IDLE") and (str(getattr(self, "_last_estate", "")).upper() == "IDLE") and (not self._modal_locked))
+                    except Exception:
+                        pass
+                if self._ch.changed("mode", mode_v):
+                    log.info("mode=%s", mode_v)
+                if self._ch.changed("estop", estop_v):
+                    log.info("estop=%s", estop_v)
+                if self._ch.changed("fault", fault_v):
+                    log.info("fault=%s", fault_v)
+                self._hb.set("tick", int(getattr(snap, "tick", 0) or 0))
+                self._hb.set("mode", mode_v)
+                self._hb.set("estop", estop_v)
+                self._hb.set("fault", fault_v)
+                if self._selected_axis:
+                    self._hb.set("axis", self._selected_axis)
+                self._hb.emit(log)
+                self._wd.mark('hb')
+            except Exception:
+                rl_log_exc("hip.poll_once", "HiP poll_once crashed (continuing).", logger=log, level="error")
 
     # ---------- render logic ----------
 

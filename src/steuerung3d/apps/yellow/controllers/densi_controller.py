@@ -48,6 +48,7 @@ from steuerung3d.protocol.estop_bits import (
 from .bindings import YellowBindings
 from .ports import CommandIn, TelemetryOut
 from .widget_cache import WidgetCache
+from .ui_watchdog import PerfWatchdog
 from .ui_contract import log_missing_optional_once
 from .ui_update import set_checked, set_enabled, set_state_by_object_name, set_state_property, set_text, update_slider
 from .ui_estop import (
@@ -172,6 +173,7 @@ class DenSiController:
 
         # Cached widget lookup (prevents repeated findChild() in hot paths)
         self._wcache = WidgetCache(self.win)
+        self._wd = PerfWatchdog(log, name='den_si')
         # Device-side TimeTick display:
         # show (lifetick_tx - lifetick_rx) in milliseconds (WORD wrap).
         self._txt_tick: QLineEdit | None = self.win.findChild(QLineEdit, "txt_tick")
@@ -1869,35 +1871,37 @@ class DenSiController:
                 pass
 
     def step_once(self) -> None:
-        # Phase 1: RX command frames / defaults
-        self._rx_command_frames()
-        self._ensure_last_cmd()
-
-        # Phase 2: connection state, header dots, and edge logs
-        self._update_l0_connection_state()
-        self._render_header_online_dot()
-        self._edge_log_cmd_changes()
-
-        # Phase 3: derive inputs used for device-local policies
-        _estop_word0, reset_able, ready_for_sollvel = self._derive_estop_inputs()
-        moving = self._compute_moving_guard()
-
-        # Phase 4: downlink one-shots / parameter ops
-        self._handle_estop_reset_cmd(reset_able)
-        self._handle_resync_cmd()
-        self._handle_gui_not_halt_cmd()
-        self._apply_param_ops(ready_for_sollvel=ready_for_sollvel, moving=moving)
-
-        # Phase 5: authoritative ladder + estop word refresh / dots
-        estop_word, bits = self._apply_safety_and_refresh_estop_word()
-        estop_edge = self._render_estop_and_compute_edge(bits, estop_word)
-
-        # Phase 6: plant step, cut latching, clamp, and tick advance
-        self._step_plant_with_clamp()
-        self._maybe_latch_cut_markers(estop_edge)
-        self._apply_estop_clamp_to_state()
-        self._advance_tick()
-
-        # Phase 7: local UI + telemetry publish
-        self._post_tick_ui_updates()
-        self._publish_telemetry_and_heartbeat()
+        with self._wd.tick():
+            # Phase 1: RX command frames / defaults
+            self._rx_command_frames()
+            self._ensure_last_cmd()
+            self._wd.mark('rx_cmd')
+                        # Phase 2: connection state, header dots, and edge logs
+            self._update_l0_connection_state()
+            self._render_header_online_dot()
+            self._edge_log_cmd_changes()
+            self._wd.mark('conn_hdr')
+                        # Phase 3: derive inputs used for device-local policies
+            _estop_word0, reset_able, ready_for_sollvel = self._derive_estop_inputs()
+            moving = self._compute_moving_guard()
+            self._wd.mark('derive')
+                        # Phase 4: downlink one-shots / parameter ops
+            self._handle_estop_reset_cmd(reset_able)
+            self._handle_resync_cmd()
+            self._handle_gui_not_halt_cmd()
+            self._apply_param_ops(ready_for_sollvel=ready_for_sollvel, moving=moving)
+            self._wd.mark('ops')
+                        # Phase 5: authoritative ladder + estop word refresh / dots
+            estop_word, bits = self._apply_safety_and_refresh_estop_word()
+            estop_edge = self._render_estop_and_compute_edge(bits, estop_word)
+            self._wd.mark('safety')
+                        # Phase 6: plant step, cut latching, clamp, and tick advance
+            self._step_plant_with_clamp()
+            self._maybe_latch_cut_markers(estop_edge)
+            self._apply_estop_clamp_to_state()
+            self._advance_tick()
+            self._wd.mark('plant')
+                        # Phase 7: local UI + telemetry publish
+            self._post_tick_ui_updates()
+            self._publish_telemetry_and_heartbeat()
+            self._wd.mark('publish')
