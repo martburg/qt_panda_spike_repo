@@ -33,9 +33,6 @@ from PySide6.QtWidgets import (
 from steuerung3d.core.intents import (
     ClaimAxis,
     EchoLifeTick,
-    ParamCancel,
-    ParamEditBegin,
-    ParamWrite,
     ReleaseAxis,
     RequestEstopReset,
     RequestResync,
@@ -57,6 +54,7 @@ except Exception:  # pragma: no cover
 
 from .bindings import YellowBindings
 from .ports import IntentOut, TelemetryIn
+from .param_txn import ParamEditTxnClient
 from .ui_update import set_state_by_object_name, set_text
 from .ui_estop import (
     age_to_online_state,
@@ -65,6 +63,7 @@ from .ui_estop import (
 )
 from .ui_banner import BANNER_COLORS, derive_banner_estate_from_word
 from .ui_format import fmt_f_unit, fmt_i_unit
+from .yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 
 # NOTE: You MUST have this decoder somewhere in your codebase.
 # If the import path differs, adjust it here.
@@ -78,48 +77,9 @@ except Exception:  # pragma: no cover
 
 log = logging.getLogger("hi_p")
 
-# v0.1 axis-agnostic parameter wiring (UI widget names -> param keys)
-_PARAM_WIDGETS: dict[str, dict[str, str]] = {
-    "pos": {
-        "HardMax": "txtHardMax_2",
-        "UserMax": "txtUserMax_2",
-        "UserMin": "txtUserMin_2",
-        "HardMin": "txtHardMin_2",
-        "PosWin": "txtPosWin_2",
-    },
-    "vel": {
-        "VelMax": "txtVelMax_3",
-        "VelWin": "txtVelWin_3",
-        "AccMax": "txtAccMax_3",
-        "AccMove": "txtAccMove_3",
-        "DccMax": "txtDccMax_3",
-        "MaxAmp": "txtMaxAmp_3",
-        "VelMaxMot": "txtVelMaxMot_3",
-    },
-    "filter": {
-        "P": "txtP_2",
-        "I": "txtI_2",
-        "D": "txtD_2",
-        "IL": "txtIL_2",
-        "RampForm": "txtRamp_2",
-    },
-    "guider": {
-        "PosMin": "txtGPosMin_3",
-        "PosMax": "txtGPosMax_2",
-        "Pitch": "txtPitch_2",
-    },
-}
-
 # Axis selection sentinel for pooled HiP panels
 NOT_ATTACHED = "NotAttached"
 
-# Compact limit display fields in the header bar (meters)
-_LIMIT_WIDGETS: dict[str, str] = {
-    "HardMin": "txtLimitHardMin",
-    "UserMin": "txtLimitUserMin",
-    "UserMax": "txtLimitUserMax",
-    "HardMax": "txtLimitHardMax",
-}
 def _parse_estop_word_from_snapshot(snap: TelemetrySnapshot) -> int:
     # Prefer raw field if present (string), fallback to typed field.
     fields = getattr(snap, "plc_uplink_fields", None)
@@ -215,11 +175,13 @@ class HiPController:
         # --- Observability (logging + optional supervisor heartbeat) ---
         self._init_observability()
 
+        # --- Parameter edit & transactional intents bookkeeping ---
+        # Must be initialized before _init_axis_selection(): the unattached UI
+        # reset path may touch param-transaction state.
+        self._init_param_txn_state()
+
         # --- Axis attachment / pooled UI behaviour ---
         self._init_axis_selection()
-
-        # --- Parameter edit & transactional intents bookkeeping ---
-        self._init_param_txn_state()
 
         # --- Wire signals (buttons, combo-box, etc.) ---
         self._wire_signals()
@@ -349,12 +311,8 @@ class HiPController:
 
     def _init_param_txn_state(self) -> None:
         """Initialize parameter edit state and transactional resend bookkeeping."""
-        # Local edit state (mirrors telemetry but must be safe at startup)
-        self._local_edit_active: bool = False
-        self._local_edit_group: str = ""
-
-        # After write/cancel, ignore remote edit flags briefly to avoid UI flicker
-        self._ignore_remote_edit_until_ns: int = 0
+        # Qt-free transactional helper (req_id/session_id bookkeeping + resends)
+        self._param_txn = ParamEditTxnClient(hip_id=self._hip_id)
 
         # Param commit observation dialog (Option A: show only after applied/timeout)
         self._pending_commit_req_id: str = ""
@@ -366,12 +324,7 @@ class HiPController:
         self._taster_prev: dict[str, bool] = {}
         self._taster_pressed_s: dict[str, float] = {}
 
-        # HIP<->Core transactional param intents (best-effort reliability)
-        self._req_seq: int = 0
-        self._session_by_group: dict[str, str] = {}
-        self._pending_txn: dict[str, dict] = {}
-        self._resend_after_ms: int = 250
-        self._max_retries: int = 8
+
 
     def _wire_signals(self) -> None:
         """Connect UI actions to intent transmissions."""
@@ -516,13 +469,17 @@ class HiPController:
                     pass
 
             # Ensure param edit UI is not in edit mode
-            self._local_edit_active = False
-            self._local_edit_group = ""
+            txn = getattr(self, "_param_txn", None)
+            if txn is not None:
+                try:
+                    txn.reset_local()
+                except Exception:
+                    pass
             self._apply_param_ui_state(edit_active=False, edit_group="")
 
         else:
             # Restore param button availability to whatever our local state is
-            self._apply_param_ui_state(edit_active=self._local_edit_active, edit_group=self._local_edit_group)
+            self._apply_param_ui_state(edit_active=self._param_txn.local_edit_active, edit_group=self._param_txn.local_edit_group)
 
     def _set_all_estop_unknown(self) -> None:
         for spec in ESTOP_SPECS.values():
@@ -697,23 +654,19 @@ class HiPController:
         axis = self._require_attached()
         if axis is None:
             return
-        self._local_edit_active = True
-        self._local_edit_group = group
+
+        self._param_txn.start_local_edit(group)
         self._apply_param_ui_state(edit_active=True, edit_group=group)
 
-        session_id = f"sess-{group}-{int(time.monotonic()*1000)}"
-        self._session_by_group[group] = session_id
-        req_id = self._next_req_id()
-
-        intent = ParamEditBegin(
-            axis_id=axis,
-            hip_id=self._hip_id,
-            group=group,
-            req_id=req_id,
-            session_id=session_id,
+        intent = self._param_txn.make_begin_intent(axis_id=axis, group=group)
+        log.info(
+            "tx intent: %s group=%s req_id=%s session=%s",
+            type(intent).__name__,
+            group,
+            intent.req_id,
+            intent.session_id,
         )
-        log.info("tx intent: %s group=%s req_id=%s session=%s", type(intent).__name__, group, req_id, session_id)
-        self._send_txn_intent(intent, group=group, kind="begin")
+        self._param_txn.send(intent, group=group, kind="begin", publish=self.intent_out.publish_intent)
 
     def _tx_param_write(self, group: str) -> None:
         axis = self._require_attached()
@@ -732,6 +685,7 @@ class HiPController:
             self._write_back_values(group, fixed)
 
             if group == "pos":
+
                 def _fmt(x: float) -> str:
                     return f"{float(x):g}"
 
@@ -746,108 +700,47 @@ class HiPController:
                         "The rule HardMax ≥ UserMax ≥ UserMin ≥ HardMin was enforced.\n\n" + "\n".join(lines),
                     )
 
-        session_id = self._ensure_session(group)
-        req_id = self._next_req_id()
-        intent = ParamWrite(
-            axis_id=axis,
-            hip_id=self._hip_id,
-            group=group,
-            values=fixed,
-            req_id=req_id,
-            session_id=session_id,
-        )
-        self._send_txn_intent(intent, group=group, kind="write")
+        intent = self._param_txn.make_write_intent(axis_id=axis, group=group, values=fixed)
+        self._param_txn.send(intent, group=group, kind="write", publish=self.intent_out.publish_intent)
 
-        self._pending_commit_req_id = req_id
+        # Track the commit observation (telemetry confirms via param_commit_* fields)
+        self._pending_commit_req_id = intent.req_id
         self._pending_commit_group = group
         self._pending_commit_values = dict(fixed)
 
-        self._local_edit_active = False
-        self._local_edit_group = ""
-        self._ignore_remote_edit_until_ns = time.monotonic_ns() + 800_000_000
+        self._param_txn.end_local_edit()
         self._apply_param_ui_state(edit_active=False, edit_group="")
 
     def _tx_param_cancel(self, group: str) -> None:
         axis = self._require_attached()
         if axis is None:
             return
-        session_id = self._ensure_session(group)
-        req_id = self._next_req_id()
-        intent = ParamCancel(
-            axis_id=axis,
-            hip_id=self._hip_id,
-            group=group,
-            req_id=req_id,
-            session_id=session_id,
-        )
-        self._send_txn_intent(intent, group=group, kind="cancel")
+        intent = self._param_txn.make_cancel_intent(axis_id=axis, group=group)
+        self._param_txn.send(intent, group=group, kind="cancel", publish=self.intent_out.publish_intent)
 
-        self._local_edit_active = False
-        self._local_edit_group = ""
-        self._ignore_remote_edit_until_ns = time.monotonic_ns() + 800_000_000
+        self._param_txn.end_local_edit()
         self._apply_param_ui_state(edit_active=False, edit_group="")
 
     # ---------- HIP<->Core transactional helpers ----------
 
-    def _next_req_id(self) -> str:
-        self._req_seq += 1
-        return f"hip-{self._req_seq:06d}"
-
-    def _ensure_session(self, group: str) -> str:
-        sid = self._session_by_group.get(group)
-        if not sid:
-            sid = f"sess-{group}-{int(time.monotonic()*1000)}"
-            self._session_by_group[group] = sid
-        return sid
-
-    def _send_txn_intent(self, intent, *, group: str, kind: str = "") -> None:
-        req_id = getattr(intent, "req_id", "")
-        if req_id:
-            self._pending_txn[req_id] = {
-                "intent": intent,
-                "group": group,
-                "kind": kind,
-                "sent_ns": time.monotonic_ns(),
-                "retries": 0,
-            }
-        self.intent_out.publish_intent(intent)
-
     def _handle_core_acks(self, snap: TelemetrySnapshot) -> None:
-        acks = getattr(snap, "core_acks", []) or []
-        for rid in list(acks):
-            if rid in self._pending_txn:
-                self._pending_txn.pop(rid, None)
-                log.info("core ack: %s", rid)
+        removed = self._param_txn.handle_core_acks(getattr(snap, "core_acks", []) or [])
+        for rid in removed:
+            log.info("core ack: %s", rid)
 
-        self._apply_param_ui_state(edit_active=self._local_edit_active, edit_group=self._local_edit_group)
+        self._apply_param_ui_state(edit_active=self._param_txn.local_edit_active, edit_group=self._param_txn.local_edit_group)
 
     def _retry_pending(self, now_ns: int) -> None:
-        if not self._pending_txn:
-            return
-        resend_after_ns = int(self._resend_after_ms) * 1_000_000
-        for rid, info in list(self._pending_txn.items()):
-            sent_ns = int(info.get("sent_ns", 0))
-            retries = int(info.get("retries", 0))
-            if now_ns - sent_ns < resend_after_ns:
-                continue
-            if retries >= self._max_retries:
-                log.error("txn give up: %s after %s retries (%s)", rid, retries, type(info.get("intent")).__name__)
-                self._pending_txn.pop(rid, None)
-                continue
-            intent = info.get("intent")
-            info["retries"] = retries + 1
-            info["sent_ns"] = now_ns
-            log.warning("txn resend: %s retry=%s %s", rid, info["retries"], type(intent).__name__ if intent else "<?>")
-            if intent is not None:
-                self.intent_out.publish_intent(intent)
+        events = self._param_txn.retry_pending(now_ns, publish=self.intent_out.publish_intent)
+        for ev in events:
+            if ev.action == "giveup":
+                log.error("txn give up: %s after %s retries (%s)", ev.req_id, ev.retries, ev.intent_type)
+            else:
+                log.warning("txn resend: %s retry=%s %s", ev.req_id, ev.retries, ev.intent_type)
 
     def _is_group_busy(self, group: str) -> bool:
-        for info in getattr(self, '_pending_txn', {}).values():
-            if info.get("group") != group:
-                continue
-            if str(info.get("kind") or "") in ("write", "cancel"):
-                return True
-        return False
+        return self._param_txn.is_group_busy(group)
+
 
     # ----- modal lock helpers -----
 
@@ -986,7 +879,7 @@ class HiPController:
         if not isinstance(params, dict) or not params:
             return
 
-        freeze_group = self._local_edit_group if self._local_edit_active else ""
+        freeze_group = self._param_txn.local_edit_group if self._param_txn.local_edit_active else ""
 
         for grp, mapping in _PARAM_WIDGETS.items():
             if freeze_group and grp == freeze_group:
@@ -1014,17 +907,16 @@ class HiPController:
         self._render_params_from_telemetry(snap)
         self._maybe_show_param_commit_dialog(snap)
 
-        if self._local_edit_active:
-            self._apply_param_ui_state(edit_active=True, edit_group=self._local_edit_group)
+        if self._param_txn.local_edit_active:
+            self._apply_param_ui_state(edit_active=True, edit_group=self._param_txn.local_edit_group)
             return
 
         now_ns = time.monotonic_ns()
-        if now_ns < int(self._ignore_remote_edit_until_ns or 0):
-            edit_active = False
-            edit_group = ""
-        else:
-            edit_active = bool(getattr(snap, "param_edit_active", False))
-            edit_group = str(getattr(snap, "param_edit_group", "") or "")
+        edit_active, edit_group = self._param_txn.effective_remote_edit_state(
+            remote_active=bool(getattr(snap, "param_edit_active", False)),
+            remote_group=str(getattr(snap, "param_edit_group", "") or ""),
+            now_ns=now_ns,
+        )
         self._apply_param_ui_state(edit_active=edit_active, edit_group=edit_group)
 
     def _maybe_show_param_commit_dialog(self, snap: TelemetrySnapshot) -> None:

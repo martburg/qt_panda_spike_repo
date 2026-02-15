@@ -59,6 +59,7 @@ from .ui_banner import (
     derive_banner_estate_from_word,
 )
 from .ui_format import fmt_f_unit, fmt_i_unit
+from .yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 
 import logging
 
@@ -101,45 +102,6 @@ _LT_LOG_EVERY_S = 0.5
 def _lt_should_log(now_s: float, last_s: float) -> bool:
     return (now_s - last_s) >= _LT_LOG_EVERY_S
 
-
-# v0.1 axis-agnostic parameter wiring (UI widget names -> param keys)
-_PARAM_WIDGETS: dict[str, dict[str, str]] = {
-    "pos": {
-        "HardMax": "txtHardMax_2",
-        "UserMax": "txtUserMax_2",
-        "UserMin": "txtUserMin_2",
-        "HardMin": "txtHardMin_2",
-        "PosWin": "txtPosWin_2",
-    },
-    "vel": {
-        "VelMax": "txtVelMax_3",
-        "VelWin": "txtVelWin_3",
-        "AccMax": "txtAccMax_3",
-        "AccMove": "txtAccMove_3",
-        "DccMax": "txtDccMax_3",
-        "MaxAmp": "txtMaxAmp_3",
-        "VelMaxMot": "txtVelMaxMot_3",
-    },
-    "filter": {
-        "P": "txtP_2",
-        "I": "txtI_2",
-        "D": "txtD_2",
-        "IL": "txtIL_2",
-        "RampForm": "txtRamp_2",    },
-    "guider": {
-        "PosMax": "txtGPosMax_2",
-        "PosMin": "txtGPosMin_3",
-        "Pitch": "txtPitch_2",
-    },
-}
-
-# Limit display fields in the header bar (meters)
-_LIMIT_WIDGETS: dict[str, str] = {
-    "HardMin": "txtLimitHardMin",
-    "UserMin": "txtLimitUserMin",
-    "UserMax": "txtLimitUserMax",
-    "HardMax": "txtLimitHardMax",
-}
 
 
 @dataclass
