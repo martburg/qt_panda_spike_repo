@@ -75,6 +75,30 @@ def set_enabled(widget: Optional[Any], enabled: bool) -> None:
         return
 
 
+def set_enabled_repolish(widget: Optional[Any], enabled: bool) -> None:
+    """Set enabled state and repolish the widget, but only on change.
+
+    Some Yellow UI variants rely on QSS rules that combine dynamic properties
+    (e.g. paramField) with enabled/disabled state. Qt will usually restyle
+    correctly on enable changes, but repolishing here is a cheap, safe guard.
+    """
+    if widget is None:
+        return
+    try:
+        cur = bool(widget.isEnabled())  # type: ignore[attr-defined]
+        en = bool(enabled)
+        if cur == en:
+            return
+        widget.setEnabled(en)  # type: ignore[attr-defined]
+        # Repolish is intentionally only done when enabled state changed.
+        try:
+            _repolish(widget)  # type: ignore[arg-type]
+        except Exception:
+            pass
+    except Exception:
+        return
+
+
 def set_checked(widget: Optional[Any], checked: bool, *, block_signals: bool = False) -> None:
     """Set QAbstractButton/QCheckBox checked state only if it differs.
 

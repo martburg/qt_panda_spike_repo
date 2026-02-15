@@ -58,7 +58,15 @@ from .param_txn import ParamEditTxnClient
 from .widget_cache import WidgetCache
 from .ui_watchdog import PerfWatchdog
 from .ui_contract import log_missing_optional_once
-from .ui_update import set_checked, set_enabled, set_state_by_object_name, set_state_property, set_text, update_slider
+from .ui_update import (
+    set_checked,
+    set_enabled,
+    set_enabled_repolish,
+    set_state_by_object_name,
+    set_state_property,
+    set_text,
+    update_slider,
+)
 from .ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
 from .ui_estop import (
     age_to_online_state,
@@ -233,6 +241,12 @@ class HiPController:
 
         # Axis selection UI (only present in pooled HiP variants)
         self._cmb_axis: QComboBox | None = self.win.findChild(QComboBox, "cmb_axis")
+
+        # Main tab widget (used for attach/param modal lock). Cache once.
+        try:
+            self._tabs_main: QTabWidget | None = self._wcache.get(QTabWidget, "tabsMain")
+        except Exception:
+            self._tabs_main = self.win.findChild(QTabWidget, "tabsMain")
 
         # Legacy tick delta display
         self._txt_tick: QLineEdit | None = self.win.findChild(QLineEdit, "txt_tick")
@@ -427,7 +441,7 @@ class HiPController:
 
         Everything is disabled when unattached, except cmb_axis so the user can attach.
         """
-        tabs = self.win.findChild(QTabWidget, "tabsMain")
+        tabs = getattr(self, "_tabs_main", None)
 
         if tabs is not None:
             if not attached:
@@ -616,7 +630,7 @@ class HiPController:
             set_text(le, txt)
             le.blockSignals(was)
             try:
-                le.setEnabled(False)
+                set_enabled(le, False)
             except Exception:
                 pass
 
@@ -769,19 +783,19 @@ class HiPController:
     # ----- modal lock helpers -----
 
     def _set_modal_param_lock(self, *, active: bool, group: str) -> None:
-        tabs = self.win.findChild(QTabWidget, "tabsMain")
+        tabs = getattr(self, "_tabs_main", None)
 
         if active and not self._modal_locked:
             self._modal_prev_enabled = {}
 
             if tabs is not None:
                 self._modal_prev_tabbar_enabled = bool(tabs.tabBar().isEnabled())
-                tabs.tabBar().setEnabled(False)
+                set_enabled(tabs.tabBar(), False)
 
             for w in self.win.findChildren(QWidget):
                 if isinstance(w, (QPushButton, QLineEdit)):
                     self._modal_prev_enabled[w] = bool(w.isEnabled())
-                    w.setEnabled(False)
+                    set_enabled(w, False)
 
             allow: list[QWidget] = []
             for _k, obj_name in _PARAM_WIDGETS.get(group, {}).items():
@@ -804,11 +818,10 @@ class HiPController:
                     allow.append(bc)
 
             for w in allow:
-                w.setEnabled(True)
                 if isinstance(w, QLineEdit):
-                    w.style().unpolish(w)
-                    w.style().polish(w)
-                    w.update()
+                    set_enabled_repolish(w, True)
+                else:
+                    set_enabled(w, True)
 
             self._modal_locked = True
             return
@@ -816,17 +829,16 @@ class HiPController:
         if (not active) and self._modal_locked:
             for w, was_enabled in list(self._modal_prev_enabled.items()):
                 try:
-                    w.setEnabled(bool(was_enabled))
                     if isinstance(w, QLineEdit):
-                        w.style().unpolish(w)
-                        w.style().polish(w)
-                        w.update()
+                        set_enabled_repolish(w, bool(was_enabled))
+                    else:
+                        set_enabled(w, bool(was_enabled))
                 except RuntimeError:
                     pass
             self._modal_prev_enabled.clear()
 
             if tabs is not None and self._modal_prev_tabbar_enabled is not None:
-                tabs.tabBar().setEnabled(bool(self._modal_prev_tabbar_enabled))
+                set_enabled(tabs.tabBar(), bool(self._modal_prev_tabbar_enabled))
             self._modal_prev_tabbar_enabled = None
             self._modal_locked = False
 
@@ -838,10 +850,7 @@ class HiPController:
             le = self._find_line_edit(obj_name)
             if le is None:
                 continue
-            le.setEnabled(bool(enabled))
-            le.style().unpolish(le)
-            le.style().polish(le)
-            le.update()
+            set_enabled_repolish(le, bool(enabled))
 
     def _set_param_button_state(self, group: str, *, editing: bool, busy: bool) -> None:
         wiring = {
@@ -857,11 +866,11 @@ class HiPController:
 
         if busy:
             if be is not None:
-                be.setEnabled(False)
+                set_enabled(be, False)
             if bw is not None:
-                bw.setEnabled(False)
+                set_enabled(bw, False)
             if bc is not None:
-                bc.setEnabled(False)
+                set_enabled(bc, False)
             return
 
         # Safety policy: do not allow starting (or committing) parameter edits once the
@@ -871,11 +880,11 @@ class HiPController:
         edits_allowed = estate not in ("ARMED", "READY")
 
         if be is not None:
-            be.setEnabled((not editing) and edits_allowed)
+            set_enabled(be, (not editing) and edits_allowed)
         if bw is not None:
-            bw.setEnabled(bool(editing) and edits_allowed)
+            set_enabled(bw, bool(editing) and edits_allowed)
         if bc is not None:
-            bc.setEnabled(bool(editing))
+            set_enabled(bc, bool(editing))
 
     def _apply_param_ui_state(self, *, edit_active: bool, edit_group: str) -> None:
         groups = ("pos", "vel", "filter", "guider")
@@ -1091,7 +1100,12 @@ class HiPController:
                 # - SafetyPLC ladder estate is IDLE (Schuetz OK, Taster released, no trip)
                 if self._btn_diag_resync is not None:
                     try:
-                        self._btn_diag_resync.setEnabled((mode_v.upper() == "IDLE") and (str(getattr(self, "_last_estate", "")).upper() == "IDLE") and (not self._modal_locked))
+                        set_enabled(
+                            self._btn_diag_resync,
+                            (mode_v.upper() == "IDLE")
+                            and (str(getattr(self, "_last_estate", "")).upper() == "IDLE")
+                            and (not self._modal_locked),
+                        )
                     except Exception:
                         pass
                 if self._ch.changed("mode", mode_v):
@@ -1347,11 +1361,11 @@ class HiPController:
         if self._txt_pos is not None:
             set_text(self._txt_pos, fmt_f_unit(pos, "m", ndigits=2))
         if self._txt_vel is not None:
-            self._txt_vel.setText(f"{vel:.2f} m/s")
+            set_text(self._txt_vel, f"{vel:.2f} m/s")
         if self._txt_amp is not None:
             set_text(self._txt_amp, fmt_i_unit(int(round(amp)), "A"))
         if self._txt_temp is not None:
-            self._txt_temp.setText(f"{int(round(temp))}°")
+            set_text(self._txt_temp, f"{int(round(temp))}°")
 
     def _render_cut_marker_readouts(self, snap: TelemetrySnapshot, params: dict) -> None:
         """Update cut marker readouts (position/velocity/posdiff/time).
@@ -1480,15 +1494,12 @@ class HiPController:
             )
 
         # Guider range readouts
-        try:
-            if self._txt_guider_range_min is not None:
-                self._txt_guider_range_min.setText(f"{g_pos_min:.3f} m")
-            if self._txt_guider_range_max is not None:
-                self._txt_guider_range_max.setText(f"{g_pos_max:.3f} m")
-            if self._txt_guider_range_val is not None:
-                self._txt_guider_range_val.setText(f"{g_pos:.3f} m")
-        except Exception:
-            pass
+        if self._txt_guider_range_min is not None:
+            set_text(self._txt_guider_range_min, f"{g_pos_min:.3f} m")
+        if self._txt_guider_range_max is not None:
+            set_text(self._txt_guider_range_max, f"{g_pos_max:.3f} m")
+        if self._txt_guider_range_val is not None:
+            set_text(self._txt_guider_range_val, f"{g_pos:.3f} m")
 
         # Guider speed slider shows MEASURED guider speed (GuideIstSpeed),
         # but its range is derived from drum max rope speed VelMax + pitch + drum diameter:
@@ -1537,11 +1548,8 @@ class HiPController:
             )
 
         # Guider speed readout (measured)
-        try:
-            if self._txt_guider_speed is not None:
-                self._txt_guider_speed.setText(f"{g_vel_meas:.3f} m/s")
-        except Exception:
-            pass
+        if self._txt_guider_speed is not None:
+            set_text(self._txt_guider_speed, f"{g_vel_meas:.3f} m/s")
     def _render_tick_delta(self, snap: TelemetrySnapshot) -> None:
         """Render legacy TimeTick into txt_tick (delta of device_tick)."""
         if self._txt_tick is None:
@@ -1576,7 +1584,7 @@ class HiPController:
             return
 
         delta, new_prev = compute_time_tick(self._prev_device_tick, cur)
-        self._txt_tick.setText(str(delta))
+        set_text(self._txt_tick, str(delta))
         self._prev_device_tick = new_prev
     def _render_estop(self, snap: TelemetrySnapshot) -> None:
         word = int(getattr(snap, "estop_status_word", 0))
@@ -1588,18 +1596,14 @@ class HiPController:
         self._last_estop_profile = profile
 
         if self.ui.btn_estop_reset:
-            self.ui.btn_estop_reset.setEnabled(bool(logical.get("reset_able", False)))
+            set_enabled(self.ui.btn_estop_reset, bool(logical.get("reset_able", False)))
 
         # Sync read-only diagnostic checkboxes. Keep this cheap: only touch the UI if
         # something actually changed, and only re-bold the active profile keys when the
         # profile itself changes.
         for key, cb in getattr(self, "_estop_checks", {}).items():
             v = bool(logical.get(key, False))
-            try:
-                if cb.isChecked() != v:
-                    cb.setChecked(v)
-            except Exception:
-                pass
+            set_checked(cb, v, block_signals=True)
             if profile_changed:
                 try:
                     f = cb.font()
