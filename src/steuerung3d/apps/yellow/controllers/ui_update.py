@@ -101,3 +101,51 @@ def set_checked(widget: Optional[Any], checked: bool, *, block_signals: bool = F
             widget.setChecked(v)  # type: ignore[attr-defined]
     except Exception:
         return
+
+
+def update_slider(
+    slider: Optional[Any],
+    *,
+    minimum: int | None = None,
+    maximum: int | None = None,
+    value: int | None = None,
+    block_signals: bool = True,
+) -> None:
+    """Update a QAbstractSlider's min/max/value with minimal churn.
+
+    All arguments are optional. When provided, the corresponding property is only
+    written if it differs. If block_signals=True, the slider's signals are
+    blocked while applying updates.
+    """
+    if slider is None:
+        return
+    try:
+        need_min = minimum is not None and int(slider.minimum()) != int(minimum)  # type: ignore[attr-defined]
+        need_max = maximum is not None and int(slider.maximum()) != int(maximum)  # type: ignore[attr-defined]
+        need_val = value is not None and int(slider.value()) != int(value)  # type: ignore[attr-defined]
+        if not (need_min or need_max or need_val):
+            return
+
+        if block_signals:
+            try:
+                was = slider.blockSignals(True)  # type: ignore[attr-defined]
+            except Exception:
+                was = None
+        else:
+            was = None
+
+        # Range first, then value.
+        if need_min:
+            slider.setMinimum(int(minimum))  # type: ignore[attr-defined]
+        if need_max:
+            slider.setMaximum(int(maximum))  # type: ignore[attr-defined]
+        if need_val:
+            slider.setValue(int(value))  # type: ignore[attr-defined]
+
+        if was is not None:
+            try:
+                slider.blockSignals(was)  # type: ignore[attr-defined]
+            except Exception:
+                pass
+    except Exception:
+        return

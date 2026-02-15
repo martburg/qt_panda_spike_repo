@@ -49,7 +49,7 @@ from .bindings import YellowBindings
 from .ports import CommandIn, TelemetryOut
 from .widget_cache import WidgetCache
 from .ui_contract import log_missing_optional_once
-from .ui_update import set_checked, set_enabled, set_state_by_object_name, set_state_property, set_text
+from .ui_update import set_checked, set_enabled, set_state_by_object_name, set_state_property, set_text, update_slider
 from .ui_estop import (
     age_to_online_state,
     compute_estop_dot_states,
@@ -347,7 +347,7 @@ class DenSiController:
         self._btn_es_start: QPushButton | None = self.win.findChild(QPushButton, "btnESStart")
         if self._btn_es_start is not None:
             self._btn_es_start.show()
-            self._btn_es_start.setEnabled(True)
+            set_enabled(self._btn_es_start, True)
             self._btn_es_start.clicked.connect(self._on_es_start_clicked)
 
         # Convenience: set/clear full estop word (test tool)
@@ -415,15 +415,15 @@ class DenSiController:
         """
         for _grp, mapping in _PARAM_WIDGETS.items():
             for _key, wname in mapping.items():
-                le = self.win.findChild(QLineEdit, wname)
+                le = None
+                try:
+                    le = self._wcache.line_edit(wname)
+                except Exception:
+                    le = self.win.findChild(QLineEdit, wname)
                 if le is None:
                     continue
                 # Mark for QSS (even though we disable them)
-                if le.property('paramField') is None:
-                    # QSS selector uses string: paramField="true"
-                    le.setProperty('paramField', 'true')
-                    le.style().unpolish(le)
-                    le.style().polish(le)
+                set_state_property(le, 'true', prop='paramField')
                 set_enabled(le, False)
 
     def _enforce_pos_chain(self, vals: dict[str, float]) -> dict[str, float]:
@@ -989,30 +989,34 @@ class DenSiController:
         return v
 
     def _wire_all_estop_bit_checkboxes(self) -> None:
+        """Auto-wire E-Stop diagnostic checkboxes that exist in the UI."""
+        current_bits = decode_estop_word(self._inj_estop_word)
+
         for spec in iter_specs():
             if not spec.checkbox:
                 continue
 
-            cb = self.win.findChild(QCheckBox, spec.checkbox)
+            cb = None
+            try:
+                cb = self._wcache.checkbox(spec.checkbox)
+            except Exception:
+                cb = self.win.findChild(QCheckBox, spec.checkbox)
+
             if cb is None:
-                # don't spam info; debug is enough
+                # Don't spam INFO; debug is enough. (Multiple UI variants exist.)
                 log.debug("checkbox not found: %s (key=%s)", spec.checkbox, spec.key)
                 continue
 
             # init checkbox from current word (logical values)
-            current_bits = decode_estop_word(self._inj_estop_word)
-            cb.setChecked(bool(current_bits.get(spec.key, False)))
+            set_checked(cb, bool(current_bits.get(spec.key, False)), block_signals=True)
 
             # ResetAble is an output of the safety ladder; it is derived from trip-cause bits.
             # Make it read-only so operator overrides cannot violate the contract.
             if spec.key == 'reset_able':
-                try:
-                    cset_enabled(b, False)
-                except Exception:
-                    pass
+                set_enabled(cb, False)
                 continue
 
-            def _make_handler(key: str, checkbox_name: str):
+            def _make_handler(key: str):
                 def _on_toggled(checked: bool) -> None:
                     # User-driven diagnostic override for brake feedback bits.
                     #
@@ -1022,9 +1026,6 @@ class DenSiController:
                     # model currently expects. This keeps "Taster influences brakes"
                     # as the default, while still allowing post-start brake faults.
                     if key in ("brk1_ok", "brk2_ok"):
-                        # Enter per-brake override only if the operator forces a value
-                        # that disagrees with the current timing-model expectation.
-                        # (This keeps auto-mode as default; override is deliberate.)
                         desired = bool(getattr(self, "_drive_ready", False))
                         if bool(checked) != bool(desired):
                             if key == "brk1_ok":
@@ -1040,7 +1041,7 @@ class DenSiController:
                     self._render_estop_word_to_ui(self._inj_estop_word)
                 return _on_toggled
 
-            cb.toggled.connect(_make_handler(spec.key, spec.checkbox))
+            cb.toggled.connect(_make_handler(spec.key))
             log.info("wired: %s -> estop key '%s'", spec.checkbox, spec.key)
 
     def _render_estop_word_to_ui(self, word: int) -> None:
@@ -1057,14 +1058,8 @@ class DenSiController:
                 cb = self.win.findChild(QCheckBox, spec.checkbox)
             if cb is None:
                 continue
-            was = cb.blockSignals(True)
             v = bool(bits.get(spec.key, False))
-            try:
-                if cb.isChecked() != v:
-                    cb.setChecked(v)
-            except Exception:
-                cb.setChecked(v)
-            cb.blockSignals(was)
+            set_checked(cb, v, block_signals=True)
 
         # Dots (including header brake dots) are updated via a separate helper so we can refresh
         # them each tick without re-writing checkboxes.
@@ -1306,7 +1301,7 @@ class DenSiController:
                     set_text(self._txt_cut_time, tok if tok else "--")
             except Exception:
                 if self._txt_cut_time is not None:
-                    self._txt_cut_time.setText("--")
+                    set_text(self._txt_cut_time, "--")
 
             for w in (self._txt_cut_pos, self._txt_cut_vel, self._txt_posdiff):
                 if w is not None:
@@ -1508,7 +1503,7 @@ class DenSiController:
             if self._txt_guider_range_val is not None:
                 set_text(self._txt_guider_range_val, fmt_f_unit(g_val, "m", ndigits=3))
             if self._txt_guider_speed is not None:
-                self._txt_guider_speed.setText(f"{g_spd:.3f} m/s")
+                set_text(self._txt_guider_speed, f"{g_spd:.3f} m/s")
 
             # --- slider indicators ---
             # sldVelCmd: show commanded velocity (setpoint) with range ±VelMax
@@ -1525,11 +1520,12 @@ class DenSiController:
                 vel_cmd = 0.0
             if self._sld_vel_cmd is not None:
                 scale = 1000.0  # m/s -> mm/s for slider resolution
-                self._sld_vel_cmd.blockSignals(True)
-                self._sld_vel_cmd.setMinimum(int(round(-vel_max * scale)))
-                self._sld_vel_cmd.setMaximum(int(round(+vel_max * scale)))
-                self._sld_vel_cmd.setValue(int(round(vel_cmd * scale)))
-                self._sld_vel_cmd.blockSignals(False)
+                update_slider(
+                    self._sld_vel_cmd,
+                    minimum=int(round(-vel_max * scale)),
+                    maximum=int(round(+vel_max * scale)),
+                    value=int(round(vel_cmd * scale)),
+                )
 
             # sldLimitRange: show current position in [UserMin, UserMax]
             user_min = float(self.state.params.get("UserMin", 0.0) or 0.0)

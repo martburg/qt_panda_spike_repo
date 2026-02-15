@@ -57,7 +57,7 @@ from .ports import IntentOut, TelemetryIn
 from .param_txn import ParamEditTxnClient
 from .widget_cache import WidgetCache
 from .ui_contract import log_missing_optional_once
-from .ui_update import set_checked, set_enabled, set_state_by_object_name, set_state_property, set_text
+from .ui_update import set_checked, set_enabled, set_state_by_object_name, set_state_property, set_text, update_slider
 from .ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
 from .ui_estop import (
     age_to_online_state,
@@ -549,14 +549,11 @@ class HiPController:
                 le = self._find_line_edit(obj_name)
                 if le is None:
                     continue
-                le.setProperty("paramField", "true")
+                set_state_property(le, "true", prop="paramField")
                 val = QDoubleValidator(-1.0e12, 1.0e12, 6, le)
                 val.setLocale(loc)
                 val.setNotation(QDoubleValidator.Notation.StandardNotation)
                 le.setValidator(val)
-                le.style().unpolish(le)
-                le.style().polish(le)
-                le.update()
 
     def _parse_float(self, s: str) -> float:
         s = (s or "").strip()
@@ -1418,14 +1415,14 @@ class HiPController:
             vel_cmd = float(getattr(ax, "vel_cmd", vel_meas) if ax is not None else vel_meas)
         except Exception:
             vel_cmd = vel_meas
-
         if self._sld_vel_cmd is not None:
             scale = 1000.0  # m/s -> mm/s
-            self._sld_vel_cmd.blockSignals(True)
-            self._sld_vel_cmd.setMinimum(int(round(-vel_max * scale)))
-            self._sld_vel_cmd.setMaximum(int(round(+vel_max * scale)))
-            self._sld_vel_cmd.setValue(int(round(vel_cmd * scale)))
-            self._sld_vel_cmd.blockSignals(False)
+            update_slider(
+                self._sld_vel_cmd,
+                minimum=int(round(-vel_max * scale)),
+                maximum=int(round(+vel_max * scale)),
+                value=int(round(vel_cmd * scale)),
+            )
 
         try:
             user_min = float(params.get("UserMin", 0.0) or 0.0)
@@ -1437,14 +1434,14 @@ class HiPController:
             user_max = 0.0
         if user_max < user_min:
             user_min, user_max = user_max, user_min
-
         if self._sld_limit_range is not None:
             scale = 1000.0  # m -> mm
-            self._sld_limit_range.blockSignals(True)
-            self._sld_limit_range.setMinimum(int(round(user_min * scale)))
-            self._sld_limit_range.setMaximum(int(round(user_max * scale)))
-            self._sld_limit_range.setValue(int(round(pos * scale)))
-            self._sld_limit_range.blockSignals(False)
+            update_slider(
+                self._sld_limit_range,
+                minimum=int(round(user_min * scale)),
+                maximum=int(round(user_max * scale)),
+                value=int(round(pos * scale)),
+            )
 
     def _render_guider_indicators(self, params: dict, snap: TelemetrySnapshot) -> None:
         """Update guider range + speed readouts and sliders."""
@@ -1467,14 +1464,14 @@ class HiPController:
             g_pos = 0.0
         if g_pos == 0.0:
             g_pos = self._raw_uplink_float(snap, "GuidePosIstUI", g_pos)
-
         if self._sld_guider_range is not None:
             scale = 1000.0  # m -> mm
-            self._sld_guider_range.blockSignals(True)
-            self._sld_guider_range.setMinimum(int(round(g_pos_min * scale)))
-            self._sld_guider_range.setMaximum(int(round(g_pos_max * scale)))
-            self._sld_guider_range.setValue(int(round(g_pos * scale)))
-            self._sld_guider_range.blockSignals(False)
+            update_slider(
+                self._sld_guider_range,
+                minimum=int(round(g_pos_min * scale)),
+                maximum=int(round(g_pos_max * scale)),
+                value=int(round(g_pos * scale)),
+            )
 
         # Guider range readouts
         try:
@@ -1524,14 +1521,14 @@ class HiPController:
             g_vel_meas = g_vel_max
         elif g_vel_meas < -g_vel_max:
             g_vel_meas = -g_vel_max
-
         if self._sld_guider_speed is not None:
             scale = 1000.0  # m/s -> mm/s
-            self._sld_guider_speed.blockSignals(True)
-            self._sld_guider_speed.setMinimum(int(round(-g_vel_max * scale)))
-            self._sld_guider_speed.setMaximum(int(round(+g_vel_max * scale)))
-            self._sld_guider_speed.setValue(int(round(g_vel_meas * scale)))
-            self._sld_guider_speed.blockSignals(False)
+            update_slider(
+                self._sld_guider_speed,
+                minimum=int(round(-g_vel_max * scale)),
+                maximum=int(round(+g_vel_max * scale)),
+                value=int(round(g_vel_meas * scale)),
+            )
 
         # Guider speed readout (measured)
         try:
