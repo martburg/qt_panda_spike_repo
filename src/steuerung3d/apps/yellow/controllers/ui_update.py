@@ -59,3 +59,45 @@ def set_text(widget: Optional[Any], text: str) -> None:
         widget.setText(text)  # type: ignore[attr-defined]
     except Exception:
         return
+
+
+def set_enabled(widget: Optional[Any], enabled: bool) -> None:
+    """Set QWidget enabled state only if it differs."""
+    if widget is None:
+        return
+    try:
+        cur = bool(widget.isEnabled())  # type: ignore[attr-defined]
+        en = bool(enabled)
+        if cur == en:
+            return
+        widget.setEnabled(en)  # type: ignore[attr-defined]
+    except Exception:
+        return
+
+
+def set_checked(widget: Optional[Any], checked: bool, *, block_signals: bool = False) -> None:
+    """Set QAbstractButton/QCheckBox checked state only if it differs.
+
+    If block_signals=True, the widget's signals are temporarily blocked.
+    """
+    if widget is None:
+        return
+    try:
+        v = bool(checked)
+        if bool(widget.isChecked()) == v:  # type: ignore[attr-defined]
+            return
+        if block_signals:
+            try:
+                was = widget.blockSignals(True)  # type: ignore[attr-defined]
+            except Exception:
+                was = None
+            widget.setChecked(v)  # type: ignore[attr-defined]
+            if was is not None:
+                try:
+                    widget.blockSignals(was)  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+        else:
+            widget.setChecked(v)  # type: ignore[attr-defined]
+    except Exception:
+        return

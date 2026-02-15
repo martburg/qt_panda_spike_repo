@@ -56,7 +56,9 @@ from .bindings import YellowBindings
 from .ports import IntentOut, TelemetryIn
 from .param_txn import ParamEditTxnClient
 from .widget_cache import WidgetCache
-from .ui_update import set_state_by_object_name, set_state_property, set_text
+from .ui_contract import log_missing_optional_once
+from .ui_update import set_checked, set_enabled, set_state_by_object_name, set_state_property, set_text
+from .ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
 from .ui_estop import (
     age_to_online_state,
     compute_estop_dot_states,
@@ -284,6 +286,33 @@ class HiPController:
         # Last EchoLifeTick sent per axis (avoid spamming duplicates)
         self._last_lifetick_echo_sent: dict[str, int] = {}
 
+        # Non-fatal UI contract check (helps diagnose mismatched .ui variants)
+        # Grouped by feature and logged once per process (DEBUG only).
+        log_missing_optional_once(
+            log,
+            self._wcache,
+            [
+                (QWidget, "dotHdrOnline"),
+                (QWidget, "dotHdrReady"),
+                (QWidget, "dotHdrFbt"),
+                (QWidget, "dotHdrBrake1"),
+                (QWidget, "dotHdrBrake2"),
+            ],
+            context="hi_p:hdr_dots",
+        )
+        log_missing_optional_once(
+            log,
+            self._wcache,
+            [
+                (QLineEdit, "txt_tick"),
+                (QLineEdit, "txt_pos"),
+                (QLineEdit, "txt_vel"),
+                (QLineEdit, "txt_amp"),
+                (QLineEdit, "txt_temp"),
+            ],
+            context="hi_p:readouts",
+        )
+
     def _init_observability(self) -> None:
         """Set up lightweight logs + optional structured status heartbeat."""
         self._hb = Heartbeat("hi_p", interval_s=1.0)
@@ -338,7 +367,7 @@ class HiPController:
         if self.ui.btn_estop_reset is not None:
             self.ui.btn_estop_reset.clicked.connect(self._on_estop_reset)
             log.info("wired: btnEStopReset -> RequestEstopReset intent")
-            self.ui.btn_estop_reset.setEnabled(False)
+            set_enabled(self.ui.btn_estop_reset, False)
         else:
             log.warning("btnEStopReset not found in UI")
 
@@ -380,13 +409,8 @@ class HiPController:
 
     def _clear_text_fields_for_unattached(self) -> None:
         # Clear all line edits except tick.
-        for le in self.win.findChildren(QLineEdit):
-            try:
-                if le is self._txt_tick:
-                    continue
-                set_text(le, "")
-            except Exception:
-                pass
+        keep = [self._txt_tick] if self._txt_tick is not None else []
+        clear_line_edits(self.win, keep=keep, text="")
         if self._txt_tick is not None:
             set_text(self._txt_tick, "--")
         self._prev_device_tick = None
@@ -394,10 +418,7 @@ class HiPController:
         # Clear a few known header/status fields if present
         for w in (self._txt_main_amp_status, self._txt_slave_amp_status, self._txt_hdr_banner_left, self._txt_hdr_banner_right):
             if w is not None:
-                try:
-                    set_text(w, "")
-                except Exception:
-                    pass
+                set_text(w, "")
 
     def _set_attach_ui_state(self, *, attached: bool) -> None:
         """Unattached = dead panel (grey + empty). Attached = normal (telemetry drives values).
@@ -408,72 +429,49 @@ class HiPController:
 
         if tabs is not None:
             if not attached:
-                tabs.setEnabled(False)
+                set_enabled(tabs, False)
             else:
                 # Modal lock overrides; don't re-enable while locked.
                 if not self._modal_locked:
-                    tabs.setEnabled(True)
+                    set_enabled(tabs, True)
 
         # Keep axis combo usable in pool mode, unless locked to fixed axis.
         if self._cmb_axis is not None:
-            try:
-                if self._lock_axis_combo and self._fixed_axis_applied:
-                    self._cmb_axis.setEnabled(False)
-                else:
-                    self._cmb_axis.setEnabled(True)
-            except Exception:
-                pass
+            if self._lock_axis_combo and self._fixed_axis_applied:
+                set_enabled(self._cmb_axis, False)
+            else:
+                set_enabled(self._cmb_axis, True)
 
         # Setup toggle should be greyed out when unattached.
         btn_setup = self._find_button("btnSetupToggle")
         btn_Mainampreset = self._find_button("btn_reset")
         if btn_Mainampreset is not None:
-            try:
-                btn_Mainampreset.setEnabled(bool(attached) and (not self._modal_locked))
-            except Exception:
-                pass
+            set_enabled(btn_Mainampreset, bool(attached) and (not self._modal_locked))
         if btn_setup is not None:
-            try:
-                btn_setup.setEnabled(bool(attached) and (not self._modal_locked))
-            except Exception:
-                pass
+            set_enabled(btn_setup, bool(attached) and (not self._modal_locked))
 
         # Recover disabled always for now.
         btn_rec = self._find_button("btnRecover")
         if btn_rec is not None:
-            try:
-                btn_rec.setEnabled(False)
-            except Exception:
-                pass
+            set_enabled(btn_rec, False)
 
         # ReSync button is only usable in Mode.IDLE (poll_once drives it).
         if self._btn_diag_resync is not None:
-            try:
-                self._btn_diag_resync.setEnabled(bool(attached) and (not self._modal_locked) and (str(self._last_mode).upper() == "IDLE") and (str(getattr(self, "_last_estate", "")).upper() == "IDLE"))
-            except Exception:
-                pass
+            set_enabled(self._btn_diag_resync, bool(attached) and (not self._modal_locked) and (str(self._last_mode).upper() == "IDLE") and (str(getattr(self, "_last_estate", "")).upper() == "IDLE"))
 
         # E-stop reset disabled when unattached (telemetry enables it when attached)
         if self.ui.btn_estop_reset is not None and not attached:
-            self.ui.btn_estop_reset.setEnabled(False)
+            set_enabled(self.ui.btn_estop_reset, False)
 
         if not attached:
             self._clear_text_fields_for_unattached()
 
             # Neutralize header dots
-            for n in ("dotHdrOnline", "dotHdrReady", "dotHdrFbt", "dotHdrBrake1", "dotHdrBrake2"):
-                set_state_by_object_name(self.win, n, None)
+            neutralize_dots(self._set_dot, ("dotHdrOnline", "dotHdrReady", "dotHdrFbt", "dotHdrBrake1", "dotHdrBrake2"))
 
             # Neutralize estop dots and checkboxes (no stale state)
-            for spec in ESTOP_SPECS.values():
-                if spec.dot:
-                    set_state_by_object_name(self.win, spec.dot, None)
-            for cb in getattr(self, "_estop_checks", {}).values():
-                try:
-                    cb.setChecked(False)
-                except Exception:
-                    pass
-
+            neutralize_dots(self._set_dot, [s.dot for s in ESTOP_SPECS.values() if s.dot])
+            uncheck_checkboxes(getattr(self, "_estop_checks", {}).values())
             # Ensure param edit UI is not in edit mode
             txn = getattr(self, "_param_txn", None)
             if txn is not None:
@@ -512,7 +510,7 @@ class HiPController:
             log.warning("telemetry stale/disconnected -> reverting E-Stop LEDs to UNKNOWN")
         self._seen_first_telem = False
         if self.ui.btn_estop_reset:
-            self.ui.btn_estop_reset.setEnabled(False)
+            set_enabled(self.ui.btn_estop_reset, False)
         self._set_all_estop_unknown()
         if self._txt_tick is not None:
             set_text(self._txt_tick, "--")
@@ -1140,11 +1138,11 @@ class HiPController:
             for w in (self._txt_main_amp_status, self._txt_slave_amp_status, self._txt_hdr_banner_left, self._txt_hdr_banner_right):
                 if w is not None:
                     set_text(w, "")
-            set_state_by_object_name(self.win, "dotHdrOnline", None)
-            set_state_by_object_name(self.win, "dotHdrReady", None)
-            set_state_by_object_name(self.win, "dotHdrFbt", None)
-            set_state_by_object_name(self.win, "dotHdrBrake1", None)
-            set_state_by_object_name(self.win, "dotHdrBrake2", None)
+            self._set_dot("dotHdrOnline", None)
+            self._set_dot("dotHdrReady", None)
+            self._set_dot("dotHdrFbt", None)
+            self._set_dot("dotHdrBrake1", None)
+            self._set_dot("dotHdrBrake2", None)
             return
 
         axes = getattr(snap, "axes", None)
@@ -1209,11 +1207,11 @@ class HiPController:
         brk1_state = hdr["dotHdrBrake1"]
         brk2_state = hdr["dotHdrBrake2"]
 
-        set_state_by_object_name(self.win, "dotHdrOnline", online_state)
-        set_state_by_object_name(self.win, "dotHdrReady", ready_state)
-        set_state_by_object_name(self.win, "dotHdrFbt", fbt_state)
-        set_state_by_object_name(self.win, "dotHdrBrake1", brk1_state)
-        set_state_by_object_name(self.win, "dotHdrBrake2", brk2_state)
+        self._set_dot("dotHdrOnline", online_state)
+        self._set_dot("dotHdrReady", ready_state)
+        self._set_dot("dotHdrFbt", fbt_state)
+        self._set_dot("dotHdrBrake1", brk1_state)
+        self._set_dot("dotHdrBrake2", brk2_state)
 
 
 
@@ -1669,7 +1667,7 @@ class HiPController:
                 self._cmb_axis.setCurrentText(self._fixed_axis)
                 self._fixed_axis_applied = True
                 if self._lock_axis_combo:
-                    self._cmb_axis.setEnabled(False)
+                    set_enabled(self._cmb_axis, False)
             else:
                 # Pool mode: do NOT auto-attach. Default to NotAttached unless user already selected a valid axis.
                 if self._selected_axis and (self._selected_axis in axis_ids):

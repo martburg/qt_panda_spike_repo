@@ -47,7 +47,9 @@ from steuerung3d.protocol.estop_bits import (
 
 from .bindings import YellowBindings
 from .ports import CommandIn, TelemetryOut
-from .ui_update import set_state_by_object_name, set_state_property, set_text
+from .widget_cache import WidgetCache
+from .ui_contract import log_missing_optional_once
+from .ui_update import set_checked, set_enabled, set_state_by_object_name, set_state_property, set_text
 from .ui_estop import (
     age_to_online_state,
     compute_estop_dot_states,
@@ -202,16 +204,13 @@ class DenSiController:
         if self._btn_diag_resync is not None:
             self._btn_diag_resync.clicked.connect(self._on_diag_resync_clicked)
             # DenSi role must not expose/enable ReSync (HiP owns workflow)
-            self._btn_diag_resync.setEnabled(False)
+            set_enabled(self._btn_diag_resync, False)
 
         # Disable operator-only buttons on DenSi
         for name in ("btn_reset", "btnRecover"):
             b = self.win.findChild(QPushButton, name)
             if b is not None:
-                try:
-                    b.setEnabled(False)
-                except Exception:
-                    pass
+                set_enabled(b, False)
 
         # Guider readouts
         self._txt_guider_range_min: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMin")
@@ -235,7 +234,7 @@ class DenSiController:
                 cmb.clear()
                 cmb.addItems([label])
                 cmb.setCurrentText(label)
-                cmb.setEnabled(False)
+                cmset_enabled(b, False)
                 cmb.blockSignals(was)
             except Exception:
                 pass
@@ -246,6 +245,29 @@ class DenSiController:
                 continue
             w = self.win.findChild(QCheckBox, spec.checkbox)
             log.debug("estop checkbox %-16s key=%-10s found=%s", spec.checkbox, spec.key, bool(w))
+
+        # Non-fatal UI contract check (helps diagnose mismatched .ui variants)
+        # Grouped by feature and logged once per process (DEBUG only).
+        log_missing_optional_once(
+            log,
+            self._wcache,
+            [
+                (QWidget, "dotHdrOnline"),
+            ],
+            context="den_si:hdr",
+        )
+        log_missing_optional_once(
+            log,
+            self._wcache,
+            [
+                (QLineEdit, "txt_tick"),
+                (QLineEdit, "txt_pos"),
+                (QLineEdit, "txt_vel"),
+                (QLineEdit, "txt_amp"),
+                (QLineEdit, "txt_temp"),
+            ],
+            context="den_si:readouts",
+        )
 
     def _init_state_and_sim(self) -> None:
         self.tb = Timebase(dt_s=self.dt_s)
@@ -374,20 +396,17 @@ class DenSiController:
         DenSi is the device side; operators should not change parameters locally.
         """
 
-        # Cached widget lookup (prevents repeated findChild() in hot paths)
-        self._wcache = WidgetCache(self.win)
-        from PySide6.QtWidgets import QPushButton
-
         btn_names = [
-            'btnPosEdit','btnPosWrite','btnPosCancel',
-            'btnVelEdit','btnVelWrite','btnVelCancel',
-            'btnFilterEdit','btnFilterWrite','btnFilterCancel',
-            'btnGuiderEdit','btnGuiderWrite','btnGuiderCancel',
+            "btnPosEdit", "btnPosWrite", "btnPosCancel",
+            "btnVelEdit", "btnVelWrite", "btnVelCancel",
+            "btnFilterEdit", "btnFilterWrite", "btnFilterCancel",
+            "btnGuiderEdit", "btnGuiderWrite", "btnGuiderCancel",
         ]
         for name in btn_names:
-            b = self.win.findChild(QPushButton, name)
+            b = self._wcache.button(name)
             if b is not None:
-                b.setEnabled(False)
+                set_enabled(b, False)
+
 
     def _disable_param_fields(self) -> None:
         """Disable parameter line edits on DenSi UI (device side).
@@ -405,7 +424,7 @@ class DenSiController:
                     le.setProperty('paramField', 'true')
                     le.style().unpolish(le)
                     le.style().polish(le)
-                le.setEnabled(False)
+                set_enabled(le, False)
 
     def _enforce_pos_chain(self, vals: dict[str, float]) -> dict[str, float]:
         """Enforce HardMax>=UserMax>=UserMin>=HardMin."""
@@ -852,7 +871,7 @@ class DenSiController:
         """
 
         if not self._seen_first_cmd:
-            set_state_by_object_name(self.win, "dotHdrOnline", None)
+            self._set_dot("dotHdrOnline", None)
             return
 
         now_ns = time.monotonic_ns()
@@ -862,12 +881,15 @@ class DenSiController:
         # Green while frames are flowing, amber when stale.
         # (Tune threshold as needed; 1s is a good first cut for dt=10ms.)
         state = age_to_online_state(age=float(age_s), good_max=1.0, warn_max=None)
-        set_state_by_object_name(self.win, "dotHdrOnline", state)
+        self._set_dot("dotHdrOnline", state)
 
     # ----- parameter helpers -----
     def _find_line_edit(self, object_name: str) -> QLineEdit | None:
-        w = self.win.findChild(QLineEdit, object_name)
-        return w if isinstance(w, QLineEdit) else None
+        try:
+            return self._wcache.line_edit(object_name)
+        except Exception:
+            w = self.win.findChild(QLineEdit, object_name)
+            return w if isinstance(w, QLineEdit) else None
 
     def _seed_params_from_ui(self) -> None:
         """Populate state.params from UI fields if available.
@@ -925,7 +947,7 @@ class DenSiController:
             le.blockSignals(was)
             # Ensure these are display-only on DenSi.
             try:
-                le.setEnabled(False)
+                set_enabled(le, False)
             except Exception:
                 pass
 
@@ -985,7 +1007,7 @@ class DenSiController:
             # Make it read-only so operator overrides cannot violate the contract.
             if spec.key == 'reset_able':
                 try:
-                    cb.setEnabled(False)
+                    cset_enabled(b, False)
                 except Exception:
                     pass
                 continue
