@@ -13,7 +13,6 @@ so HiP can be tested without a real SafetyPLC.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from enum import Enum, auto
 import time
 from datetime import datetime
 
@@ -77,48 +76,40 @@ from ..panels.densi_estop_dots_render import apply_densi_estop_dots_vm
 from ..panels.densi_cut_markers_vm import compute_densi_cut_markers_vm
 from ..panels.densi_cut_markers_render import DenSiCutMarkersBindings, apply_densi_cut_markers_vm
 
+from ..panels.densi_estop_checkboxes import (
+    DenSiEstopCheckboxBindings,
+    discover_densi_estop_checkboxes,
+    init_densi_estop_checkboxes,
+    sync_densi_estop_checkboxes,
+    wire_densi_estop_checkboxes,
+)
+from ..panels.densi_limits_vm import compute_densi_limits_vm
+from ..panels.densi_limits_render import apply_densi_limits_vm
+from ..panels.densi_lifetick_vm import compute_densi_lifetick_vm
+from ..panels.densi_lifetick_render import apply_densi_lifetick_vm
+from ..panels.densi_param_ops_core import apply_densi_param_ops
+
+from ..engines.densi_engine import DenSiEngine, DenSiTickResult
+from ..engines.densi_types import EStopState, L0Top, L0Sub
+
+
 import logging
 
 
 log = logging.getLogger("den_si")
 
-class EStopState(Enum):
-    """Device-local Safety/EStop ladder state."""
+def _lt_should_log(now_s: float, last_log_s: float, interval_s: float = 1.0) -> bool:
+    """Return True if LifeTick debug logging should emit.
 
-    ESTOP = auto()
-    IDLE = auto()
-    ARMED = auto()
-    READY = auto()
-
-
-class L0Top(Enum):
-    """DenSi (device-local) top-level connection state.
-
-    We model whether the device has seen at least one command frame.
-    Connection arbitration/ownership is handled elsewhere in the legacy stack;
-    for now we accept any incoming connection.
+    Used by DenSiController._step_lifetick() for throttled/edge-triggered traces.
+    This helper used to live in the controller module and got lost during the
+    north refactor; without it DenSi crashes and stops publishing telemetry.
     """
-
-    START = auto()       # no command frames seen yet
-    CONNECTED = auto()   # at least one command frame seen recently
-
-
-class L0Sub(Enum):
-    """DenSi (device-local) connected substates."""
-
-    IDLE = auto()
-    RESETTING_ESTOP = auto()
-    EDIT_PARAMETER = auto()
-
-# --- Lifetick tracing (DenSi -> Core -> HiP -> Core -> DenSi) ---
-# Keep logging useful (avoid per-tick spam): throttle to at most once per 0.5s.
-_LT_LOG_EVERY_S = 0.5
-
-
-def _lt_should_log(now_s: float, last_s: float) -> bool:
-    return (now_s - last_s) >= _LT_LOG_EVERY_S
-
-
+    try:
+        return (float(now_s) - float(last_log_s)) >= float(interval_s)
+    except Exception:
+        # Be permissive: logging must never break the device loop.
+        return True
 
 @dataclass
 class DenSiController:
@@ -186,6 +177,7 @@ class DenSiController:
 
         # Cached widget lookup (prevents repeated findChild() in hot paths)
         self._wcache = WidgetCache(self.win)
+        self._b_estop_cbs: DenSiEstopCheckboxBindings | None = None
         self._wd = PerfWatchdog(log, name='den_si')
         # Device-side TimeTick display:
         # show (lifetick_tx - lifetick_rx) in milliseconds (WORD wrap).
@@ -312,76 +304,105 @@ class DenSiController:
         )
 
     def _init_state_and_sim(self) -> None:
-        self.tb = Timebase(dt_s=self.dt_s)
-        self.state = MachineState()
-        for a in self.axis_ids:
-            self.state.ensure_axis(a)
+        # L0 disconnect threshold (seconds). Keep generous to avoid flapping during debug.
+        self._disconnect_after_s = 2.0
 
-        # Initialize parameter bank from current UI text (if present)
-        self._seed_params_from_ui()
+        # Engine owns simulation + ladder semantics.
+        self.engine = DenSiEngine.build_default(
+            axis_ids=list(self.axis_ids),
+            dt_s=float(self.dt_s),
+            normalize_pos_chain=self._normalize_pos_chain,
+            normalize_guider_range=self._normalize_guider_range,
+            enforce_pos_chain=self._enforce_pos_chain,
+            enforce_guider_minmax=self._enforce_guider_minmax,
+        )
+        self.engine.disconnect_after_s = float(self._disconnect_after_s)
 
-        # Plausible measured defaults so UI/HiP have stable values from tick 0
-        self.state.params.setdefault("ActCur", 0.0)   # A
-        self.state.params.setdefault("Temp", 20.0)    # °C
-        self.state.params.setdefault("CutPos", 0.0)   # m
-        self.state.params.setdefault("CutVel", 0.0)   # m/s
+        # Backwards-compat aliases (controller code still references these).
+        self.tb = self.engine.tb
+        self.state = self.engine.state
+        self.device = self.engine.device
 
-        # Plausible guider defaults (so HiP and DenSi show sane numbers from tick 0)
-        self.state.params.setdefault("PosMin", 0.0)        # m
-        self.state.params.setdefault("PosMax", 0.966)      # m
-        self.state.params.setdefault("GuidePosIst", 0.011) # m
-        self.state.params.setdefault("GuideIstSpeed", 0.0) # m/s
-
-        # Render limit header fields (txtLimit*) from seeded params.
-        self._render_limit_fields_from_params(self.state.params)
-
-        self.device = SimDevice(plant=SimAxisPlant())
-        self._last_cmd: CommandFrame | None = None
-
-    def _init_l0_connection_state(self) -> None:
-        """Device-local connection state (seen command frames recently?)."""
-        self._l0_top = L0Top.START
-        self._l0_sub = L0Sub.IDLE
-        self._disconnect_after_s = 2.0  # generous to avoid flapping during debug
+        # Controller-local tracking (UI/logging only)
+        self._last_cmd = None
+        self._last_cmd_ns = None
         self._seen_first_cmd = False
 
+        # seed the legacy params for UI display
+        self.state.params["SystemTime"] = self._now_token()
+
+        # --- defaults expected by UI + protocol contract tests ---
+        self.state.params.setdefault("PosChain0", 0.0)
+        self.state.params.setdefault("PosChain1", 0.0)
+        self.state.params.setdefault("PosChain2", 0.0)
+        self.state.params.setdefault("PosChain3", 0.0)
+
+        self.state.params.setdefault("GuiderMin", -0.5)
+        self.state.params.setdefault("GuiderMax", 0.5)
+
+        self.state.params.setdefault("AccMax", 1.0)
+        self.state.params.setdefault("AxisAmp", 100.0)
+
+        # latched cut markers (engine starts with cleared markers)
+        self.state.params.setdefault("CutPos", 0.0)
+        self.state.params.setdefault("CutVel", 0.0)
+        self.state.params.setdefault("CutTime", 0.0)
+        self.state.params.setdefault("PosDiffFor", 0.0)
+
+        # reflect initial L0 state
+        self.state.params["DenSiL0Top"] = self.engine.l0_top.name
+        self.state.params["DenSiL0Sub"] = self.engine.l0_sub.name
+
+    def _init_l0_connection_state(self) -> None:
+        """Initialize legacy L0 connection state mirrors.
+
+        DenSiEngine owns the authoritative L0 connection state. The controller
+        keeps these mirrors for edge logs and any remaining helper paths that
+        reference `_l0_top/_l0_sub`.
+        """
+        self._l0_top = getattr(self.engine, "l0_top", L0Top.START)
+        self._l0_sub = getattr(self.engine, "l0_sub", L0Sub.IDLE)
+        self._seen_first_cmd = False
+        self._last_cmd_ns = None
+        try:
+            self.state.params["DenSiL0Top"] = self._l0_top.name
+            self.state.params["DenSiL0Sub"] = self._l0_sub.name
+        except Exception:
+            pass
+
     def _init_estop_and_startup_emulation(self) -> None:
-        """Initialize injected EStop bits and the simplified SafetyPLC handoff."""
-        # Logical injected bits (invert handled by encode/decode)
-        self._inj_bits = {k: False for k in ESTOP_SPECS.keys()}
+        """Initialize E-Stop/startup emulation (legacy mirrors).
 
-        # Startup / SafetyPLC handoff emulation
-        self._taster_prev = False
-        self._taster_rise_t_s: float | None = None
-        self._taster_delay_s = 2.0
-        self._drive_ready = False
-        self._estate = EStopState.ESTOP
-        self._BRAKE_SWITCH_S = 1.5
-        self._es_start_armed = False  # SafetyPLC Start pressed (simulated by btnESStart)
+        North refactor: DenSiEngine owns deterministic safety/ladder state.
+        This initializer seeds a few legacy mirrors used by UI/display helpers.
+        """
+        # Ensure engine starts in the expected FAULT state (broken OK chain, reset-able).
+        try:
+            self.engine.reset_to_fault_state()
+        except Exception:
+            pass
 
-        # Per-brake override (simulate one brake fault)
-        self._brake_override_b1 = False
-        self._brake_override_b2 = False
+        # Injected E-Stop word/bits (UI checkboxes reflect this)
+        try:
+            self._inj_estop_word = int(getattr(self.engine, "inj_estop_word", 0))
+            self._inj_bits = decode_estop_word(self._inj_estop_word)
+        except Exception:
+            self._inj_bits = {k: False for k in ESTOP_SPECS.keys()}
+            self._inj_estop_word = int(encode_estop_word(self._inj_bits))
 
-        # Cut markers (latched on E-Stop entry)
-        self._cut_valid = False
-        self._cut_pos_m = 0.0
-        self._cut_vel_mps = 0.0
-        self._cut_time_s = 0.0
-        self._systemtime_tok = ""
-        self._prev_estop_state = False
+        # Grace display trackers (banner/ready timing)
+        self.engine.taster_prev_disp = bool(getattr(self.engine, "taster_prev_disp", False))
+        self.engine.taster_pressed_s = getattr(self.engine, "taster_pressed_s", None)
 
-        # Match HiP brake-dot display semantics (equivalence + SafetyPLC grace)
-        self._BRAKE_HANDOFF_GRACE_S = 2.0
-        self._taster_prev_disp = False
-        self._taster_pressed_s: float | None = None
+        # Seed UI cut marker params (engine holds cleared markers at startup)
+        try:
+            self.state.params.setdefault("CutPos", float(getattr(self.engine, "cut_pos_m", 0.0) or 0.0))
+            self.state.params.setdefault("CutVel", float(getattr(self.engine, "cut_vel_mps", 0.0) or 0.0))
+            self.state.params.setdefault("CutTime", float(getattr(self.engine, "cut_time_s", 0.0) or 0.0))
+            self.state.params.setdefault("PosDiffFor", float(getattr(self.engine, "posdiff_for", 0.0) or 0.0))
+        except Exception:
+            pass
 
-        # Start in a "FAULT" state: show full estop chain broken until HiP reset.
-        self._apply_fault_state()
-        self._prev_estop_state = bool(getattr(self.state, "estop", False))
-
-        self._estop_latched = False
-        self._safety_ok = True  # placeholder
 
     def _wire_buttons_and_estop_controls(self) -> None:
         """Wire DenSi-only controls and EStop injection helpers."""
@@ -402,7 +423,7 @@ class DenSiController:
         self._wire_all_estop_bit_checkboxes()
 
         # Initial paint
-        self._render_estop_word_to_ui(self._inj_estop_word)
+        self._render_estop_word_to_ui(self.engine.inj_estop_word)
 
     def _lock_param_ui_device_side(self) -> None:
         """DenSi is device-side: parameters are displayed but not editable locally."""
@@ -521,7 +542,7 @@ class DenSiController:
         self._estop_latched = True  # reflect 'trip' immediately in state.estop
         self._brake_override_b1 = False
         self._brake_override_b2 = False
-        self._render_estop_word_to_ui(self._inj_estop_word)
+        self._render_estop_word_to_ui(self.engine.inj_estop_word)
 
     def _apply_go_state(self) -> None:
         """Set injected bits to a stable 'GO' state (no flash)."""
@@ -539,7 +560,7 @@ class DenSiController:
 
         self._inj_estop_word = encode_estop_word(self._inj_bits)
         self._estop_latched = False
-        self._render_estop_word_to_ui(self._inj_estop_word)
+        self._render_estop_word_to_ui(self.engine.inj_estop_word)
 
 
     def _sync_reset_able_bit(self) -> bool:
@@ -606,7 +627,7 @@ class DenSiController:
         self._brake_override_b1 = False
         self._brake_override_b2 = False
 
-        self._render_estop_word_to_ui(self._inj_estop_word)
+        self._render_estop_word_to_ui(self.engine.inj_estop_word)
     def _apply_estop_state_machine(self) -> None:
         """Authoritative ESTOP/IDLE/ARMED/READY ladder + brake timing.
 
@@ -712,7 +733,7 @@ class DenSiController:
             changed = True
 
         if changed:
-            self._render_estop_word_to_ui(self._inj_estop_word)
+            self._render_estop_word_to_ui(self.engine.inj_estop_word)
 
     def _apply_startup_logic(self) -> None:
         """Emulate SafetyPLC timing: Taster -> (delay) -> drives ready & brakes lifted."""
@@ -743,7 +764,7 @@ class DenSiController:
             self._taster_prev = bool(bits.get("taster", False))
             if changed:
                 self._inj_estop_word = encode_estop_word(bits)
-                self._render_estop_word_to_ui(self._inj_estop_word)
+                self._render_estop_word_to_ui(self.engine.inj_estop_word)
             return
 
         # Require explicit SafetyPLC Start (btnESStart) before we allow Taster to arm the drives.
@@ -768,7 +789,7 @@ class DenSiController:
             self._taster_prev = bool(bits.get("taster", False))
             if changed:
                 self._inj_estop_word = encode_estop_word(bits)
-                self._render_estop_word_to_ui(self._inj_estop_word)
+                self._render_estop_word_to_ui(self.engine.inj_estop_word)
             return
 
         taster = bool(bits.get("taster", False))
@@ -819,7 +840,7 @@ class DenSiController:
 
         if changed:
             self._inj_estop_word = encode_estop_word(bits)
-            self._render_estop_word_to_ui(self._inj_estop_word)
+            self._render_estop_word_to_ui(self.engine.inj_estop_word)
 
     @staticmethod
     def _make_drive_status_word(
@@ -958,23 +979,8 @@ class DenSiController:
 
     def _render_limit_fields_from_params(self, values: dict[str, float]) -> None:
         """Update txtLimitHardMin/UserMin/UserMax/HardMax from parameter values."""
-        for key, obj_name in _LIMIT_WIDGETS.items():
-            if key not in values:
-                continue
-            le = self._find_line_edit(obj_name)
-            if le is None:
-                continue
-            txt = self._fmt_m(values[key])
-            if le.text() == txt:
-                continue
-            was = le.blockSignals(True)
-            set_text(le, txt)
-            le.blockSignals(was)
-            # Ensure these are display-only on DenSi.
-            try:
-                set_enabled(le, False)
-            except Exception:
-                pass
+        vm = compute_densi_limits_vm(values=values, limit_widgets=_LIMIT_WIDGETS)
+        apply_densi_limits_vm(vm, find_line_edit=self._find_line_edit)
 
     def _normalize_pos_chain(self, values: dict[str, float]) -> dict[str, float]:
         v = dict(values)
@@ -1014,77 +1020,64 @@ class DenSiController:
         return v
 
     def _wire_all_estop_bit_checkboxes(self) -> None:
-        """Auto-wire E-Stop diagnostic checkboxes that exist in the UI."""
-        current_bits = decode_estop_word(self._inj_estop_word)
+        """Auto-wire E-Stop diagnostic checkboxes that exist in the UI.
 
-        for spec in iter_specs():
-            if not spec.checkbox:
-                continue
+        North refactor: discovery/wiring lives in panels.densi_estop_checkboxes.
+        Controller keeps the semantic callback that mutates injected bits.
+        """
 
-            cb = None
+        def _get_cb(obj_name: str) -> QCheckBox | None:
             try:
-                cb = self._wcache.checkbox(spec.checkbox)
+                return self._wcache.checkbox(obj_name)
             except Exception:
-                cb = self.win.findChild(QCheckBox, spec.checkbox)
+                w = self.win.findChild(QCheckBox, obj_name)
+                return w if isinstance(w, QCheckBox) else None
 
-            if cb is None:
-                # Don't spam INFO; debug is enough. (Multiple UI variants exist.)
-                log.debug("checkbox not found: %s (key=%s)", spec.checkbox, spec.key)
-                continue
+        self._b_estop_cbs = discover_densi_estop_checkboxes(get_checkbox=_get_cb)
+        init_densi_estop_checkboxes(
+            bindings=self._b_estop_cbs,
+            estop_word=int(self.engine.inj_estop_word),
+            set_checked=lambda cb, v: set_checked(cb, v, block_signals=True),
+            set_enabled=lambda cb, en: set_enabled(cb, en),
+            readonly_keys={"reset_able"},
+        )
+        wire_densi_estop_checkboxes(bindings=self._b_estop_cbs, on_toggled=self._on_estop_checkbox_toggled)
 
-            # init checkbox from current word (logical values)
-            set_checked(cb, bool(current_bits.get(spec.key, False)), block_signals=True)
 
-            # ResetAble is an output of the safety ladder; it is derived from trip-cause bits.
-            # Make it read-only so operator overrides cannot violate the contract.
-            if spec.key == 'reset_able':
-                set_enabled(cb, False)
-                continue
+    def _on_estop_checkbox_toggled(self, key: str, checked: bool) -> None:
+        """UI-driven diagnostic override for E-Stop bits."""
+        try:
+            self.engine.inject_estop_bit(key, bool(checked))
+        except Exception:
+            return
 
-            def _make_handler(key: str):
-                def _on_toggled(checked: bool) -> None:
-                    # User-driven diagnostic override for brake feedback bits.
-                    #
-                    # Default behavior: BRK1/BRK2 follow the Taster timing model
-                    # (after ESStart + 2s delay). We only enter override mode when
-                    # the operator sets a value that conflicts with what the timing
-                    # model currently expects. This keeps "Taster influences brakes"
-                    # as the default, while still allowing post-start brake faults.
-                    if key in ("brk1_ok", "brk2_ok"):
-                        desired = bool(getattr(self, "_drive_ready", False))
-                        if bool(checked) != bool(desired):
-                            if key == "brk1_ok":
-                                self._brake_override_b1 = True
-                            else:
-                                self._brake_override_b2 = True
+        log.info("inject estop %s=%s (word=0x%08X)", key, checked, int(self.engine.inj_estop_word))
+        self._render_estop_word_to_ui(int(self.engine.inj_estop_word))
 
-                    self._inj_bits[key] = bool(checked)
-                    # Encode first, then enforce derived ResetAble policy.
-                    self._inj_estop_word = encode_estop_word(self._inj_bits)
-                    self._sync_reset_able_bit()
-                    log.info("inject estop %s=%s (word=0x%08X)", key, checked, self._inj_estop_word)
-                    self._render_estop_word_to_ui(self._inj_estop_word)
-                return _on_toggled
-
-            cb.toggled.connect(_make_handler(spec.key))
-            log.info("wired: %s -> estop key '%s'", spec.checkbox, spec.key)
 
     def _render_estop_word_to_ui(self, word: int) -> None:
         bits = decode_estop_word(word)
 
         # sync checkboxes (avoid feedback loops)
-        for spec in iter_specs():
-            if not spec.checkbox:
-                continue
-            cb = None
-            try:
-                cb = self._wcache.checkbox(spec.checkbox)
-            except Exception:
-                cb = self.win.findChild(QCheckBox, spec.checkbox)
-            if cb is None:
-                continue
-            v = bool(bits.get(spec.key, False))
-            set_checked(cb, v, block_signals=True)
+        if self._b_estop_cbs is not None:
+            sync_densi_estop_checkboxes(
+                bindings=self._b_estop_cbs,
+                estop_word=int(word),
+                set_checked=lambda cb, v: set_checked(cb, v, block_signals=True),
+            )
+        else:
+            for spec in iter_specs():
+                if not spec.checkbox:
+                    continue
+                cb = None
+                try:
+                    cb = self._wcache.checkbox(spec.checkbox)
+                except Exception:
+                    cb = self.win.findChild(QCheckBox, spec.checkbox)
+                if cb is None:
+                    continue
+                v = bool(bits.get(spec.key, False))
+                set_checked(cb, v, block_signals=True)
 
         # Dots (including header brake dots) are updated via a separate helper so we can refresh
         # them each tick without re-writing checkboxes.
@@ -1117,17 +1110,17 @@ class DenSiController:
         ready = bool(bits.get("ready", False))
 
         # --- update taster-edge tracker (preserve legacy grace semantics) ---
-        prev = bool(getattr(self, "_taster_prev_disp", taster))
-        pressed_s = getattr(self, "_taster_pressed_s", None)
+        prev = bool(getattr(self.engine, "taster_prev_disp", taster))
+        pressed_s = getattr(self.engine, "taster_pressed_s", None)
         st0 = TasterEdgeState(prev=prev, pressed_s=pressed_s if pressed_s is None else float(pressed_s))
         st1 = update_taster_edge_state(state=st0, taster=taster, now_s=float(time.monotonic()))
-        self._taster_prev_disp = bool(st1.prev)
-        self._taster_pressed_s = st1.pressed_s
+        self.engine.taster_prev_disp = bool(st1.prev)
+        self.engine.taster_pressed_s = st1.pressed_s
 
         within_grace = within_brake_grace(
             state=st1,
             now_s=float(time.monotonic()),
-            grace_s=float(getattr(self, "_BRAKE_HANDOFF_GRACE_S", 2.0)),
+            grace_s=float(getattr(self.engine, "brake_handoff_grace_s", 2.0)),
         )
 
         # --- banner ---
@@ -1143,26 +1136,12 @@ class DenSiController:
         # --- dots ---
         dvm = compute_densi_estop_dots_vm(bits=bits, taster=taster, ready=ready, within_brake_grace=within_grace)
         apply_densi_estop_dots_vm(dvm, set_dot=self._set_dot)
-    def _update_taster_edge_disp(self, taster: bool) -> None:
-        """Track taster rising edge (0->1) for brake handoff grace."""
-        prev = bool(getattr(self, "_taster_prev_disp", taster))
-        if (not prev) and bool(taster):
-            self._taster_pressed_s = time.monotonic()
-        self._taster_prev_disp = bool(taster)
-
-    def _within_brake_grace_disp(self) -> bool:
-        """True if within grace window after taster rose."""
-        t0 = getattr(self, "_taster_pressed_s", None)
-        if t0 is None:
-            return False
-        return (time.monotonic() - float(t0)) <= float(getattr(self, "_BRAKE_HANDOFF_GRACE_S", 2.0))
-
 
     def _banner_estate_from_word_disp(self, word: int) -> str:
         """Derive ESTOP/IDLE/ARMED/READY from EStopStatus word (and taster grace)."""
         return derive_banner_estate_from_word(
             int(word),
-            within_brake_grace=self._within_brake_grace_disp,
+            within_brake_grace=self.engine.within_brake_grace_disp,
         )
 
     def _apply_banner_estate_disp(self, estate: str) -> None:
@@ -1180,7 +1159,7 @@ class DenSiController:
         Legacy meaning behaves like equivalence (NOT XOR): brk_ok_raw == taster.
         Add SafetyPLC's grace after taster rises.
         """
-        if bool(taster) and self._within_brake_grace_disp():
+        if bool(taster) and self.engine.within_brake_grace_disp():
             return True
         return bool(brk_ok_raw)
 
@@ -1189,17 +1168,16 @@ class DenSiController:
 
     def _set_inj_estop_all(self) -> None:
         # Set ALL logical bits to True
-        for k in self._inj_bits.keys():
-            self._inj_bits[k] = True
-        self._inj_estop_word = encode_estop_word(self._inj_bits)
-        log.info("inject: SET ALL bits (word=0x%08X)", self._inj_estop_word)
-        self._render_estop_word_to_ui(self._inj_estop_word)
+        self.engine.set_all_estop_bits()
+        log.info("inject: SET ALL bits (word=0x%08X)", int(self.engine.inj_estop_word))
+        self._render_estop_word_to_ui(int(self.engine.inj_estop_word))
 
     def _clear_inj_estop_all(self) -> None:
         # Restore a stable "GO" state (healthy chain) instead of clearing everything.
         # This keeps ResetAble/OK bits true and avoids painting the operator into a corner.
-        self._apply_go_state()
-        log.info("inject: GO state (word=0x%08X)", self._inj_estop_word)
+        self.engine.apply_go_state()
+        log.info("inject: GO state (word=0x%08X)", int(self.engine.inj_estop_word))
+        self._render_estop_word_to_ui(int(self.engine.inj_estop_word))
 
 
     def _emit_status(self, now_ns: int) -> None:
@@ -1251,47 +1229,19 @@ class DenSiController:
         return now.strftime("%d-%m-%Y %H:%M:%S ") + f"{ms:03d} ms"
 
     def _clear_cut_markers(self) -> None:
-        """Clear latched cut markers and reset exported params."""
-        self._cut_valid = False
-        self._cut_pos_m = 0.0
-        self._cut_vel_mps = 0.0
-        self._cut_time_s = 0.0
-        # Prevent immediate re-latch if we're still in estop
-        self._prev_estop_state = bool(getattr(self.state, "estop", False))
-
-        try:
-            self.state.params["CutPos"] = 0.0
-            self.state.params["CutVel"] = 0.0
-            self.state.params["CutTime"] = 0.0
-            self.state.params["PosDiffFor"] = 0.0
-        except Exception:
-            pass
+        """Clear latched cut markers (engine is source of truth)."""
+        self.engine.clear_cut_markers(reset_prev=True)
 
     def _on_es_start_clicked(self) -> None:
-        """Simulate SafetyPLC Start (ESStart).
-
-        In the legacy stack ESStart arms the safety handoff and is represented
-        on the wire as the 'schuetz' bit in EStopStatusWord.
-        """
-        # Allow ESStart even if we are in default ESTOP (not started),
-        # but never when a trip is latched (requires EStopReset first).
-        if bool(getattr(self, '_estop_latched', False)):
-            return
-
-        self._es_start_armed = True
-        self._inj_bits['schuetz'] = True
-        # If Taster is already held, start the timer now
-        if bool(self._inj_bits.get('taster', False)):
-            self._taster_rise_t_s = float(self.state.t_s)
-        self._inj_estop_word = encode_estop_word(self._inj_bits)
-        self._render_estop_word_to_ui(self._inj_estop_word)
-        log.info('ESStart pressed -> schuetz=1')
+        """Simulate SafetyPLC Start (ESStart)."""
+        self.engine.press_es_start()
+        self._render_estop_word_to_ui(int(self.engine.inj_estop_word))
+        log.info("ESStart pressed")
 
 
     def _on_diag_resync_clicked(self) -> None:
         """Operator pressed ReSync: clear cut markers."""
-        self._clear_cut_markers()
-        # paint immediately
+        self.engine.clear_cut_markers(reset_prev=True)
         self._render_cut_markers_to_ui(pos_m=None)
 
     def _render_cut_markers_to_ui(self, *, pos_m: float | None) -> None:
@@ -1305,19 +1255,19 @@ class DenSiController:
         """
         try:
             vm = compute_densi_cut_markers_vm(
-                cut_valid=bool(getattr(self, "_cut_valid", False)),
+                cut_valid=bool(getattr(self.engine, "cut_valid", False)),
                 estop_now=bool(getattr(self.state, "estop", False)),
                 now_token=str(self._now_token()),
-                systemtime_tok=str(getattr(self, "_systemtime_tok", "") or "") or None,
+                systemtime_tok=str(getattr(self.engine, "systemtime_tok", "") or "") or None,
                 systemtime_param=str(self.state.params.get("SystemTime", "") or "") or None,
-                cut_pos_m=float(getattr(self, "_cut_pos_m", 0.0) or 0.0) if bool(getattr(self, "_cut_valid", False)) else None,
-                cut_vel_mps=float(getattr(self, "_cut_vel_mps", 0.0) or 0.0) if bool(getattr(self, "_cut_valid", False)) else None,
+                cut_pos_m=float(getattr(self.engine, "cut_pos_m", 0.0) or 0.0) if bool(getattr(self.engine, "cut_valid", False)) else None,
+                cut_vel_mps=float(getattr(self.engine, "cut_vel_mps", 0.0) or 0.0) if bool(getattr(self.engine, "cut_valid", False)) else None,
                 pos_m=pos_m,
             )
 
-            # --- apply effects (state.params + controller token) ---
+            # --- apply effects (state.params + engine token) ---
             if vm.effects.systemtime_tok is not None:
-                self._systemtime_tok = vm.effects.systemtime_tok
+                self.engine.systemtime_tok = vm.effects.systemtime_tok
                 self.state.params["SystemTime"] = vm.effects.systemtime_tok
 
             if vm.effects.posdiff_for is not None:
@@ -1337,7 +1287,12 @@ class DenSiController:
             )
         except Exception:
             # Fail-safe UI display
-            for w in (getattr(self, "_txt_cut_time", None), getattr(self, "_txt_cut_pos", None), getattr(self, "_txt_cut_vel", None), getattr(self, "_txt_posdiff", None)):
+            for w in (
+                getattr(self, "_txt_cut_time", None),
+                getattr(self, "_txt_cut_pos", None),
+                getattr(self, "_txt_cut_vel", None),
+                getattr(self, "_txt_posdiff", None),
+            ):
                 if w is not None:
                     set_text(w, "--")
 
@@ -1377,9 +1332,16 @@ class DenSiController:
     # ---------------------------------------------------------------------
 
     def _step_lifetick(self) -> None:
-        # --- LiveTick semantics (device-origin) ---
-        # tx: incrementing device tick (DenSi sim, ms-based 16-bit counter)
-        # rx: echo value received from HiP/Core in last command frame
+        """LifeTick logging + tick-display rendering.
+
+        North refactor: the engine owns the deterministic counters written into
+        `AxisTelemetry.meta` (device_tick/lifetick_tx/lifetick_rx).
+
+        The controller keeps:
+        - debug logging of echo changes (edge-triggered)
+        - rendering the legacy TimeTick field (txt_tick)
+        - lightweight heartbeat fields (tx/rx/diff)
+        """
         now_s = time.monotonic()
         _echo_map = getattr(self._last_cmd, "lifetick_echo", {}) if self._last_cmd is not None else {}
 
@@ -1414,26 +1376,9 @@ class DenSiController:
                 log.debug("DenSi rx cmd: <no cmd yet>")
                 self._lt_last_cmd_log_s = now_s
 
-        inc_ms = max(1, int(round(self.tb.dt_s * 1000.0)))
         for _axis_id, _ax in self.state.axes.items():
-            # Legacy PLC analogue: LifetickUItx is a WORD that increments in (roughly) milliseconds.
-            # This drives the GUI's TimeTick display (delta between successive received lifeticks).
-            prev = int(_ax.meta.get("device_tick", 0)) & 0xFFFF
-            dev_tick = (prev + inc_ms) & 0xFFFF
-            _ax.meta["device_tick"] = dev_tick
-
-            # Keep livetick_tx aligned with device_tick for echo/watchdog semantics.
-            _ax.meta["lifetick_tx"] = int(dev_tick)
-            try:
-                _ax.meta["lifetick_rx"] = int(dict(_echo_map).get(_axis_id, 0) or 0)
-            except Exception:
-                _ax.meta["lifetick_rx"] = 0
-            # Cycle time indicator for debugging/UX.
-            _ax.meta["timetick_ms"] = inc_ms
-
-            # Debug log the tick values
-            tx = int(_ax.meta.get("lifetick_tx", 0)) & 0xFFFF
-            rx = int(_ax.meta.get("lifetick_rx", 0)) & 0xFFFF
+            tx = int(_ax.meta.get("lifetick_tx", 0) or 0) & 0xFFFF
+            rx = int(_ax.meta.get("lifetick_rx", 0) or 0) & 0xFFFF
             diff = (tx - rx) & 0xFFFF
 
             # Heartbeat focuses on the primary axis (first configured axis).
@@ -1457,26 +1402,10 @@ class DenSiController:
 
         # Render device-side tick staleness like PLC does:
         # diff = LifetickUItx - LifetickUIrx (WORD wrap)
-        if self._txt_tick is not None and self.axis_ids:
-            axis_id = self.axis_ids[0]
-            ax = self.state.axes.get(axis_id)
-            if ax is not None:
-                try:
-                    tx = int(ax.meta.get("lifetick_tx", 0)) & 0xFFFF
-                except Exception:
-                    tx = 0
-                try:
-                    rx = int(ax.meta.get("lifetick_rx", 0)) & 0xFFFF
-                except Exception:
-                    rx = 0
-                diff = (tx - rx) & 0xFFFF
-                # avoid repaint churn
-                s = str(diff)
-                if self._txt_tick.text() != s:
-                    set_text(self._txt_tick, s)
-            else:
-                if self._txt_tick.text() != "--":
-                    set_text(self._txt_tick, "--")
+        if self._txt_tick is not None:
+            axis_id0 = self.axis_ids[0] if self.axis_ids else ""
+            vm = compute_densi_lifetick_vm(state=self.state, axis_id=axis_id0)
+            apply_densi_lifetick_vm(vm, txt_tick=self._txt_tick)
 
 
 
@@ -1642,56 +1571,18 @@ class DenSiController:
                 bool(ready_for_sollvel),
                 bool(moving),
             )
-        from steuerung3d.core.command_frame import ParamEditBeginOp, ParamCancelOp, ParamWriteOp, coerce_param_ops
 
-        for op in coerce_param_ops(getattr(self._last_cmd, "param_ops", []) or []):
-            if not allow_param_ops:
-                continue
-            if isinstance(op, ParamEditBeginOp):
-                grp = str(op.group or "")
-                self.state.param_edit_active = True
-                self.state.param_edit_group = grp
-                log.info("param_edit_begin: group=%s", grp)
-
-            elif isinstance(op, ParamCancelOp):
-                grp = str(op.group or "")
-                if (not grp) or (grp == self.state.param_edit_group):
-                    self.state.param_edit_active = False
-                    self.state.param_edit_group = ""
-                log.info("param_cancel: group=%s", grp)
-
-            elif isinstance(op, ParamWriteOp):
-                grp = str(op.group or "")
-                vals = {str(k): float(v) for k, v in dict(op.values or {}).items()}
-
-                # ST does *not* implement a param-edit session on the wire.
-                # In simulation we still *support* edit sessions, but we also accept
-                # direct writes when no session is active.
-
-                # enforce minimal device-side guards too
-                if grp == 'pos':
-                    vals = self._normalize_pos_chain(vals)
-                elif grp == 'guider':
-                    vals = self._normalize_guider_range(vals)
-                if self.state.param_edit_active and (grp != self.state.param_edit_group):
-                    log.warning(
-                        "param_write rejected: group=%s active=%s active_group=%s",
-                        grp,
-                        self.state.param_edit_active,
-                        self.state.param_edit_group,
-                    )
-                else:
-                    if grp == 'pos':
-                        vals = self._enforce_pos_chain(vals)
-                    elif grp == 'guider':
-                        vals = self._enforce_guider_minmax(vals)
-
-                    self.state.params.update(vals)
-                    self._apply_param_values_to_ui(vals)
-                    # end edit session after a successful write
-                    self.state.param_edit_active = False
-                    self.state.param_edit_group = ""
-                    log.info("param_write accepted: group=%s keys=%s", grp, sorted(vals.keys()))
+        res = apply_densi_param_ops(
+            state=self.state,
+            param_ops=getattr(self._last_cmd, "param_ops", []) or [],
+            allow=allow_param_ops,
+            normalize_pos_chain=self._normalize_pos_chain,
+            normalize_guider_range=self._normalize_guider_range,
+            enforce_pos_chain=self._enforce_pos_chain,
+            enforce_guider_minmax=self._enforce_guider_minmax,
+        )
+        if res.applied_values:
+            self._apply_param_values_to_ui(res.applied_values)
 
     def _apply_safety_and_refresh_estop_word(self) -> tuple[int, dict]:
         # SafetyPLC/drive handoff emulation (taster -> ready/brakes after delay)
@@ -1700,7 +1591,7 @@ class DenSiController:
         # ResetAble policy: becomes true once Master/Slave/Network/EStop1/EStop2 are cleared (while in ESTOP).
         if self._sync_reset_able_bit():
             try:
-                self._render_estop_word_to_ui(self._inj_estop_word)
+                self._render_estop_word_to_ui(self.engine.inj_estop_word)
             except Exception:
                 pass
 
@@ -1770,12 +1661,34 @@ class DenSiController:
         self._prev_estop_state = bool(self.state.estop)
 
     def _post_tick_ui_updates(self) -> None:
-        # --- LiveTick + local UI readouts (device-side) ---
-        self._step_lifetick()
+        """Device-side UI updates performed after the engine tick.
+
+        North refactor: the engine owns deterministic state evolution (including
+        lifetick counters + status words). The controller keeps only UI concerns:
+        - log echo changes
+        - render tick display + readouts
+        """
+        self._step_lifetick()  # logging + tick display (no state mutation)
         self._render_live_readouts_ui()
 
-        # Provide plausible legacy drive status words so HiP's AmpStatus fields light up.
-        self._update_drive_status_words()
+    def _drain_command_frames(self) -> list[CommandFrame]:
+        """Drain inbound command frames.
+
+        The engine consumes the frames; the controller keeps only
+        logging/heartbeat side effects.
+        """
+        frames = self.command_in.drain_command_frames(limit=100)
+        if frames:
+            last = frames[-1]
+            self._hb.inc("cmd_rx", len(frames))
+            log.debug(
+                "rx cmd: tick=%s estop_reset=%s fault=%s mode=%s",
+                getattr(last, "tick", None),
+                getattr(last, "estop_reset", None),
+                getattr(last, "fault", None),
+                getattr(last, "mode", None),
+            )
+        return list(frames)
 
     def _publish_telemetry_and_heartbeat(self) -> None:
         snap = TelemetrySnapshot.from_state(self.state)
@@ -1826,36 +1739,37 @@ class DenSiController:
 
     def step_once(self) -> None:
         with self._wd.tick():
-            # Phase 1: RX command frames / defaults
-            self._rx_command_frames()
-            self._ensure_last_cmd()
+            # Phase 1: RX frames (controller side effects only)
+            frames = self._drain_command_frames()
             self._wd.mark('rx_cmd')
-                        # Phase 2: connection state, header dots, and edge logs
-            self._update_l0_connection_state()
+
+            # Phase 2: deterministic engine tick
+            res = self.engine.step(frames=frames, now_ns=int(time.monotonic_ns()))
+            # Back-compat aliases for UI/logging code
+            self._last_cmd = res.last_cmd
+            self._last_cmd_ns = res.last_cmd_ns
+            self._seen_first_cmd = bool(getattr(self.engine, "seen_first_cmd", False))
+            self._wd.mark('engine')
+
+            # Phase 3: UI indicators / edge logs
             self._render_header_online_dot()
             self._edge_log_cmd_changes()
-            self._wd.mark('conn_hdr')
-                        # Phase 3: derive inputs used for device-local policies
-            _estop_word0, reset_able, ready_for_sollvel = self._derive_estop_inputs()
-            moving = self._compute_moving_guard()
-            self._wd.mark('derive')
-                        # Phase 4: downlink one-shots / parameter ops
-            self._handle_estop_reset_cmd(reset_able)
-            self._handle_resync_cmd()
             self._handle_gui_not_halt_cmd()
-            self._apply_param_ops(ready_for_sollvel=ready_for_sollvel, moving=moving)
-            self._wd.mark('ops')
-                        # Phase 5: authoritative ladder + estop word refresh / dots
-            estop_word, bits = self._apply_safety_and_refresh_estop_word()
-            estop_edge = self._render_estop_and_compute_edge(bits, estop_word)
-            self._wd.mark('safety')
-                        # Phase 6: plant step, cut latching, clamp, and tick advance
-            self._step_plant_with_clamp()
-            self._maybe_latch_cut_markers(estop_edge)
-            self._apply_estop_clamp_to_state()
-            self._advance_tick()
-            self._wd.mark('plant')
-                        # Phase 7: local UI + telemetry publish
+            self._wd.mark('hdr')
+
+            # Phase 4: parameter UI echo (device is authoritative)
+            if getattr(res, "applied_param_values", None):
+                self._apply_param_values_to_ui(dict(res.applied_param_values))
+            self._wd.mark('params')
+
+            # Phase 5: estop/banners/dots (checkbox refresh only when ResetAble toggled)
+            if bool(getattr(res, "reset_able_changed", False)):
+                self._render_estop_word_to_ui(int(self.engine.inj_estop_word))
+            else:
+                self._render_estop_dots_from_bits(dict(res.estop_bits), int(res.estop_word))
+            self._wd.mark('estop_ui')
+
+            # Phase 6: local UI readouts + telemetry publish
             self._post_tick_ui_updates()
             self._publish_telemetry_and_heartbeat()
             self._wd.mark('publish')
