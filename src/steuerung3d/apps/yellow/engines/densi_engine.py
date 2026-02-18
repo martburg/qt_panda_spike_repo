@@ -147,8 +147,40 @@ class DenSiEngine:
             enforce_guider_minmax=enforce_guider_minmax,
         )
         eng.reset_to_fault_state()
+        eng._seed_default_params()
         eng.prev_estop_state = bool(getattr(eng.state, "estop", False))
         return eng
+
+    def _seed_default_params(self) -> None:
+        try:
+            self.state.params["SystemTime"] = self._now_token()
+        except Exception:
+            pass
+
+        # Defaults expected by UI + protocol contract tests
+        self.state.params.setdefault("PosChain0", 0.0)
+        self.state.params.setdefault("PosChain1", 0.0)
+        self.state.params.setdefault("PosChain2", 0.0)
+        self.state.params.setdefault("PosChain3", 0.0)
+
+        self.state.params.setdefault("GuiderMin", -0.5)
+        self.state.params.setdefault("GuiderMax", 0.5)
+
+        self.state.params.setdefault("AccMax", 1.0)
+        self.state.params.setdefault("AxisAmp", 100.0)
+
+        # Latched cut markers start cleared
+        self.state.params.setdefault("CutPos", 0.0)
+        self.state.params.setdefault("CutVel", 0.0)
+        self.state.params.setdefault("CutTime", 0.0)
+        self.state.params.setdefault("PosDiffFor", 0.0)
+
+        # Reflect initial L0 state
+        try:
+            self.state.params["DenSiL0Top"] = self.l0_top.name
+            self.state.params["DenSiL0Sub"] = self.l0_sub.name
+        except Exception:
+            pass
 
     # ---------------------------------------------------------------------
     # helpers

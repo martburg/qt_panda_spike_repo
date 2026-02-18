@@ -6,6 +6,17 @@ Qt controllers. Controllers should remain wiring + rendering only.
 
 from .densi_engine import DenSiEngine, DenSiTickResult
 from .densi_types import EStopState, L0Top, L0Sub
+from .hip_engine import (
+    HipEngine,
+    HipAttachInputs,
+    HipAttachState,
+    HipBannerInputs,
+    HipParamCommitDialog,
+    HipState,
+    HipViewModel,
+    HipStepInputs,
+    HipStepResult,
+)
 
 __all__ = [
     "DenSiEngine",
@@ -13,4 +24,13 @@ __all__ = [
     "EStopState",
     "L0Top",
     "L0Sub",
+    "HipEngine",
+    "HipAttachInputs",
+    "HipAttachState",
+    "HipBannerInputs",
+    "HipParamCommitDialog",
+    "HipState",
+    "HipViewModel",
+    "HipStepInputs",
+    "HipStepResult",
 ]
