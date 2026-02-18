@@ -43,6 +43,9 @@ apps/yellow/parts/**.ui
 
 apps/yellow/ui_split/parts/**.ui
 
+If legacy top-level .ui files exist (e.g., yellow3.ui, yellow3_shell_marker.ui),
+archive them under apps/yellow/archive_ui/ to avoid runtime confusion.
+
 Keep one canonical location (default: ui_split/parts/ because ui_shell.py loads ui_split/yellow3_merged.ui).
 
 Remove the duplicate folder and duplicate merge script:
