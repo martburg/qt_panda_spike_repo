@@ -1,0 +1,248 @@
+/* ===== palette tuned to legacy ===== */
+QMainWindow { background: #7b2a2a; }  /* base behind frames */
+
+/* main red frames */
+#frameHeader, #frameFooter, #frameMain, #frameSetupToggle, #frameSetup {
+    background: #a85151;              /* brick red that works w/ black+white text */
+    border: 1px solid #000;
+    border-radius: 10px;
+}
+
+/* guider speed box */
+#frameGuiderSpeed, #frameGuiderRange { border: 1px solid #000; border-radius: 8px; }
+
+/* yellow status column */
+#frameStatusPanel {
+    background: #f2c20c;
+    border: 2px solid #000;
+    border-radius: 10px;
+}
+
+/* "yellow strip" blocks that should NOT be red-tinted */
+#frmMasterGuiderNetwork, #frmGComBlock, #frmYellowLeft, #frmYellowRight,
+#frameStatusLeft, #frameStatusMid, #frameStatusRight, #frameStatusMasterBlock, #frameStatusGBlock {
+    background: #d8d2b0;              /* warm grey/khaki */
+    border: 2px solid #000;
+    border-radius: 8px;
+}
+
+/* ===== group boxes ===== */
+QGroupBox#gbPanel {
+    background: #d9d9d9;
+    border: 1px solid #000;
+    border-radius: 8px;
+    margin-top: 18px;
+    color: #111;
+}
+QGroupBox#gbPanel::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    top: 4px;
+    padding: 0 6px;
+    color: #111;
+    font-weight: 600;
+}
+QGroupBox#gbStatusFlagsTop,
+QGroupBox#gbStatusFlags,
+QGroupBox#gbSafetyFlags,
+QGroupBox#gbTwinSafeFlags,
+QGroupBox#gbGuiderFlags {
+    background: rgba(255,255,255,0.22);
+    border: 1px solid #000;
+    border-radius: 8px;
+}
+
+/* ===== text ===== */
+QLabel { color: #111; }
+QLabel#lblUnit { color: #eee; font-weight: bold; }
+QLabel[role="headerSmall"] { color: #f8f8f8; }
+
+/* ===== inputs ===== */
+QLineEdit {
+    background: #efefef;
+    border: 1px solid #666;
+    border-radius: 4px;
+    padding: 2px 6px;
+    color: #111;
+}
+
+/* Parameter fields: HiP should turn white when active, light grey when disabled */
+QLineEdit[paramField="true"]:enabled { background: #ffffff; }
+QLineEdit[paramField="true"]:disabled { background: #d8d8d8; color: #555; }
+
+QLineEdit#txtVelMaxMot, QLineEdit#txtLagError { color: #c00000; font-weight: bold; }
+
+QComboBox {
+    background: #efefef;
+    border: 1px solid #666;
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+
+/* ===== buttons (bevel + strong outline) ===== */
+QPushButton, QToolButton {
+    background: #e2e2e2;
+    color: #111;
+
+    border-style: solid;
+    border-width: 2px;
+
+    /* faux double-border / bevel */
+    border-top-color: #ffffff;
+    border-left-color: #ffffff;
+    border-right-color: #2b2b2b;
+    border-bottom-color: #2b2b2b;
+
+    border-radius: 1px;
+    padding: 6px 12px;
+    margin: 4px;
+}
+QPushButton:hover, QToolButton:hover {
+    background: #ededed;
+    border-top-color: #ffffff;
+    border-left-color: #ffffff;
+    border-right-color: #1a1a1a;
+    border-bottom-color: #1a1a1a;
+}
+QPushButton:pressed, QToolButton:pressed {
+    background: #d0d0d0;
+
+    border-top-color: #2b2b2b;
+    border-left-color: #2b2b2b;
+    border-right-color: #ffffff;
+    border-bottom-color: #ffffff;
+
+    padding-top: 7px;
+    padding-left: 13px;
+}
+QPushButton:disabled, QToolButton:disabled {
+    background:#dcdcdc;
+    color: #888;
+    border-top-color: #f5f5f5;
+    border-left-color: #f5f5f5;
+    border-right-color: #bdbdbd;
+    border-bottom-color: #bdbdbd;
+}
+
+/* Danger */
+QPushButton[kind="danger"], QToolButton[kind="danger"] {
+    background: #c9a2a2;           /* desaturated warm red-grey */
+    color: #111;
+
+    border-style: solid;
+    border-width: 2px;
+
+    border-top-color: #f2e8e8;
+    border-left-color: #f2e8e8;
+    border-right-color: #3a1a1a;
+    border-bottom-color: #3a1a1a;
+
+    border-radius: 1px;
+    padding: 6px 12px;
+    margin: 4px;
+    outline: none;
+}
+QPushButton[kind="danger"]:hover, QToolButton[kind="danger"]:hover {
+    background: #b10000;
+    color: #f2f2f2;
+    border-right-color: #220c0c;
+    border-bottom-color: #220c0c;
+}
+QPushButton[kind="danger"]:pressed, QToolButton[kind="danger"]:pressed {
+    background: #b99f9f;
+
+    border-top-color: #3a1a1a;
+    border-left-color: #3a1a1a;
+    border-right-color: #f2e8e8;
+    border-bottom-color: #f2e8e8;
+
+    padding-top: 7px;
+    padding-left: 13px;
+}
+QPushButton[kind="danger"]:disabled, QToolButton[kind="danger"]:disabled {
+    background: #cfc7c7;
+    color: #777;
+    border-right-color: #8a7a7a;
+    border-bottom-color: #8a7a7a;
+}
+
+/* ===== LED dots: geometry only (NO color here) ===== */
+QFrame#led_fbt_dot, QFrame#led_ready_dot, QFrame#led_online_dot,
+QFrame#led_brk1_dot, QFrame#led_brk2_dot,
+QFrame#dotMaster, QFrame#dotGuider, QFrame#dotNetwork,
+QFrame#dotEStop1, QFrame#dotEStop2, QFrame#dot30kw, QFrame#dot05kw,
+QFrame#dotBRK1, QFrame#dotBRK2, QFrame#dotBRK2KB,
+QFrame#dotSPS, QFrame#dotRed, QFrame#dotENC,
+QFrame#dotPosWin, QFrame#dotVelWin, QFrame#dotEndlage,
+QFrame#g1_com_dot, QFrame#g1_fb_dot, QFrame#g1_out_dot,
+QFrame#g2_com_dot, QFrame#g2_fb_dot, QFrame#g2_out_dot,
+QFrame#g3_com_dot, QFrame#g3_fb_dot, QFrame#g3_out_dot,
+QFrame#dotHdrFbt, QFrame#dotHdrReady, QFrame#dotHdrOnline,
+QFrame#dotHdrBrake1, QFrame#dotHdrBrake2,
+QFrame#ledGuiderReadyDot, QFrame#ledGuiderOnlineDot
+{
+    min-width: 12px; max-width: 12px;
+    min-height: 12px; max-height: 12px;
+    border-radius: 6px;
+    border: 1px solid #000;
+}
+
+/* Default for any LED that has a state set (covers warn/good/bad/off etc.) */
+QFrame[state] { background: #000; }  /* default = black */
+
+/* State overrides */
+QFrame[state="bad"]  { background: #d33; }  /* red */
+QFrame[state="good"] { background: #3d3; }  /* green */
+QFrame[state="warn"] { background: #ea0; }  /* amber */
+
+/* ===== Tabs: neutral grey, NO red bleed ===== */
+#frameSetup QTabWidget::pane {
+    border: 1px solid #000;
+    border-radius: 10px;
+    background: #f2f2f2;
+    top: -1px;
+}
+
+/* Make the actual tab pages neutral grey */
+#frameSetup QTabWidget QWidget#pageGuider,
+#frameSetup QTabWidget QWidget#pageParameters,
+#frameSetup QTabWidget QWidget#pageDiagnostics,
+#frameSetup QTabWidget QWidget#pageCommsTiming,
+#frameSetup QTabWidget QWidget#pageLastFrames,
+#frameSetup QTabWidget QWidget#pageFaultInject,
+#frameSetup QTabWidget QWidget#pageEventsFaults,
+#frameSetup QTabWidget QWidget#pageLogging {
+    background: #e0e0e0;
+}
+
+/* Tab buttons (subtle grey, rounded) */
+#frameSetup QTabBar::tab {
+    border: 1px solid #000;
+    border-bottom: none;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    padding: 5px 12px;
+    margin-right: 4px;
+    background: #e0e0e0;
+    color: #111;
+}
+#frameSetup QTabBar::tab:selected {
+    background: #f7f7f7;
+    margin-bottom: -1px;
+    font-weight: 600;
+}
+#frameSetup QTabBar::tab:hover { background: #ebebeb; }
+
+/* Diagnostics sub-tabs a touch smaller */
+#tabsDiagnostics QTabBar::tab {
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    padding: 4px 10px;
+}
+/* Make only the E-Stop ALL buttons taller */
+QPushButton#btnEStopAllSet,
+QPushButton#btnEStopAllClear {
+    min-height: 25px;     /* bump until it matches your visual row */
+    padding-top: 0px;
+    padding-bottom: 0px;
+}

@@ -6,32 +6,42 @@ This package splits the large `yellow3.ui` into three **edit-friendly** chunk fi
 - Keep the **runtime UI identical** to the original monolithic file.
 - Let you edit big pages in smaller `.ui` files.
 
+## Runtime UI (source of truth)
+The app loads its UI from `ui_split/yellow3_merged.ui` via `ui_shell.py`.
+Edit the split parts and merge to refresh that runtime file.
+
+## Legacy duplicates (quarantined)
+Older root-level UI artifacts are now in `legacy_ui/`:
+- `legacy_ui/yellow3.ui`
+- `legacy_ui/yellow3_shell_marker.ui`
+- `legacy_ui/parts/**`
+
 ## Files
-- `yellow3_shell_marker.ui`
+- `ui_split/yellow3_shell_marker.ui`
   - The main window + all widgets **except** the heavy tab pages.
   - Contains markers (in `whatsThis`) that tell the merge tool where to insert the parts.
 
-- `parts/pageGuider.ui`
-- `parts/pageParameters.ui`
-- `parts/pageDiagnostics.ui`
+- `ui_split/parts/pageGuider.ui`
+- `ui_split/parts/pageParameters.ui`
+- `ui_split/parts/pageDiagnostics.ui`
   - The extracted contents of the corresponding pages.
 
-- `merge_yellow3_ui.py`
-  - Rebuilds a monolithic `yellow3.ui` by inserting each part into the correct page.
+- `ui_split/merge_yellow3_ui.py`
+  - Rebuilds `ui_split/yellow3_merged.ui` by inserting each part into the correct page.
 
 ## How to use
 1) Edit whichever part you need in Qt Designer:
-   - `parts/pageGuider.ui`
-   - `parts/pageParameters.ui`
-   - `parts/pageDiagnostics.ui`
+  - `ui_split/parts/pageGuider.ui`
+  - `ui_split/parts/pageParameters.ui`
+  - `ui_split/parts/pageDiagnostics.ui`
 
 2) Rebuild the runtime file:
 
 ```bash
-python merge_yellow3_ui.py --shell yellow3_shell_marker.ui --parts parts --out yellow3.ui
+python ui_split/merge_yellow3_ui.py --shell ui_split/yellow3_shell_marker.ui --parts ui_split/parts --out ui_split/yellow3_merged.ui
 ```
 
-3) Use the produced `yellow3.ui` in your app exactly like before.
+3) Runtime uses `ui_split/yellow3_merged.ui`; edit parts and merge to refresh it.
 
 ## Notes / invariants
 - Widget `objectName`s inside each part are preserved.
@@ -39,7 +49,7 @@ python merge_yellow3_ui.py --shell yellow3_shell_marker.ui --parts parts --out y
 
 
 ## Diagnostics split
-`parts/pageDiagnostics.ui` is now a *shell* that contains the `tabsDiagnostics` structure, but each large child page is split into its own file under `parts/diagnostics/`:
+`ui_split/parts/pageDiagnostics.ui` is now a *shell* that contains the `tabsDiagnostics` structure, but each large child page is split into its own file under `ui_split/parts/diagnostics/`:
 
 - `pageDiagCommsTiming.ui`
 - `pageDiagLastFrames.ui`

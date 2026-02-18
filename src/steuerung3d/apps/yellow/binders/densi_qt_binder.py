@@ -50,7 +50,7 @@ from ..panels.densi_lifetick_render import apply_densi_lifetick_vm
 from ..panels.densi_limits_vm import compute_densi_limits_vm
 from ..panels.densi_limits_render import apply_densi_limits_vm
 from ..panels.densi_readouts_render import DenSiReadoutsBindings, apply_densi_readouts_vm
-from ..engines.densi_types2 import DensiInputs, DensiUiInputs, DensiEstopToggle
+from ..engines.densi_inputs import DensiInputs, DensiUiInputs, DensiEstopToggle
 from ..engines.densi_viewmodel import DensiViewModel
 from steuerung3d.protocol.estop_bits import decode_estop_word, iter_specs
 
