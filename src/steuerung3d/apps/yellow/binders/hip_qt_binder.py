@@ -43,7 +43,7 @@ from ..controllers.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WID
 from ..controllers.ui_contract import log_missing_optional_once, log_missing_required_once
 from ..controllers.ui_format import fmt_f_unit
 from ..controllers.ui_banner import BANNER_COLORS
-from ..engines.hip_engine import (
+from ..engines.hip.engine import (
     HipParamAction,
     HipUiInputs,
     HipViewModel,

@@ -34,7 +34,7 @@ from .bindings import YellowBindings
 from .ports import IntentOut, TelemetryIn
 from .ui_watchdog import PerfWatchdog
 from ..binders.hip_qt_binder import HipQtBinder
-from ..engines.hip_engine import HipEngine, HipStepInputs, HipStepResult, HipUiInputs, HipViewModel
+from ..engines.hip.engine import HipEngine, HipStepInputs, HipStepResult, HipUiInputs, HipViewModel
 
 log = logging.getLogger("hi_p")
 

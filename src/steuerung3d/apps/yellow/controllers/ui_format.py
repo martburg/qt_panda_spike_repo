@@ -1,42 +1,17 @@
-# src/steuerung3d/apps/yellow/controllers/ui_format.py
-"""Formatting helpers for UI readouts.
-
-We keep formatting logic centralized so controller code reads like a spec and
-remains consistent across HiP and DenSi.
-"""
+"""Shim: re-export Qt-free formatting helpers from domain."""
 
 from __future__ import annotations
 
-from typing import Any
+from ..domain.ui_format import (
+    fmt_f,
+    fmt_f_unit,
+    fmt_i,
+    fmt_i_unit,
+)
 
-
-def fmt_f(x: Any, ndigits: int = 3, empty: str = "--") -> str:
-    """Format a float-like value or return `empty` if None/invalid."""
-    if x is None:
-        return empty
-    try:
-        return f"{float(x):.{ndigits}f}"
-    except Exception:
-        return empty
-
-
-def fmt_f_unit(x: Any, unit: str, ndigits: int = 2, empty: str = "--") -> str:
-    """Format float + unit, e.g. '1.23 m'."""
-    s = fmt_f(x, ndigits=ndigits, empty="")
-    return f"{s} {unit}" if s else empty
-
-
-def fmt_i_unit(x: Any, unit: str, empty: str = "--") -> str:
-    """Format int + unit, e.g. '12 A'."""
-    s = fmt_i(x, empty="")
-    return f"{s} {unit}" if s else empty
-
-
-def fmt_i(x: Any, empty: str = "--") -> str:
-    """Format an int-like value or return `empty` if None/invalid."""
-    if x is None:
-        return empty
-    try:
-        return str(int(x))
-    except Exception:
-        return empty
+__all__ = [
+    "fmt_f",
+    "fmt_f_unit",
+    "fmt_i",
+    "fmt_i_unit",
+]

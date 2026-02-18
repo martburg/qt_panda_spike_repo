@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from steuerung3d.apps.yellow.engines.hip_engine import HipEngine, HipAttachInputs, HipBannerInputs
+from steuerung3d.apps.yellow.engines.hip.engine import HipEngine, HipAttachInputs, HipBannerInputs
 from steuerung3d.apps.yellow.controllers.ui_banner import derive_banner_estate_from_word
 
 

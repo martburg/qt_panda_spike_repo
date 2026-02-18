@@ -6,7 +6,7 @@ Qt controllers. Controllers should remain wiring + rendering only.
 
 from .densi_engine import DenSiEngine, DenSiTickResult
 from .densi_types import EStopState, L0Top, L0Sub
-from .hip_engine import (
+from .hip.engine import (
     HipEngine,
     HipAttachInputs,
     HipAttachState,

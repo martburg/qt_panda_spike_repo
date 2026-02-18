@@ -179,6 +179,19 @@ class DenSiController:
     # ------------------------------------------------------------------
 
     def _normalize_pos_chain(self, values: dict[str, float]) -> dict[str, float]:
+        return self._coerce_pos_chain(values)
+
+    def _normalize_guider_range(self, values: dict[str, float]) -> dict[str, float]:
+        return self._coerce_guider_range(values)
+
+    def _enforce_pos_chain(self, vals: dict[str, float]) -> dict[str, float]:
+        return self._coerce_pos_chain(vals)
+
+    def _enforce_guider_minmax(self, vals: dict[str, float]) -> dict[str, float]:
+        return self._coerce_guider_range(vals)
+
+    @staticmethod
+    def _coerce_pos_chain(values: dict[str, float]) -> dict[str, float]:
         v = dict(values)
         keys = ("HardMax", "UserMax", "UserMin", "HardMin")
         if not all(k in v for k in keys):
@@ -201,41 +214,9 @@ class DenSiController:
         v["UserMin"] = user_min
         return v
 
-    def _normalize_guider_range(self, values: dict[str, float]) -> dict[str, float]:
+    @staticmethod
+    def _coerce_guider_range(values: dict[str, float]) -> dict[str, float]:
         v = dict(values)
-        if "PosMin" not in v or "PosMax" not in v:
-            return v
-        pos_min = float(v["PosMin"])
-        pos_max = float(v["PosMax"])
-        if pos_min > pos_max:
-            pos_min, pos_max = pos_max, pos_min
-        if pos_min == pos_max:
-            pos_max = pos_min + (1e-6 * (abs(pos_min) + 1.0))
-        v["PosMin"] = pos_min
-        v["PosMax"] = pos_max
-        return v
-
-    def _enforce_pos_chain(self, vals: dict[str, float]) -> dict[str, float]:
-        v = dict(vals)
-        need = ("HardMax", "UserMax", "UserMin", "HardMin")
-        if not all(k in v for k in need):
-            return v
-        hard_max = float(v["HardMax"])
-        hard_min = float(v["HardMin"])
-        user_max = float(v["UserMax"])
-        user_min = float(v["UserMin"])
-        if hard_max < hard_min:
-            hard_max, hard_min = hard_min, hard_max
-        user_max = max(hard_min, min(hard_max, user_max))
-        user_min = max(hard_min, min(user_max, user_min))
-        v["HardMax"] = hard_max
-        v["HardMin"] = hard_min
-        v["UserMax"] = user_max
-        v["UserMin"] = user_min
-        return v
-
-    def _enforce_guider_minmax(self, vals: dict[str, float]) -> dict[str, float]:
-        v = dict(vals)
         if "PosMin" not in v or "PosMax" not in v:
             return v
         pos_min = float(v["PosMin"])

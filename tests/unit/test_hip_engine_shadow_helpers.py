@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from steuerung3d.apps.yellow.engines.hip_engine import HipEngine, HipViewModel
+from steuerung3d.apps.yellow.engines.hip.engine import HipEngine, HipViewModel
 from steuerung3d.core.intents import EchoLifeTick
 
 

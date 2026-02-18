@@ -1,0 +1,51 @@
+"""HiP engine data structures (compat shim)."""
+
+from __future__ import annotations
+
+from .engine import (
+    NOT_ATTACHED,
+    HipAttachCombo,
+    HipAttachInputs,
+    HipAttachState,
+    HipBannerInputs,
+    HipBannerState,
+    HipCutMarkersState,
+    HipDriveStatusState,
+    HipEstopState,
+    HipHeaderDots,
+    HipParamAction,
+    HipParamButtons,
+    HipParamCommitDialog,
+    HipParamGroup,
+    HipParamUiState,
+    HipReadoutsState,
+    HipState,
+    HipStepInputs,
+    HipStepResult,
+    HipUiInputs,
+    HipViewModel,
+)
+
+__all__ = [
+    "NOT_ATTACHED",
+    "HipAttachCombo",
+    "HipAttachInputs",
+    "HipAttachState",
+    "HipBannerInputs",
+    "HipBannerState",
+    "HipCutMarkersState",
+    "HipDriveStatusState",
+    "HipEstopState",
+    "HipHeaderDots",
+    "HipParamAction",
+    "HipParamButtons",
+    "HipParamCommitDialog",
+    "HipParamGroup",
+    "HipParamUiState",
+    "HipReadoutsState",
+    "HipState",
+    "HipStepInputs",
+    "HipStepResult",
+    "HipUiInputs",
+    "HipViewModel",
+]

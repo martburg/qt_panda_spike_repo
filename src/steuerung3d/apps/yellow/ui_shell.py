@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QAbstractButton, QLineEdit, QComboBox, QAbstractSl
 from PySide6.QtWidgets import QSpinBox, QDoubleSpinBox, QCheckBox
 
 from .qss_loader import load_base_qss
+
 # Role-specific canvas tint (ONLY centralwidget background)
 IP_BG  = "#E6F2FF"  # light sky blue
 CFC_BG = "#E8FFF1"  # light mint
@@ -32,6 +33,8 @@ QMainWindow[appRole="cfc"] QWidget#centralwidget {
     background: #E8FFF1;
 }
 """
+
+
 def parse_role(argv: list[str]) -> str:
     p = argparse.ArgumentParser(add_help=False)
     p.add_argument("--role", choices=("ip", "cfc"), default="ip")
@@ -162,7 +165,7 @@ def build_yellow_window(*, role: str, ui_path=None):
     if ui_path is None:
         ui_path = Path(__file__).with_name("ui_split") / "yellow3_merged.ui"
     win = load_ui(Path(ui_path))
-        # Hide Diagnostics tab in IP role (HMI client)
+    # Hide Diagnostics tab in IP role (HMI client)
     if role == "ip":
         tabs_main = win.findChild(QTabWidget, "tabsMain")
         page_diag = win.findChild(QWidget, "pageDiagnostics")

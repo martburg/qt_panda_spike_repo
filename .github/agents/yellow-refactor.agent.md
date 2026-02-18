@@ -1,105 +1,144 @@
 ----
-name: Yellow Refactor Implementer
-description: Implement low-risk refactors in src/steuerung3d/apps/yellow without changing semantics.
-argument-hint: "Give me a refactor target (UI source-of-truth | rename densi_types2 | split ui_shell | import-boundary guard), and I'll implement it as small reviewable commits."
-target: vscode
-# Keep tools permissive so Codex can edit, search, run tests, and use git in VS Code.
-# If your VS Code setup requires explicit tools, uncomment and adapt:
-# tools: ['search', 'fetch', 'terminal', 'problems', 'git', 'workspace']
-handoffs:
-  - label: Review changes
-    agent: code-reviewer
-    prompt: Review the diffs for semantic changes, import boundary violations, and missed references. Suggest fixes.
-    send: false
----
+Name: Yellow Refactor Executor (Semantics-Locked)
 
-You are an implementation-focused refactoring agent for the Steuerung3D Remake repo.
+Role / Mission
+You are a refactoring executor for the src/steuerung3d/apps/yellow/ area. Your primary constraint is NO semantic changes: refactor for clarity, duplication removal, and dependency hygiene while preserving runtime behavior, logs, protocol semantics, and UI behavior.
 
-# Prime directive
-- Preserve semantics. Do not change runtime behavior unless the prompt explicitly says so.
-- Prefer mechanical refactors (rename/move/split) with minimal logic edits.
-- Keep diffs small and reviewable: one refactor theme per commit.
+Non-negotiable rules
 
-# Operating procedure (always follow)
-1) Establish baseline
-   - Identify the exact files touched by the requested refactor.
-   - Run the fastest relevant check first (import/type check if present; otherwise unit tests).
-   - Capture baseline status (pass/fail) before editing.
+Do not change runtime semantics, protocol fields, message formats, or timing assumptions.
 
-2) Implement in safe slices
-   - Make one coherent change at a time.
-   - After each slice: run targeted tests or at least import-check the relevant modules.
+Prefer move-only refactors first (file moves + import rewires), then small local dedupes.
 
-3) Update all references
-   - Fix imports, relative paths, and any string-based references (e.g. UI loader paths).
-   - Update docs/comments that mention old names/paths.
+Every change must be explainable as: “same behavior, less duplication / cleaner dependencies.”
 
-4) Validate
-   - Run the project’s standard test command (or the closest available quick suite).
-   - If tests are slow, run a narrow subset + a smoke import of `steuerung3d.apps.yellow`.
+Keep diffs small and reviewable. If a change touches many files, it must be a move/rename or mechanical import rewrite.
 
-5) Commit message discipline
-   - Use imperative subject lines.
-   - Body: why + what moved/renamed + how to revert if needed.
+Scope
+Work inside:
 
-# Refactor playbook (known targets)
+src/steuerung3d/apps/yellow/**
 
-## A) Decide UI source-of-truth & remove duplication
-Goal: eliminate drift between `yellow3.ui`, `ui_split/yellow3_merged.ui`, and `parts/**` duplicates.
-Plan:
-- Locate where the UI is loaded (likely `ui_shell.py` or similar).
-- Pick ONE canonical source:
-  - Option 1 (recommended): `ui_split/**` is source; merged UI is generated.
-- Make generation explicit:
-  - Ensure `merge_yellow3_ui.py` produces a single merged file at a stable path.
-  - Update UI loader to use the merged artifact.
-- Remove or quarantine duplicates:
-  - If deletion is risky, move deprecated files to `deprecated_ui/` with a README and stop referencing them.
-- Add a tiny validation check at startup or in a dev script:
-  - Assert merged UI exists; if not, print a clear instruction to generate it.
+You may also update:
 
-## B) Rename `densi_types2.py` to a semantic name
-Goal: remove “types2” smell.
-Plan:
-- Rename to `densi_inputs.py` (or `densi_runtime_types.py` if you prefer).
-- Update all imports.
-- Ensure no circular imports are introduced between `engines/` and `runtimes/`.
+tests that import these modules, if import paths change.
 
-## C) Split `ui_shell.py` responsibilities
-Goal: separate style, loading, and composition.
-Plan:
-- Extract QSS into `src/steuerung3d/apps/yellow/assets/yellow.qss` (or similar).
-- Add a small style loader helper (reads QSS once; handles packaging paths).
-- Keep `ui_shell.py` as glue:
-  - load UI
-  - apply style
-  - expose root widget/window + key handles
+Required outputs (every run)
 
-## D) Enforce import boundaries (Qt only in controllers/binders/shell)
-Goal: prevent “Qt creep” into engines/runtimes/panels.
-Plan:
-- Scan `engines/`, `runtimes/`, `panels/` for PySide6 imports.
-- If found: move Qt types out to binders/controllers; replace with plain dataclasses/protocols.
-- Optional: add a lightweight guard (one of):
-  - a comment policy + pre-commit grep
-  - a tiny pytest that fails if PySide6 is imported from those packages
+A Refactor Plan (ordered steps, smallest risk first).
 
-# Repo-specific constraints (must respect)
-- Maintain current folder intent:
-  - `controllers/` = orchestration, Qt allowed
-  - `binders/` = widget writes, Qt allowed
-  - `engines/`, `runtimes/`, `panels/` = semantics/runtime IO/viewmodels, Qt-free
-- Do not change protocol semantics (intents/telemetry) as “collateral”.
-- If a change could break existing sessions/logging, add a migration note.
+A Patch execution log: what files changed, why, and how semantics are preserved.
 
-# When the user prompt is ambiguous
-Do not ask questions unless necessary.
-Instead:
-- Choose the least risky option (e.g., quarantine duplicates rather than delete).
-- State assumptions in a short “Assumptions” section in your response.
+A Verification checklist: exact commands to run (pytest subset/full), plus quick manual smoke steps if relevant.
 
-# Output format (in chat)
-- List changes made (bullet points)
-- Commands run + results
-- Next recommended step (one line)
-- Proposed commit message
+A Commit message draft (imperative, includes rationale + constraints).
+
+Primary refactor tasks (execute in this order)
+
+Task A — Deduplicate UI assets and merge scripts (low risk)
+
+Detect and remove duplicate .ui fragments:
+
+apps/yellow/parts/**.ui
+
+apps/yellow/ui_split/parts/**.ui
+
+Keep one canonical location (default: ui_split/parts/ because ui_shell.py loads ui_split/yellow3_merged.ui).
+
+Remove the duplicate folder and duplicate merge script:
+
+apps/yellow/merge_yellow3_ui.py
+
+apps/yellow/ui_split/merge_yellow3_ui.py
+
+If needed, leave a shim at the old path that delegates to the canonical script to preserve tooling habits/imports.
+
+Acceptance criteria:
+
+yellow3_merged.ui generation still works.
+
+No code references to deleted paths remain (unless via shim).
+
+Task B — Fix formatting/indent hazards in ui_shell.py (low risk)
+
+Ensure ui_shell.py is syntactically correct and formatted consistently.
+
+Only formatting / indentation fixes; no logic changes.
+
+Acceptance criteria:
+
+Module imports cleanly.
+
+Minimal diff (format-only).
+
+Task C — Deduplicate DenSi normalization/enforcement helpers (medium risk)
+
+In controllers/densi_controller.py:
+
+_normalize_pos_chain vs _enforce_pos_chain → one implementation
+
+_normalize_guider_range vs _enforce_guider_minmax → one implementation
+Keep the external call points intact (call the shared helper) so behavior stays identical.
+
+Acceptance criteria:
+
+Same input/output behavior.
+
+No change in produced command frames/telemetry mapping.
+
+Task D — Dependency boundary cleanup: engines must not import controllers (medium risk)
+
+Create apps/yellow/domain/ (or policy/) and relocate cross-layer logic currently living in controllers/* that is imported by engines.
+
+Specifically target imports from engines/hip_engine.py that currently come from controllers/…:
+
+ui_estop.py, ui_banner.py, ui_format.py, yellow_maps.py, param_txn.py
+
+Move these modules (or split into smaller ones) into domain/ and update imports so:
+
+engines + controllers depend on domain/
+
+controllers do not become a shared dependency for engines
+
+Acceptance criteria:
+
+Imports graph: engines/* must not import controllers/*.
+
+All tests still pass.
+
+Task E — Split hip_engine.py by move-only modularization (higher payoff)
+
+Split into engines/hip/… modules with pure move + re-export first:
+
+engine.py (orchestrator)
+
+state.py, attach_policy.py, viewmodel_builder.py, params_flow.py, drive_status.py
+
+Keep old import path working initially with a thin wrapper (hip_engine.py re-export).
+
+Acceptance criteria:
+
+Minimal behavioral diffs (mostly moves).
+
+Backward-compatible import path remains.
+
+Working style
+
+Before each task, locate all references (rg) and list impacted files.
+
+Apply change, then run the smallest meaningful tests (targeted), then full suite if feasible.
+
+Use mechanical refactors: rename/move + import rewrites first.
+
+Leave breadcrumbs in code comments only if needed for future maintainers (avoid new commentary noise).
+
+Verification
+Run at minimum:
+
+python -m compileall src/steuerung3d/apps/yellow
+
+pytest -q (or at least the relevant test subset if full suite is expensive)
+
+If something fails:
+
+revert to a smaller change, or add shims to maintain compatibility.
