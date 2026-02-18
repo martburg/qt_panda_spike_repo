@@ -68,22 +68,22 @@ class DenSiQtBinder:
         self._wcache = WidgetCache(self.win)
 
         # Widgets
-        self._txt_tick: QLineEdit | None = self.win.findChild(QLineEdit, "txt_tick")
+        self._txtTick: QLineEdit | None = self.win.findChild(QLineEdit, "txtTick")
         self._txt_hdr_banner_left: QLineEdit | None = self.win.findChild(QLineEdit, "txtHdrBannerLeft")
         self._txt_hdr_banner_right: QLineEdit | None = (
             self.win.findChild(QLineEdit, "txtHdrBannerRight")
             or self.win.findChild(QLineEdit, "txtHdrBannnerRight")
         )
 
-        self._txt_pos: QLineEdit | None = self.win.findChild(QLineEdit, "txt_pos")
-        self._txt_vel: QLineEdit | None = self.win.findChild(QLineEdit, "txt_vel")
-        self._txt_amp: QLineEdit | None = self.win.findChild(QLineEdit, "txt_amp")
-        self._txt_temp: QLineEdit | None = self.win.findChild(QLineEdit, "txt_temp")
+        self._txtPos: QLineEdit | None = self.win.findChild(QLineEdit, "txtPos")
+        self._txtVel: QLineEdit | None = self.win.findChild(QLineEdit, "txtVel")
+        self._txtAmp: QLineEdit | None = self.win.findChild(QLineEdit, "txtAmp")
+        self._txtTemp: QLineEdit | None = self.win.findChild(QLineEdit, "txtTemp")
 
-        self._txt_cut_pos: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_pos")
-        self._txt_cut_vel: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_vel")
-        self._txt_cut_time: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_time")
-        self._txt_posdiff: QLineEdit | None = self.win.findChild(QLineEdit, "txt_posdiff")
+        self._txtCutPos: QLineEdit | None = self.win.findChild(QLineEdit, "txtCutPos")
+        self._txtCutVel: QLineEdit | None = self.win.findChild(QLineEdit, "txtCutVel")
+        self._txtCutTime: QLineEdit | None = self.win.findChild(QLineEdit, "txtCutTime")
+        self._txtPosdiff: QLineEdit | None = self.win.findChild(QLineEdit, "txtPosdiff")
 
         self._txt_guider_range_min: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMin")
         self._txt_guider_range_max: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMax")
@@ -105,13 +105,13 @@ class DenSiQtBinder:
         self._btn_estop_all_set: QPushButton | None = self.win.findChild(QPushButton, "btnEStopAllSet")
         self._btn_estop_all_clear: QPushButton | None = self.win.findChild(QPushButton, "btnEStopAllClear")
 
-        self._cmb_axis: QComboBox | None = self.win.findChild(QComboBox, "cmb_axis")
+        self._cmbAxis: QComboBox | None = self.win.findChild(QComboBox, "cmbAxis")
 
         self._b_readouts = DenSiReadoutsBindings(
-            txt_pos=self._txt_pos,
-            txt_vel=self._txt_vel,
-            txt_amp=self._txt_amp,
-            txt_temp=self._txt_temp,
+            txtPos=self._txtPos,
+            txtVel=self._txtVel,
+            txtAmp=self._txtAmp,
+            txtTemp=self._txtTemp,
             txt_guider_range_min=self._txt_guider_range_min,
             txt_guider_range_max=self._txt_guider_range_max,
             txt_guider_range_val=self._txt_guider_range_val,
@@ -126,10 +126,10 @@ class DenSiQtBinder:
         )
 
         self._b_cut_markers = DenSiCutMarkersBindings(
-            cut_time=self._txt_cut_time,
-            cut_pos=self._txt_cut_pos,
-            cut_vel=self._txt_cut_vel,
-            posdiff=self._txt_posdiff,
+            cut_time=self._txtCutTime,
+            cut_pos=self._txtCutPos,
+            cut_vel=self._txtCutVel,
+            posdiff=self._txtPosdiff,
         )
 
         self._wire_signals()
@@ -138,8 +138,8 @@ class DenSiQtBinder:
             self.log,
             self._wcache,
             [
-                (QComboBox, "cmb_axis"),
-                (QLineEdit, "txt_tick"),
+                (QComboBox, "cmbAxis"),
+                (QLineEdit, "txtTick"),
                 (QLineEdit, "txtHdrBannerLeft"),
                 (QLineEdit, "txtHdrBannerRight"),
             ],
@@ -155,11 +155,11 @@ class DenSiQtBinder:
             self.log,
             self._wcache,
             [
-                (QLineEdit, "txt_tick"),
-                (QLineEdit, "txt_pos"),
-                (QLineEdit, "txt_vel"),
-                (QLineEdit, "txt_amp"),
-                (QLineEdit, "txt_temp"),
+                (QLineEdit, "txtTick"),
+                (QLineEdit, "txtPos"),
+                (QLineEdit, "txtVel"),
+                (QLineEdit, "txtAmp"),
+                (QLineEdit, "txtTemp"),
             ],
             context="den_si:readouts",
         )
@@ -202,16 +202,16 @@ class DenSiQtBinder:
                 set_enabled(le, False)
 
     def init_fixed_axis(self) -> None:
-        if self._cmb_axis is None:
+        if self._cmbAxis is None:
             return
         label = self.axis_ids[0] if self.axis_ids else "?"
         try:
-            was = self._cmb_axis.blockSignals(True)
-            self._cmb_axis.clear()
-            self._cmb_axis.addItems([label])
-            self._cmb_axis.setCurrentText(label)
-            set_enabled(self._cmb_axis, False)
-            self._cmb_axis.blockSignals(was)
+            was = self._cmbAxis.blockSignals(True)
+            self._cmbAxis.clear()
+            self._cmbAxis.addItems([label])
+            self._cmbAxis.setCurrentText(label)
+            set_enabled(self._cmbAxis, False)
+            self._cmbAxis.blockSignals(was)
         except Exception:
             pass
 
@@ -234,15 +234,15 @@ class DenSiQtBinder:
         wire_densi_estop_checkboxes(bindings=self._estop_cb_bindings, on_toggled=self._on_estop_checkbox_toggled)
 
     def reset_ui_startup(self) -> None:
-        if self._txt_tick is not None:
-            set_text(self._txt_tick, "--")
+        if self._txtTick is not None:
+            set_text(self._txtTick, "--")
 
         # DenSi role must not expose/enable ReSync (HiP owns workflow)
         if self._btn_diag_resync is not None:
             set_enabled(self._btn_diag_resync, False)
 
         # Disable operator-only buttons
-        for name in ("btn_reset", "btnRecover"):
+        for name in ("btnReset", "btnRecover"):
             b = self.win.findChild(QPushButton, name)
             if b is not None:
                 set_enabled(b, False)
@@ -266,7 +266,7 @@ class DenSiQtBinder:
         apply_densi_estop_dots_vm(vm.estop_dots, set_dot=self._set_dot)
         apply_densi_readouts_vm(vm.readouts, self._b_readouts)
         apply_densi_cut_markers_vm(vm.cut_markers, self._b_cut_markers)
-        apply_densi_lifetick_vm(vm.lifetick, txt_tick=self._txt_tick)
+        apply_densi_lifetick_vm(vm.lifetick, txtTick=self._txtTick)
 
         if vm.refresh_checkboxes:
             if self._estop_cb_bindings is not None:

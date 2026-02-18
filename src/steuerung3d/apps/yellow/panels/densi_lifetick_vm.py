@@ -1,4 +1,4 @@
-"""DenSi LifeTick UI VM (txt_tick).
+"""DenSi LifeTick UI VM (txtTick).
 
 Semantics:
 - Show diff = (lifetick_tx - lifetick_rx) & 0xFFFF for the primary axis.

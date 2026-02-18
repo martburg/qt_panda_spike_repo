@@ -70,7 +70,7 @@
            <number>0</number>
           </property>
           <item>
-           <widget class="QComboBox" name="cmb_axis">
+           <widget class="QComboBox" name="cmbAxis">
             <property name="minimumSize">
              <size>
               <width>0</width>
@@ -105,7 +105,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="txt_pos">
+           <widget class="QLineEdit" name="txtPos">
             <property name="minimumSize">
              <size>
               <width>0</width>
@@ -130,7 +130,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="txt_vel">
+           <widget class="QLineEdit" name="txtVel">
             <property name="minimumSize">
              <size>
               <width>0</width>
@@ -155,7 +155,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="txt_amp">
+           <widget class="QLineEdit" name="txtAmp">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
               <horstretch>0</horstretch>
@@ -230,7 +230,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="btn_reset">
+           <widget class="QPushButton" name="btnReset">
             <property name="minimumSize">
              <size>
               <width>0</width>
@@ -243,7 +243,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="txt_temp">
+           <widget class="QLineEdit" name="txtTemp">
             <property name="minimumSize">
              <size>
               <width>0</width>
@@ -268,7 +268,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="txt_tick">
+           <widget class="QLineEdit" name="txtTick">
             <property name="minimumSize">
              <size>
               <width>0</width>
@@ -783,7 +783,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QLineEdit" name="txt_cut_pos">
+            <widget class="QLineEdit" name="txtCutPos">
              <property name="minimumSize">
               <size>
                <width>65</width>
@@ -822,7 +822,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QLineEdit" name="txt_cut_vel">
+            <widget class="QLineEdit" name="txtCutVel">
              <property name="minimumSize">
               <size>
                <width>65</width>
@@ -861,7 +861,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QLineEdit" name="txt_cut_time">
+            <widget class="QLineEdit" name="txtCutTime">
              <property name="minimumSize">
               <size>
                <width>160</width>
@@ -900,7 +900,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QLineEdit" name="txt_posdiff">
+            <widget class="QLineEdit" name="txtPosdiff">
              <property name="minimumSize">
               <size>
                <width>65</width>
@@ -1496,7 +1496,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g1_com_dot" />
+               <widget class="QFrame" name="dotG1Com" />
               </item>
               <item>
                <spacer name="horizontalSpacer_20">
@@ -1526,7 +1526,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g2_com_dot" />
+               <widget class="QFrame" name="dotG2Com" />
               </item>
               <item>
                <spacer name="horizontalSpacer_23">
@@ -1556,7 +1556,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g3_com_dot" />
+               <widget class="QFrame" name="dotG3Com" />
               </item>
               <item>
                <spacer name="horizontalSpacer_26">
@@ -1586,7 +1586,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g1_out_dot" />
+               <widget class="QFrame" name="dotG1Out" />
               </item>
               <item>
                <spacer name="horizontalSpacer_21">
@@ -1616,7 +1616,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g2_out_dot" />
+               <widget class="QFrame" name="dotG2Out" />
               </item>
               <item>
                <spacer name="horizontalSpacer_24">
@@ -1646,7 +1646,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g3_out_dot" />
+               <widget class="QFrame" name="dotG3Out" />
               </item>
               <item>
                <spacer name="horizontalSpacer_27">
@@ -1676,7 +1676,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g1_fb_dot" />
+               <widget class="QFrame" name="dotG1Fb" />
               </item>
               <item>
                <spacer name="horizontalSpacer_22">
@@ -1706,7 +1706,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g2_fb_dot" />
+               <widget class="QFrame" name="dotG2Fb" />
               </item>
               <item>
                <spacer name="horizontalSpacer_25">
@@ -1736,7 +1736,7 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QFrame" name="g3_fb_dot" />
+               <widget class="QFrame" name="dotG3Fb" />
               </item>
               <item>
                <spacer name="horizontalSpacer_28">

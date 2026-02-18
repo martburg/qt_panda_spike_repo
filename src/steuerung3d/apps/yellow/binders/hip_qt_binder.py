@@ -68,10 +68,10 @@ class HipQtBinder:
 
         # Core widgets
         self._tabs_main: QTabWidget | None = self._wcache.get(QTabWidget, "tabsMain")
-        self._cmb_axis: QComboBox | None = self.win.findChild(QComboBox, "cmb_axis")
+        self._cmbAxis: QComboBox | None = self.win.findChild(QComboBox, "cmbAxis")
 
         # Header + tick
-        self._txt_tick: QLineEdit | None = self.win.findChild(QLineEdit, "txt_tick")
+        self._txtTick: QLineEdit | None = self.win.findChild(QLineEdit, "txtTick")
         self._txt_hdr_banner_left: QLineEdit | None = self.win.findChild(QLineEdit, "txtHdrBannerLeft")
         self._txt_hdr_banner_right: QLineEdit | None = (
             self.win.findChild(QLineEdit, "txtHdrBannerRight")
@@ -83,15 +83,15 @@ class HipQtBinder:
         self._txt_slave_amp_status: QLineEdit | None = self.win.findChild(QLineEdit, "txtSlaveAmpStatus")
 
         # Readouts
-        self._txt_pos: QLineEdit | None = self.win.findChild(QLineEdit, "txt_pos")
-        self._txt_vel: QLineEdit | None = self.win.findChild(QLineEdit, "txt_vel")
-        self._txt_amp: QLineEdit | None = self.win.findChild(QLineEdit, "txt_amp")
-        self._txt_temp: QLineEdit | None = self.win.findChild(QLineEdit, "txt_temp")
+        self._txtPos: QLineEdit | None = self.win.findChild(QLineEdit, "txtPos")
+        self._txtVel: QLineEdit | None = self.win.findChild(QLineEdit, "txtVel")
+        self._txtAmp: QLineEdit | None = self.win.findChild(QLineEdit, "txtAmp")
+        self._txtTemp: QLineEdit | None = self.win.findChild(QLineEdit, "txtTemp")
 
-        self._txt_cut_pos: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_pos")
-        self._txt_cut_vel: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_vel")
-        self._txt_cut_time: QLineEdit | None = self.win.findChild(QLineEdit, "txt_cut_time")
-        self._txt_posdiff: QLineEdit | None = self.win.findChild(QLineEdit, "txt_posdiff")
+        self._txtCutPos: QLineEdit | None = self.win.findChild(QLineEdit, "txtCutPos")
+        self._txtCutVel: QLineEdit | None = self.win.findChild(QLineEdit, "txtCutVel")
+        self._txtCutTime: QLineEdit | None = self.win.findChild(QLineEdit, "txtCutTime")
+        self._txtPosdiff: QLineEdit | None = self.win.findChild(QLineEdit, "txtPosdiff")
 
         self._txt_guider_range_min: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMin")
         self._txt_guider_range_max: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMax")
@@ -153,8 +153,8 @@ class HipQtBinder:
             self.log,
             self._wcache,
             [
-                (QComboBox, "cmb_axis"),
-                (QLineEdit, "txt_tick"),
+                (QComboBox, "cmbAxis"),
+                (QLineEdit, "txtTick"),
                 (QLineEdit, "txtHdrBannerLeft"),
                 (QLineEdit, "txtHdrBannerRight"),
             ],
@@ -176,11 +176,11 @@ class HipQtBinder:
             self.log,
             self._wcache,
             [
-                (QLineEdit, "txt_tick"),
-                (QLineEdit, "txt_pos"),
-                (QLineEdit, "txt_vel"),
-                (QLineEdit, "txt_amp"),
-                (QLineEdit, "txt_temp"),
+                (QLineEdit, "txtTick"),
+                (QLineEdit, "txtPos"),
+                (QLineEdit, "txtVel"),
+                (QLineEdit, "txtAmp"),
+                (QLineEdit, "txtTemp"),
             ],
             context="hi_p:readouts",
         )
@@ -192,8 +192,8 @@ class HipQtBinder:
     # ------------------------------------------------------------------
 
     def _wire_signals(self) -> None:
-        if self._cmb_axis is not None:
-            self._cmb_axis.currentTextChanged.connect(self._on_axis_selected)
+        if self._cmbAxis is not None:
+            self._cmbAxis.currentTextChanged.connect(self._on_axis_selected)
         if self._btn_estop_reset is not None:
             self._btn_estop_reset.clicked.connect(self._on_estop_reset_clicked)
         if self._btn_diag_resync is not None:
@@ -237,9 +237,9 @@ class HipQtBinder:
 
     def read_inputs(self) -> HipUiInputs:
         axis_selected = ""
-        if self._cmb_axis is not None:
+        if self._cmbAxis is not None:
             try:
-                axis_selected = str(self._cmb_axis.currentText() or "").strip()
+                axis_selected = str(self._cmbAxis.currentText() or "").strip()
             except Exception:
                 axis_selected = ""
 
@@ -290,9 +290,9 @@ class HipQtBinder:
         self._set_all_estop_unknown()
 
     def apply_tick_text(self, text: str) -> None:
-        if self._txt_tick is None:
+        if self._txtTick is None:
             return
-        set_text(self._txt_tick, str(text))
+        set_text(self._txtTick, str(text))
 
     def apply_online_state(self, state: str | None) -> None:
         if state is None:
@@ -304,23 +304,23 @@ class HipQtBinder:
     # ------------------------------------------------------------------
 
     def _apply_attach_state(self, vm: HipViewModel) -> None:
-        if vm.attach_combo is not None and self._cmb_axis is not None:
+        if vm.attach_combo is not None and self._cmbAxis is not None:
             items = list(vm.attach_combo.items or [])
             cur = str(vm.attach_combo.current or "")
-            existing = [self._cmb_axis.itemText(i) for i in range(self._cmb_axis.count())]
-            if existing != items or (cur and self._cmb_axis.currentText().strip() != cur):
+            existing = [self._cmbAxis.itemText(i) for i in range(self._cmbAxis.count())]
+            if existing != items or (cur and self._cmbAxis.currentText().strip() != cur):
                 self._suppress_axis_signal = True
-                was = self._cmb_axis.blockSignals(True)
+                was = self._cmbAxis.blockSignals(True)
                 try:
                     if existing != items:
-                        self._cmb_axis.clear()
-                        self._cmb_axis.addItems(items)
-                    if cur and self._cmb_axis.currentText().strip() != cur:
-                        self._cmb_axis.setCurrentText(cur)
+                        self._cmbAxis.clear()
+                        self._cmbAxis.addItems(items)
+                    if cur and self._cmbAxis.currentText().strip() != cur:
+                        self._cmbAxis.setCurrentText(cur)
                 finally:
-                    self._cmb_axis.blockSignals(was)
+                    self._cmbAxis.blockSignals(was)
                     self._suppress_axis_signal = False
-            set_enabled(self._cmb_axis, bool(vm.attach_combo.enabled))
+            set_enabled(self._cmbAxis, bool(vm.attach_combo.enabled))
 
         if vm.attach_state is None:
             return
@@ -329,12 +329,12 @@ class HipQtBinder:
             set_enabled(self._tabs_main, bool(vm.attach_state.tabs_enabled))
 
         btn_setup = self._find_button("btnSetupToggle")
-        btn_reset = self._find_button("btn_reset")
+        btnReset = self._find_button("btnReset")
         btn_rec = self._find_button("btnRecover")
         if btn_setup is not None:
             set_enabled(btn_setup, bool(vm.attach_state.setup_enabled))
-        if btn_reset is not None:
-            set_enabled(btn_reset, bool(vm.attach_state.main_amp_reset_enabled))
+        if btnReset is not None:
+            set_enabled(btnReset, bool(vm.attach_state.main_amp_reset_enabled))
         if btn_rec is not None:
             set_enabled(btn_rec, False)
 
@@ -401,14 +401,14 @@ class HipQtBinder:
         if ro is None:
             return
 
-        if self._txt_pos is not None:
-            set_text(self._txt_pos, ro.pos_text)
-        if self._txt_vel is not None:
-            set_text(self._txt_vel, ro.vel_text)
-        if self._txt_amp is not None:
-            set_text(self._txt_amp, ro.amp_text)
-        if self._txt_temp is not None:
-            set_text(self._txt_temp, ro.temp_text)
+        if self._txtPos is not None:
+            set_text(self._txtPos, ro.pos_text)
+        if self._txtVel is not None:
+            set_text(self._txtVel, ro.vel_text)
+        if self._txtAmp is not None:
+            set_text(self._txtAmp, ro.amp_text)
+        if self._txtTemp is not None:
+            set_text(self._txtTemp, ro.temp_text)
 
         if self._txt_guider_range_min is not None:
             set_text(self._txt_guider_range_min, ro.guider_min_text)
@@ -452,14 +452,14 @@ class HipQtBinder:
         cm = vm.cut_markers
         if cm is None:
             return
-        if self._txt_cut_time is not None:
-            set_text(self._txt_cut_time, cm.cut_time_text)
-        if self._txt_cut_pos is not None:
-            set_text(self._txt_cut_pos, cm.cut_pos_text)
-        if self._txt_cut_vel is not None:
-            set_text(self._txt_cut_vel, cm.cut_vel_text)
-        if self._txt_posdiff is not None:
-            set_text(self._txt_posdiff, cm.posdiff_text)
+        if self._txtCutTime is not None:
+            set_text(self._txtCutTime, cm.cut_time_text)
+        if self._txtCutPos is not None:
+            set_text(self._txtCutPos, cm.cut_pos_text)
+        if self._txtCutVel is not None:
+            set_text(self._txtCutVel, cm.cut_vel_text)
+        if self._txtPosdiff is not None:
+            set_text(self._txtPosdiff, cm.posdiff_text)
 
     def _apply_params(self, vm: HipViewModel) -> None:
         if vm.param_ui is not None:
@@ -585,10 +585,10 @@ class HipQtBinder:
                 self._set_dot(spec.dot, "warn")
 
     def _clear_for_unattached(self) -> None:
-        keep = [self._txt_tick] if self._txt_tick is not None else []
+        keep = [self._txtTick] if self._txtTick is not None else []
         clear_line_edits(self.win, keep=keep, text="")
-        if self._txt_tick is not None:
-            set_text(self._txt_tick, "--")
+        if self._txtTick is not None:
+            set_text(self._txtTick, "--")
 
         for w in (
             self._txt_main_amp_status,

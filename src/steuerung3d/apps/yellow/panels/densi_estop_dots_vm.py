@@ -2,7 +2,7 @@
 
 Computes:
 - header dots (FBT/READY/BRAKE1/BRAKE2)
-- per-bit diagnostic dots (dotMaster, g1_fb_dot, ...)
+- per-bit diagnostic dots (dotMaster, dotG1Fb, ...)
 
 This intentionally does NOT touch checkboxes; checkbox sync stays in the controller.
 """

@@ -1,4 +1,4 @@
-"""Qt renderer for DenSi LifeTick UI (txt_tick)."""
+"""Qt renderer for DenSi LifeTick UI (txtTick)."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ from .densi_lifetick_vm import DenSiLifeTickVM
 from ..controllers.ui_update import set_text
 
 
-def apply_densi_lifetick_vm(vm: DenSiLifeTickVM, *, txt_tick: QLineEdit | None) -> None:
-    if txt_tick is None:
+def apply_densi_lifetick_vm(vm: DenSiLifeTickVM, *, txtTick: QLineEdit | None) -> None:
+    if txtTick is None:
         return
     try:
-        if txt_tick.text() != vm.text:
-            set_text(txt_tick, vm.text)
+        if txtTick.text() != vm.text:
+            set_text(txtTick, vm.text)
     except Exception:
         pass

@@ -22,10 +22,10 @@ if TYPE_CHECKING:  # pragma: no cover
 
 @dataclass(frozen=True)
 class DenSiReadoutsBindings:
-    txt_pos: "QLineEdit | None" = None
-    txt_vel: "QLineEdit | None" = None
-    txt_amp: "QLineEdit | None" = None
-    txt_temp: "QLineEdit | None" = None
+    txtPos: "QLineEdit | None" = None
+    txtVel: "QLineEdit | None" = None
+    txtAmp: "QLineEdit | None" = None
+    txtTemp: "QLineEdit | None" = None
 
     txt_guider_range_min: "QLineEdit | None" = None
     txt_guider_range_max: "QLineEdit | None" = None
@@ -38,10 +38,10 @@ class DenSiReadoutsBindings:
 
 def apply_densi_readouts_vm(vm: DenSiReadoutsVM, b: DenSiReadoutsBindings) -> None:
     # Primary live readouts
-    set_text(b.txt_pos, vm.pos_text)
-    set_text(b.txt_vel, vm.vel_text)
-    set_text(b.txt_amp, vm.amp_text)
-    set_text(b.txt_temp, vm.temp_text)
+    set_text(b.txtPos, vm.pos_text)
+    set_text(b.txtVel, vm.vel_text)
+    set_text(b.txtAmp, vm.amp_text)
+    set_text(b.txtTemp, vm.temp_text)
 
     # Guider readouts
     set_text(b.txt_guider_range_min, vm.guider_min_text)
