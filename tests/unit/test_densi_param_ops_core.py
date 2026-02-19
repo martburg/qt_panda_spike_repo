@@ -4,7 +4,7 @@ sys.path.insert(0, 'src')
 
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.command_frame import ParamEditBeginOp, ParamWriteOp
-from steuerung3d.apps.yellow.panels.densi_param_ops_core import apply_densi_param_ops
+from steuerung3d.apps.yellow.engines.densi.param_ops import apply_densi_param_ops
 
 
 def test_param_ops_begin_write_ends_session_and_applies_values():

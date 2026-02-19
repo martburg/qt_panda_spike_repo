@@ -37,7 +37,7 @@ from ..qtutil.widget_cache import WidgetCache
 from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 from ..panels.densi_banner_render import DenSiBannerBindings, apply_densi_banner_vm
 from ..panels.densi_cut_markers_render import DenSiCutMarkersBindings, apply_densi_cut_markers_vm
-from ..panels.densi_estop_checkboxes import (
+from ..panels.densi_estop_checkboxes_render import (
     DenSiEstopCheckboxBindings,
     discover_densi_estop_checkboxes,
     init_densi_estop_checkboxes,
