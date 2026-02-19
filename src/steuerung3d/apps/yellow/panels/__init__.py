@@ -7,4 +7,7 @@ This package is the start of the "north" refactor:
 
 Keeping the computation Qt-free lets us unit-test semantics and refactor
 controllers aggressively without changing behavior.
+
+Note: root-level panel shim modules were removed; import from panels.hip or
+panels.densi subpackages directly.
 """
