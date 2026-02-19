@@ -38,9 +38,17 @@ from .types import EStopState, L0Top, L0Sub
 from .cut_markers import clear_cut_markers as _clear_cut_markers
 from .cut_markers import maybe_latch_cut_markers as _maybe_latch_cut_markers
 from .drive_status import update_drive_status_words
+from .estop_fsm import (
+    apply_estop_state_machine,
+    compute_estop_edge_and_update_state as _compute_estop_edge_and_update_state,
+    derive_estop_inputs as _derive_estop_inputs,
+    ready_from_estop_word as _ready_from_estop_word,
+    reset_able_from_estop_word as _reset_able_from_estop_word,
+    sync_reset_able_bit as _sync_reset_able_bit,
+)
+from .resync import handle_resync_cmd as _handle_resync_cmd
 from .param_ops import apply_densi_param_ops
 from .motion_clamp import apply_estop_clamp_to_state, compute_moving_guard, step_plant_with_clamp
-from ...domain.ui_banner import BANNER_DYNAMIC_EXCLUDE, derive_banner_estate_from_word
 
 
 
@@ -342,28 +350,13 @@ class DenSiEngine:
         Returns True if packed word changed.
         """
         bits = self._ensure_inj_bits()
-        if "reset_able" not in bits:
-            return False
-
-        trip_causes = any(bool(bits.get(k, False)) for k in ESTOP_CAUSE_KEYS)
-
-        # Only surface ResetAble while we are in ESTOP.
-        try:
-            estate = derive_banner_estate_from_word(
-                int(self.inj_estop_word),
-                within_brake_grace=self.within_brake_grace_disp,
-            )
-        except Exception:
-            estate = "ESTOP"
-        in_estop = (estate == "ESTOP")
-
-        desired = (not trip_causes) and bool(in_estop)
-        if bool(bits.get("reset_able", False)) == bool(desired):
-            return False
-
-        bits["reset_able"] = bool(desired)
-        self.inj_estop_word = int(encode_estop_word(bits))
-        return True
+        changed, new_word = _sync_reset_able_bit(
+            inj_bits=bits,
+            inj_estop_word=int(self.inj_estop_word),
+            within_brake_grace=self.within_brake_grace_disp,
+        )
+        self.inj_estop_word = int(new_word)
+        return bool(changed)
     def inject_estop_bit(self, key: str, checked: bool) -> None:
         """UI-driven diagnostic override for E-Stop bits."""
         bits = self._ensure_inj_bits()
@@ -412,79 +405,27 @@ class DenSiEngine:
     def apply_estop_state_machine(self) -> None:
         """Authoritative ESTOP/IDLE/ARMED/READY ladder + brake timing."""
         bits = self._ensure_inj_bits()
-        schuetz = bool(bits.get("schuetz", False))
-        taster = bool(bits.get("taster", False))
-
-        # Track taster edge in device timebase (deterministic)
-        if taster and (not bool(self.taster_prev)):
-            self.taster_rise_t_s = float(self.state.t_s)
-        if not taster:
-            self.taster_rise_t_s = None
-        self.taster_prev = bool(taster)
-
-        elapsed: float | None = None
-        if self.taster_rise_t_s is not None:
-            try:
-                elapsed = float(self.state.t_s) - float(self.taster_rise_t_s)
-            except Exception:
-                elapsed = None
-
-        brake_switch_s = float(self.brake_switch_s)
-        grace_s = float(self.brake_handoff_grace_s)
-
-        # Desired brake OK-for-mode
-        if bool(self.estop_latched) or (not schuetz):
-            desired_brk_ok = (not taster)
-        else:
-            if not taster:
-                desired_brk_ok = True
-            else:
-                desired_brk_ok = (elapsed is not None) and (elapsed >= brake_switch_s)
-
-        for k in ("brk1_ok", "brk2_ok"):
-            if k in bits and bool(bits.get(k, False)) != bool(desired_brk_ok):
-                # respect override
-                if k == "brk1_ok" and bool(self.brake_override_b1):
-                    continue
-                if k == "brk2_ok" and bool(self.brake_override_b2):
-                    continue
-                bits[k] = bool(desired_brk_ok)
-
-        # Trip evaluation
-        trip_cause = any(bool(bits.get(k, False)) for k in ESTOP_CAUSE_KEYS)
-        ok_keys = [k for k in ESTOP_OK_KEYS if (k not in BANNER_DYNAMIC_EXCLUDE) and (k not in ("brk1_ok", "brk2_ok"))]
-        ok_chain_fault = any(not bool(bits.get(k, True)) for k in ok_keys)
-
-        brk_ok = bool(bits.get("brk1_ok", True)) and bool(bits.get("brk2_ok", True))
-        if taster:
-            brake_trip = (not brk_ok) and ((elapsed is None) or (elapsed >= grace_s))
-        else:
-            brake_trip = (not brk_ok)
-
-        trip_active = trip_cause or ok_chain_fault or brake_trip or (not bool(self.safety_ok))
-
-        if trip_active:
-            self.estop_latched = True
-            if bool(bits.get("ready", False)):
-                bits["ready"] = False
-            if bool(bits.get("schuetz", False)):
-                bits["schuetz"] = False
-            self.drive_ready = False
-            self.estate = EStopState.ESTOP
-        else:
-            if not schuetz:
-                self.estate = EStopState.ESTOP
-            elif not taster:
-                self.estate = EStopState.IDLE
-            else:
-                self.estate = EStopState.READY if brk_ok else EStopState.ARMED
-
-            desired_ready = (self.estate == EStopState.READY)
-            if "ready" in bits and bool(bits.get("ready", False)) != bool(desired_ready):
-                bits["ready"] = bool(desired_ready)
-            self.drive_ready = bool(desired_ready)
-
-        self.inj_estop_word = int(encode_estop_word(bits))
+        (
+            self.inj_estop_word,
+            self.taster_prev,
+            self.taster_rise_t_s,
+            self.drive_ready,
+            self.estate,
+            self.estop_latched,
+        ) = apply_estop_state_machine(
+            inj_bits=bits,
+            state_t_s=float(self.state.t_s),
+            brake_switch_s=float(self.brake_switch_s),
+            brake_handoff_grace_s=float(self.brake_handoff_grace_s),
+            estop_latched=bool(self.estop_latched),
+            safety_ok=bool(self.safety_ok),
+            taster_prev=bool(self.taster_prev),
+            taster_rise_t_s=self.taster_rise_t_s,
+            drive_ready=bool(self.drive_ready),
+            estate=self.estate,
+            brake_override_b1=bool(self.brake_override_b1),
+            brake_override_b2=bool(self.brake_override_b2),
+        )
 
     # ---------------------------------------------------------------------
     # cut markers
@@ -566,26 +507,15 @@ class DenSiEngine:
             pass
 
     def derive_estop_inputs(self) -> tuple[int, bool, bool]:
-        word = int(self.inj_estop_word)
-        reset_able = bool(self._reset_able_from_estop_word(word))
-        ready_for_sollvel = bool(self._ready_from_estop_word(word))
-        return word, reset_able, ready_for_sollvel
+        return _derive_estop_inputs(int(self.inj_estop_word))
 
     @staticmethod
     def _reset_able_from_estop_word(word: int) -> bool:
-        try:
-            bits = decode_estop_word(int(word))
-            return bool(bits.get("reset_able", False))
-        except Exception:
-            return False
+        return _reset_able_from_estop_word(int(word))
 
     @staticmethod
     def _ready_from_estop_word(word: int) -> bool:
-        try:
-            bits = decode_estop_word(int(word))
-            return bool(bits.get("ready", False))
-        except Exception:
-            return False
+        return _ready_from_estop_word(int(word))
 
     def compute_moving_guard(self) -> bool:
         return compute_moving_guard(state=self.state, axis_ids=list(self.axis_ids))
@@ -604,8 +534,11 @@ class DenSiEngine:
 
     def handle_resync_cmd(self) -> None:
         cmd = self.ensure_last_cmd()
-        if self.l0_top == L0Top.CONNECTED and bool(getattr(cmd, "resync", False)):
-            self.clear_cut_markers(reset_prev=True)
+        _handle_resync_cmd(
+            cmd=cmd,
+            l0_top=self.l0_top,
+            clear_cut_markers=lambda reset_prev: self.clear_cut_markers(reset_prev=reset_prev),
+        )
 
     def apply_param_ops(self, ready_for_sollvel: bool, moving: bool) -> dict[str, float]:
         cmd = self.ensure_last_cmd()
@@ -639,10 +572,12 @@ class DenSiEngine:
 
     def compute_estop_edge_and_update_state(self, estop_word: int) -> bool:
         # EStop ladder is authoritative
-        self.state.estop = bool(self.estate == EStopState.ESTOP)
-        self.state.estop_status_word = int(estop_word)
-        # latch on entry
-        return bool(self.state.estop) and (not bool(self.prev_estop_state))
+        return _compute_estop_edge_and_update_state(
+            estate=self.estate,
+            prev_estop_state=bool(self.prev_estop_state),
+            estop_word=int(estop_word),
+            state=self.state,
+        )
 
     def step_plant_with_clamp(self) -> None:
         cmd = self.ensure_last_cmd()
