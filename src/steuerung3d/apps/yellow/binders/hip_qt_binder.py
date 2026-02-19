@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QLineEdit,
-    QMessageBox,
     QPushButton,
     QTabWidget,
     QWidget,
@@ -28,6 +27,7 @@ from PySide6.QtWidgets import (
 from ..qtutil.ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
 from ..qtutil.param_widget_binder import ParamWidgetBinder
 from ..qtutil.modal_lock import ModalLock
+from ..qtutil.param_ui_apply import ParamUiBindings, apply_param_ui
 from ..qtutil.ui_update import (
     set_enabled,
     set_enabled_repolish,
@@ -42,6 +42,9 @@ from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS 
 from ..domain.ui_format import fmt_f_unit
 from ..panels.hip_banner_render import HipBannerBindings, apply_hip_banner
 from ..panels.hip_estop_render import HipEstopBindings, apply_hip_estop
+from ..panels.hip_header_dots_render import HipHeaderDotsBindings, apply_hip_header_dots
+from ..panels.hip_cut_markers_render import HipCutMarkersBindings, apply_hip_cut_markers
+from ..panels.hip_drive_status_render import HipDriveStatusBindings, apply_hip_drive_status
 from ..panels.hip_readouts_render import HipReadoutsBindings, apply_hip_readouts
 from ..panels.hip_sliders_render import HipSlidersBindings, apply_hip_sliders
 from ..engines.hip.engine import (
@@ -65,6 +68,9 @@ class HipQtBinder:
     _suppress_axis_signal: bool = False
     _banner_bindings: HipBannerBindings | None = None
     _estop_bindings: HipEstopBindings | None = None
+    _header_dots_bindings: HipHeaderDotsBindings | None = None
+    _cut_markers_bindings: HipCutMarkersBindings | None = None
+    _drive_status_bindings: HipDriveStatusBindings | None = None
     _readouts_bindings: HipReadoutsBindings | None = None
     _sliders_bindings: HipSlidersBindings | None = None
     _modal_lock: ModalLock | None = None
@@ -81,52 +87,44 @@ class HipQtBinder:
 
         # Core widgets
         self._tabs_main: QTabWidget | None = self._wcache.get(QTabWidget, "tabsMain")
-        self._cmbAxis: QComboBox | None = self.win.findChild(QComboBox, "cmbAxis")
+        self._cmbAxis: QComboBox | None = self._wcache.combo_box("cmbAxis")
 
         # Header + tick
-        self._txtTick: QLineEdit | None = self.win.findChild(QLineEdit, "txtTick")
-        self._txt_hdr_banner_left: QLineEdit | None = self.win.findChild(QLineEdit, "txtHdrBannerLeft")
-        self._txt_hdr_banner_right: QLineEdit | None = self.win.findChild(
-            QLineEdit, "txtHdrBannerRight"
-        )
-        self._frame_header: QWidget | None = self.win.findChild(QWidget, "frameHeader")
-        self._frame_footer: QWidget | None = self.win.findChild(QWidget, "frameFooter")
+        self._txtTick: QLineEdit | None = self._wcache.line_edit("txtTick")
+        self._txt_hdr_banner_left: QLineEdit | None = self._wcache.line_edit("txtHdrBannerLeft")
+        self._txt_hdr_banner_right: QLineEdit | None = self._wcache.line_edit("txtHdrBannerRight")
+        self._frame_header: QWidget | None = self._wcache.widget("frameHeader")
+        self._frame_footer: QWidget | None = self._wcache.widget("frameFooter")
 
         # Drive status fields
-        self._txt_main_amp_status: QLineEdit | None = self.win.findChild(QLineEdit, "txtMainAmpStatus")
-        self._txt_slave_amp_status: QLineEdit | None = self.win.findChild(QLineEdit, "txtSlaveAmpStatus")
+        self._txt_main_amp_status: QLineEdit | None = self._wcache.line_edit("txtMainAmpStatus")
+        self._txt_slave_amp_status: QLineEdit | None = self._wcache.line_edit("txtSlaveAmpStatus")
 
         # Readouts
-        self._txtPos: QLineEdit | None = self.win.findChild(QLineEdit, "txtPos")
-        self._txtVel: QLineEdit | None = self.win.findChild(QLineEdit, "txtVel")
-        self._txtAmp: QLineEdit | None = self.win.findChild(QLineEdit, "txtAmp")
-        self._txtTemp: QLineEdit | None = self.win.findChild(QLineEdit, "txtTemp")
+        self._txtPos: QLineEdit | None = self._wcache.line_edit("txtPos")
+        self._txtVel: QLineEdit | None = self._wcache.line_edit("txtVel")
+        self._txtAmp: QLineEdit | None = self._wcache.line_edit("txtAmp")
+        self._txtTemp: QLineEdit | None = self._wcache.line_edit("txtTemp")
 
-        self._txtCutPos: QLineEdit | None = self.win.findChild(QLineEdit, "txtCutPos")
-        self._txtCutVel: QLineEdit | None = self.win.findChild(QLineEdit, "txtCutVel")
-        self._txtCutTime: QLineEdit | None = self.win.findChild(QLineEdit, "txtCutTime")
-        self._txtPosdiff: QLineEdit | None = self.win.findChild(QLineEdit, "txtPosdiff")
+        self._txtCutPos: QLineEdit | None = self._wcache.line_edit("txtCutPos")
+        self._txtCutVel: QLineEdit | None = self._wcache.line_edit("txtCutVel")
+        self._txtCutTime: QLineEdit | None = self._wcache.line_edit("txtCutTime")
+        self._txtPosdiff: QLineEdit | None = self._wcache.line_edit("txtPosdiff")
 
-        self._txt_guider_range_min: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMin")
-        self._txt_guider_range_max: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMax")
-        self._txt_guider_range_val: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeValue")
-        self._txt_guider_speed: QLineEdit | None = self.win.findChild(
-            QLineEdit, "txtGuiderSpeed"
-        )
+        self._txt_guider_range_min: QLineEdit | None = self._wcache.line_edit("txtGuiderRangeMin")
+        self._txt_guider_range_max: QLineEdit | None = self._wcache.line_edit("txtGuiderRangeMax")
+        self._txt_guider_range_val: QLineEdit | None = self._wcache.line_edit("txtGuiderRangeValue")
+        self._txt_guider_speed: QLineEdit | None = self._wcache.line_edit("txtGuiderSpeed")
 
         # Sliders
-        self._sld_vel_cmd: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldVelCmd")
-        self._sld_limit_range: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldLimitRange")
-        self._sld_guider_range: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldGuiderRange")
-        self._sld_guider_speed: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldGuiderSpeed")
+        self._sld_vel_cmd: QAbstractSlider | None = self._wcache.slider("sldVelCmd")
+        self._sld_limit_range: QAbstractSlider | None = self._wcache.slider("sldLimitRange")
+        self._sld_guider_range: QAbstractSlider | None = self._wcache.slider("sldGuiderRange")
+        self._sld_guider_speed: QAbstractSlider | None = self._wcache.slider("sldGuiderSpeed")
 
         # Buttons
-        self._btn_estop_reset: QPushButton | None = self.win.findChild(
-            QPushButton, "btnEStopReset"
-        )
-        self._btn_diag_resync: QPushButton | None = self.win.findChild(
-            QPushButton, "btnDiagResync"
-        )
+        self._btn_estop_reset: QPushButton | None = self._wcache.button("btnEStopReset")
+        self._btn_diag_resync: QPushButton | None = self._wcache.button("btnDiagResync")
 
         if self._txt_hdr_banner_right is None:
             raise RuntimeError("UI is missing widget named 'txtHdrBannerRight'")
@@ -142,7 +140,7 @@ class HipQtBinder:
         for spec in ESTOP_SPECS.values():
             if not spec.checkbox:
                 continue
-            cb = self.win.findChild(QCheckBox, spec.checkbox)
+            cb = self._wcache.checkbox(spec.checkbox)
             if cb is not None:
                 cb.setEnabled(False)
                 self._estop_checks[spec.key] = cb
@@ -179,6 +177,23 @@ class HipQtBinder:
             btn_estop_reset=self._btn_estop_reset,
             estop_checks=dict(self._estop_checks or {}),
             set_dot=self._set_dot,
+        )
+        self._header_dots_bindings = HipHeaderDotsBindings(
+            dot_hdr_online=self._wcache.widget("dotHdrOnline"),
+            dot_hdr_ready=self._wcache.widget("dotHdrReady"),
+            dot_hdr_fbt=self._wcache.widget("dotHdrFbt"),
+            dot_hdr_brake1=self._wcache.widget("dotHdrBrake1"),
+            dot_hdr_brake2=self._wcache.widget("dotHdrBrake2"),
+        )
+        self._cut_markers_bindings = HipCutMarkersBindings(
+            txt_cut_time=self._txtCutTime,
+            txt_cut_pos=self._txtCutPos,
+            txt_cut_vel=self._txtCutVel,
+            txt_posdiff=self._txtPosdiff,
+        )
+        self._drive_status_bindings = HipDriveStatusBindings(
+            txt_main_amp_status=self._txt_main_amp_status,
+            txt_slave_amp_status=self._txt_slave_amp_status,
         )
         self._readouts_bindings = HipReadoutsBindings(
             txt_pos=self._require_widget(self._txtPos, "txtPos"),
@@ -456,13 +471,9 @@ class HipQtBinder:
             self._clear_for_unattached()
 
     def _apply_drive_status(self, vm: HipViewModel) -> None:
-        ds = vm.drive_status
-        if ds is None:
+        if self._drive_status_bindings is None:
             return
-        if self._txt_main_amp_status is not None:
-            set_text(self._txt_main_amp_status, str(ds.main_text))
-        if self._txt_slave_amp_status is not None:
-            set_text(self._txt_slave_amp_status, str(ds.slave_text))
+        apply_hip_drive_status(self._drive_status_bindings, vm)
 
     def _apply_banner(self, vm: HipViewModel) -> None:
         if self._banner_bindings is None:
@@ -470,13 +481,9 @@ class HipQtBinder:
         apply_hip_banner(self._banner_bindings, vm)
 
     def _apply_header_dots(self, vm: HipViewModel) -> None:
-        if vm.header_dots is None:
+        if self._header_dots_bindings is None:
             return
-        self._set_dot("dotHdrOnline", vm.header_dots.online_state)
-        self._set_dot("dotHdrReady", vm.header_dots.ready_state)
-        self._set_dot("dotHdrFbt", vm.header_dots.fbt_state)
-        self._set_dot("dotHdrBrake1", vm.header_dots.brk1_state)
-        self._set_dot("dotHdrBrake2", vm.header_dots.brk2_state)
+        apply_hip_header_dots(self._header_dots_bindings, vm)
 
     def _apply_estop_state(self, vm: HipViewModel) -> None:
         if self._estop_bindings is None:
@@ -494,60 +501,20 @@ class HipQtBinder:
         apply_hip_sliders(self._sliders_bindings, vm)
 
     def _apply_cut_markers(self, vm: HipViewModel) -> None:
-        cm = vm.cut_markers
-        if cm is None:
+        if self._cut_markers_bindings is None:
             return
-        if self._txtCutTime is not None:
-            set_text(self._txtCutTime, cm.cut_time_text)
-        if self._txtCutPos is not None:
-            set_text(self._txtCutPos, cm.cut_pos_text)
-        if self._txtCutVel is not None:
-            set_text(self._txtCutVel, cm.cut_vel_text)
-        if self._txtPosdiff is not None:
-            set_text(self._txtPosdiff, cm.posdiff_text)
+        apply_hip_cut_markers(self._cut_markers_bindings, vm)
 
     def _apply_params(self, vm: HipViewModel) -> None:
-        if vm.param_ui is not None:
-            self._apply_modal_param_lock(vm.param_ui.modal_lock_active, vm.param_ui.modal_lock_group)
-
-            for group, gstate in (vm.param_ui.groups or {}).items():
-                self._set_param_group_enabled(group, bool(gstate.fields_enabled))
-                self._set_param_button_state(group, gstate.buttons)
-
-        if vm.param_values:
-            self._param_binder.apply_param_values(
-                vm.param_values,
-                freeze_group=str(vm.param_freeze_group or ""),
-                skip_focused=True,
-                block_signals=True,
-            )
-
-        if vm.param_writeback_values and vm.param_writeback_group:
-            self._param_binder.apply_param_values(
-                vm.param_writeback_values,
-                freeze_group=str(vm.param_writeback_group or ""),
-                skip_focused=False,
-                block_signals=True,
-            )
-            if vm.param_writeback_message:
-                QMessageBox.information(
-                    self.win,
-                    "Position limits adjusted",
-                    str(vm.param_writeback_message),
-                )
-
-        if vm.param_commit_dialog is not None:
-            dlg = vm.param_commit_dialog
-            if str(dlg.level).lower() == "warning":
-                QMessageBox.warning(self.win, str(dlg.title), str(dlg.message))
-            else:
-                QMessageBox.information(self.win, str(dlg.title), str(dlg.message))
-
-        if vm.limit_values:
-            self._param_binder.apply_limit_values(
-                vm.limit_values,
-                format_value=lambda v: fmt_f_unit(v, "m", ndigits=2).replace(".", ","),
-            )
+        bindings = ParamUiBindings(
+            win=self.win,
+            modal_lock=self._modal_lock,
+            param_binder=self._param_binder,
+            find_line_edit=self._find_line_edit,
+            find_button=self._find_button,
+            format_limit_value=lambda v: fmt_f_unit(v, "m", ndigits=2).replace(".", ","),
+        )
+        apply_param_ui(bindings, vm)
 
     # ------------------------------------------------------------------
     # UI helpers
@@ -612,60 +579,3 @@ class HipQtBinder:
         neutralize_dots(self._set_dot, [s.dot for s in ESTOP_SPECS.values() if s.dot])
         uncheck_checkboxes(getattr(self, "_estop_checks", {}).values())
 
-    def _apply_modal_param_lock(self, active: bool, group: str) -> None:
-        if self._modal_lock is None:
-            return
-
-        if active:
-            allow: list[QWidget] = []
-            for _k, obj_name in _PARAM_WIDGETS.get(group, {}).items():
-                le = self._find_line_edit(obj_name)
-                if le is not None:
-                    allow.append(le)
-
-            wiring = {
-                "pos": ("btnPosWrite", "btnPosCancel"),
-                "vel": ("btnVelWrite", "btnVelCancel"),
-                "filter": ("btnFilterWrite", "btnFilterCancel"),
-                "guider": ("btnGuiderWrite", "btnGuiderCancel"),
-            }
-            if group in wiring:
-                bw = self._find_button(wiring[group][0])
-                bc = self._find_button(wiring[group][1])
-                if bw is not None:
-                    allow.append(bw)
-                if bc is not None:
-                    allow.append(bc)
-
-            self._modal_lock.lock(allow=allow)
-            return
-
-        self._modal_lock.unlock()
-
-    def _set_param_group_enabled(self, group: str, enabled: bool) -> None:
-        mapping = _PARAM_WIDGETS.get(group, {})
-        for _key, obj_name in mapping.items():
-            le = self._find_line_edit(obj_name)
-            if le is None:
-                continue
-            set_enabled_repolish(le, bool(enabled))
-
-    def _set_param_button_state(self, group: str, buttons) -> None:
-        wiring = {
-            "pos": ("btnPosEdit", "btnPosWrite", "btnPosCancel"),
-            "vel": ("btnVelEdit", "btnVelWrite", "btnVelCancel"),
-            "filter": ("btnFilterEdit", "btnFilterWrite", "btnFilterCancel"),
-            "guider": ("btnGuiderEdit", "btnGuiderWrite", "btnGuiderCancel"),
-        }
-        if group not in wiring:
-            return
-        b_edit, b_write, b_cancel = wiring[group]
-        be = self._find_button(b_edit)
-        bw = self._find_button(b_write)
-        bc = self._find_button(b_cancel)
-        if be is not None:
-            set_enabled(be, bool(buttons.edit_enabled))
-        if bw is not None:
-            set_enabled(bw, bool(buttons.write_enabled))
-        if bc is not None:
-            set_enabled(bc, bool(buttons.cancel_enabled))
