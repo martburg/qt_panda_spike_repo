@@ -2,7 +2,7 @@ import sys
 
 sys.path.insert(0, 'src')
 
-from steuerung3d.apps.yellow.panels.densi_limits_vm import compute_densi_limits_vm
+from steuerung3d.apps.yellow.panels.densi.densi_limits_vm import compute_densi_limits_vm
 
 
 def test_limits_vm_format_and_decimal_comma():

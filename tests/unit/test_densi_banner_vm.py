@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from steuerung3d.apps.yellow.panels.densi_banner_vm import compute_densi_banner_vm
+from steuerung3d.apps.yellow.panels.densi.densi_banner_vm import compute_densi_banner_vm
 from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS, encode_estop_word
 
 

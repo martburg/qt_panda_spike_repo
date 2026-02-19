@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from steuerung3d.apps.yellow.panels.densi_estop_dots_vm import compute_densi_estop_dots_vm
+from steuerung3d.apps.yellow.panels.densi.densi_estop_dots_vm import (
+    compute_densi_estop_dots_vm,
+)
 
 
 def test_estop_dots_cause_and_header_brake_grace() -> None:

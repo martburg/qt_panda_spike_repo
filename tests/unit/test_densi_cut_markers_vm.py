@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from steuerung3d.apps.yellow.panels.densi_cut_markers_vm import compute_densi_cut_markers_vm
+from steuerung3d.apps.yellow.panels.densi.densi_cut_markers_vm import (
+    compute_densi_cut_markers_vm,
+)
 
 
 def test_cut_markers_token_advances_only_when_not_estop() -> None:

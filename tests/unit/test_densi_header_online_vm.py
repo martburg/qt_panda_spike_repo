@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from steuerung3d.apps.yellow.panels.densi_header_online_vm import compute_densi_header_online_vm
+from steuerung3d.apps.yellow.panels.densi.densi_header_online_vm import (
+    compute_densi_header_online_vm,
+)
 
 
 def test_header_online_dot_off_until_first_cmd() -> None:
