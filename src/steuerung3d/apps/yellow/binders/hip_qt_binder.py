@@ -40,7 +40,7 @@ from ..qtutil.widget_cache import WidgetCache
 from ..qtutil.ui_contract import log_missing_optional_once, log_missing_required_once
 from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 from ..domain.ui_format import fmt_f_unit
-from ..domain.ui_banner import BANNER_COLORS
+from ..panels.hip_banner_render import HipBannerBindings, apply_hip_banner
 from ..engines.hip.engine import (
     HipParamAction,
     HipUiInputs,
@@ -60,6 +60,7 @@ class HipQtBinder:
     _axis_selection_changed: bool = False
     _axis_selected_value: str = ""
     _suppress_axis_signal: bool = False
+    _banner_bindings: HipBannerBindings | None = None
 
     def __post_init__(self) -> None:
         self._wcache = WidgetCache(self.win)
@@ -159,6 +160,11 @@ class HipQtBinder:
 
         # Param input validators (numeric)
         self._init_param_inputs()
+
+        self._banner_bindings = HipBannerBindings(
+            txt_hdr_banner_left=self._txt_hdr_banner_left,
+            txt_hdr_banner_right=self._txt_hdr_banner_right,
+        )
 
         # UI contract checks
         log_missing_required_once(
@@ -427,14 +433,9 @@ class HipQtBinder:
             set_text(self._txt_slave_amp_status, str(ds.slave_text))
 
     def _apply_banner(self, vm: HipViewModel) -> None:
-        if vm.banner is None:
+        if self._banner_bindings is None:
             return
-        bg, fg = BANNER_COLORS.get(vm.banner.estate, ("#F9E547", "#000000"))
-        for w in (self._txt_hdr_banner_left, self._txt_hdr_banner_right):
-            if w is None:
-                continue
-            set_text(w, vm.banner.estate)
-            w.setStyleSheet(f"background-color: {bg}; color: {fg}; font-weight: 700;")
+        apply_hip_banner(self._banner_bindings, vm)
 
     def _apply_header_dots(self, vm: HipViewModel) -> None:
         if vm.header_dots is None:
