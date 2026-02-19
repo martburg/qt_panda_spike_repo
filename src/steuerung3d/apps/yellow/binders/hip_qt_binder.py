@@ -28,7 +28,6 @@ from PySide6.QtWidgets import (
 from ..qtutil.ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
 from ..qtutil.param_widget_binder import ParamWidgetBinder
 from ..qtutil.ui_update import (
-    set_checked,
     set_enabled,
     set_enabled_repolish,
     set_state_by_object_name,
@@ -41,6 +40,9 @@ from ..qtutil.ui_contract import log_missing_optional_once, log_missing_required
 from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 from ..domain.ui_format import fmt_f_unit
 from ..panels.hip_banner_render import HipBannerBindings, apply_hip_banner
+from ..panels.hip_estop_render import HipEstopBindings, apply_hip_estop
+from ..panels.hip_readouts_render import HipReadoutsBindings, apply_hip_readouts
+from ..panels.hip_sliders_render import HipSlidersBindings, apply_hip_sliders
 from ..engines.hip.engine import (
     HipParamAction,
     HipUiInputs,
@@ -61,6 +63,9 @@ class HipQtBinder:
     _axis_selected_value: str = ""
     _suppress_axis_signal: bool = False
     _banner_bindings: HipBannerBindings | None = None
+    _estop_bindings: HipEstopBindings | None = None
+    _readouts_bindings: HipReadoutsBindings | None = None
+    _sliders_bindings: HipSlidersBindings | None = None
 
     def __post_init__(self) -> None:
         self._wcache = WidgetCache(self.win)
@@ -164,6 +169,27 @@ class HipQtBinder:
         self._banner_bindings = HipBannerBindings(
             txt_hdr_banner_left=self._txt_hdr_banner_left,
             txt_hdr_banner_right=self._txt_hdr_banner_right,
+        )
+        self._estop_bindings = HipEstopBindings(
+            btn_estop_reset=self._btn_estop_reset,
+            estop_checks=dict(self._estop_checks or {}),
+            set_dot=self._set_dot,
+        )
+        self._readouts_bindings = HipReadoutsBindings(
+            txt_pos=self._require_widget(self._txtPos, "txtPos"),
+            txt_vel=self._require_widget(self._txtVel, "txtVel"),
+            txt_amp=self._require_widget(self._txtAmp, "txtAmp"),
+            txt_temp=self._require_widget(self._txtTemp, "txtTemp"),
+            txt_guider_range_min=self._require_widget(self._txt_guider_range_min, "txtGuiderRangeMin"),
+            txt_guider_range_max=self._require_widget(self._txt_guider_range_max, "txtGuiderRangeMax"),
+            txt_guider_range_val=self._require_widget(self._txt_guider_range_val, "txtGuiderRangeValue"),
+            txt_guider_speed=self._require_widget(self._txt_guider_speed, "txtGuiderSpeed"),
+        )
+        self._sliders_bindings = HipSlidersBindings(
+            sld_vel_cmd=self._require_widget(self._sld_vel_cmd, "sldVelCmd"),
+            sld_limit_range=self._require_widget(self._sld_limit_range, "sldLimitRange"),
+            sld_guider_range=self._require_widget(self._sld_guider_range, "sldGuiderRange"),
+            sld_guider_speed=self._require_widget(self._sld_guider_speed, "sldGuiderSpeed"),
         )
 
         # UI contract checks
@@ -302,6 +328,7 @@ class HipQtBinder:
         self._apply_header_dots(vm)
         self._apply_estop_state(vm)
         self._apply_readouts(vm)
+        self._apply_sliders(vm)
         self._apply_joy_speed(float(vm.joy_soll_speed))
         self._apply_cut_markers(vm)
         self._apply_params(vm)
@@ -447,77 +474,19 @@ class HipQtBinder:
         self._set_dot("dotHdrBrake2", vm.header_dots.brk2_state)
 
     def _apply_estop_state(self, vm: HipViewModel) -> None:
-        es = vm.estop_state
-        if es is None:
+        if self._estop_bindings is None:
             return
-        for dot, state in (es.dots or {}).items():
-            self._set_dot(str(dot), state)
-        if self._btn_estop_reset is not None:
-            set_enabled(self._btn_estop_reset, bool(es.reset_enabled))
-
-        # Checkboxes (read-only)
-        for key, cb in (self._estop_checks or {}).items():
-            v = bool(es.checkbox_states.get(key, False))
-            set_checked(cb, v, block_signals=True)
-            if es.profile_changed:
-                try:
-                    f = cb.font()
-                    f.setBold(key in es.active_keys)
-                    cb.setFont(f)
-                except Exception:
-                    pass
+        apply_hip_estop(self._estop_bindings, vm)
 
     def _apply_readouts(self, vm: HipViewModel) -> None:
-        ro = vm.readouts
-        if ro is None:
+        if self._readouts_bindings is None:
             return
+        apply_hip_readouts(self._readouts_bindings, vm)
 
-        if self._txtPos is not None:
-            set_text(self._txtPos, ro.pos_text)
-        if self._txtVel is not None:
-            set_text(self._txtVel, ro.vel_text)
-        if self._txtAmp is not None:
-            set_text(self._txtAmp, ro.amp_text)
-        if self._txtTemp is not None:
-            set_text(self._txtTemp, ro.temp_text)
-
-        if self._txt_guider_range_min is not None:
-            set_text(self._txt_guider_range_min, ro.guider_min_text)
-        if self._txt_guider_range_max is not None:
-            set_text(self._txt_guider_range_max, ro.guider_max_text)
-        if self._txt_guider_range_val is not None:
-            set_text(self._txt_guider_range_val, ro.guider_val_text)
-        if self._txt_guider_speed is not None:
-            set_text(self._txt_guider_speed, ro.guider_speed_text)
-
-        if self._sld_vel_cmd is not None:
-            update_slider(
-                self._sld_vel_cmd,
-                minimum=ro.vel_cmd_min,
-                maximum=ro.vel_cmd_max,
-                value=ro.vel_cmd_val,
-            )
-        if self._sld_limit_range is not None:
-            update_slider(
-                self._sld_limit_range,
-                minimum=ro.limit_min,
-                maximum=ro.limit_max,
-                value=ro.limit_val,
-            )
-        if self._sld_guider_range is not None:
-            update_slider(
-                self._sld_guider_range,
-                minimum=ro.guider_range_min,
-                maximum=ro.guider_range_max,
-                value=ro.guider_range_val,
-            )
-        if self._sld_guider_speed is not None:
-            update_slider(
-                self._sld_guider_speed,
-                minimum=ro.guider_speed_min,
-                maximum=ro.guider_speed_max,
-                value=ro.guider_speed_val,
-            )
+    def _apply_sliders(self, vm: HipViewModel) -> None:
+        if self._sliders_bindings is None:
+            return
+        apply_hip_sliders(self._sliders_bindings, vm)
 
     def _apply_cut_markers(self, vm: HipViewModel) -> None:
         cm = vm.cut_markers
@@ -595,6 +564,12 @@ class HipQtBinder:
         except Exception:
             w = self.win.findChild(QLineEdit, object_name)
             return w if isinstance(w, QLineEdit) else None
+
+    @staticmethod
+    def _require_widget(widget: QWidget | None, object_name: str) -> QWidget:
+        if widget is None:
+            raise RuntimeError(f"UI is missing widget named '{object_name}'")
+        return widget
 
     def _set_dot(self, object_name: str, state) -> None:
         if not object_name:
