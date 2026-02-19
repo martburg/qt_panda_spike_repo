@@ -36,12 +36,12 @@ except Exception:  # pragma: no cover
 from ..engines.densi.engine import DenSiEngine, DenSiTickResult
 from ..engines.densi.inputs import DensiInputs
 from ..engines.densi.viewmodel import DensiViewModel
-from ..panels.densi_banner_vm import compute_densi_banner_vm
-from ..panels.densi_cut_markers_vm import compute_densi_cut_markers_vm
-from ..panels.densi_estop_dots_vm import compute_densi_estop_dots_vm
-from ..panels.densi_header_online_vm import compute_densi_header_online_vm
-from ..panels.densi_lifetick_vm import compute_densi_lifetick_vm
-from ..panels.densi_readouts_vm import compute_densi_readouts_vm
+from ..panels.densi.densi_banner_vm import compute_densi_banner_vm
+from ..panels.densi.densi_cut_markers_vm import compute_densi_cut_markers_vm
+from ..panels.densi.densi_estop_dots_vm import compute_densi_estop_dots_vm
+from ..panels.densi.densi_header_online_vm import compute_densi_header_online_vm
+from ..panels.densi.densi_lifetick_vm import compute_densi_lifetick_vm
+from ..panels.densi.densi_readouts_vm import compute_densi_readouts_vm
 from ..domain.taster_edge_state import TasterEdgeState, update_taster_edge_state, within_brake_grace
 
 

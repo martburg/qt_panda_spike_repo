@@ -30,25 +30,24 @@ from ..qtutil.ui_update import (
     set_enabled,
     set_state_by_object_name,
     set_state_property,
-    set_text,
-    update_slider,
 )
 from ..qtutil.widget_cache import WidgetCache
 from ..qtutil.ui_format import fmt_float_de
+from ..qtutil.binder_helpers import block_signals, safe_set_text
 from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
-from ..panels.densi_banner_render import DenSiBannerBindings, apply_densi_banner_vm
-from ..panels.densi_cut_markers_render import DenSiCutMarkersBindings, apply_densi_cut_markers_vm
-from ..panels.densi_estop_checkboxes_render import (
+from ..panels.densi.densi_banner_render import DenSiBannerBindings, apply_densi_banner_vm
+from ..panels.densi.densi_cut_markers_render import DenSiCutMarkersBindings, apply_densi_cut_markers_vm
+from ..panels.densi.densi_estop_checkboxes_render import (
     DenSiEstopCheckboxBindings,
     discover_densi_estop_checkboxes,
     init_densi_estop_checkboxes,
     sync_densi_estop_checkboxes,
     wire_densi_estop_checkboxes,
 )
-from ..panels.densi_estop_dots_render import apply_densi_estop_dots_vm
-from ..panels.densi_header_online_render import apply_densi_header_online_vm
-from ..panels.densi_lifetick_render import apply_densi_lifetick_vm
-from ..panels.densi_readouts_render import DenSiReadoutsBindings, apply_densi_readouts_vm
+from ..panels.densi.densi_estop_dots_render import apply_densi_estop_dots_vm
+from ..panels.densi.densi_header_online_render import apply_densi_header_online_vm
+from ..panels.densi.densi_lifetick_render import apply_densi_lifetick_vm
+from ..panels.densi.densi_readouts_render import DenSiReadoutsBindings, apply_densi_readouts_vm
 from ..engines.densi.inputs import DensiInputs, DensiUiInputs, DensiEstopToggle
 from ..engines.densi.viewmodel import DensiViewModel
 from steuerung3d.protocol.estop_bits import decode_estop_word, iter_specs
@@ -204,12 +203,11 @@ class DenSiQtBinder:
             return
         label = self.axis_ids[0] if self.axis_ids else "?"
         try:
-            was = self._cmbAxis.blockSignals(True)
-            self._cmbAxis.clear()
-            self._cmbAxis.addItems([label])
-            self._cmbAxis.setCurrentText(label)
-            set_enabled(self._cmbAxis, False)
-            self._cmbAxis.blockSignals(was)
+            with block_signals(self._cmbAxis):
+                self._cmbAxis.clear()
+                self._cmbAxis.addItems([label])
+                self._cmbAxis.setCurrentText(label)
+                set_enabled(self._cmbAxis, False)
         except Exception:
             pass
 
@@ -232,8 +230,7 @@ class DenSiQtBinder:
         wire_densi_estop_checkboxes(bindings=self._estop_cb_bindings, on_toggled=self._on_estop_checkbox_toggled)
 
     def reset_ui_startup(self) -> None:
-        if self._txtTick is not None:
-            set_text(self._txtTick, "--")
+        safe_set_text(self._txtTick, "--")
 
         # DenSi role must not expose/enable ReSync (HiP owns workflow)
         if self._btn_diag_resync is not None:

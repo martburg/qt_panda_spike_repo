@@ -1,16 +1,6 @@
-"""Qt-only renderer for DenSi header online dot."""
+"""Compatibility re-export for moved module.
 
-from __future__ import annotations
+TODO: remove after callers switch to panels.densi.* imports.
+"""
 
-from collections.abc import Callable
-
-from .densi_header_online_vm import DenSiHeaderOnlineVM
-
-
-def apply_densi_header_online_vm(
-    vm: DenSiHeaderOnlineVM,
-    *,
-    set_dot: Callable[[str, str | None], None],
-) -> None:
-    # Controller owns dot lookup + property/QSS wiring via set_dot.
-    set_dot("dotHdrOnline", vm.dot_state)
+from .densi.densi_header_online_render import *  # noqa: F401,F403

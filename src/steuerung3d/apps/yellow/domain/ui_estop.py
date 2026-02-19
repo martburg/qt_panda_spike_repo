@@ -24,8 +24,8 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS as _ESTOP_CAUSE_KEYS
-from steuerung3d.protocol.estop_bits import ESTOP_OK_KEYS as _ESTOP_OK_KEYS
+from .estop_facts import estop_cause_keys as _estop_cause_keys
+from .estop_facts import estop_ok_keys as _estop_ok_keys
 
 
 @dataclass(frozen=True)
@@ -68,8 +68,8 @@ def compute_estop_dot_state(
     if key == "brk2kb_ok":
         return "good" if value else "bad"
 
-    ck = _ESTOP_CAUSE_KEYS if cause_keys is None else cause_keys
-    ok = _ESTOP_OK_KEYS if ok_keys is None else ok_keys
+    ck = _estop_cause_keys() if cause_keys is None else cause_keys
+    ok = _estop_ok_keys() if ok_keys is None else ok_keys
 
     if key in ck:
         return "bad" if value else "good"

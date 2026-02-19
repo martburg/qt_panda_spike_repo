@@ -31,9 +31,9 @@ from ..domain.ui_estop import infer_estop_profile
 from ..engines.hip.engine import HipEngine, HipStepInputs, HipStepResult, HipUiInputs
 from ..engines.hip.types import HipPresentationData
 from ..engines.hip.viewmodel import HipViewModel
-from ..panels.hip_banner_vm import compute_hip_banner_vm
-from ..panels.hip_estop_vm import compute_hip_estop_vm
-from ..panels.hip_header_dots_vm import compute_hip_header_dots_vm
+from ..panels.hip.hip_banner_vm import compute_hip_banner_vm
+from ..panels.hip.hip_estop_vm import compute_hip_estop_vm
+from ..panels.hip.hip_header_dots_vm import compute_hip_header_dots_vm
 from .runtime_utils import (
     compute_age_ms,
     compute_status_level,

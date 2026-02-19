@@ -4,32 +4,31 @@ from __future__ import annotations
 
 from typing import Callable
 
-from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS, decode_estop_word, encode_estop_word
+from ...domain.estop_facts import (
+    decode_estop_word,
+    encode_estop_word,
+    estop_cause_keys,
+    estop_ok_keys,
+    ready_from_word,
+    reset_able_from_word,
+)
 
 from ...domain.ui_banner import BANNER_DYNAMIC_EXCLUDE, derive_banner_estate_from_word
 from .types import EStopState
 
 
 def reset_able_from_estop_word(word: int) -> bool:
-    try:
-        bits = decode_estop_word(int(word))
-        return bool(bits.get("reset_able", False))
-    except Exception:
-        return False
+    return bool(reset_able_from_word(int(word)))
 
 
 def ready_from_estop_word(word: int) -> bool:
-    try:
-        bits = decode_estop_word(int(word))
-        return bool(bits.get("ready", False))
-    except Exception:
-        return False
+    return bool(ready_from_word(int(word)))
 
 
 def derive_estop_inputs(inj_estop_word: int) -> tuple[int, bool, bool]:
     word = int(inj_estop_word)
-    reset_able = bool(reset_able_from_estop_word(word))
-    ready_for_sollvel = bool(ready_from_estop_word(word))
+    reset_able = bool(reset_able_from_word(word))
+    ready_for_sollvel = bool(ready_from_word(word))
     return word, reset_able, ready_for_sollvel
 
 
@@ -42,7 +41,9 @@ def sync_reset_able_bit(
     if "reset_able" not in inj_bits:
         return False, int(inj_estop_word)
 
-    trip_causes = any(bool(inj_bits.get(k, False)) for k in ESTOP_CAUSE_KEYS)
+    cause_keys = estop_cause_keys()
+    ok_keys = estop_ok_keys()
+    trip_causes = any(bool(inj_bits.get(k, False)) for k in cause_keys)
 
     try:
         estate = derive_banner_estate_from_word(
@@ -77,6 +78,8 @@ def apply_estop_state_machine(
     brake_override_b1: bool,
     brake_override_b2: bool,
 ) -> tuple[int, bool, float | None, bool, EStopState, bool]:
+    cause_keys = estop_cause_keys()
+    ok_keys_all = estop_ok_keys()
     schuetz = bool(inj_bits.get("schuetz", False))
     taster = bool(inj_bits.get("taster", False))
 
@@ -112,10 +115,10 @@ def apply_estop_state_machine(
                 continue
             inj_bits[k] = bool(desired_brk_ok)
 
-    trip_cause = any(bool(inj_bits.get(k, False)) for k in ESTOP_CAUSE_KEYS)
+    trip_cause = any(bool(inj_bits.get(k, False)) for k in cause_keys)
     ok_keys = [
         k
-        for k in ESTOP_OK_KEYS
+        for k in ok_keys_all
         if (k not in BANNER_DYNAMIC_EXCLUDE) and (k not in ("brk1_ok", "brk2_ok"))
     ]
     ok_chain_fault = any(not bool(inj_bits.get(k, True)) for k in ok_keys)

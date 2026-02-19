@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ...panels.densi_banner_vm import DenSiBannerVM
-from ...panels.densi_cut_markers_vm import DenSiCutMarkersVM
-from ...panels.densi_estop_dots_vm import DenSiEstopDotsVM
-from ...panels.densi_header_online_vm import DenSiHeaderOnlineVM
-from ...panels.densi_lifetick_vm import DenSiLifeTickVM
-from ...panels.densi_readouts_vm import DenSiReadoutsVM
+from ...panels.densi.densi_banner_vm import DenSiBannerVM
+from ...panels.densi.densi_cut_markers_vm import DenSiCutMarkersVM
+from ...panels.densi.densi_estop_dots_vm import DenSiEstopDotsVM
+from ...panels.densi.densi_header_online_vm import DenSiHeaderOnlineVM
+from ...panels.densi.densi_lifetick_vm import DenSiLifeTickVM
+from ...panels.densi.densi_readouts_vm import DenSiReadoutsVM
 
 
 @dataclass(frozen=True)

@@ -18,7 +18,7 @@ def _ensure_app() -> None:
 def test_yellow_ui_widget_presence() -> None:
     _ensure_app()
     root = Path(__file__).resolve().parents[2]
-    ui_path = root / "src" / "steuerung3d" / "apps" / "yellow" / "ui_split" / "yellow3_merged.ui"
+    ui_path = root / "src" / "steuerung3d" / "apps" / "yellow" / "assets" / "yellow3_merged.ui"
     win = ui_shell.load_ui(ui_path)
 
     required = [

@@ -163,7 +163,7 @@ def build_yellow_window(*, role: str, ui_path=None):
     """
 
     if ui_path is None:
-        ui_path = Path(__file__).with_name("ui_split") / "yellow3_merged.ui"
+        ui_path = Path(__file__).with_name("assets") / "yellow3_merged.ui"
     win = load_ui(Path(ui_path))
     # Hide Diagnostics tab in IP role (HMI client)
     if role == "ip":

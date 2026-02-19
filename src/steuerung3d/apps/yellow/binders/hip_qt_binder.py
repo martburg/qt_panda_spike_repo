@@ -33,20 +33,20 @@ from ..qtutil.ui_update import (
     set_enabled_repolish,
     set_state_by_object_name,
     set_state_property,
-    set_text,
     update_slider,
 )
 from ..qtutil.widget_cache import WidgetCache
 from ..qtutil.ui_format import fmt_f_unit_de
 from ..qtutil.ui_contract import log_missing_optional_once, log_missing_required_once
+from ..qtutil.binder_helpers import block_signals, safe_set_text
 from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
-from ..panels.hip_banner_render import HipBannerBindings, apply_hip_banner
-from ..panels.hip_estop_render import HipEstopBindings, apply_hip_estop
-from ..panels.hip_header_dots_render import HipHeaderDotsBindings, apply_hip_header_dots
-from ..panels.hip_cut_markers_render import HipCutMarkersBindings, apply_hip_cut_markers
-from ..panels.hip_drive_status_render import HipDriveStatusBindings, apply_hip_drive_status
-from ..panels.hip_readouts_render import HipReadoutsBindings, apply_hip_readouts
-from ..panels.hip_sliders_render import HipSlidersBindings, apply_hip_sliders
+from ..panels.hip.hip_banner_render import HipBannerBindings, apply_hip_banner
+from ..panels.hip.hip_estop_render import HipEstopBindings, apply_hip_estop
+from ..panels.hip.hip_header_dots_render import HipHeaderDotsBindings, apply_hip_header_dots
+from ..panels.hip.hip_cut_markers_render import HipCutMarkersBindings, apply_hip_cut_markers
+from ..panels.hip.hip_drive_status_render import HipDriveStatusBindings, apply_hip_drive_status
+from ..panels.hip.hip_readouts_render import HipReadoutsBindings, apply_hip_readouts
+from ..panels.hip.hip_sliders_render import HipSlidersBindings, apply_hip_sliders
 from ..engines.hip.engine import (
     HipParamAction,
     HipUiInputs,
@@ -352,9 +352,7 @@ class HipQtBinder:
         self._apply_joy_speed(0.0)
 
     def apply_tick_text(self, text: str) -> None:
-        if self._txtTick is None:
-            return
-        set_text(self._txtTick, str(text))
+        safe_set_text(self._txtTick, text)
 
     def apply_online_state(self, state: str | None) -> None:
         if state is None:
@@ -425,15 +423,12 @@ class HipQtBinder:
             existing = [self._cmbAxis.itemText(i) for i in range(self._cmbAxis.count())]
             if existing != items or (cur and self._cmbAxis.currentText().strip() != cur):
                 self._suppress_axis_signal = True
-                was = self._cmbAxis.blockSignals(True)
-                try:
+                with block_signals(self._cmbAxis):
                     if existing != items:
                         self._cmbAxis.clear()
                         self._cmbAxis.addItems(items)
                     if cur and self._cmbAxis.currentText().strip() != cur:
                         self._cmbAxis.setCurrentText(cur)
-                finally:
-                    self._cmbAxis.blockSignals(was)
                     self._suppress_axis_signal = False
             set_enabled(self._cmbAxis, bool(vm.attach_combo.enabled))
 
@@ -593,8 +588,7 @@ class HipQtBinder:
     def _clear_for_unattached(self) -> None:
         keep = [self._txtTick] if self._txtTick is not None else []
         clear_line_edits(self.win, keep=keep, text="")
-        if self._txtTick is not None:
-            set_text(self._txtTick, "--")
+        safe_set_text(self._txtTick, "--")
 
         for w in (
             self._txt_main_amp_status,
@@ -602,8 +596,7 @@ class HipQtBinder:
             self._txt_hdr_banner_left,
             self._txt_hdr_banner_right,
         ):
-            if w is not None:
-                set_text(w, "")
+            safe_set_text(w, "")
 
         neutralize_dots(self._set_dot, ("dotHdrOnline", "dotHdrReady", "dotHdrFbt", "dotHdrBrake1", "dotHdrBrake2"))
         neutralize_dots(self._set_dot, [s.dot for s in ESTOP_SPECS.values() if s.dot])
