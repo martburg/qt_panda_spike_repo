@@ -35,8 +35,11 @@ from steuerung3d.protocol.estop_bits import (
 )
 
 from .types import EStopState, L0Top, L0Sub
+from .cut_markers import clear_cut_markers as _clear_cut_markers
+from .cut_markers import maybe_latch_cut_markers as _maybe_latch_cut_markers
+from .drive_status import update_drive_status_words
 from .param_ops import apply_densi_param_ops
-from .setpoint_semantics import normalize_cmd_for_plant
+from .motion_clamp import apply_estop_clamp_to_state, compute_moving_guard, step_plant_with_clamp
 from ...domain.ui_banner import BANNER_DYNAMIC_EXCLUDE, derive_banner_estate_from_word
 
 
@@ -488,90 +491,23 @@ class DenSiEngine:
     # ---------------------------------------------------------------------
 
     def clear_cut_markers(self, *, reset_prev: bool = False) -> None:
-        self.cut_valid = False
-        self.cut_pos_m = 0.0
-        self.cut_vel_mps = 0.0
-        self.cut_time_s = 0.0
-        if reset_prev:
-            self.prev_estop_state = bool(getattr(self.state, "estop", False))
-
-        try:
-            self.state.params["CutPos"] = 0.0
-            self.state.params["CutVel"] = 0.0
-            self.state.params["CutTime"] = 0.0
-            self.state.params["PosDiffFor"] = 0.0
-        except Exception:
-            pass
+        (
+            self.cut_valid,
+            self.cut_pos_m,
+            self.cut_vel_mps,
+            self.cut_time_s,
+            self.systemtime_tok,
+            self.prev_estop_state,
+        ) = _clear_cut_markers(
+            state=self.state,
+            reset_prev=bool(reset_prev),
+            prev_estop_state=bool(self.prev_estop_state),
+        )
 
     # ---------------------------------------------------------------------
     # legacy/diagnostic meta helpers
     # ---------------------------------------------------------------------
 
-    @staticmethod
-    def _make_drive_status_word(
-        *,
-        output_powered: bool,
-        amp_ready: bool,
-        referenced: bool,
-        in_position: bool,
-        brake_lifted: bool,
-        fault: bool,
-        zustand: int,
-    ) -> int:
-        w = 0
-        if output_powered:
-            w |= 1 << 0
-        if amp_ready:
-            w |= 1 << 1
-        if referenced:
-            w |= 1 << 2
-        if in_position:
-            w |= 1 << 3
-        if brake_lifted:
-            w |= 1 << 4
-        if fault:
-            w |= 1 << 5
-        w |= (int(zustand) & 0xFF) << 8
-        return int(w)
-
-    def update_drive_status_words(self) -> None:
-        bits = decode_estop_word(int(self.inj_estop_word))
-        taster = bool(bits.get("taster", False))
-
-        for _axis_id, ax in self.state.axes.items():
-            vel = float(getattr(ax, "vel", 0.0) or 0.0)
-            in_pos = abs(vel) < 1e-3
-
-            if bool(self.state.estop):
-                main = self._make_drive_status_word(
-                    output_powered=False, amp_ready=False, referenced=False, in_position=False,
-                    brake_lifted=False, fault=True, zustand=14,
-                )
-                slave = self._make_drive_status_word(
-                    output_powered=False, amp_ready=False, referenced=False, in_position=False,
-                    brake_lifted=False, fault=True, zustand=14,
-                )
-            elif self.drive_ready and taster:
-                main = self._make_drive_status_word(
-                    output_powered=True, amp_ready=True, referenced=True, in_position=in_pos,
-                    brake_lifted=True, fault=False, zustand=10,
-                )
-                slave = self._make_drive_status_word(
-                    output_powered=True, amp_ready=True, referenced=True, in_position=in_pos,
-                    brake_lifted=True, fault=False, zustand=5,
-                )
-            else:
-                main = self._make_drive_status_word(
-                    output_powered=False, amp_ready=False, referenced=False, in_position=False,
-                    brake_lifted=False, fault=False, zustand=0,
-                )
-                slave = self._make_drive_status_word(
-                    output_powered=False, amp_ready=False, referenced=False, in_position=False,
-                    brake_lifted=False, fault=False, zustand=0,
-                )
-
-            ax.meta["status_word"] = int(main)
-            ax.meta["guide_status_word"] = int(slave)
 
     def step_lifetick(self) -> None:
         """Update legacy device_tick/lifetick meta fields.
@@ -652,12 +588,7 @@ class DenSiEngine:
             return False
 
     def compute_moving_guard(self) -> bool:
-        axis_id0 = self.axis_ids[0] if self.axis_ids else ""
-        ax0 = self.state.axes.get(axis_id0) if axis_id0 else None
-        try:
-            return bool(ax0 is not None and abs(float(getattr(ax0, "vel", 0.0) or 0.0)) > 1e-3)
-        except Exception:
-            return False
+        return compute_moving_guard(state=self.state, axis_ids=list(self.axis_ids))
 
     def handle_estop_reset_cmd(self, reset_able: bool) -> None:
         cmd = self.ensure_last_cmd()
@@ -715,44 +646,36 @@ class DenSiEngine:
 
     def step_plant_with_clamp(self) -> None:
         cmd = self.ensure_last_cmd()
-        cmd_for_plant = normalize_cmd_for_plant(
-            cmd,
+        step_plant_with_clamp(
+            device=self.device,
             state=self.state,
+            cmd=cmd,
             dt_s=float(self.tb.dt_s),
             axis_ids=list(self.axis_ids),
             drive_ready=bool(self.drive_ready),
         )
-        self.device.step(self.state, cmd_for_plant, float(self.tb.dt_s))
 
     def maybe_latch_cut_markers(self, estop_edge: bool) -> None:
-        if bool(estop_edge) and (not bool(self.cut_valid)):
-            axis_id = self.axis_ids[0] if self.axis_ids else ""
-            ax0 = self.state.axes.get(axis_id) if axis_id else None
-            if ax0 is not None:
-                self.cut_valid = True
-                self.cut_pos_m = float(getattr(ax0, "pos", 0.0) or 0.0)
-                self.cut_vel_mps = float(getattr(ax0, "vel", 0.0) or 0.0)
-                self.cut_time_s = float(getattr(self.state, "t_s", 0.0) or 0.0)
-                self.systemtime_tok = self._now_token()
-
-                try:
-                    self.state.params["SystemTime"] = self.systemtime_tok
-                except Exception:
-                    pass
-
-                try:
-                    self.state.params["CutPos"] = float(self.cut_pos_m)
-                    self.state.params["CutVel"] = float(self.cut_vel_mps)
-                    self.state.params["CutTime"] = float(self.cut_time_s)
-                    self.state.params["PosDiffFor"] = 0.0
-                except Exception:
-                    pass
+        (
+            self.cut_valid,
+            self.cut_pos_m,
+            self.cut_vel_mps,
+            self.cut_time_s,
+            self.systemtime_tok,
+        ) = _maybe_latch_cut_markers(
+            state=self.state,
+            axis_ids=list(self.axis_ids),
+            estop_edge=bool(estop_edge),
+            cut_valid=bool(self.cut_valid),
+            now_token=self._now_token,
+            cut_pos_m=float(self.cut_pos_m),
+            cut_vel_mps=float(self.cut_vel_mps),
+            cut_time_s=float(self.cut_time_s),
+            systemtime_tok=str(self.systemtime_tok or ""),
+        )
 
     def apply_estop_clamp_to_state(self) -> None:
-        if bool(self.state.estop):
-            for ax in self.state.axes.values():
-                ax.enabled = False
-                ax.vel = 0.0
+        apply_estop_clamp_to_state(state=self.state)
 
     def advance_tick(self) -> None:
         self.state.tick += 1
@@ -783,7 +706,11 @@ class DenSiEngine:
 
         # phase 7 (non-Qt semantics): lifetick + status words
         self.step_lifetick()
-        self.update_drive_status_words()
+        update_drive_status_words(
+            state=self.state,
+            inj_estop_word=int(self.inj_estop_word),
+            drive_ready=bool(self.drive_ready),
+        )
 
         return DenSiTickResult(
             cmd_rx_count=cmd_rx_count,
