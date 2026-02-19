@@ -26,6 +26,47 @@ from .stack_meta import write_meta
 from .status import StatusCollector, env_for_process
 
 
+def _birdseye_multiline_default() -> bool:
+    return str(os.getenv("BIRDSEYE_MULTILINE", "1")).strip().lower() not in ("0", "false", "no")
+
+
+def _wrap_line(text: str, width: int) -> list[str]:
+    if width <= 0:
+        return [text]
+    if len(text) <= width:
+        return [text]
+    out: list[str] = []
+    i = 0
+    while i < len(text):
+        out.append(text[i : i + width])
+        i += width
+    return out
+
+
+def format_birds_eye(
+    parts: List[str],
+    *,
+    multiline: bool = True,
+    max_entries: int = 6,
+    max_width: int = 120,
+) -> str:
+    if not parts:
+        return ""
+    items = list(parts[: int(max_entries)])
+    if not multiline:
+        return "[birds] " + " | ".join(items)
+
+    lines = ["[birds-eye]"]
+    prefix = "  - "
+    cont = "    "
+    wrap_width = max_width - len(prefix)
+    for item in items:
+        wrapped = _wrap_line(str(item), wrap_width)
+        for idx, seg in enumerate(wrapped):
+            lines.append(f"{prefix}{seg}" if idx == 0 else f"{cont}{seg}")
+    return "\n".join(lines)
+
+
 def _now_ts() -> str:
     return time.strftime("%Y%m%d_%H%M%S")
 
@@ -385,9 +426,7 @@ class StackRuntime:
                 if t.last_line:
                     parts.append(f"{name}: {t.last_line[:120]}")
 
-        if not parts:
-            return ""
-        return "[birds] " + " | ".join(parts[:6])
+        return format_birds_eye(parts, multiline=_birdseye_multiline_default())
 
     def _report_crash(self, rp: RunningProcess, rc: int):
         print(f"\n[stack] process exited: {rp.spec.name} pid={rp.popen.pid} rc={rc}")
