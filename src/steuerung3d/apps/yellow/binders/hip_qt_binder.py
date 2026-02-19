@@ -14,8 +14,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import logging
 
-from PySide6.QtCore import QLocale
-from PySide6.QtGui import QDoubleValidator
 from PySide6.QtWidgets import (
     QAbstractSlider,
     QCheckBox,
@@ -28,7 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..qtutil.ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
-from ..qtutil.ui_params import apply_param_values_to_line_edits
+from ..qtutil.param_widget_binder import ParamWidgetBinder
 from ..qtutil.ui_update import (
     set_checked,
     set_enabled,
@@ -65,6 +63,13 @@ class HipQtBinder:
 
     def __post_init__(self) -> None:
         self._wcache = WidgetCache(self.win)
+        self._param_binder = ParamWidgetBinder(
+            self.win,
+            self.log,
+            _PARAM_WIDGETS,
+            _LIMIT_WIDGETS,
+            cache=self._wcache,
+        )
 
         # Core widgets
         self._tabs_main: QTabWidget | None = self._wcache.get(QTabWidget, "tabsMain")
@@ -264,7 +269,7 @@ class HipQtBinder:
 
         param_values: dict[str, dict[str, float]] = {}
         for group in _PARAM_WIDGETS.keys():
-            param_values[group] = self._read_param_values(group)
+            param_values[group] = self._param_binder.read_group_values(group)
 
         return HipUiInputs(
             axis_selected=axis_selected,
@@ -535,20 +540,16 @@ class HipQtBinder:
                 self._set_param_button_state(group, gstate.buttons)
 
         if vm.param_values:
-            apply_param_values_to_line_edits(
+            self._param_binder.apply_param_values(
                 vm.param_values,
-                _PARAM_WIDGETS,
-                self._find_line_edit,
                 freeze_group=str(vm.param_freeze_group or ""),
                 skip_focused=True,
                 block_signals=True,
             )
 
         if vm.param_writeback_values and vm.param_writeback_group:
-            apply_param_values_to_line_edits(
+            self._param_binder.apply_param_values(
                 vm.param_writeback_values,
-                _PARAM_WIDGETS,
-                self._find_line_edit,
                 freeze_group=str(vm.param_writeback_group or ""),
                 skip_focused=False,
                 block_signals=True,
@@ -568,55 +569,17 @@ class HipQtBinder:
                 QMessageBox.information(self.win, str(dlg.title), str(dlg.message))
 
         if vm.limit_values:
-            for key, obj_name in _LIMIT_WIDGETS.items():
-                if key not in vm.limit_values:
-                    continue
-                le = self._find_line_edit(obj_name)
-                if le is None:
-                    continue
-                txt = fmt_f_unit(vm.limit_values[key], "m", ndigits=2).replace(".", ",")
-                set_text(le, txt)
-                try:
-                    set_enabled(le, False)
-                except Exception:
-                    pass
+            self._param_binder.apply_limit_values(
+                vm.limit_values,
+                format_value=lambda v: fmt_f_unit(v, "m", ndigits=2).replace(".", ","),
+            )
 
     # ------------------------------------------------------------------
     # UI helpers
     # ------------------------------------------------------------------
 
     def _init_param_inputs(self) -> None:
-        loc = QLocale.system()
-        for _grp, mapping in _PARAM_WIDGETS.items():
-            for _key, obj_name in mapping.items():
-                le = self._find_line_edit(obj_name)
-                if le is None:
-                    continue
-                set_state_property(le, "true", prop="paramField")
-                val = QDoubleValidator(-1.0e12, 1.0e12, 6, le)
-                val.setLocale(loc)
-                val.setNotation(QDoubleValidator.Notation.StandardNotation)
-                le.setValidator(val)
-
-    def _parse_float(self, s: str) -> float:
-        s = (s or "").strip()
-        if not s:
-            return 0.0
-        s = s.replace(",", ".")
-        return float(s)
-
-    def _read_param_values(self, group: str) -> dict[str, float]:
-        mapping = _PARAM_WIDGETS.get(group, {})
-        out: dict[str, float] = {}
-        for key, obj_name in mapping.items():
-            le = self._find_line_edit(obj_name)
-            if le is None:
-                continue
-            try:
-                out[key] = self._parse_float(le.text())
-            except ValueError:
-                self.log.warning("param parse failed: %s=%r", key, le.text())
-        return out
+        self._param_binder.init_param_inputs()
 
     def _find_button(self, object_name: str) -> QPushButton | None:
         try:

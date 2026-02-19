@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..qtutil.ui_contract import log_missing_optional_once, log_missing_required_once
-from ..qtutil.ui_params import apply_param_values_to_line_edits
+from ..qtutil.param_widget_binder import ParamWidgetBinder
 from ..qtutil.ui_update import (
     set_checked,
     set_enabled,
@@ -47,8 +47,6 @@ from ..panels.densi_estop_checkboxes_render import (
 from ..panels.densi_estop_dots_render import apply_densi_estop_dots_vm
 from ..panels.densi_header_online_render import apply_densi_header_online_vm
 from ..panels.densi_lifetick_render import apply_densi_lifetick_vm
-from ..panels.densi_limits_vm import compute_densi_limits_vm
-from ..panels.densi_limits_render import apply_densi_limits_vm
 from ..panels.densi_readouts_render import DenSiReadoutsBindings, apply_densi_readouts_vm
 from ..engines.densi.inputs import DensiInputs, DensiUiInputs, DensiEstopToggle
 from ..engines.densi.viewmodel import DensiViewModel
@@ -66,6 +64,13 @@ class DenSiQtBinder:
 
     def __post_init__(self) -> None:
         self._wcache = WidgetCache(self.win)
+        self._param_binder = ParamWidgetBinder(
+            self.win,
+            self.log,
+            _PARAM_WIDGETS,
+            _LIMIT_WIDGETS,
+            cache=self._wcache,
+        )
 
         # Widgets
         self._txtTick: QLineEdit | None = self.win.findChild(QLineEdit, "txtTick")
@@ -173,17 +178,7 @@ class DenSiQtBinder:
     # ------------------------------------------------------------------
 
     def seed_params_from_ui(self) -> dict[str, float]:
-        params: dict[str, float] = {}
-        for _grp, mapping in _PARAM_WIDGETS.items():
-            for key, obj_name in mapping.items():
-                le = self._find_line_edit(obj_name)
-                if le is None:
-                    continue
-                try:
-                    params[key] = float(le.text().strip() or "0")
-                except ValueError:
-                    continue
-        return params
+        return self._param_binder.read_all_values()
 
     def lock_param_ui_device_side(self) -> None:
         btn_names = [
@@ -198,12 +193,10 @@ class DenSiQtBinder:
                 set_enabled(b, False)
 
         for _grp, mapping in _PARAM_WIDGETS.items():
-            for _key, wname in mapping.items():
-                le = self._find_line_edit(wname)
-                if le is None:
-                    continue
-                set_state_property(le, 'true', prop='paramField')
+            for _key, _wname, _obj, le in self._param_binder.iter_param_line_edits():
+                set_state_property(le, "true", prop="paramField")
                 set_enabled(le, False)
+            break
 
     def init_fixed_axis(self) -> None:
         if self._cmbAxis is None:
@@ -290,17 +283,24 @@ class DenSiQtBinder:
                     set_checked(cb, bool(bits.get(spec.key, False)), block_signals=True)
 
         if vm.applied_param_values:
-            apply_param_values_to_line_edits(
+            self._param_binder.apply_param_values(
                 vm.applied_param_values,
-                _PARAM_WIDGETS,
-                self._find_line_edit,
                 freeze_group="",
                 skip_focused=True,
                 block_signals=True,
             )
 
-            limits_vm = compute_densi_limits_vm(values=vm.applied_param_values, limit_widgets=_LIMIT_WIDGETS)
-            apply_densi_limits_vm(limits_vm, find_line_edit=self._find_line_edit)
+            def _fmt_limit(val: float) -> str:
+                try:
+                    s = f"{float(val):0.2f} m"
+                except Exception:
+                    s = ""
+                return s.replace(".", ",")
+
+            self._param_binder.apply_limit_values(
+                vm.applied_param_values,
+                format_value=_fmt_limit,
+            )
 
     # ------------------------------------------------------------------
     # Signal wiring

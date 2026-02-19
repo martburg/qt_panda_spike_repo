@@ -2,4 +2,32 @@
 
 from __future__ import annotations
 
-from .engine import *  # noqa: F403
+__all__ = [
+	"HipEngine",
+	"HipAttachInputs",
+	"HipAttachState",
+	"HipBannerInputs",
+	"HipParamCommitDialog",
+	"HipState",
+	"HipViewModel",
+	"HipStepInputs",
+	"HipStepResult",
+]
+
+
+def __getattr__(name: str):
+	if name in __all__:
+		from .engine import (  # type: ignore
+			HipEngine,
+			HipAttachInputs,
+			HipAttachState,
+			HipBannerInputs,
+			HipParamCommitDialog,
+			HipState,
+			HipViewModel,
+			HipStepInputs,
+			HipStepResult,
+		)
+
+		return locals()[name]
+	raise AttributeError(name)

@@ -7,7 +7,7 @@ comparison before cutover.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict, field
+from dataclasses import asdict
 from typing import Any, Iterable
 
 from steuerung3d.core.intents import (
@@ -28,17 +28,37 @@ from steuerung3d.protocol.estop_bits import ESTOP_SPECS, decode_estop_word
 from steuerung3d.util.tick import compute_time_tick
 
 from ...domain.param_txn import ParamEditTxnClient, RetryEvent
-from ...domain.ui_estop import (
-    age_to_online_state,
-    compute_estop_dot_states,
-    compute_header_estop_dot_states,
-    infer_estop_profile,
-    active_estop_keys_for_profile,
-)
-from ...domain.ui_banner import BANNER_COLORS, derive_banner_estate_from_word
+from ...domain.ui_estop import age_to_online_state, infer_estop_profile
+from ...domain.ui_banner import derive_banner_estate_from_word
 from ...domain.ui_format import fmt_f_unit, fmt_i_unit
 from ...domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 from ...domain.joy_motion_map import map_soll_speed_to_jog_winch
+from .types import HipPresentationData
+
+from .types import (
+    HipAttachCombo,
+    HipAttachInputs,
+    HipAttachState,
+    HipBannerInputs,
+    HipParamAction,
+    HipParamButtons,
+    HipParamCommitDialog,
+    HipParamGroup,
+    HipParamUiState,
+    HipState,
+    HipStepInputs,
+    HipStepResult,
+    HipUiInputs,
+)
+from .viewmodel import (
+    HipBannerState,
+    HipCutMarkersState,
+    HipDriveStatusState,
+    HipEstopState,
+    HipHeaderDots,
+    HipReadoutsState,
+    HipViewModel,
+)
 
 # NOTE: drive status decoder is optional.
 try:
@@ -48,220 +68,6 @@ except Exception:  # pragma: no cover
 
 
 NOT_ATTACHED = "NotAttached"
-
-
-@dataclass(frozen=True)
-class HipAttachInputs:
-    attached: bool
-    modal_locked: bool
-    last_mode: str
-    last_estate: str
-
-
-@dataclass(frozen=True)
-class HipAttachState:
-    attached: bool
-    tabs_enabled: bool | None
-    setup_enabled: bool
-    main_amp_reset_enabled: bool
-    resync_enabled: bool
-    estop_reset_enabled: bool | None
-
-
-@dataclass(frozen=True)
-class HipBannerInputs:
-    estop_word: int
-    within_brake_grace: bool
-
-
-@dataclass(frozen=True)
-class HipAttachCombo:
-    items: list[str]
-    current: str
-    enabled: bool
-    fixed_axis_applied: bool
-
-
-@dataclass(frozen=True)
-class HipParamAction:
-    kind: str  # edit|write|cancel
-    group: str
-
-
-@dataclass(frozen=True)
-class HipUiInputs:
-    axis_selected: str
-    axis_selection_changed: bool
-    estop_reset_clicked: bool
-    resync_clicked: bool
-    param_actions: list[HipParamAction]
-    param_values: dict[str, dict[str, float]]
-
-
-@dataclass(frozen=True)
-class HipParamButtons:
-    edit_enabled: bool
-    write_enabled: bool
-    cancel_enabled: bool
-
-
-@dataclass(frozen=True)
-class HipParamGroup:
-    fields_enabled: bool
-    buttons: HipParamButtons
-
-
-@dataclass(frozen=True)
-class HipParamUiState:
-    modal_lock_active: bool
-    modal_lock_group: str
-    groups: dict[str, HipParamGroup]
-
-
-@dataclass(frozen=True)
-class HipParamCommitDialog:
-    level: str  # "info" | "warning"
-    title: str
-    message: str
-
-
-@dataclass(frozen=True)
-class HipBannerState:
-    estate: str
-    bg: str
-    fg: str
-    left_text: str
-    right_text: str
-
-
-@dataclass(frozen=True)
-class HipHeaderDots:
-    online_state: str | None
-    ready_state: str | None
-    fbt_state: str | None
-    brk1_state: str | None
-    brk2_state: str | None
-
-
-@dataclass(frozen=True)
-class HipDriveStatusState:
-    main_text: str
-    slave_text: str
-
-
-@dataclass(frozen=True)
-class HipEstopState:
-    dots: dict[str, str | None]
-    reset_enabled: bool
-    checkbox_states: dict[str, bool]
-    active_keys: set[str]
-    profile_changed: bool
-
-
-@dataclass(frozen=True)
-class HipReadoutsState:
-    pos_text: str
-    vel_text: str
-    amp_text: str
-    temp_text: str
-    guider_min_text: str
-    guider_max_text: str
-    guider_val_text: str
-    guider_speed_text: str
-    vel_cmd_min: int
-    vel_cmd_max: int
-    vel_cmd_val: int
-    limit_min: int
-    limit_max: int
-    limit_val: int
-    guider_range_min: int
-    guider_range_max: int
-    guider_range_val: int
-    guider_speed_min: int
-    guider_speed_max: int
-    guider_speed_val: int
-
-
-@dataclass(frozen=True)
-class HipCutMarkersState:
-    cut_time_text: str
-    cut_pos_text: str
-    cut_vel_text: str
-    posdiff_text: str
-
-
-@dataclass(frozen=True)
-class HipViewModel:
-    tick_text: str
-    age_ms: int | None
-    stale: bool
-    lifetick_age: int | None
-    online_state: str | None
-    estop: bool
-    fault: bool
-    drive_status_summary: str
-    joy_deadman: bool = False
-    joy_select_hip: bool = False
-    joy_soll_speed: float = 0.0
-    banner: HipBannerState | None = None
-    header_dots: HipHeaderDots | None = None
-    drive_status: HipDriveStatusState | None = None
-    estop_state: HipEstopState | None = None
-    readouts: HipReadoutsState | None = None
-    cut_markers: HipCutMarkersState | None = None
-    attach_state: HipAttachState | None = None
-    attach_combo: HipAttachCombo | None = None
-    param_ui: HipParamUiState | None = None
-    param_values: dict[str, float] = field(default_factory=dict)
-    param_freeze_group: str = ""
-    limit_values: dict[str, float] = field(default_factory=dict)
-    param_writeback_group: str = ""
-    param_writeback_values: dict[str, float] = field(default_factory=dict)
-    param_writeback_message: str = ""
-    param_commit_dialog: HipParamCommitDialog | None = None
-
-
-@dataclass
-class HipState:
-    prev_device_tick: int | None = None
-    last_lifetick_echo_sent: dict[str, int] = field(default_factory=dict)
-    selected_axis: str = ""
-    fixed_axis_applied: bool = False
-    last_ui_axis_selected: str = ""
-    prev_estop_profile: str = ""
-    pending_commit_req_id: str = ""
-    pending_commit_group: str = ""
-    pending_commit_values: dict[str, float] = field(default_factory=dict)
-    commit_dialog_shown_for: set[str] = field(default_factory=set)
-    joy: JoyState = field(default_factory=JoyState)
-    last_claim_attempt_ns_by_axis: dict[str, int] = field(default_factory=dict)
-    last_sent_speed_by_axis: dict[str, float] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class HipStepInputs:
-    snap: TelemetrySnapshot
-    hip_id: str
-    last_rx_ns: int | None
-    now_ns: int
-    stale_after_ms: int
-    fixed_axis: str
-    lock_axis_combo: bool
-    last_mode: str
-    last_estate: str
-    ui: HipUiInputs
-    core_acks: list[str]
-    joy: JoyState
-
-
-@dataclass(frozen=True)
-class HipStepResult:
-    view_model: HipViewModel
-    legacy_view_model: HipViewModel
-    intents: list[object]
-    resync_ignored: bool
-    resync_block_reason: str
-    txn_events: list[RetryEvent] = field(default_factory=list)
 
 
 class HipEngine:
@@ -493,70 +299,18 @@ class HipEngine:
             int(estop_word),
             within_brake_grace=(lambda: bool(within_banner)),
         )
-        bg, fg = BANNER_COLORS.get(estate, ("#F9E547", "#000000"))
-        banner = HipBannerState(
-            estate=str(estate),
-            bg=str(bg),
-            fg=str(fg),
-            left_text=str(estate),
-            right_text=str(estate),
-        )
 
         def _brake_ok_display(raw: bool) -> bool:
             if bool(taster) and bool(within_brake):
                 return True
             return bool(raw)
 
-        hdr_states = compute_header_estop_dot_states(
-            taster=bool(taster),
-            ready=bool(logical.get("ready", False)),
-            brk1_raw=bool(logical.get("brk1_ok", False)),
-            brk2_raw=bool(logical.get("brk2_ok", False)),
-            brake_ok_display=_brake_ok_display,
-        )
-        header_dots = HipHeaderDots(
-            online_state=online_state,
-            ready_state=hdr_states.get("dotHdrReady"),
-            fbt_state=hdr_states.get("dotHdrFbt"),
-            brk1_state=hdr_states.get("dotHdrBrake1"),
-            brk2_state=hdr_states.get("dotHdrBrake2"),
-        )
-
         profile = infer_estop_profile(logical)
-        active_keys = active_estop_keys_for_profile(profile, ESTOP_SPECS.keys())
-        profile_changed = str(profile) != str(self.state.prev_estop_profile or "")
-
-        estop_dots = compute_estop_dot_states(
-            bits=logical,
-            taster=bool(taster),
-            specs=ESTOP_SPECS.values(),
-            brake_ok_display=_brake_ok_display,
-        )
-        checkbox_states = {spec.key: bool(logical.get(spec.key, False)) for spec in ESTOP_SPECS.values()}
-        reset_enabled = bool(logical.get("reset_able", False)) if attached else False
-        estop_state = HipEstopState(
-            dots=estop_dots,
-            reset_enabled=bool(reset_enabled),
-            checkbox_states=checkbox_states,
-            active_keys=set(active_keys),
-            profile_changed=bool(profile_changed),
-        )
 
         joy = getattr(snap, "joy", None) or JoyState()
         joy_deadman = bool(getattr(joy, "deadman", False))
         joy_select_hip = bool(getattr(joy, "select_hip", False))
         joy_soll_speed = float(getattr(joy, "soll_speed", 0.0) or 0.0)
-
-        legacy_vm = HipViewModel(
-            tick_text=str(tick_text),
-            age_ms=age_ms,
-            stale=bool(stale),
-            lifetick_age=lifetick_age,
-            online_state=online_state,
-            estop=bool(estop),
-            fault=bool(fault),
-            drive_status_summary=str(drive_status_summary or ""),
-        )
 
         readouts = None
         cut_markers = None
@@ -690,7 +444,7 @@ class HipEngine:
 
         param_commit_dialog = self._maybe_build_param_commit_dialog(snap)
 
-        vm = HipViewModel(
+        presentation = HipPresentationData(
             tick_text=str(tick_text),
             age_ms=age_ms,
             stale=bool(stale),
@@ -699,13 +453,17 @@ class HipEngine:
             estop=bool(estop),
             fault=bool(fault),
             drive_status_summary=str(drive_status_summary or ""),
+            drive_status=drive_status,
+            estop_word=int(estop_word),
+            within_banner=bool(within_banner),
+            within_brake=bool(within_brake),
+            logical=dict(logical),
+            taster=bool(taster),
+            attached=bool(attached),
+            prev_estop_profile=str(self.state.prev_estop_profile or ""),
             joy_deadman=bool(joy_deadman),
             joy_select_hip=bool(joy_select_hip),
             joy_soll_speed=float(joy_soll_speed),
-            banner=banner,
-            header_dots=header_dots,
-            drive_status=drive_status,
-            estop_state=estop_state,
             readouts=readouts,
             cut_markers=cut_markers,
             attach_state=attach_state,
@@ -727,8 +485,9 @@ class HipEngine:
         self.state.prev_estop_profile = str(profile or "")
 
         return HipStepResult(
-            view_model=vm,
-            legacy_view_model=legacy_vm,
+            view_model=None,
+            legacy_view_model=None,
+            presentation=presentation,
             intents=intents,
             resync_ignored=bool(resync_ignored),
             resync_block_reason=str(resync_reason or ""),

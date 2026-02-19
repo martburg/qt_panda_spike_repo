@@ -27,7 +27,13 @@ except Exception:  # pragma: no cover
     StatusEmitter = None  # type: ignore
 
 from ..domain.param_txn import RetryEvent
-from ..engines.hip.engine import HipEngine, HipStepInputs, HipStepResult, HipUiInputs, HipViewModel
+from ..domain.ui_estop import infer_estop_profile
+from ..engines.hip.engine import HipEngine, HipStepInputs, HipStepResult, HipUiInputs
+from ..engines.hip.types import HipPresentationData
+from ..engines.hip.viewmodel import HipViewModel
+from ..panels.hip_banner_vm import compute_hip_banner_vm
+from ..panels.hip_estop_vm import compute_hip_estop_vm
+from ..panels.hip_header_dots_vm import compute_hip_header_dots_vm
 
 
 @dataclass(frozen=True)
@@ -157,7 +163,8 @@ class HipRuntime:
             )
         )
 
-        vm = engine_result.view_model
+        vm = self._assemble_view_model(engine_result.presentation)
+        legacy_vm = self._assemble_legacy_view_model(engine_result.presentation)
 
         self._hb.inc("rx_telem", len(snaps))
         mode_v = str(getattr(snap, "mode", ""))
@@ -172,7 +179,7 @@ class HipRuntime:
             self._last_estate = "ESTOP"
 
         if self._shadow_mode == "shadow":
-            self._diff_shadow(engine_result=engine_result, legacy_vm=engine_result.legacy_view_model)
+            self._diff_shadow(engine_vm=vm, legacy_vm=legacy_vm)
 
         if vm.param_writeback_values and vm.param_writeback_group:
             self._log.info(
@@ -241,9 +248,9 @@ class HipRuntime:
             return
         self._log.debug("hip.shadow.%s %s", key, msg)
 
-    def _diff_shadow(self, *, engine_result: HipStepResult, legacy_vm: HipViewModel) -> None:
+    def _diff_shadow(self, *, engine_vm: HipViewModel, legacy_vm: HipViewModel) -> None:
         legacy_vm_norm = HipEngine.normalize_view_model(legacy_vm)
-        engine_vm_norm = HipEngine.normalize_view_model(engine_result.view_model)
+        engine_vm_norm = HipEngine.normalize_view_model(engine_vm)
 
         keys = (
             "tick_text",
@@ -262,6 +269,80 @@ class HipRuntime:
                 "view_model",
                 f"legacy={legacy_subset} engine={engine_subset}",
             )
+
+    @staticmethod
+    def _assemble_legacy_view_model(pres: HipPresentationData) -> HipViewModel:
+        return HipViewModel(
+            tick_text=str(pres.tick_text),
+            age_ms=pres.age_ms,
+            stale=bool(pres.stale),
+            lifetick_age=pres.lifetick_age,
+            online_state=pres.online_state,
+            estop=bool(pres.estop),
+            fault=bool(pres.fault),
+            drive_status_summary=str(pres.drive_status_summary or ""),
+        )
+
+    @staticmethod
+    def _assemble_view_model(pres: HipPresentationData) -> HipViewModel:
+        banner = compute_hip_banner_vm(
+            estop_word=int(pres.estop_word),
+            within_brake_grace=bool(pres.within_banner),
+        )
+
+        def _brake_ok_display(raw: bool) -> bool:
+            if bool(pres.taster) and bool(pres.within_brake):
+                return True
+            return bool(raw)
+
+        header_dots = compute_hip_header_dots_vm(
+            online_state=pres.online_state,
+            taster=bool(pres.taster),
+            ready=bool(pres.logical.get("ready", False)),
+            brk1_raw=bool(pres.logical.get("brk1_ok", False)),
+            brk2_raw=bool(pres.logical.get("brk2_ok", False)),
+            brake_ok_display=_brake_ok_display,
+        )
+
+        profile = infer_estop_profile(pres.logical)
+        estop_state = compute_hip_estop_vm(
+            logical=pres.logical,
+            taster=bool(pres.taster),
+            attached=bool(pres.attached),
+            brake_ok_display=_brake_ok_display,
+            profile=profile,
+            prev_profile=str(pres.prev_estop_profile or ""),
+        )
+
+        return HipViewModel(
+            tick_text=str(pres.tick_text),
+            age_ms=pres.age_ms,
+            stale=bool(pres.stale),
+            lifetick_age=pres.lifetick_age,
+            online_state=pres.online_state,
+            estop=bool(pres.estop),
+            fault=bool(pres.fault),
+            drive_status_summary=str(pres.drive_status_summary or ""),
+            joy_deadman=bool(pres.joy_deadman),
+            joy_select_hip=bool(pres.joy_select_hip),
+            joy_soll_speed=float(pres.joy_soll_speed),
+            banner=banner,
+            header_dots=header_dots,
+            drive_status=pres.drive_status,
+            estop_state=estop_state,
+            readouts=pres.readouts,
+            cut_markers=pres.cut_markers,
+            attach_state=pres.attach_state,
+            attach_combo=pres.attach_combo,
+            param_ui=pres.param_ui,
+            param_values=dict(pres.param_values or {}),
+            param_freeze_group=str(pres.param_freeze_group or ""),
+            limit_values=dict(pres.limit_values or {}),
+            param_writeback_group=str(pres.param_writeback_group or ""),
+            param_writeback_values=dict(pres.param_writeback_values or {}),
+            param_writeback_message=str(pres.param_writeback_message or ""),
+            param_commit_dialog=pres.param_commit_dialog,
+        )
 
     def _emit_status(self, now_ns: int) -> None:
         if not getattr(self, "_status", None):
