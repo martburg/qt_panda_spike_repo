@@ -8,8 +8,6 @@ from steuerung3d.adapters.sim.device import SimDevice
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.state import MachineState
 
-from .setpoint_semantics import normalize_cmd_for_plant
-
 
 def compute_moving_guard(*, state: MachineState, axis_ids: Iterable[str]) -> bool:
     axis_id0 = next(iter(axis_ids), "")
@@ -26,17 +24,8 @@ def step_plant_with_clamp(
     state: MachineState,
     cmd: CommandFrame,
     dt_s: float,
-    axis_ids: Iterable[str],
-    drive_ready: bool,
 ) -> None:
-    cmd_for_plant = normalize_cmd_for_plant(
-        cmd,
-        state=state,
-        dt_s=float(dt_s),
-        axis_ids=list(axis_ids),
-        drive_ready=bool(drive_ready),
-    )
-    device.step(state, cmd_for_plant, float(dt_s))
+    device.step(state, cmd, float(dt_s))
 
 
 def apply_estop_clamp_to_state(*, state: MachineState) -> None:

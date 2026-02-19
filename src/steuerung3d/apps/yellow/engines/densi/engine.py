@@ -49,6 +49,7 @@ from .estop_fsm import (
 from .resync import handle_resync_cmd as _handle_resync_cmd
 from .param_ops import apply_densi_param_ops
 from .motion_clamp import apply_estop_clamp_to_state, compute_moving_guard, step_plant_with_clamp
+from .setpoint_semantics import normalize_cmd_for_plant
 
 
 
@@ -581,13 +582,18 @@ class DenSiEngine:
 
     def step_plant_with_clamp(self) -> None:
         cmd = self.ensure_last_cmd()
-        step_plant_with_clamp(
-            device=self.device,
+        cmd_for_plant = normalize_cmd_for_plant(
+            cmd,
             state=self.state,
-            cmd=cmd,
             dt_s=float(self.tb.dt_s),
             axis_ids=list(self.axis_ids),
             drive_ready=bool(self.drive_ready),
+        )
+        step_plant_with_clamp(
+            device=self.device,
+            state=self.state,
+            cmd=cmd_for_plant,
+            dt_s=float(self.tb.dt_s),
         )
 
     def maybe_latch_cut_markers(self, estop_edge: bool) -> None:

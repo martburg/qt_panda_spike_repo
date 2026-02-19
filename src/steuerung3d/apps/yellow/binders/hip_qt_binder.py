@@ -37,6 +37,7 @@ from ..qtutil.ui_update import (
     update_slider,
 )
 from ..qtutil.widget_cache import WidgetCache
+from ..qtutil.ui_format import fmt_f_unit_de
 from ..qtutil.ui_contract import log_missing_optional_once, log_missing_required_once
 from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 from ..domain.ui_format import fmt_f_unit
@@ -512,7 +513,7 @@ class HipQtBinder:
             param_binder=self._param_binder,
             find_line_edit=self._find_line_edit,
             find_button=self._find_button,
-            format_limit_value=lambda v: fmt_f_unit(v, "m", ndigits=2).replace(".", ","),
+            format_limit_value=lambda v: fmt_f_unit_de(v, unit="m", ndigits=2, empty="--"),
         )
         apply_param_ui(bindings, vm)
 

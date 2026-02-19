@@ -34,6 +34,7 @@ from ..qtutil.ui_update import (
     update_slider,
 )
 from ..qtutil.widget_cache import WidgetCache
+from ..qtutil.ui_format import fmt_float_de
 from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 from ..panels.densi_banner_render import DenSiBannerBindings, apply_densi_banner_vm
 from ..panels.densi_cut_markers_render import DenSiCutMarkersBindings, apply_densi_cut_markers_vm
@@ -291,11 +292,7 @@ class DenSiQtBinder:
             )
 
             def _fmt_limit(val: float) -> str:
-                try:
-                    s = f"{float(val):0.2f} m"
-                except Exception:
-                    s = ""
-                return s.replace(".", ",")
+                return fmt_float_de(val, ndigits=2, unit="m", empty="")
 
             self._param_binder.apply_limit_values(
                 vm.applied_param_values,

@@ -33,3 +33,12 @@ def test_normalize_cmd_for_plant_clamps_on_estop() -> None:
     assert out.axes["A"].vel == 0.0
     assert out.axes["B"].enable is False
     assert out.axes["B"].vel == 0.0
+
+
+def test_normalize_cmd_for_plant_clamps_when_not_ready() -> None:
+    st = MachineState(estop=False)
+    cmd = _cmd()
+    out = normalize_cmd_for_plant(cmd, state=st, dt_s=0.01, axis_ids=["A"], drive_ready=False)
+    assert out is not cmd
+    assert out.axes["A"].enable is False
+    assert out.axes["A"].vel == 0.0

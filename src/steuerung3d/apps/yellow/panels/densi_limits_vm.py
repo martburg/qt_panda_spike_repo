@@ -11,14 +11,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..qtutil.ui_format import fmt_float_de
+
 
 def _fmt_m(v: float) -> str:
     """Format a length in meters for the compact limit fields."""
-    try:
-        s = f"{float(v):0.2f} m"
-    except Exception:
-        s = ""
-    return s.replace(".", ",")
+    return fmt_float_de(v, ndigits=2, unit="m", empty="")
 
 
 @dataclass(frozen=True)
