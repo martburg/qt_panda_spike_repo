@@ -39,10 +39,10 @@ from ..controllers.ui_update import (
     update_slider,
 )
 from ..controllers.widget_cache import WidgetCache
-from ..controllers.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 from ..controllers.ui_contract import log_missing_optional_once, log_missing_required_once
-from ..controllers.ui_format import fmt_f_unit
-from ..controllers.ui_banner import BANNER_COLORS
+from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
+from ..domain.ui_format import fmt_f_unit
+from ..domain.ui_banner import BANNER_COLORS
 from ..engines.hip.engine import (
     HipParamAction,
     HipUiInputs,
@@ -73,9 +73,8 @@ class HipQtBinder:
         # Header + tick
         self._txtTick: QLineEdit | None = self.win.findChild(QLineEdit, "txtTick")
         self._txt_hdr_banner_left: QLineEdit | None = self.win.findChild(QLineEdit, "txtHdrBannerLeft")
-        self._txt_hdr_banner_right: QLineEdit | None = (
-            self.win.findChild(QLineEdit, "txtHdrBannerRight")
-            or self.win.findChild(QLineEdit, "txtHdrBannnerRight")
+        self._txt_hdr_banner_right: QLineEdit | None = self.win.findChild(
+            QLineEdit, "txtHdrBannerRight"
         )
 
         # Drive status fields
@@ -96,9 +95,8 @@ class HipQtBinder:
         self._txt_guider_range_min: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMin")
         self._txt_guider_range_max: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMax")
         self._txt_guider_range_val: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeValue")
-        self._txt_guider_speed: QLineEdit | None = (
-            self.win.findChild(QLineEdit, "txtGuiderSpeed")
-            or self.win.findChild(QLineEdit, "txtGuiderPos_2")
+        self._txt_guider_speed: QLineEdit | None = self.win.findChild(
+            QLineEdit, "txtGuiderSpeed"
         )
 
         # Sliders
@@ -108,14 +106,21 @@ class HipQtBinder:
         self._sld_guider_speed: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldGuiderSpeed")
 
         # Buttons
-        self._btn_estop_reset: QPushButton | None = (
-            self.win.findChild(QPushButton, "btnEStopReset")
-            or self.win.findChild(QPushButton, "btn_estop_reset")
+        self._btn_estop_reset: QPushButton | None = self.win.findChild(
+            QPushButton, "btnEStopReset"
         )
-        self._btn_diag_resync: QPushButton | None = (
-            self.win.findChild(QPushButton, "btnReSync")
-            or self.win.findChild(QPushButton, "btnDiagResync")
+        self._btn_diag_resync: QPushButton | None = self.win.findChild(
+            QPushButton, "btnDiagResync"
         )
+
+        if self._txt_hdr_banner_right is None:
+            raise RuntimeError("UI is missing widget named 'txtHdrBannerRight'")
+        if self._txt_guider_speed is None:
+            raise RuntimeError("UI is missing widget named 'txtGuiderSpeed'")
+        if self._btn_estop_reset is None:
+            raise RuntimeError("UI is missing widget named 'btnEStopReset'")
+        if self._btn_diag_resync is None:
+            raise RuntimeError("UI is missing widget named 'btnDiagResync'")
 
         # Estop diagnostic checkboxes (read-only)
         self._estop_checks: dict[str, QCheckBox] = {}

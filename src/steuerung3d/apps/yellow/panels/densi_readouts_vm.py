@@ -15,7 +15,7 @@ from typing import Any
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.state import MachineState
 
-from ..controllers.ui_format import fmt_f_unit, fmt_i_unit
+from ..domain.ui_format import fmt_f_unit, fmt_i_unit
 
 
 @dataclass(frozen=True)

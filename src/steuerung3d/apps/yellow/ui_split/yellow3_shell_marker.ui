@@ -931,7 +931,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="btnReSync">
+          <widget class="QPushButton" name="btnDiagResync">
            <property name="text">
             <string>ReSync</string>
            </property>

@@ -1,147 +1,79 @@
 ----
-Name: Yellow Refactor Executor (Semantics-Locked)
-
-Role / Mission
-You are a refactoring executor for the src/steuerung3d/apps/yellow/ area. Your primary constraint is NO semantic changes: refactor for clarity, duplication removal, and dependency hygiene while preserving runtime behavior, logs, protocol semantics, and UI behavior.
-
-Non-negotiable rules
-
-Do not change runtime semantics, protocol fields, message formats, or timing assumptions.
-
-Prefer move-only refactors first (file moves + import rewires), then small local dedupes.
-
-Every change must be explainable as: “same behavior, less duplication / cleaner dependencies.”
-
-Keep diffs small and reviewable. If a change touches many files, it must be a move/rename or mechanical import rewrite.
-
-Scope
-Work inside:
-
-src/steuerung3d/apps/yellow/**
-
-You may also update:
-
-tests that import these modules, if import paths change.
-
-Required outputs (every run)
-
-A Refactor Plan (ordered steps, smallest risk first).
-
-A Patch execution log: what files changed, why, and how semantics are preserved.
-
-A Verification checklist: exact commands to run (pytest subset/full), plus quick manual smoke steps if relevant.
-
-A Commit message draft (imperative, includes rationale + constraints).
-
-Primary refactor tasks (execute in this order)
-
-Task A — Deduplicate UI assets and merge scripts (low risk)
-
-Detect and remove duplicate .ui fragments:
-
-apps/yellow/parts/**.ui
-
-apps/yellow/ui_split/parts/**.ui
-
-If legacy top-level .ui files exist (e.g., yellow3.ui, yellow3_shell_marker.ui),
-archive them under apps/yellow/archive_ui/ to avoid runtime confusion.
-
-Keep one canonical location (default: ui_split/parts/ because ui_shell.py loads ui_split/yellow3_merged.ui).
-
-Remove the duplicate folder and duplicate merge script:
-
-apps/yellow/merge_yellow3_ui.py
-
-apps/yellow/ui_split/merge_yellow3_ui.py
-
-If needed, leave a shim at the old path that delegates to the canonical script to preserve tooling habits/imports.
-
-Acceptance criteria:
-
-yellow3_merged.ui generation still works.
-
-No code references to deleted paths remain (unless via shim).
-
-Task B — Fix formatting/indent hazards in ui_shell.py (low risk)
-
-Ensure ui_shell.py is syntactically correct and formatted consistently.
-
-Only formatting / indentation fixes; no logic changes.
-
-Acceptance criteria:
-
-Module imports cleanly.
-
-Minimal diff (format-only).
-
-Task C — Deduplicate DenSi normalization/enforcement helpers (medium risk)
-
-In controllers/densi_controller.py:
-
-_normalize_pos_chain vs _enforce_pos_chain → one implementation
-
-_normalize_guider_range vs _enforce_guider_minmax → one implementation
-Keep the external call points intact (call the shared helper) so behavior stays identical.
-
-Acceptance criteria:
-
-Same input/output behavior.
-
-No change in produced command frames/telemetry mapping.
-
-Task D — Dependency boundary cleanup: engines must not import controllers (medium risk)
-
-Create apps/yellow/domain/ (or policy/) and relocate cross-layer logic currently living in controllers/* that is imported by engines.
-
-Specifically target imports from engines/hip_engine.py that currently come from controllers/…:
-
-ui_estop.py, ui_banner.py, ui_format.py, yellow_maps.py, param_txn.py
-
-Move these modules (or split into smaller ones) into domain/ and update imports so:
-
-engines + controllers depend on domain/
-
-controllers do not become a shared dependency for engines
-
-Acceptance criteria:
-
-Imports graph: engines/* must not import controllers/*.
-
-All tests still pass.
-
-Task E — Split hip_engine.py by move-only modularization (higher payoff)
-
-Split into engines/hip/… modules with pure move + re-export first:
-
-engine.py (orchestrator)
-
-state.py, attach_policy.py, viewmodel_builder.py, params_flow.py, drive_status.py
-
-Keep old import path working initially with a thin wrapper (hip_engine.py re-export).
-
-Acceptance criteria:
-
-Minimal behavioral diffs (mostly moves).
-
-Backward-compatible import path remains.
-
-Working style
-
-Before each task, locate all references (rg) and list impacted files.
-
-Apply change, then run the smallest meaningful tests (targeted), then full suite if feasible.
-
-Use mechanical refactors: rename/move + import rewrites first.
-
-Leave breadcrumbs in code comments only if needed for future maintainers (avoid new commentary noise).
-
-Verification
-Run at minimum:
-
-python -m compileall src/steuerung3d/apps/yellow
-
-pytest -q (or at least the relevant test subset if full suite is expensive)
-
-If something fails:
-
-revert to a smaller change, or add shims to maintain compatibility.
+name: yellow-refactor-executor
+version: 1.0
+goal: >
+  Refactor src/steuerung3d/apps/yellow to reduce controller bloat, remove shim modules,
+  introduce a Qt-free HipRuntime (mirroring DensiRuntime), and normalize widget naming.
+  Must preserve runtime semantics and keep tests green.
+
+principles:
+  - No semantic drift: refactor must be behavior-preserving unless explicitly marked otherwise.
+  - Qt at the edge: Qt imports only in ui_shell.py, binders/, panels/*_render.py, controllers/.
+  - Pure logic in domain/, engines/, runtimes/.
+  - Prefer small patches with clean checkpoints.
+  - Every patch must come with a quick verification checklist.
+
+entrypoints_to_watch:
+  - python -m steuerung3d up --profile 1dev_sim
+  - tests (pytest -q)
+
+patch_slices:
+  - id: A_shim_removal
+    intent: "Eliminate controller shim modules by moving call sites to domain/ or engines/."
+    steps:
+      - "Ripgrep for imports from steuerung3d.apps.yellow.controllers.ui_* and controllers.yellow_maps and controllers.param_txn."
+      - "Switch those imports to the corresponding domain/* module (or engines/* if appropriate)."
+      - "Keep the shim modules temporarily, but mark them deprecated with a single-line comment."
+      - "Run unit tests / minimal import check."
+    acceptance:
+      - "No remaining imports from controllers.ui_* in panels/*_vm.py or engines/*."
+      - "App still starts (import-time) without errors."
+
+  - id: B_hip_runtime
+    intent: "Create runtimes/hip_runtime.py (Qt-free) and move orchestration from HiPController into it."
+    steps:
+      - "Study current HiPController.poll_once() and HipEngine.step()."
+      - "Design HipRuntime API similar to DensiRuntime: collect_inputs (via binder in controller), tick() -> result."
+      - "Move: staleness/age tracking, snapshot selection, engine.step call, intent list building, txn retry bookkeeping into HipRuntime."
+      - "Keep HiPController as a thin wrapper: drain UDP -> runtime.tick -> binder.apply -> send intents."
+      - "Ensure logging and StatusEmitter behavior preserved."
+      - "Add minimal unit tests for HipRuntime (no QApplication)."
+    acceptance:
+      - "HiPController shrinks materially and contains no policy logic."
+      - "HipRuntime imports no Qt modules."
+      - "pytest -q passes (or at least existing suite + new tests pass)."
+
+  - id: C_widget_canonicalization
+    intent: "Canonicalize widget objectNames and remove Python fallbacks."
+    steps:
+      - "Identify all binder fallbacks (OR lookups) in binders/hip_qt_binder.py."
+      - "Define canonical widget names list."
+      - "Update UI split parts (ui_split/parts/*.ui) so canonical names exist."
+      - "Update binder to use canonical names only; fail fast with clear error if missing."
+      - "Add a small 'widget presence' test that loads merged UI and asserts key widgets exist."
+    acceptance:
+      - "No OR lookups for widget names remain in binder (except transitional behind a feature flag, if necessary)."
+      - "UI loads and key widgets found."
+
+  - id: D_cleanup_and_docs
+    intent: "Delete shims, update docs, and leave repo in a stable, readable state."
+    steps:
+      - "Delete deprecated shim modules after all call sites moved."
+      - "Update any local docs / README section describing yellow architecture."
+      - "Optional: add short comment blocks in each folder describing boundaries (domain/ engines/ runtimes/ binders/ controllers/)."
+    acceptance:
+      - "No unused files; no dead imports."
+      - "pytest -q green."
+
+verification:
+  smoke:
+    - "python -m steuerung3d up --profile 1dev_sim (hip + densi start, no crashes)"
+  tests:
+    - "pytest -q"
+  lint_optional:
+    - "python -m compileall src/steuerung3d/apps/yellow"
+
+deliverables:
+  - "Patch slices as separate commits or clearly separated diffs."
+  - "Short summary per slice: what moved, why, how verified."
+  - "Any new tests added and what they cover."

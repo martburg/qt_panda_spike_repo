@@ -47,6 +47,12 @@ python ui_split/merge_yellow3_ui.py --shell ui_split/yellow3_shell_marker.ui --p
 - The merged output has the **same widget tree** (names/count) as the original monolithic file.
 
 
+## Architecture boundaries (Qt at the edge)
+- Qt imports live only in `ui_shell.py`, `binders/`, `controllers/`, and `panels/*_render.py`.
+- Pure logic lives in `domain/`, `engines/`, and `runtimes/` (Qt-free).
+- HiP orchestration is handled by `runtimes/hip_runtime.py`, with policy in `engines/hip/`.
+
+
 ## Diagnostics split
 `ui_split/parts/pageDiagnostics.ui` is now a *shell* that contains the `tabsDiagnostics` structure, but each large child page is split into its own file under `ui_split/parts/diagnostics/`:
 

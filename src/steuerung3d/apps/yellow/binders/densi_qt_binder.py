@@ -34,7 +34,7 @@ from ..controllers.ui_update import (
     update_slider,
 )
 from ..controllers.widget_cache import WidgetCache
-from ..controllers.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
+from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 from ..panels.densi_banner_render import DenSiBannerBindings, apply_densi_banner_vm
 from ..panels.densi_cut_markers_render import DenSiCutMarkersBindings, apply_densi_cut_markers_vm
 from ..panels.densi_estop_checkboxes import (
@@ -70,9 +70,8 @@ class DenSiQtBinder:
         # Widgets
         self._txtTick: QLineEdit | None = self.win.findChild(QLineEdit, "txtTick")
         self._txt_hdr_banner_left: QLineEdit | None = self.win.findChild(QLineEdit, "txtHdrBannerLeft")
-        self._txt_hdr_banner_right: QLineEdit | None = (
-            self.win.findChild(QLineEdit, "txtHdrBannerRight")
-            or self.win.findChild(QLineEdit, "txtHdrBannnerRight")
+        self._txt_hdr_banner_right: QLineEdit | None = self.win.findChild(
+            QLineEdit, "txtHdrBannerRight"
         )
 
         self._txtPos: QLineEdit | None = self.win.findChild(QLineEdit, "txtPos")
@@ -88,17 +87,15 @@ class DenSiQtBinder:
         self._txt_guider_range_min: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMin")
         self._txt_guider_range_max: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMax")
         self._txt_guider_range_val: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeValue")
-        self._txt_guider_speed: QLineEdit | None = (
-            self.win.findChild(QLineEdit, "txtGuiderSpeed")
-            or self.win.findChild(QLineEdit, "txtGuiderPos_2")
+        self._txt_guider_speed: QLineEdit | None = self.win.findChild(
+            QLineEdit, "txtGuiderSpeed"
         )
 
         self._sld_vel_cmd: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldVelCmd")
         self._sld_limit_range: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldLimitRange")
 
-        self._btn_diag_resync: QPushButton | None = (
-            self.win.findChild(QPushButton, "btnReSync")
-            or self.win.findChild(QPushButton, "btnDiagResync")
+        self._btn_diag_resync: QPushButton | None = self.win.findChild(
+            QPushButton, "btnDiagResync"
         )
         self._btn_es_start: QPushButton | None = self.win.findChild(QPushButton, "btnESStart")
 
@@ -106,6 +103,13 @@ class DenSiQtBinder:
         self._btn_estop_all_clear: QPushButton | None = self.win.findChild(QPushButton, "btnEStopAllClear")
 
         self._cmbAxis: QComboBox | None = self.win.findChild(QComboBox, "cmbAxis")
+
+        if self._txt_hdr_banner_right is None:
+            raise RuntimeError("UI is missing widget named 'txtHdrBannerRight'")
+        if self._txt_guider_speed is None:
+            raise RuntimeError("UI is missing widget named 'txtGuiderSpeed'")
+        if self._btn_diag_resync is None:
+            raise RuntimeError("UI is missing widget named 'btnDiagResync'")
 
         self._b_readouts = DenSiReadoutsBindings(
             txtPos=self._txtPos,

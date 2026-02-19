@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from collections.abc import Iterable
 
-from ..controllers.ui_estop import compute_estop_dot_states, compute_header_estop_dot_states
+from ..domain.ui_estop import compute_estop_dot_states, compute_header_estop_dot_states
 from steuerung3d.protocol.estop_bits import iter_specs
 
 

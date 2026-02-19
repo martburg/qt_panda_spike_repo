@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from steuerung3d.apps.yellow.controllers.ui_estop import (
+from steuerung3d.apps.yellow.domain.ui_estop import (
     age_to_online_state,
     compute_estop_dot_state,
     compute_estop_dot_states,

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..controllers.ui_format import fmt_f_unit
+from ..domain.ui_format import fmt_f_unit
 
 
 @dataclass(frozen=True)

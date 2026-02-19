@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..controllers.ui_estop import age_to_online_state
+from ..domain.ui_estop import age_to_online_state
 
 
 @dataclass(frozen=True)

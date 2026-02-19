@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..controllers.ui_banner import BANNER_COLORS, derive_banner_estate_from_word
+from ..domain.ui_banner import BANNER_COLORS, derive_banner_estate_from_word
 
 
 @dataclass(frozen=True)
