@@ -4,8 +4,8 @@ This package intentionally keeps deterministic device semantics (DenSi) out of
 Qt controllers. Controllers should remain wiring + rendering only.
 """
 
-from .densi_engine import DenSiEngine, DenSiTickResult
-from .densi_types import EStopState, L0Top, L0Sub
+from .densi.engine import DenSiEngine, DenSiTickResult
+from .densi.types import EStopState, L0Top, L0Sub
 from .hip.engine import (
     HipEngine,
     HipAttachInputs,

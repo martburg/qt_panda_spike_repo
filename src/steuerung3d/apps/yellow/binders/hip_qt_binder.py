@@ -27,9 +27,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..controllers.ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
-from ..controllers.ui_params import apply_param_values_to_line_edits
-from ..controllers.ui_update import (
+from ..qtutil.ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
+from ..qtutil.ui_params import apply_param_values_to_line_edits
+from ..qtutil.ui_update import (
     set_checked,
     set_enabled,
     set_enabled_repolish,
@@ -38,8 +38,8 @@ from ..controllers.ui_update import (
     set_text,
     update_slider,
 )
-from ..controllers.widget_cache import WidgetCache
-from ..controllers.ui_contract import log_missing_optional_once, log_missing_required_once
+from ..qtutil.widget_cache import WidgetCache
+from ..qtutil.ui_contract import log_missing_optional_once, log_missing_required_once
 from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 from ..domain.ui_format import fmt_f_unit
 from ..domain.ui_banner import BANNER_COLORS

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from PySide6.QtWidgets import QLineEdit
 
-from ..controllers.ui_update import set_text
+from ..qtutil.ui_update import set_text
 from .densi_cut_markers_vm import DenSiCutMarkersVM
 
 

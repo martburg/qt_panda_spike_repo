@@ -23,9 +23,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..controllers.ui_contract import log_missing_optional_once, log_missing_required_once
-from ..controllers.ui_params import apply_param_values_to_line_edits
-from ..controllers.ui_update import (
+from ..qtutil.ui_contract import log_missing_optional_once, log_missing_required_once
+from ..qtutil.ui_params import apply_param_values_to_line_edits
+from ..qtutil.ui_update import (
     set_checked,
     set_enabled,
     set_state_by_object_name,
@@ -33,7 +33,7 @@ from ..controllers.ui_update import (
     set_text,
     update_slider,
 )
-from ..controllers.widget_cache import WidgetCache
+from ..qtutil.widget_cache import WidgetCache
 from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 from ..panels.densi_banner_render import DenSiBannerBindings, apply_densi_banner_vm
 from ..panels.densi_cut_markers_render import DenSiCutMarkersBindings, apply_densi_cut_markers_vm
@@ -50,8 +50,8 @@ from ..panels.densi_lifetick_render import apply_densi_lifetick_vm
 from ..panels.densi_limits_vm import compute_densi_limits_vm
 from ..panels.densi_limits_render import apply_densi_limits_vm
 from ..panels.densi_readouts_render import DenSiReadoutsBindings, apply_densi_readouts_vm
-from ..engines.densi_inputs import DensiInputs, DensiUiInputs, DensiEstopToggle
-from ..engines.densi_viewmodel import DensiViewModel
+from ..engines.densi.inputs import DensiInputs, DensiUiInputs, DensiEstopToggle
+from ..engines.densi.viewmodel import DensiViewModel
 from steuerung3d.protocol.estop_bits import decode_estop_word, iter_specs
 
 

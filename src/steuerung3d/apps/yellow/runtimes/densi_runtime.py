@@ -27,9 +27,9 @@ try:
 except Exception:  # pragma: no cover
     StatusEmitter = None  # type: ignore
 
-from ..engines.densi_engine import DenSiEngine, DenSiTickResult
-from ..engines.densi_inputs import DensiInputs
-from ..engines.densi_viewmodel import DensiViewModel
+from ..engines.densi.engine import DenSiEngine, DenSiTickResult
+from ..engines.densi.inputs import DensiInputs
+from ..engines.densi.viewmodel import DensiViewModel
 from ..panels.densi_banner_vm import compute_densi_banner_vm
 from ..panels.densi_cut_markers_vm import compute_densi_cut_markers_vm
 from ..panels.densi_estop_dots_vm import compute_densi_estop_dots_vm

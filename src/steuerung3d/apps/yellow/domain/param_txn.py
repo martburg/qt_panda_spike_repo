@@ -10,7 +10,7 @@ parameter editing:
 - provide a small policy helper for reflecting param-edit state without UI flicker
 
 The goal is to keep controller logic readable and keep the state machine testable
-without importing PySide6.
+without importing Qt.
 """
 
 from __future__ import annotations

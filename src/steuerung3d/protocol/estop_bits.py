@@ -21,17 +21,17 @@ class EstopBitSpec:
 ESTOP_SPECS: Dict[str, EstopBitSpec] = {
     # --- Guider channel bits (INVERTED in legacy) ---
     # G3
-    "g3_fb":  EstopBitSpec("g3_fb",  0, invert=True, checkbox="chkEsG3Fb",  dot="g3_fb_dot"),
-    "g3_com": EstopBitSpec("g3_com", 1, invert=True, checkbox="chkEsG3Com", dot="g3_com_dot"),
-    "g3_out": EstopBitSpec("g3_out", 2, invert=True, checkbox="chkEsG3Out", dot="g3_out_dot"),
+    "g3_fb":  EstopBitSpec("g3_fb",  0, invert=True, checkbox="chkEsG3Fb",  dot="dotG3Fb"),
+    "g3_com": EstopBitSpec("g3_com", 1, invert=True, checkbox="chkEsG3Com", dot="dotG3Com"),
+    "g3_out": EstopBitSpec("g3_out", 2, invert=True, checkbox="chkEsG3Out", dot="dotG3Out"),
     # G2
-    "g2_fb":  EstopBitSpec("g2_fb",  3, invert=True, checkbox="chkEsG2Fb",  dot="g2_fb_dot"),
-    "g2_com": EstopBitSpec("g2_com", 4, invert=True, checkbox="chkEsG2Com", dot="g2_com_dot"),
-    "g2_out": EstopBitSpec("g2_out", 5, invert=True, checkbox="chkEsG2Out", dot="g2_out_dot"),
+    "g2_fb":  EstopBitSpec("g2_fb",  3, invert=True, checkbox="chkEsG2Fb",  dot="dotG2Fb"),
+    "g2_com": EstopBitSpec("g2_com", 4, invert=True, checkbox="chkEsG2Com", dot="dotG2Com"),
+    "g2_out": EstopBitSpec("g2_out", 5, invert=True, checkbox="chkEsG2Out", dot="dotG2Out"),
     # G1
-    "g1_fb":  EstopBitSpec("g1_fb",  6, invert=True, checkbox="chkEsG1Fb",  dot="g1_fb_dot"),
-    "g1_com": EstopBitSpec("g1_com", 7, invert=True, checkbox="chkEsG1Com", dot="g1_com_dot"),
-    "g1_out": EstopBitSpec("g1_out", 8, invert=True, checkbox="chkEsG1Out", dot="g1_out_dot"),
+    "g1_fb":  EstopBitSpec("g1_fb",  6, invert=True, checkbox="chkEsG1Fb",  dot="dotG1Fb"),
+    "g1_com": EstopBitSpec("g1_com", 7, invert=True, checkbox="chkEsG1Com", dot="dotG1Com"),
+    "g1_out": EstopBitSpec("g1_out", 8, invert=True, checkbox="chkEsG1Out", dot="dotG1Out"),
 
     # --- Core / safety bits (not inverted) ---
     "master":      EstopBitSpec("master",      9,  checkbox="chkEStopMaster",  dot="dotMaster"),

@@ -28,7 +28,7 @@ try:
 except Exception:  # pragma: no cover
     StatusEmitter = None  # type: ignore
 
-from .bindings import YellowBindings
+from ..qtutil.bindings import YellowBindings
 from .ports import IntentOut, TelemetryIn
 from .ui_watchdog import PerfWatchdog
 from ..binders.hip_qt_binder import HipQtBinder

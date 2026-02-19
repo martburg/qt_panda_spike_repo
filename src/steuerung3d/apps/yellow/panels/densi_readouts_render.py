@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
-from ..controllers.ui_update import set_text, update_slider
+from ..qtutil.ui_update import set_text, update_slider
 
 from .densi_readouts_vm import DenSiReadoutsVM
 

@@ -34,9 +34,9 @@ from steuerung3d.protocol.estop_bits import (
     encode_estop_word,
 )
 
-from .densi_types import EStopState, L0Top, L0Sub
-from ..panels.densi_param_ops_core import apply_densi_param_ops
-from ..domain.ui_banner import BANNER_DYNAMIC_EXCLUDE, derive_banner_estate_from_word
+from .types import EStopState, L0Top, L0Sub
+from ...panels.densi_param_ops_core import apply_densi_param_ops
+from ...domain.ui_banner import BANNER_DYNAMIC_EXCLUDE, derive_banner_estate_from_word
 
 
 
