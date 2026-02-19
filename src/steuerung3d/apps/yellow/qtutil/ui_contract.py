@@ -1,4 +1,4 @@
-# src/steuerung3d/apps/yellow/controllers/ui_contract.py
+# src/steuerung3d/apps/yellow/qtutil/ui_contract.py
 """UI contract helpers for Yellow controllers.
 
 We have multiple .ui variants in the wild. Some widgets are optional or may have

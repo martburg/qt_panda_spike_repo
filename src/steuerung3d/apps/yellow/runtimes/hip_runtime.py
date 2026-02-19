@@ -1,4 +1,4 @@
-"""Qt-free runtime seam for HiP.
+"""Qt-free runtime seam for Hip.
 
 Responsibilities:
 - Drain telemetry snapshots (provided by controller).

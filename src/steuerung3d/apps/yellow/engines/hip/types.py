@@ -1,4 +1,4 @@
-"""HiP engine data types (Qt-free)."""
+"""Hip engine data types (Qt-free)."""
 
 from __future__ import annotations
 

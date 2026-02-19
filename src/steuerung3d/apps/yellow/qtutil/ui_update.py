@@ -1,4 +1,4 @@
-# src/steuerung3d/apps/yellow/controllers/ui_update.py
+# src/steuerung3d/apps/yellow/qtutil/ui_update.py
 """Small, pragmatic UI write helpers.
 
 Goals:

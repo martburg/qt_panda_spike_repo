@@ -1,4 +1,4 @@
-# src/steuerung3d/apps/yellow/controllers/widget_cache.py
+# src/steuerung3d/apps/yellow/qtutil/widget_cache.py
 """Tiny widget lookup cache for Yellow controllers.
 
 Motivation

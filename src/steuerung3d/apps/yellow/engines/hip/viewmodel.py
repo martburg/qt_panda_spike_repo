@@ -1,4 +1,4 @@
-"""HiP view-model types (Qt-free)."""
+"""Hip view-model types (Qt-free)."""
 
 from __future__ import annotations
 

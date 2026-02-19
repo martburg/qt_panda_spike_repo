@@ -1,7 +1,7 @@
-# src/steuerung3d/apps/yellow/controllers/ui_panel_state.py
+# src/steuerung3d/apps/yellow/qtutil/ui_panel_state.py
 """Shared helpers for common panel state transitions.
 
-Yellow UIs have a few recurring "panel mode" transitions, e.g. HiP pooled panels
+Yellow UIs have a few recurring "panel mode" transitions, e.g. Hip pooled panels
 switch between unattached (dead/grey) and attached (live) states.
 
 These helpers keep that logic small and consistent across controllers while

@@ -1,9 +1,9 @@
-# src/steuerung3d/apps/yellow/controllers/ui_params.py
-"""Parameter UI helpers shared by HiP and DenSi.
+# src/steuerung3d/apps/yellow/qtutil/ui_params.py
+"""Parameter UI helpers shared by Hip and DenSi.
 
 Why this exists:
 - Keep param rendering consistent across panels (formatting + signal blocking).
-- Reduce copy/paste drift between HiP and DenSi controllers.
+- Reduce copy/paste drift between Hip and DenSi controllers.
 
 These helpers are intentionally conservative:
 - best-effort (never raise)
