@@ -16,11 +16,13 @@ from ...domain.banner_facts import BANNER_DYNAMIC_EXCLUDE, derive_banner_estate_
 from .types import EStopState
 
 
+# compat
 def reset_able_from_estop_word(word: int) -> bool:
     """Compatibility wrapper: use domain.estop_facts instead."""
     return bool(estop_facts.reset_able_from_word(int(word)))
 
 
+# compat
 def ready_from_estop_word(word: int) -> bool:
     """Compatibility wrapper: use domain.estop_facts instead."""
     return bool(estop_facts.ready_from_word(int(word)))

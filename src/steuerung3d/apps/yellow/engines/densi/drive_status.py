@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from steuerung3d.core.state import MachineState
-from steuerung3d.protocol.estop_bits import decode_estop_word
+from ...domain.estop_facts import decode_estop_word
 
 
 def make_drive_status_word(

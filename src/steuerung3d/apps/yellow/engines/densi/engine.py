@@ -26,12 +26,13 @@ from steuerung3d.adapters.sim.device import SimDevice
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
 from steuerung3d.core.state import MachineState
-from steuerung3d.protocol.estop_bits import (
-    ESTOP_SPECS,
-    ESTOP_CAUSE_KEYS,
-    ESTOP_OK_KEYS,
+from steuerung3d.protocol.estop_bits import ESTOP_SPECS
+
+from ...domain.estop_facts import (
     decode_estop_word,
     encode_estop_word,
+    estop_cause_keys,
+    estop_ok_keys,
 )
 
 from .types import EStopState, L0Top, L0Sub
@@ -242,27 +243,28 @@ class DenSiEngine:
             self.inj_bits = {k: False for k in ESTOP_SPECS.keys()}
         return self.inj_bits
 
-    
     def reset_to_fault_state(self) -> None:
         """Start in a FAULT state: break OK chain but allow immediate EStopReset.
 
         Legacy-compatible policy:
-          - Trip-causes NOT asserted at startup (no explicit cause latched): ESTOP_CAUSE_KEYS => False
-          - Status/OK chain broken (red): ESTOP_OK_KEYS => False
+          - Trip-causes NOT asserted at startup (no explicit cause latched): cause keys => False
+          - Status/OK chain broken (red): OK chain keys => False
           - ResetAble is derived from trip-cause bits and becomes True when causes are clear.
         """
         bits = self._ensure_inj_bits()
+        cause_keys = estop_cause_keys()
+        ok_keys = estop_ok_keys()
 
         # default everything False
         for k in list(bits.keys()):
             bits[k] = False
 
         # Trip causes clear at startup (no explicit cause latched)
-        for k in ESTOP_CAUSE_KEYS:
+        for k in cause_keys:
             bits[k] = False
 
         # Break the OK chain (red)
-        for k in ESTOP_OK_KEYS:
+        for k in ok_keys:
             bits[k] = False
 
         # ResetAble derived; seed as False then sync
@@ -301,12 +303,14 @@ class DenSiEngine:
     def apply_go_state(self) -> None:
         """Set injected bits to a stable 'GO' state (no flash)."""
         bits = self._ensure_inj_bits()
+        cause_keys = estop_cause_keys()
+        ok_keys = estop_ok_keys()
         for k in list(bits.keys()):
             bits[k] = False
 
-        for k in ESTOP_OK_KEYS:
+        for k in ok_keys:
             bits[k] = True
-        for k in ESTOP_CAUSE_KEYS:
+        for k in cause_keys:
             bits[k] = False
 
         self.inj_estop_word = int(encode_estop_word(bits))
@@ -315,12 +319,14 @@ class DenSiEngine:
     def apply_post_reset_state(self) -> None:
         """Clear initial FAULT latch, but remain not-ready until Taster + delay."""
         bits = self._ensure_inj_bits()
+        cause_keys = estop_cause_keys()
+        ok_keys = estop_ok_keys()
         for k in list(bits.keys()):
             bits[k] = False
 
-        for k in ESTOP_OK_KEYS:
+        for k in ok_keys:
             bits[k] = True
-        for k in ESTOP_CAUSE_KEYS:
+        for k in cause_keys:
             bits[k] = False
 
         # Post-reset we are *not* yet ready: operator must press the Taster and wait a bit.
