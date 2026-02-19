@@ -19,7 +19,13 @@ from typing import List
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
-from steuerung3d.util.ratelimit import rl_log_exc
+from .runtime_utils import (
+    compute_age_ms,
+    compute_status_level,
+    compute_stale,
+    emit_status,
+    format_age_ms,
+)
 
 # Optional structured status heartbeat (used by stack supervisor birds-eye)
 try:
@@ -36,11 +42,7 @@ from ..panels.densi_estop_dots_vm import compute_densi_estop_dots_vm
 from ..panels.densi_header_online_vm import compute_densi_header_online_vm
 from ..panels.densi_lifetick_vm import compute_densi_lifetick_vm
 from ..panels.densi_readouts_vm import compute_densi_readouts_vm
-from ..engines.densi.taster_edge_state import (
-    TasterEdgeState,
-    update_taster_edge_state,
-    within_brake_grace,
-)
+from ..domain.taster_edge_state import TasterEdgeState, update_taster_edge_state, within_brake_grace
 
 
 @dataclass(frozen=True)
@@ -238,37 +240,33 @@ class DensiRuntime:
         if not self._status:
             return
 
-        age_ms: float | None
-        if self._last_cmd_ns is None:
-            age_ms = None
-        else:
-            age_ms = (int(now_ns) - int(self._last_cmd_ns)) / 1_000_000.0
-
-        stale = (age_ms is None) or (age_ms >= float(self._stale_after_ms))
-        level = "ERR" if (self._last_estop or self._last_fault) else ("WARN" if stale else "OK")
+        age_ms = compute_age_ms(int(now_ns), self._last_cmd_ns)
+        stale = compute_stale(age_ms, self._stale_after_ms)
+        level = compute_status_level(self._last_estop, self._last_fault, stale)
         axis = self._axis_ids[0] if self._axis_ids else ""
         mode = self._last_mode or ""
         online = bool(self._seen_first_cmd) and (not stale)
-        age_disp = "NA" if age_ms is None else f"{age_ms:.0f}"
+        age_disp = format_age_ms(age_ms)
         summary = f"axis={axis or '-'} mode={mode or '-'} online={int(online)} age_ms={age_disp}"
 
-        try:
-            self._status.emit_every(
-                level=level,
-                summary=summary,
-                fields={
-                    "axis": axis,
-                    "mode": mode,
-                    "online": bool(online),
-                    "age_ms": (-1 if age_ms is None else float(age_ms)),
-                    "stale": bool(stale),
-                    "estop": bool(self._last_estop),
-                    "fault": bool(self._last_fault),
-                    "tick": int(getattr(self.engine.state, "tick", 0) or 0),
-                },
-            )
-        except Exception:
-            rl_log_exc("densi.status.emit", "DenSi status emission failed", logger=self._log)
+        emit_status(
+            self._status,
+            level=level,
+            summary=summary,
+            fields={
+                "axis": axis,
+                "mode": mode,
+                "online": bool(online),
+                "age_ms": (-1 if age_ms is None else float(age_ms)),
+                "stale": bool(stale),
+                "estop": bool(self._last_estop),
+                "fault": bool(self._last_fault),
+                "tick": int(getattr(self.engine.state, "tick", 0) or 0),
+            },
+            log=self._log,
+            exc_tag="densi.status.emit",
+            exc_msg="DenSi status emission failed",
+        )
 
     @staticmethod
     def _lt_should_log(now_s: float, last_log_s: float, interval_s: float = 1.0) -> bool:

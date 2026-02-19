@@ -18,7 +18,7 @@ from steuerung3d.core.intents import ParamEditBegin
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
-from steuerung3d.util.ratelimit import RateLimiter, rl_log_exc
+from steuerung3d.util.ratelimit import RateLimiter
 
 # Optional structured status heartbeat (used by stack supervisor birds-eye)
 try:
@@ -34,6 +34,13 @@ from ..engines.hip.viewmodel import HipViewModel
 from ..panels.hip_banner_vm import compute_hip_banner_vm
 from ..panels.hip_estop_vm import compute_hip_estop_vm
 from ..panels.hip_header_dots_vm import compute_hip_header_dots_vm
+from .runtime_utils import (
+    compute_age_ms,
+    compute_status_level,
+    compute_stale,
+    emit_status,
+    format_age_ms,
+)
 
 
 @dataclass(frozen=True)
@@ -348,38 +355,34 @@ class HipRuntime:
         if not getattr(self, "_status", None):
             return
 
-        age_ms: float | None
-        if self._last_rx_ns is None:
-            age_ms = None
-        else:
-            age_ms = (int(now_ns) - int(self._last_rx_ns)) / 1_000_000.0
-
-        stale = (age_ms is None) or (age_ms >= float(self._stale_after_ms))
-        level = "ERR" if (self._last_estop or self._last_fault) else ("WARN" if stale else "OK")
+        age_ms = compute_age_ms(int(now_ns), self._last_rx_ns)
+        stale = compute_stale(age_ms, self._stale_after_ms)
+        level = compute_status_level(self._last_estop, self._last_fault, stale)
         axis = str(getattr(self.engine.state, "selected_axis", "") or "") or (self._fixed_axis or "")
         mode = self._last_mode or ""
-        age_disp = "NA" if age_ms is None else f"{age_ms:.0f}"
+        age_disp = format_age_ms(age_ms)
         joy = getattr(self.engine.state, "joy", JoyState())
         dm = 1 if bool(getattr(joy, "deadman", False)) else 0
         sel = 1 if bool(getattr(joy, "select_hip", False)) else 0
         sp = float(getattr(joy, "soll_speed", 0.0))
         summary = f"axis={axis or '-'} mode={mode or '-'} age_ms={age_disp} JOY dm={dm} sel={sel} sp={sp:+.2f}"
 
-        try:
-            self._status.emit_every(
-                level=level,
-                summary=summary,
-                fields={
-                    "axis": axis,
-                    "mode": mode,
-                    "age_ms": (-1 if age_ms is None else float(age_ms)),
-                    "stale": bool(stale),
-                    "estop": bool(self._last_estop),
-                    "fault": bool(self._last_fault),
-                    "joy_deadman": bool(getattr(joy, "deadman", False)),
-                    "joy_select_hip": bool(getattr(joy, "select_hip", False)),
-                    "joy_soll_speed": float(sp),
-                },
-            )
-        except Exception:
-            rl_log_exc("hip.status.emit", "HiP status emission failed", logger=self._log)
+        emit_status(
+            self._status,
+            level=level,
+            summary=summary,
+            fields={
+                "axis": axis,
+                "mode": mode,
+                "age_ms": (-1 if age_ms is None else float(age_ms)),
+                "stale": bool(stale),
+                "estop": bool(self._last_estop),
+                "fault": bool(self._last_fault),
+                "joy_deadman": bool(getattr(joy, "deadman", False)),
+                "joy_select_hip": bool(getattr(joy, "select_hip", False)),
+                "joy_soll_speed": float(sp),
+            },
+            log=self._log,
+            exc_tag="hip.status.emit",
+            exc_msg="HiP status emission failed",
+        )

@@ -40,3 +40,20 @@ def fmt_i(x: Any, empty: str = "--") -> str:
         return str(int(x))
     except Exception:
         return empty
+
+
+def fmt_float_de(v: Any, *, ndigits: int = 2, unit: str | None = None, empty: str = "") -> str:
+    """Format a float with comma decimal separator and optional unit."""
+    try:
+        s = f"{float(v):0.{int(ndigits)}f}"
+    except Exception:
+        return str(empty)
+    if unit:
+        s = f"{s} {unit}"
+    return s.replace(".", ",")
+
+
+def fmt_f_unit_de(v: Any, *, unit: str, ndigits: int = 2, empty: str = "--") -> str:
+    """Format float + unit with comma decimal separator."""
+    s = fmt_f_unit(v, unit, ndigits=ndigits, empty=empty)
+    return str(s).replace(".", ",")

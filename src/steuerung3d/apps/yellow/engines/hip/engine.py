@@ -22,10 +22,12 @@ from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import ESTOP_SPECS, decode_estop_word
 
 from ...domain.param_txn import ParamEditTxnClient, RetryEvent
+from ...domain.taster_edge_state import TasterEdgeState, update_taster_edge_state, within_brake_grace
 from ...domain.ui_estop import age_to_online_state, infer_estop_profile
 from ...domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 from ...domain.joy_motion_map import map_soll_speed_to_jog_winch
 from .types import HipPresentationData
+from .attach_state import NOT_ATTACHED, build_attach_combo, compute_attach_state
 from .intent_policy import (
     claim_allowed,
     gate_motion_intents,
@@ -44,11 +46,10 @@ from .presentation import (
     read_amp_and_temp,
     read_axis_pos_vel,
 )
+from .param_ui import run_param_txn
 
 from .types import (
-    HipAttachCombo,
     HipAttachInputs,
-    HipAttachState,
     HipBannerInputs,
     HipParamAction,
     HipParamButtons,
@@ -62,16 +63,12 @@ from .types import (
 )
 from .viewmodel import HipCutMarkersState, HipDriveStatusState, HipReadoutsState, HipViewModel
 
-NOT_ATTACHED = "NotAttached"
-
-
 class HipEngine:
     """Minimal HipEngine surface (shadow-mode only)."""
 
     def __init__(self, *, hip_id: str = "") -> None:
         self._param_txn = ParamEditTxnClient(hip_id=str(hip_id or ""))
-        self._taster_prev: dict[str, bool] = {}
-        self._taster_pressed_s: dict[str, float] = {}
+        self._taster_state: dict[str, TasterEdgeState] = {}
         self.state = HipState()
 
     @staticmethod
@@ -82,51 +79,19 @@ class HipEngine:
         return gate_motion_intents(intents, deadman=deadman)
 
     def _update_taster_edge(self, axis_id: str, taster: bool, now_s: float) -> None:
-        prev = self._taster_prev.get(axis_id, taster)
-        if (not prev) and taster:
-            self._taster_pressed_s[axis_id] = float(now_s)
-        self._taster_prev[axis_id] = bool(taster)
+        prev = self._taster_state.get(axis_id, TasterEdgeState())
+        self._taster_state[axis_id] = update_taster_edge_state(
+            state=prev,
+            taster=bool(taster),
+            now_s=float(now_s),
+        )
 
     def _within_brake_grace(self, axis_id: str, now_s: float, grace_s: float) -> bool:
-        t0 = self._taster_pressed_s.get(axis_id)
-        if t0 is None:
-            return False
-        return (float(now_s) - float(t0)) <= float(grace_s)
+        state = self._taster_state.get(axis_id, TasterEdgeState())
+        return within_brake_grace(state=state, now_s=float(now_s), grace_s=float(grace_s))
 
-    def compute_attach_state(self, inputs: HipAttachInputs) -> HipAttachState:
-        attached = bool(inputs.attached)
-        modal_locked = bool(inputs.modal_locked)
-        last_mode = str(inputs.last_mode or "").upper()
-        last_estate = str(inputs.last_estate or "").upper()
-
-        # Preserve legacy behavior: when modal-locked and attached, do not
-        # force tabs enabled/disabled.
-        if attached and modal_locked:
-            tabs_enabled: bool | None = None
-        else:
-            tabs_enabled = bool(attached) and (not modal_locked)
-
-        setup_enabled = bool(attached) and (not modal_locked)
-        main_amp_reset_enabled = bool(attached) and (not modal_locked)
-
-        resync_enabled = (
-            bool(attached)
-            and (not modal_locked)
-            and (last_mode == "IDLE")
-            and (last_estate == "IDLE")
-        )
-
-        # Preserve legacy behavior: only force-disable when unattached.
-        estop_reset_enabled: bool | None = None if attached else False
-
-        return HipAttachState(
-            attached=attached,
-            tabs_enabled=tabs_enabled,
-            setup_enabled=setup_enabled,
-            main_amp_reset_enabled=main_amp_reset_enabled,
-            resync_enabled=resync_enabled,
-            estop_reset_enabled=estop_reset_enabled,
-        )
+    def compute_attach_state(self, inputs: HipAttachInputs):
+        return compute_attach_state(inputs)
 
     def compute_banner_estate(self, inputs: HipBannerInputs) -> str:
         return compute_banner_estate(
@@ -161,34 +126,13 @@ class HipEngine:
         prev_selected = str(self.state.selected_axis or "").strip()
         fixed_applied = bool(self.state.fixed_axis_applied)
 
-        items = [NOT_ATTACHED] + axis_ids
-        combo_enabled = True
-        combo_current = NOT_ATTACHED
-        if fixed_axis and fixed_axis in axis_ids:
-            selected_axis = fixed_axis
-            combo_current = fixed_axis
-            fixed_applied = True
-            combo_enabled = not (bool(inputs.lock_axis_combo) and fixed_applied)
-        else:
-            if ui_axis in axis_ids:
-                selected_axis = ui_axis
-            elif ui_axis == NOT_ATTACHED or not ui_axis:
-                selected_axis = ""
-            else:
-                selected_axis = ""
-
-            if ui_axis in items:
-                combo_current = ui_axis
-            elif prev_selected in axis_ids:
-                combo_current = prev_selected
-            else:
-                combo_current = NOT_ATTACHED
-
-        attach_combo = HipAttachCombo(
-            items=items,
-            current=combo_current,
-            enabled=bool(combo_enabled),
-            fixed_axis_applied=bool(fixed_applied),
+        attach_combo, selected_axis, fixed_applied = build_attach_combo(
+            axis_ids=list(axis_ids),
+            ui_axis=str(ui_axis or ""),
+            fixed_axis=str(fixed_axis or ""),
+            prev_selected=str(prev_selected or ""),
+            fixed_applied=bool(fixed_applied),
+            lock_axis_combo=bool(inputs.lock_axis_combo),
         )
 
         intents: list[object] = []
@@ -312,10 +256,6 @@ class HipEngine:
                 estate=estate,
             )
 
-        param_writeback_group = ""
-        param_writeback_values: dict[str, float] = {}
-        param_writeback_message = ""
-
         # --- UI actions -> intents (param ops, estop reset, resync) ---
         if ui.estop_reset_clicked and axis_id:
             intents.append(RequestEstopReset(axis_id=axis_id, hip_id=hip_id))
@@ -331,66 +271,18 @@ class HipEngine:
                 if readouts is not None:
                     cut_markers = HipCutMarkersState("--", "--", "--", "--")
 
-        # Apply core acks before param txn decisions
-        self._param_txn.handle_core_acks(list(inputs.core_acks or []))
-
-        for action in list(ui.param_actions or []):
-            if not axis_id:
-                continue
-            group = str(action.group or "")
-            kind = str(action.kind or "")
-            if kind == "edit":
-                self._param_txn.start_local_edit(group)
-                intent = self._param_txn.make_begin_intent(axis_id=axis_id, group=group)
-                self._param_txn.send(intent, group=group, kind="begin", publish=intents.append, now_ns=int(inputs.now_ns))
-            elif kind == "write":
-                vals = dict(ui.param_values.get(group, {}) if isinstance(ui.param_values, dict) else {})
-                fixed = dict(vals)
-                if group == "pos":
-                    fixed = self._normalize_pos_chain(fixed)
-                elif group == "guider":
-                    fixed = self._normalize_guider_range(fixed)
-
-                if fixed != vals:
-                    param_writeback_group = group
-                    param_writeback_values = dict(fixed)
-                    if group == "pos":
-                        lines = []
-                        for k in ("HardMax", "UserMax", "UserMin", "HardMin"):
-                            if k in vals and k in fixed and float(vals[k]) != float(fixed[k]):
-                                lines.append(f"{k}: {float(vals[k]):g} → {float(fixed[k]):g}")
-                        if lines:
-                            param_writeback_message = (
-                                "The rule HardMax ≥ UserMax ≥ UserMin ≥ HardMin was enforced.\n\n"
-                                + "\n".join(lines)
-                            )
-
-                intent = self._param_txn.make_write_intent(axis_id=axis_id, group=group, values=fixed)
-                self._param_txn.send(intent, group=group, kind="write", publish=intents.append, now_ns=int(inputs.now_ns))
-                self._param_txn.end_local_edit(now_ns=int(inputs.now_ns))
-
-                self.state.pending_commit_req_id = str(getattr(intent, "req_id", "") or "")
-                self.state.pending_commit_group = str(getattr(intent, "group", "") or "")
-                self.state.pending_commit_values = dict(getattr(intent, "values", {}) or {})
-            elif kind == "cancel":
-                intent = self._param_txn.make_cancel_intent(axis_id=axis_id, group=group)
-                self._param_txn.send(intent, group=group, kind="cancel", publish=intents.append, now_ns=int(inputs.now_ns))
-                self._param_txn.end_local_edit(now_ns=int(inputs.now_ns))
-
-        txn_events = self._param_txn.retry_pending(int(inputs.now_ns), publish=intents.append)
-
-        # Compute param UI state
-        now_ns = int(inputs.now_ns)
-        edit_active, edit_group = self._param_txn.effective_remote_edit_state(
-            remote_active=bool(getattr(snap, "param_edit_active", False)),
-            remote_group=str(getattr(snap, "param_edit_group", "") or ""),
-            now_ns=now_ns,
-        )
-        param_ui = self._compute_param_ui_state(
-            edit_active=bool(edit_active),
-            edit_group=str(edit_group or ""),
+        param_result = run_param_txn(
+            txn=self._param_txn,
+            state=self.state,
+            ui=ui,
+            axis_id=str(axis_id or ""),
+            now_ns=int(inputs.now_ns),
             estate=str(estate or ""),
+            snap=snap,
+            intents=intents,
+            core_acks=list(inputs.core_acks or []),
         )
+        param_ui = param_result.param_ui
 
         attach_state = self.compute_attach_state(
             HipAttachInputs(
@@ -409,7 +301,7 @@ class HipEngine:
         except Exception:
             limit_values = {}
 
-        param_freeze_group = self._param_txn.local_edit_group if self._param_txn.local_edit_active else ""
+        param_freeze_group = str(param_result.param_freeze_group or "")
 
         lifetick_intents, echo_map = self._compute_lifetick_echo_intents(
             snap=snap,
@@ -420,7 +312,7 @@ class HipEngine:
 
         intents = gate_motion_intents(intents, deadman=self.state.joy.deadman)
 
-        param_commit_dialog = self._maybe_build_param_commit_dialog(snap)
+        param_commit_dialog = param_result.param_commit_dialog
 
         presentation = HipPresentationData(
             tick_text=str(tick_text),
@@ -450,9 +342,9 @@ class HipEngine:
             param_values=dict(params or {}),
             param_freeze_group=str(param_freeze_group or ""),
             limit_values=dict(limit_values or {}),
-            param_writeback_group=str(param_writeback_group or ""),
-            param_writeback_values=dict(param_writeback_values or {}),
-            param_writeback_message=str(param_writeback_message or ""),
+            param_writeback_group=str(param_result.param_writeback_group or ""),
+            param_writeback_values=dict(param_result.param_writeback_values or {}),
+            param_writeback_message=str(param_result.param_writeback_message or ""),
             param_commit_dialog=param_commit_dialog,
         )
 
@@ -469,46 +361,8 @@ class HipEngine:
             intents=intents,
             resync_ignored=bool(resync_ignored),
             resync_block_reason=str(resync_reason or ""),
-            txn_events=list(txn_events or []),
+            txn_events=list(param_result.txn_events or []),
         )
-
-    def _maybe_build_param_commit_dialog(self, snap: TelemetrySnapshot) -> HipParamCommitDialog | None:
-        rid = str(getattr(snap, "param_commit_req_id", "") or "")
-        status = str(getattr(snap, "param_commit_status", "idle") or "idle")
-        group = str(getattr(snap, "param_commit_group", "") or "")
-
-        if not rid or rid != str(self.state.pending_commit_req_id or ""):
-            return None
-        if rid in self.state.commit_dialog_shown_for:
-            return None
-        if status not in ("applied", "timeout"):
-            return None
-
-        self.state.commit_dialog_shown_for.add(rid)
-
-        if status == "applied":
-            msg = f"{group} parameters were applied (observed in telemetry)."
-            dialog = HipParamCommitDialog(level="info", title="Parameters applied", message=msg)
-        else:
-            unmatched = list(getattr(snap, "param_commit_unmatched", []) or [])
-            params = dict(getattr(snap, "params", {}) or {})
-            want = dict(self.state.pending_commit_values or {})
-
-            lines = [
-                f"{group} parameters were not confirmed (timeout).",
-                "",
-                "Mismatches:",
-            ]
-            for k in unmatched:
-                w = want.get(k, "?")
-                g = params.get(k, "<missing>")
-                lines.append(f"- {k}: want {w}  got {g}")
-            dialog = HipParamCommitDialog(level="warning", title="Parameters not confirmed", message="\n".join(lines))
-
-        self.state.pending_commit_req_id = ""
-        self.state.pending_commit_group = ""
-        self.state.pending_commit_values = {}
-        return dialog
 
     @staticmethod
     def normalize_intents(intents: Iterable[object]) -> list[tuple[str, tuple[tuple[str, Any], ...]]]:
@@ -541,42 +395,6 @@ class HipEngine:
             pass
         return norm
 
-    @staticmethod
-    def _normalize_pos_chain(values: dict[str, float]) -> dict[str, float]:
-        v = dict(values)
-        need = {"HardMax", "UserMax", "UserMin", "HardMin"}
-        if not need.issubset(v.keys()):
-            return v
-
-        hard_max = float(v["HardMax"])
-        hard_min = float(v["HardMin"])
-        user_max = float(v["UserMax"])
-        user_min = float(v["UserMin"])
-
-        if hard_max < hard_min:
-            hard_max, hard_min = hard_min, hard_max
-
-        user_max = max(min(user_max, hard_max), hard_min)
-        user_min = max(min(user_min, user_max), hard_min)
-
-        v["HardMax"] = hard_max
-        v["HardMin"] = hard_min
-        v["UserMax"] = user_max
-        v["UserMin"] = user_min
-        return v
-
-    @staticmethod
-    def _normalize_guider_range(values: dict[str, float]) -> dict[str, float]:
-        v = dict(values)
-        if "PosMin" not in v or "PosMax" not in v:
-            return v
-        pos_min = float(v["PosMin"])
-        pos_max = float(v["PosMax"])
-        if pos_min > pos_max:
-            pos_min = pos_max
-        v["PosMin"] = pos_min
-        v["PosMax"] = pos_max
-        return v
 
     def _compute_param_ui_state(self, *, edit_active: bool, edit_group: str, estate: str) -> HipParamUiState:
         groups = ("pos", "vel", "filter", "guider")
