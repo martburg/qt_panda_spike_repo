@@ -25,9 +25,11 @@ from steuerung3d.core.intents import (
     ParamWrite,
     ParamCancel,
     EchoLifeTick,
+    JoyStateUpdate,
 )
 
 from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
+from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
 
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamOp, decode_param_ops
 
@@ -57,6 +59,7 @@ _INTENT_TYPE_MAP = {
     "param_write": ParamWrite,
     "param_cancel": ParamCancel,
     "echo_lifetick": EchoLifeTick,
+    "joy_state_update": JoyStateUpdate,
 }
 
 
@@ -102,6 +105,15 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
                 except Exception:
                     continue
 
+    joy_in = payload.get("joy", {})
+    joy = JoyState()
+    if isinstance(joy_in, dict):
+        joy = JoyState(
+            deadman=bool(joy_in.get("deadman", False)),
+            select_hip=bool(joy_in.get("select_hip", False)),
+            soll_speed=clamp_soll_speed(joy_in.get("soll_speed", 0.0)),
+        )
+
     return TelemetrySnapshot(
         tick=int(payload.get("tick", 0)),
         t_s=float(payload.get("t_s", 0.0)),
@@ -127,6 +139,7 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
         param_commit_status=str(payload.get("param_commit_status", "idle")),
         param_commit_age_ticks=int(payload.get("param_commit_age_ticks", 0)),
         param_commit_unmatched=[str(x) for x in list(payload.get("param_commit_unmatched", []))],
+        joy=joy,
     )
 
 

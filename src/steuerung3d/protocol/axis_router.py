@@ -5,6 +5,7 @@ from typing import Dict, Iterable, List, Mapping, Optional, Protocol
 
 from steuerung3d.core.command_frame import CommandFrame, ParamOp, coerce_param_ops
 from steuerung3d.core.telemetry import TelemetrySnapshot
+from steuerung3d.core.joy_state import JoyState
 
 
 class CommandFrameSink(Protocol):
@@ -169,6 +170,7 @@ class AxisRouter:
             param_commit_status=str(self.last_dev_param_commit_status_by_axis.get(axis_id, str(getattr(snap, "param_commit_status", "idle")))),
             param_commit_age_ticks=int(self.last_dev_param_commit_age_ticks_by_axis.get(axis_id, int(getattr(snap, "param_commit_age_ticks", 0)))),
             param_commit_unmatched=list(self.last_dev_param_commit_unmatched_by_axis.get(axis_id, list(getattr(snap, "param_commit_unmatched", [])) or [])),
+            joy=getattr(snap, "joy", JoyState()),
         )
 
     def publish_ui_snapshot(self, snap: TelemetrySnapshot) -> int:

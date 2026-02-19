@@ -22,8 +22,10 @@ from steuerung3d.core.intents import (
     ParamWrite,
     ParamCancel,
     EchoLifeTick,
+    JoyStateUpdate,
     Intent,
 )
+from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
 from steuerung3d.core.mode import Mode
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.command_frame import ParamEditBeginOp, ParamWriteOp, ParamCancelOp
@@ -126,6 +128,14 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             v16 = int(value) & 0xFFFF
             state.lifetick_echo_by_axis[axis_id] = v16
             log.debug("LIFETICK Core rx EchoLifeTick: axis=%s value=%d hip_id=%s", axis_id, v16, str(_hip_id or ""))
+            return
+
+        case JoyStateUpdate(deadman=_deadman, select_hip=_select_hip, soll_speed=_soll_speed):
+            state.joy = JoyState(
+                deadman=bool(_deadman),
+                select_hip=bool(_select_hip),
+                soll_speed=clamp_soll_speed(float(_soll_speed)),
+            )
             return
 
         # --- SAFETY / GLOBAL REQUESTS ---

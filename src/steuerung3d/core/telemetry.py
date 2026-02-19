@@ -7,6 +7,7 @@ from typing import Dict
 from steuerung3d.core.mode import Mode
 from steuerung3d.core.state import AxisState, MachineState
 from steuerung3d.core.param_registry import eps_for_param
+from steuerung3d.core.joy_state import JoyState
 
 @dataclass(frozen=True)
 class AxisTelemetry:
@@ -75,6 +76,9 @@ class TelemetrySnapshot:
     param_commit_age_ticks: int = 0
     param_commit_unmatched: list[str] = field(default_factory=list)
 
+    # Joystick state (UI-only; not used for device telemetry)
+    joy: JoyState = field(default_factory=JoyState)
+
     @classmethod
     def from_state(cls, state: MachineState) -> "TelemetrySnapshot":
         axes = {
@@ -130,6 +134,7 @@ class TelemetrySnapshot:
             param_commit_status=str(getattr(state, "param_commit_status", "idle")),
             param_commit_age_ticks=int(getattr(state, "param_commit_observed_ticks", 0) if str(getattr(state, "param_commit_status", "idle")) in ("pending", "timeout") else 0),
             param_commit_unmatched=list(getattr(state, "param_commit_unmatched", [])),
+            joy=getattr(state, "joy", JoyState()),
         )
 
 

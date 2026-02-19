@@ -140,6 +140,19 @@ class SmoothStop:
     type: Literal["smooth_stop"] = "smooth_stop"
 
 
+# -------- Joystick state update (v0.2) --------
+
+
+@dataclass(frozen=True)
+class JoyStateUpdate:
+    """Atomic joystick state sample."""
+
+    type: Literal["joy_state_update"] = "joy_state_update"
+    deadman: bool = False
+    select_hip: bool = False
+    soll_speed: float = 0.0
+
+
 # -------- Parameters (axis-agnostic, v0.1) --------
 
 ParamGroup = Literal["pos", "vel", "filter"]
@@ -220,4 +233,5 @@ Intent = Union[
     ParamWrite,
     ParamCancel,
     EchoLifeTick,
+    JoyStateUpdate,
 ]

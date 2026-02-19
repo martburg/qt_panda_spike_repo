@@ -16,6 +16,7 @@ import os
 
 from steuerung3d.core.intents import ParamEditBegin
 from steuerung3d.core.telemetry import TelemetrySnapshot
+from steuerung3d.core.joy_state import JoyState
 from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 from steuerung3d.util.ratelimit import RateLimiter, rl_log_exc
 
@@ -152,6 +153,7 @@ class HipRuntime:
                 last_estate=str(self._last_estate or ""),
                 ui=inputs.ui,
                 core_acks=list(getattr(snap, "core_acks", []) or []),
+                joy=getattr(snap, "joy", JoyState()),
             )
         )
 
@@ -218,6 +220,8 @@ class HipRuntime:
             self._hb.set("axis", axis)
         self._hb.emit(self._log)
 
+        self._emit_status(now_ns)
+
         return HipRuntimeResult(
             snap=snap,
             engine_result=engine_result,
@@ -274,7 +278,11 @@ class HipRuntime:
         axis = str(getattr(self.engine.state, "selected_axis", "") or "") or (self._fixed_axis or "")
         mode = self._last_mode or ""
         age_disp = "NA" if age_ms is None else f"{age_ms:.0f}"
-        summary = f"axis={axis or '-'} mode={mode or '-'} age_ms={age_disp}"
+        joy = getattr(self.engine.state, "joy", JoyState())
+        dm = 1 if bool(getattr(joy, "deadman", False)) else 0
+        sel = 1 if bool(getattr(joy, "select_hip", False)) else 0
+        sp = float(getattr(joy, "soll_speed", 0.0))
+        summary = f"axis={axis or '-'} mode={mode or '-'} age_ms={age_disp} JOY dm={dm} sel={sel} sp={sp:+.2f}"
 
         try:
             self._status.emit_every(
@@ -287,6 +295,9 @@ class HipRuntime:
                     "stale": bool(stale),
                     "estop": bool(self._last_estop),
                     "fault": bool(self._last_fault),
+                    "joy_deadman": bool(getattr(joy, "deadman", False)),
+                    "joy_select_hip": bool(getattr(joy, "select_hip", False)),
+                    "joy_soll_speed": float(sp),
                 },
             )
         except Exception:

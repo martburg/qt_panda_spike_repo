@@ -18,7 +18,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Sequence, Set
 
-from steuerung3d.core.intents import EnableAxis, JogWinch
+from steuerung3d.core.intents import EnableAxis, JogWinch, JoyStateUpdate
+from steuerung3d.core.joy_state import clamp_soll_speed
 
 
 @dataclass(frozen=True)
@@ -102,6 +103,16 @@ def _apply_deadzone_and_expo(x: float, deadzone: float, expo: float) -> float:
     return y if x >= 0 else -y
 
 
+def _apply_deadzone_only(x: float, deadzone: float) -> float:
+    if deadzone < 0:
+        deadzone = 0.0
+    if deadzone > 0.95:
+        deadzone = 0.95
+    if abs(x) <= deadzone:
+        return 0.0
+    return x
+
+
 
 def _pressed_buttons(rc: Any) -> Set[int]:
     """Return set of pressed button indices for different rc types."""
@@ -143,9 +154,30 @@ def synthesize_intents(
     deadman_btn = bind.buttons.get("deadman")
     fine_btn = bind.buttons.get("fine")
     pressed = _pressed_buttons(rc)
+    axes = _axes(rc)
 
     deadman = (deadman_btn is not None) and (deadman_btn in pressed)
     fine = (fine_btn is not None) and (fine_btn in pressed)
+
+    select_btn = bind.buttons.get("select_hip")
+    select_hip = (select_btn is not None) and (select_btn in pressed)
+
+    soll_speed = 0.0
+    soll_axis = bind.axes.get("soll_speed")
+    if soll_axis is not None and 0 <= soll_axis < len(axes):
+        soll_speed = float(axes[soll_axis])
+        if bind.invert.get("soll_speed", False):
+            soll_speed = -soll_speed
+        soll_speed = _apply_deadzone_only(soll_speed, bind.deadzone)
+    soll_speed = clamp_soll_speed(soll_speed)
+
+    intents.append(
+        JoyStateUpdate(
+            deadman=bool(deadman),
+            select_hip=bool(select_hip),
+            soll_speed=float(soll_speed),
+        )
+    )
 
     rig_ids = rig.ordered_winch_ids()
 
@@ -194,7 +226,7 @@ def synthesize_intents(
     # Compute jog rate
     axis_idx = bind.axes.get("manual_jog")
     raw = 0.0
-    axes = _axes(rc)
+    # axes already fetched above
     if axis_idx is not None and 0 <= axis_idx < len(axes):
         raw = float(axes[axis_idx])
     if bind.invert.get("manual_jog", False):

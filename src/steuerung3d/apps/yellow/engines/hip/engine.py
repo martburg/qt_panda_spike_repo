@@ -13,10 +13,16 @@ from typing import Any, Iterable
 from steuerung3d.core.intents import (
     ClaimAxis,
     EchoLifeTick,
+    EnableAxis,
+    JogAxis,
+    JogCartesian,
+    JogWinch,
     ReleaseAxis,
     RequestEstopReset,
     RequestResync,
+    SmoothStop,
 )
+from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import ESTOP_SPECS, decode_estop_word
 from steuerung3d.util.tick import compute_time_tick
@@ -32,6 +38,7 @@ from ...domain.ui_estop import (
 from ...domain.ui_banner import BANNER_COLORS, derive_banner_estate_from_word
 from ...domain.ui_format import fmt_f_unit, fmt_i_unit
 from ...domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
+from ...domain.joy_motion_map import map_soll_speed_to_jog_winch
 
 # NOTE: drive status decoder is optional.
 try:
@@ -193,6 +200,9 @@ class HipViewModel:
     estop: bool
     fault: bool
     drive_status_summary: str
+    joy_deadman: bool = False
+    joy_select_hip: bool = False
+    joy_soll_speed: float = 0.0
     banner: HipBannerState | None = None
     header_dots: HipHeaderDots | None = None
     drive_status: HipDriveStatusState | None = None
@@ -223,6 +233,9 @@ class HipState:
     pending_commit_group: str = ""
     pending_commit_values: dict[str, float] = field(default_factory=dict)
     commit_dialog_shown_for: set[str] = field(default_factory=set)
+    joy: JoyState = field(default_factory=JoyState)
+    last_claim_attempt_ns_by_axis: dict[str, int] = field(default_factory=dict)
+    last_sent_speed_by_axis: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -238,6 +251,7 @@ class HipStepInputs:
     last_estate: str
     ui: HipUiInputs
     core_acks: list[str]
+    joy: JoyState
 
 
 @dataclass(frozen=True)
@@ -258,6 +272,38 @@ class HipEngine:
         self._taster_prev: dict[str, bool] = {}
         self._taster_pressed_s: dict[str, float] = {}
         self.state = HipState()
+
+    @staticmethod
+    def _is_motion_intent(intent: object) -> bool:
+        return isinstance(intent, (EnableAxis, JogAxis, JogWinch, JogCartesian, SmoothStop))
+
+    def _gate_motion_intents(self, intents: Iterable[object], *, deadman: bool) -> list[object]:
+        if bool(deadman):
+            return list(intents)
+        return [i for i in intents if not self._is_motion_intent(i)]
+
+    def _claim_allowed(self, axis_id: str, now_ns: int, *, min_interval_ns: int = 500_000_000) -> bool:
+        last = int(self.state.last_claim_attempt_ns_by_axis.get(axis_id, -10**18))
+        if int(now_ns) - last < int(min_interval_ns):
+            return False
+        self.state.last_claim_attempt_ns_by_axis[axis_id] = int(now_ns)
+        return True
+
+    def _should_emit_speed(self, axis_id: str, speed: float, *, eps: float = 1e-3) -> bool:
+        last = self.state.last_sent_speed_by_axis.get(axis_id)
+        if last is None or abs(float(speed) - float(last)) > float(eps):
+            self.state.last_sent_speed_by_axis[axis_id] = float(speed)
+            return True
+        return False
+
+    @staticmethod
+    def _get_claim_owner(snap: TelemetrySnapshot, axis_id: str) -> str:
+        densis = getattr(snap, "densis", None)
+        if isinstance(densis, dict):
+            d = densis.get(axis_id)
+            if d is not None:
+                return str(getattr(d, "claimed_by_hip", "") or "")
+        return ""
 
     def _update_taster_edge(self, axis_id: str, taster: bool, now_s: float) -> None:
         prev = self._taster_prev.get(axis_id, taster)
@@ -316,6 +362,12 @@ class HipEngine:
         snap = inputs.snap
         ui = inputs.ui
         hip_id = str(inputs.hip_id or "")
+        joy_in = inputs.joy if isinstance(inputs.joy, JoyState) else JoyState()
+        self.state.joy = JoyState(
+            deadman=bool(getattr(joy_in, "deadman", False)),
+            select_hip=bool(getattr(joy_in, "select_hip", False)),
+            soll_speed=clamp_soll_speed(getattr(joy_in, "soll_speed", 0.0)),
+        )
         if getattr(self._param_txn, "hip_id", "") != hip_id:
             self._param_txn.hip_id = hip_id
 
@@ -372,6 +424,28 @@ class HipEngine:
 
         axis_id = str(selected_axis or fixed_axis or "").strip()
         attached = bool(selected_axis or fixed_axis)
+        mode_now = str(getattr(snap, "mode", "") or "")
+
+        if axis_id and self.state.joy.deadman and str(mode_now).upper() == "LIVE":
+            owner = self._get_claim_owner(snap, axis_id)
+            if owner == str(hip_id or ""):
+                intent = map_soll_speed_to_jog_winch(
+                    winch_id=axis_id,
+                    soll_speed=float(self.state.joy.soll_speed),
+                    hip_id=hip_id,
+                )
+                if intent is not None and self._should_emit_speed(axis_id, float(intent.rate)):
+                    intents.append(intent)
+
+        if self.state.joy.select_hip and axis_id:
+            owner = self._get_claim_owner(snap, axis_id)
+            if owner != str(hip_id or ""):
+                has_claim = any(
+                    isinstance(i, ClaimAxis) and str(getattr(i, "axis_id", "")) == axis_id
+                    for i in intents
+                )
+                if (not has_claim) and self._claim_allowed(axis_id, int(inputs.now_ns)):
+                    intents.append(ClaimAxis(axis_id=axis_id, hip_id=hip_id))
 
         prev_device_tick = self.state.prev_device_tick
         tick_text, new_prev = self._compute_tick_text(
@@ -402,8 +476,6 @@ class HipEngine:
         now_s = float(inputs.now_ns) / 1e9
         estop_word = int(self._parse_estop_word_from_snapshot(snap))
         logical = decode_estop_word(estop_word)
-
-        mode_now = str(getattr(snap, "mode", "") or "")
 
         axis_id_for_estate = axis_id
         if not axis_id_for_estate:
@@ -469,6 +541,11 @@ class HipEngine:
             active_keys=set(active_keys),
             profile_changed=bool(profile_changed),
         )
+
+        joy = getattr(snap, "joy", None) or JoyState()
+        joy_deadman = bool(getattr(joy, "deadman", False))
+        joy_select_hip = bool(getattr(joy, "select_hip", False))
+        joy_soll_speed = float(getattr(joy, "soll_speed", 0.0) or 0.0)
 
         legacy_vm = HipViewModel(
             tick_text=str(tick_text),
@@ -609,6 +686,8 @@ class HipEngine:
         )
         intents.extend(lifetick_intents)
 
+        intents = self._gate_motion_intents(intents, deadman=self.state.joy.deadman)
+
         param_commit_dialog = self._maybe_build_param_commit_dialog(snap)
 
         vm = HipViewModel(
@@ -620,6 +699,9 @@ class HipEngine:
             estop=bool(estop),
             fault=bool(fault),
             drive_status_summary=str(drive_status_summary or ""),
+            joy_deadman=bool(joy_deadman),
+            joy_select_hip=bool(joy_select_hip),
+            joy_soll_speed=float(joy_soll_speed),
             banner=banner,
             header_dots=header_dots,
             drive_status=drive_status,

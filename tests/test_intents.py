@@ -1,5 +1,6 @@
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, SetEstop
+from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, JogWinch, SetEstop
+from steuerung3d.core.executor import build_command_frame
 from steuerung3d.core.state import MachineState
 
 
@@ -40,3 +41,14 @@ def test_estop_disables_axes_and_blocks_motion():
     # measured remains clamped
     assert st.axes["X"].enabled is False
     assert st.axes["X"].vel == 0.0
+
+
+def test_jog_winch_writes_vel_in_command_frame() -> None:
+    st = MachineState()
+    apply_intent(st, ArmLiveMode())
+    apply_intent(st, EnableAxis(axis_id="Anton", enable=True))
+    apply_intent(st, JogWinch(winch_id="Anton", rate=-0.5))
+
+    cmd = build_command_frame(st)
+    assert "Anton" in cmd.axes
+    assert cmd.axes["Anton"].vel == -0.5

@@ -82,6 +82,8 @@ def main() -> int:
     next_t = time.monotonic()
     last_rx_ns: int | None = None
     sent_stale_zero = False
+    last_buttons: list[int] = []
+    last_axes: list[float] = []
 
     hb = Heartbeat("joy2intent", interval_s=1.0)
     ch = ChangeTracker()
@@ -108,6 +110,14 @@ def main() -> int:
         if rc is not None:
             last_rx_ns = now_ns
             sent_stale_zero = False
+            try:
+                last_buttons = [i for i, v in enumerate(rc.buttons) if v]
+            except Exception:
+                last_buttons = []
+            try:
+                last_axes = [float(x) for x in list(rc.axes)[:6]]
+            except Exception:
+                last_axes = []
             intents = synthesize_intents(st, rc, bind, rig, lim)
 
             # Minimal "what changed" logs (no spam)
@@ -162,9 +172,14 @@ def main() -> int:
             stale = (age_ms_f is not None) and (age_ms_f > cfg.stale_after_ms)
             level = 'WARN' if stale else 'OK'
             age_ms_i = int(age_ms_f) if age_ms_f is not None else None
+            btns_s = "[" + ",".join(str(b) for b in last_buttons[:8]) + "]"
+            axes_s = "[" + ",".join(f"{a:+.2f}" for a in last_axes[:6]) + "]"
             status.emit_every(
                 level=level,
-                summary=f"mode={st.mode} age_ms={age_ms_i if age_ms_i is not None else 'NA'} stale_stop={sent_stale_zero}",
+                summary=(
+                    f"mode={st.mode} age_ms={age_ms_i if age_ms_i is not None else 'NA'} "
+                    f"stale_stop={sent_stale_zero} btn={btns_s} axes={axes_s}"
+                ),
                 fields={
                     "mode": st.mode,
                     "age_ms": age_ms_i,
@@ -172,6 +187,8 @@ def main() -> int:
                     "raw_in": f"{cfg.raw_in[0]}:{cfg.raw_in[1]}",
                     "intent_out": f"{cfg.intent_out[0]}:{cfg.intent_out[1]}",
                     "winches": list(rig.winches),
+                    "joy_buttons": list(last_buttons),
+                    "joy_axes": list(last_axes),
                 },
             )
 

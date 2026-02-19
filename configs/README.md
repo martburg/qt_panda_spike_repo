@@ -8,6 +8,7 @@ Package-level defaults / embedded example configs shipped with the library.
 
 - `dev_plc.toml`
 - `inputd_gamepad.toml`
+- `joy2intent_bindings_gamepad.toml`
 - `joy2intent_gamepad.toml`
 - `log_viewer.toml`
 - `plc_stack.toml`
@@ -20,3 +21,4 @@ Package-level defaults / embedded example configs shipped with the library.
 ## Notes
 
 - This README was auto-generated to help orient the repo. If something is inaccurate, update it to match reality.
+- Stack profiles (e.g. `configs/stacks/1dev_sim.toml`) currently point joy2intent to `configs/joy2intent_bindings_gamepad.toml`.

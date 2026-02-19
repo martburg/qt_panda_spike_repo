@@ -6,6 +6,7 @@ from typing import Dict, Any
 from steuerung3d.core.command_frame import ParamOp
 
 from steuerung3d.core.mode import Mode
+from steuerung3d.core.joy_state import JoyState
 
 
 @dataclass
@@ -98,6 +99,9 @@ class MachineState:
     # HI-P can emit EchoLifeTick(axis_id,value). Core stores the last value per axis
     # and forwards it via CommandFrame.lifetick_echo so DenSi/device can mirror it.
     lifetick_echo_by_axis: Dict[str, int] = field(default_factory=dict)
+
+    # --- joystick state (UI telemetry only; used in Stage 2) ---
+    joy: JoyState = field(default_factory=JoyState)
 
 
     def ensure_axis(self, axis_id: str) -> AxisState:

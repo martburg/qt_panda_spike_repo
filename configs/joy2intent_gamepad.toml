@@ -31,6 +31,7 @@ max_v = { x = 0.60, y = 0.60, z = 0.40 }
 # Use:  python -m steuerung3d.apps.inputd --list
 # and/or python -m steuerung3d.apps.inputd --dump
 manual_jog = 1
+soll_speed = 1
 x = 0
 y = 1
 z = 2
@@ -45,6 +46,9 @@ select_0 = 0
 select_1 = 1
 select_2 = 2
 select_3 = 3
+
+# select_hip (held) to request ClaimAxis in HiP
+select_hip = 3
 
 # fine mode (user muscle memory)
 fine = 7

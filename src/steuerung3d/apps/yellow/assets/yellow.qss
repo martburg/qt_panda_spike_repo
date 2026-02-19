@@ -8,6 +8,14 @@ QMainWindow { background: #7b2a2a; }  /* base behind frames */
     border-radius: 10px;
 }
 
+QFrame#frameFooter[joy_deadman="true"] {
+    background-color: #00a000;
+}
+
+QFrame#frameHeader[joy_select="true"] {
+    background-color: #00a000;
+}
+
 /* guider speed box */
 #frameGuiderSpeed, #frameGuiderRange { border: 1px solid #000; border-radius: 8px; }
 

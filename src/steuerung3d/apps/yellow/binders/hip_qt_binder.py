@@ -76,6 +76,8 @@ class HipQtBinder:
         self._txt_hdr_banner_right: QLineEdit | None = self.win.findChild(
             QLineEdit, "txtHdrBannerRight"
         )
+        self._frame_header: QWidget | None = self.win.findChild(QWidget, "frameHeader")
+        self._frame_footer: QWidget | None = self.win.findChild(QWidget, "frameFooter")
 
         # Drive status fields
         self._txt_main_amp_status: QLineEdit | None = self.win.findChild(QLineEdit, "txtMainAmpStatus")
@@ -279,20 +281,25 @@ class HipQtBinder:
 
     def apply(self, vm: HipViewModel) -> None:
         self.apply_tick_text(vm.tick_text)
+        self._set_joy_properties(vm.joy_deadman, vm.joy_select_hip)
         self._apply_attach_state(vm)
         if vm.attach_state is not None and not bool(vm.attach_state.attached):
+            self._apply_joy_speed(float(vm.joy_soll_speed))
             return
         self._apply_drive_status(vm)
         self._apply_banner(vm)
         self._apply_header_dots(vm)
         self._apply_estop_state(vm)
         self._apply_readouts(vm)
+        self._apply_joy_speed(float(vm.joy_soll_speed))
         self._apply_cut_markers(vm)
         self._apply_params(vm)
 
     def apply_startup_state(self) -> None:
         self.apply_tick_text("--")
         self._set_all_estop_unknown()
+        self._set_joy_properties(False, False)
+        self._apply_joy_speed(0.0)
 
     def apply_tick_text(self, text: str) -> None:
         if self._txtTick is None:
@@ -303,6 +310,59 @@ class HipQtBinder:
         if state is None:
             return
         self._set_dot("dotHdrOnline", state)
+
+    def _set_joy_properties(self, deadman: bool, select_hip: bool) -> None:
+        # Joy UI reflection: QSS uses joy_deadman/joy_select dynamic properties.
+        if self._frame_footer is not None:
+            set_state_property(
+                self._frame_footer,
+                "true" if bool(deadman) else "false",
+                prop="joy_deadman",
+            )
+        if self._frame_header is not None:
+            set_state_property(
+                self._frame_header,
+                "true" if bool(select_hip) else "false",
+                prop="joy_select",
+            )
+
+    def _apply_joy_speed(self, soll_speed: float) -> None:
+        # sldVelCmd is display-only; updates are programmatic with signals blocked.
+        if self._sld_vel_cmd is None:
+            return
+        try:
+            v = float(soll_speed or 0.0)
+        except Exception:
+            v = 0.0
+        if v < -1.0:
+            v = -1.0
+        elif v > 1.0:
+            v = 1.0
+
+        try:
+            min_v = int(self._sld_vel_cmd.minimum())
+            max_v = int(self._sld_vel_cmd.maximum())
+        except Exception:
+            min_v = 0
+            max_v = 0
+
+        if min_v >= 0 or max_v <= 0:
+            scale = max(abs(min_v), abs(max_v), 1000)
+            min_v = -scale
+            max_v = scale
+            update_slider(self._sld_vel_cmd, minimum=min_v, maximum=max_v)
+        else:
+            scale = max(abs(min_v), abs(max_v))
+            if scale <= 0:
+                scale = 1000
+
+        value = int(round(v * scale))
+        if value < min_v:
+            value = min_v
+        elif value > max_v:
+            value = max_v
+        update_slider(self._sld_vel_cmd, value=value)
+
 
     # ------------------------------------------------------------------
     # Apply helpers
