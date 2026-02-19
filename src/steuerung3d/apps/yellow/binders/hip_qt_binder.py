@@ -40,7 +40,6 @@ from ..qtutil.widget_cache import WidgetCache
 from ..qtutil.ui_format import fmt_f_unit_de
 from ..qtutil.ui_contract import log_missing_optional_once, log_missing_required_once
 from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
-from ..domain.ui_format import fmt_f_unit
 from ..panels.hip_banner_render import HipBannerBindings, apply_hip_banner
 from ..panels.hip_estop_render import HipEstopBindings, apply_hip_estop
 from ..panels.hip_header_dots_render import HipHeaderDotsBindings, apply_hip_header_dots
@@ -75,6 +74,7 @@ class HipQtBinder:
     _readouts_bindings: HipReadoutsBindings | None = None
     _sliders_bindings: HipSlidersBindings | None = None
     _modal_lock: ModalLock | None = None
+    _param_ui_bindings: ParamUiBindings | None = None
 
     def __post_init__(self) -> None:
         self._wcache = WidgetCache(self.win)
@@ -170,48 +170,7 @@ class HipQtBinder:
         # Param input validators (numeric)
         self._init_param_inputs()
 
-        self._banner_bindings = HipBannerBindings(
-            txt_hdr_banner_left=self._txt_hdr_banner_left,
-            txt_hdr_banner_right=self._txt_hdr_banner_right,
-        )
-        self._estop_bindings = HipEstopBindings(
-            btn_estop_reset=self._btn_estop_reset,
-            estop_checks=dict(self._estop_checks or {}),
-            set_dot=self._set_dot,
-        )
-        self._header_dots_bindings = HipHeaderDotsBindings(
-            dot_hdr_online=self._wcache.widget("dotHdrOnline"),
-            dot_hdr_ready=self._wcache.widget("dotHdrReady"),
-            dot_hdr_fbt=self._wcache.widget("dotHdrFbt"),
-            dot_hdr_brake1=self._wcache.widget("dotHdrBrake1"),
-            dot_hdr_brake2=self._wcache.widget("dotHdrBrake2"),
-        )
-        self._cut_markers_bindings = HipCutMarkersBindings(
-            txt_cut_time=self._txtCutTime,
-            txt_cut_pos=self._txtCutPos,
-            txt_cut_vel=self._txtCutVel,
-            txt_posdiff=self._txtPosdiff,
-        )
-        self._drive_status_bindings = HipDriveStatusBindings(
-            txt_main_amp_status=self._txt_main_amp_status,
-            txt_slave_amp_status=self._txt_slave_amp_status,
-        )
-        self._readouts_bindings = HipReadoutsBindings(
-            txt_pos=self._require_widget(self._txtPos, "txtPos"),
-            txt_vel=self._require_widget(self._txtVel, "txtVel"),
-            txt_amp=self._require_widget(self._txtAmp, "txtAmp"),
-            txt_temp=self._require_widget(self._txtTemp, "txtTemp"),
-            txt_guider_range_min=self._require_widget(self._txt_guider_range_min, "txtGuiderRangeMin"),
-            txt_guider_range_max=self._require_widget(self._txt_guider_range_max, "txtGuiderRangeMax"),
-            txt_guider_range_val=self._require_widget(self._txt_guider_range_val, "txtGuiderRangeValue"),
-            txt_guider_speed=self._require_widget(self._txt_guider_speed, "txtGuiderSpeed"),
-        )
-        self._sliders_bindings = HipSlidersBindings(
-            sld_vel_cmd=self._require_widget(self._sld_vel_cmd, "sldVelCmd"),
-            sld_limit_range=self._require_widget(self._sld_limit_range, "sldLimitRange"),
-            sld_guider_range=self._require_widget(self._sld_guider_range, "sldGuiderRange"),
-            sld_guider_speed=self._require_widget(self._sld_guider_speed, "sldGuiderSpeed"),
-        )
+        self._build_bindings()
 
         # UI contract checks
         log_missing_required_once(
@@ -248,6 +207,38 @@ class HipQtBinder:
                 (QLineEdit, "txtTemp"),
             ],
             context="hi_p:readouts",
+        )
+        log_missing_required_once(
+            self.log,
+            self._wcache,
+            [
+                (QLineEdit, "txtPos"),
+                (QLineEdit, "txtVel"),
+                (QLineEdit, "txtAmp"),
+                (QLineEdit, "txtTemp"),
+                (QLineEdit, "txtGuiderRangeMin"),
+                (QLineEdit, "txtGuiderRangeMax"),
+                (QLineEdit, "txtGuiderRangeValue"),
+                (QLineEdit, "txtGuiderSpeed"),
+                (QAbstractSlider, "sldVelCmd"),
+                (QAbstractSlider, "sldLimitRange"),
+                (QAbstractSlider, "sldGuiderRange"),
+                (QAbstractSlider, "sldGuiderSpeed"),
+            ],
+            context="hi_p:bindings_required",
+        )
+        log_missing_optional_once(
+            self.log,
+            self._wcache,
+            [
+                (QLineEdit, "txtCutTime"),
+                (QLineEdit, "txtCutPos"),
+                (QLineEdit, "txtCutVel"),
+                (QLineEdit, "txtPosdiff"),
+                (QLineEdit, "txtMainAmpStatus"),
+                (QLineEdit, "txtSlaveAmpStatus"),
+            ],
+            context="hi_p:bindings_optional",
         )
 
         self._wire_signals()
@@ -507,15 +498,9 @@ class HipQtBinder:
         apply_hip_cut_markers(self._cut_markers_bindings, vm)
 
     def _apply_params(self, vm: HipViewModel) -> None:
-        bindings = ParamUiBindings(
-            win=self.win,
-            modal_lock=self._modal_lock,
-            param_binder=self._param_binder,
-            find_line_edit=self._find_line_edit,
-            find_button=self._find_button,
-            format_limit_value=lambda v: fmt_f_unit_de(v, unit="m", ndigits=2, empty="--"),
-        )
-        apply_param_ui(bindings, vm)
+        if self._param_ui_bindings is None:
+            return
+        apply_param_ui(self._param_ui_bindings, vm)
 
     # ------------------------------------------------------------------
     # UI helpers
@@ -525,18 +510,62 @@ class HipQtBinder:
         self._param_binder.init_param_inputs()
 
     def _find_button(self, object_name: str) -> QPushButton | None:
-        try:
-            return self._wcache.button(object_name)
-        except Exception:
-            w = self.win.findChild(QPushButton, object_name)
-            return w if isinstance(w, QPushButton) else None
+        return self._wcache.button(object_name)
 
     def _find_line_edit(self, object_name: str) -> QLineEdit | None:
-        try:
-            return self._wcache.line_edit(object_name)
-        except Exception:
-            w = self.win.findChild(QLineEdit, object_name)
-            return w if isinstance(w, QLineEdit) else None
+        return self._wcache.line_edit(object_name)
+
+    def _build_bindings(self) -> None:
+        self._banner_bindings = HipBannerBindings(
+            txt_hdr_banner_left=self._txt_hdr_banner_left,
+            txt_hdr_banner_right=self._txt_hdr_banner_right,
+        )
+        self._estop_bindings = HipEstopBindings(
+            btn_estop_reset=self._btn_estop_reset,
+            estop_checks=dict(self._estop_checks or {}),
+            set_dot=self._set_dot,
+        )
+        self._header_dots_bindings = HipHeaderDotsBindings(
+            dot_hdr_online=self._wcache.widget("dotHdrOnline"),
+            dot_hdr_ready=self._wcache.widget("dotHdrReady"),
+            dot_hdr_fbt=self._wcache.widget("dotHdrFbt"),
+            dot_hdr_brake1=self._wcache.widget("dotHdrBrake1"),
+            dot_hdr_brake2=self._wcache.widget("dotHdrBrake2"),
+        )
+        self._cut_markers_bindings = HipCutMarkersBindings(
+            txt_cut_time=self._txtCutTime,
+            txt_cut_pos=self._txtCutPos,
+            txt_cut_vel=self._txtCutVel,
+            txt_posdiff=self._txtPosdiff,
+        )
+        self._drive_status_bindings = HipDriveStatusBindings(
+            txt_main_amp_status=self._txt_main_amp_status,
+            txt_slave_amp_status=self._txt_slave_amp_status,
+        )
+        self._readouts_bindings = HipReadoutsBindings(
+            txt_pos=self._require_widget(self._txtPos, "txtPos"),
+            txt_vel=self._require_widget(self._txtVel, "txtVel"),
+            txt_amp=self._require_widget(self._txtAmp, "txtAmp"),
+            txt_temp=self._require_widget(self._txtTemp, "txtTemp"),
+            txt_guider_range_min=self._require_widget(self._txt_guider_range_min, "txtGuiderRangeMin"),
+            txt_guider_range_max=self._require_widget(self._txt_guider_range_max, "txtGuiderRangeMax"),
+            txt_guider_range_val=self._require_widget(self._txt_guider_range_val, "txtGuiderRangeValue"),
+            txt_guider_speed=self._require_widget(self._txt_guider_speed, "txtGuiderSpeed"),
+        )
+        self._sliders_bindings = HipSlidersBindings(
+            sld_vel_cmd=self._require_widget(self._sld_vel_cmd, "sldVelCmd"),
+            sld_limit_range=self._require_widget(self._sld_limit_range, "sldLimitRange"),
+            sld_guider_range=self._require_widget(self._sld_guider_range, "sldGuiderRange"),
+            sld_guider_speed=self._require_widget(self._sld_guider_speed, "sldGuiderSpeed"),
+        )
+        self._param_ui_bindings = ParamUiBindings(
+            win=self.win,
+            modal_lock=self._modal_lock,
+            param_binder=self._param_binder,
+            find_line_edit=self._find_line_edit,
+            find_button=self._find_button,
+            format_limit_value=lambda v: fmt_f_unit_de(v, unit="m", ndigits=2, empty="--"),
+        )
 
     @staticmethod
     def _require_widget(widget: QWidget | None, object_name: str) -> QWidget:
