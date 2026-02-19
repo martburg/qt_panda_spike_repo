@@ -19,7 +19,6 @@ import uuid
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QWidget
 
-from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 from steuerung3d.util.ratelimit import rl_log_exc
 
 # Optional structured status heartbeat (used by stack supervisor birds-eye)
@@ -32,6 +31,7 @@ from ..qtutil.bindings import YellowBindings
 from ..ports import IntentOut, TelemetryIn
 from ..qtutil.perf_watchdog import PerfWatchdog
 from ..binders.hip_qt_binder import HipQtBinder
+from .controller_utils import init_observability, run_guarded, start_poll_timer
 from ..engines.hip.engine import HipEngine, HipUiInputs
 from ..runtimes.hip_runtime import HipRuntime
 
@@ -87,11 +87,11 @@ class HiPController:
 
     def _init_observability(self) -> None:
         """Set up lightweight logs + optional structured status heartbeat."""
-        self._hb = Heartbeat("hi_p", interval_s=1.0)
-        self._ch = ChangeTracker()
-
-        # Structured supervisor heartbeat (side-channel; PLC packets unchanged)
-        self._status = StatusEmitter.from_env(default_service="hi_p") if StatusEmitter else None
+        self._hb, self._ch, self._status, _dbg = init_observability(
+            "hi_p",
+            status_emitter_cls=StatusEmitter,
+            status_default_service="hi_p",
+        )
         self._last_mode: str = ""
         self._last_estop: bool = False
         self._last_fault: bool = False
@@ -125,14 +125,10 @@ class HiPController:
     # -------------------------------------------------------------------------
 
     def start_polling(self, *, period_ms: int = 50) -> None:
-        t = QTimer(self.win)
-        t.setInterval(period_ms)
-        t.timeout.connect(self.poll_once)
-        t.start()
-        self._timer = t
+        self._timer = start_poll_timer(self.win, period_ms=period_ms, callback=self.poll_once)
 
     def poll_once(self) -> None:
-        try:
+        def _body() -> None:
             with self._wd.tick():
                 snaps = self.telemetry_in.drain_telemetry(limit=50)
                 self._wd.mark("rx")
@@ -177,5 +173,13 @@ class HiPController:
                     self._publish_intent(intent)
 
                 self._wd.mark("hb")
-        except Exception:
-            rl_log_exc("hip.poll_once", "HiP poll_once crashed (continuing).", logger=log, level="error")
+
+        run_guarded(
+            _body,
+            on_error=lambda: rl_log_exc(
+                "hip.poll_once",
+                "HiP poll_once crashed (continuing).",
+                logger=log,
+                level="error",
+            ),
+        )

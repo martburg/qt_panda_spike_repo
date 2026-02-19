@@ -19,7 +19,7 @@ import time
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QWidget
 
-from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker, RateLimiter
+from steuerung3d.util.heartbeat import RateLimiter
 
 # Optional structured status heartbeat (used by stack supervisor birds-eye)
 try:
@@ -33,6 +33,7 @@ from ..qtutil.bindings import YellowBindings
 from ..ports import CommandIn, TelemetryOut
 from ..qtutil.perf_watchdog import PerfWatchdog
 from ..binders.densi_qt_binder import DenSiQtBinder
+from .controller_utils import init_observability, start_poll_timer
 from ..engines.densi.engine import DenSiEngine
 from ..runtimes.densi_runtime import DensiRuntime
 
@@ -103,12 +104,12 @@ class DenSiController:
         self.ui = YellowBindings.from_window(self.win)
 
     def _init_observability(self) -> None:
-        self._hb = Heartbeat("den_si", interval_s=1.0)
-        self._dbg_rl = RateLimiter(1.0)
-        self._ch = ChangeTracker()
-
-        # Structured status heartbeat (side-channel for supervisor birds-eye; PLC packets unchanged)
-        self._status = StatusEmitter.from_env(default_service="den_si") if StatusEmitter else None
+        self._hb, self._ch, self._status, self._dbg_rl = init_observability(
+            "den_si",
+            status_emitter_cls=StatusEmitter,
+            status_default_service="den_si",
+            dbg_rl_interval_s=1.0,
+        )
 
     def _init_state_and_sim(self) -> None:
         self._disconnect_after_s = 2.0
@@ -133,11 +134,7 @@ class DenSiController:
     # ------------------------------------------------------------------
 
     def start(self) -> None:
-        t = QTimer(self.win)
-        t.setInterval(int(self.dt_s * 1000))
-        t.timeout.connect(self.step_once)
-        t.start()
-        self._timer = t
+        self._timer = start_poll_timer(self.win, period_ms=int(self.dt_s * 1000), callback=self.step_once)
 
     def step_once(self) -> None:
         with self._wd.tick():
