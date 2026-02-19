@@ -13,27 +13,37 @@ from typing import Any, Iterable
 from steuerung3d.core.intents import (
     ClaimAxis,
     EchoLifeTick,
-    EnableAxis,
-    JogAxis,
-    JogCartesian,
-    JogWinch,
     ReleaseAxis,
     RequestEstopReset,
     RequestResync,
-    SmoothStop,
 )
 from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import ESTOP_SPECS, decode_estop_word
-from steuerung3d.util.tick import compute_time_tick
 
 from ...domain.param_txn import ParamEditTxnClient, RetryEvent
 from ...domain.ui_estop import age_to_online_state, infer_estop_profile
-from ...domain.ui_banner import derive_banner_estate_from_word
-from ...domain.ui_format import fmt_f_unit, fmt_i_unit
 from ...domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 from ...domain.joy_motion_map import map_soll_speed_to_jog_winch
 from .types import HipPresentationData
+from .intent_policy import (
+    claim_allowed,
+    gate_motion_intents,
+    get_claim_owner,
+    is_motion_intent,
+    should_emit_speed,
+)
+from .presentation import (
+    compute_banner_estate,
+    compute_cut_markers_state,
+    compute_drive_status_texts,
+    compute_readouts_state,
+    compute_tick_text,
+    get_lifetick_age,
+    parse_estop_word_from_snapshot,
+    read_amp_and_temp,
+    read_axis_pos_vel,
+)
 
 from .types import (
     HipAttachCombo,
@@ -50,22 +60,7 @@ from .types import (
     HipStepResult,
     HipUiInputs,
 )
-from .viewmodel import (
-    HipBannerState,
-    HipCutMarkersState,
-    HipDriveStatusState,
-    HipEstopState,
-    HipHeaderDots,
-    HipReadoutsState,
-    HipViewModel,
-)
-
-# NOTE: drive status decoder is optional.
-try:
-    from steuerung3d.protocol.drive_status import decode_drive_status  # type: ignore
-except Exception:  # pragma: no cover
-    decode_drive_status = None  # type: ignore
-
+from .viewmodel import HipCutMarkersState, HipDriveStatusState, HipReadoutsState, HipViewModel
 
 NOT_ATTACHED = "NotAttached"
 
@@ -81,35 +76,10 @@ class HipEngine:
 
     @staticmethod
     def _is_motion_intent(intent: object) -> bool:
-        return isinstance(intent, (EnableAxis, JogAxis, JogWinch, JogCartesian, SmoothStop))
+        return is_motion_intent(intent)
 
     def _gate_motion_intents(self, intents: Iterable[object], *, deadman: bool) -> list[object]:
-        if bool(deadman):
-            return list(intents)
-        return [i for i in intents if not self._is_motion_intent(i)]
-
-    def _claim_allowed(self, axis_id: str, now_ns: int, *, min_interval_ns: int = 500_000_000) -> bool:
-        last = int(self.state.last_claim_attempt_ns_by_axis.get(axis_id, -10**18))
-        if int(now_ns) - last < int(min_interval_ns):
-            return False
-        self.state.last_claim_attempt_ns_by_axis[axis_id] = int(now_ns)
-        return True
-
-    def _should_emit_speed(self, axis_id: str, speed: float, *, eps: float = 1e-3) -> bool:
-        last = self.state.last_sent_speed_by_axis.get(axis_id)
-        if last is None or abs(float(speed) - float(last)) > float(eps):
-            self.state.last_sent_speed_by_axis[axis_id] = float(speed)
-            return True
-        return False
-
-    @staticmethod
-    def _get_claim_owner(snap: TelemetrySnapshot, axis_id: str) -> str:
-        densis = getattr(snap, "densis", None)
-        if isinstance(densis, dict):
-            d = densis.get(axis_id)
-            if d is not None:
-                return str(getattr(d, "claimed_by_hip", "") or "")
-        return ""
+        return gate_motion_intents(intents, deadman=deadman)
 
     def _update_taster_edge(self, axis_id: str, taster: bool, now_s: float) -> None:
         prev = self._taster_prev.get(axis_id, taster)
@@ -159,9 +129,9 @@ class HipEngine:
         )
 
     def compute_banner_estate(self, inputs: HipBannerInputs) -> str:
-        return derive_banner_estate_from_word(
-            int(inputs.estop_word),
-            within_brake_grace=lambda: bool(inputs.within_brake_grace),
+        return compute_banner_estate(
+            estop_word=int(inputs.estop_word),
+            within_brake_grace=bool(inputs.within_brake_grace),
         )
 
     def step(self, inputs: HipStepInputs) -> HipStepResult:
@@ -233,34 +203,42 @@ class HipEngine:
         mode_now = str(getattr(snap, "mode", "") or "")
 
         if axis_id and self.state.joy.deadman and str(mode_now).upper() == "LIVE":
-            owner = self._get_claim_owner(snap, axis_id)
+            owner = get_claim_owner(snap, axis_id)
             if owner == str(hip_id or ""):
                 intent = map_soll_speed_to_jog_winch(
                     winch_id=axis_id,
                     soll_speed=float(self.state.joy.soll_speed),
                     hip_id=hip_id,
                 )
-                if intent is not None and self._should_emit_speed(axis_id, float(intent.rate)):
+                if intent is not None and should_emit_speed(
+                    self.state.last_sent_speed_by_axis,
+                    axis_id,
+                    float(intent.rate),
+                ):
                     intents.append(intent)
 
         if self.state.joy.select_hip and axis_id:
-            owner = self._get_claim_owner(snap, axis_id)
+            owner = get_claim_owner(snap, axis_id)
             if owner != str(hip_id or ""):
                 has_claim = any(
                     isinstance(i, ClaimAxis) and str(getattr(i, "axis_id", "")) == axis_id
                     for i in intents
                 )
-                if (not has_claim) and self._claim_allowed(axis_id, int(inputs.now_ns)):
+                if (not has_claim) and claim_allowed(
+                    self.state.last_claim_attempt_ns_by_axis,
+                    axis_id,
+                    int(inputs.now_ns),
+                ):
                     intents.append(ClaimAxis(axis_id=axis_id, hip_id=hip_id))
 
         prev_device_tick = self.state.prev_device_tick
-        tick_text, new_prev = self._compute_tick_text(
+        tick_text, new_prev = compute_tick_text(
             snap=snap,
             axis_id=axis_id,
             prev_device_tick=prev_device_tick,
         )
 
-        lifetick_age = self._get_lifetick_age(snap=snap, axis_id=axis_id)
+        lifetick_age = get_lifetick_age(snap=snap, axis_id=axis_id)
         online_state = None
         if lifetick_age is not None:
             online_state = age_to_online_state(age=float(lifetick_age), good_max=30.0, warn_max=500.0)
@@ -275,12 +253,12 @@ class HipEngine:
         estop = bool(getattr(snap, "estop", False))
         fault = bool(getattr(snap, "fault", False))
 
-        main_text, slave_text = self._compute_drive_status_texts(snap=snap, axis_id=axis_id)
+        main_text, slave_text = compute_drive_status_texts(snap=snap, axis_id=axis_id)
         drive_status_summary = f"{main_text}|{slave_text}" if (main_text or slave_text) else ""
         drive_status = HipDriveStatusState(main_text=str(main_text), slave_text=str(slave_text))
 
         now_s = float(inputs.now_ns) / 1e9
-        estop_word = int(self._parse_estop_word_from_snapshot(snap))
+        estop_word = int(parse_estop_word_from_snapshot(snap))
         logical = decode_estop_word(estop_word)
 
         axis_id_for_estate = axis_id
@@ -295,9 +273,9 @@ class HipEngine:
         within_banner = self._within_brake_grace(axis_id_for_estate, now_s, 2.0)
         within_brake = self._within_brake_grace(axis_id_for_estate, now_s, 3.0)
 
-        estate = derive_banner_estate_from_word(
-            int(estop_word),
-            within_brake_grace=(lambda: bool(within_banner)),
+        estate = compute_banner_estate(
+            estop_word=int(estop_word),
+            within_brake_grace=bool(within_banner),
         )
 
         def _brake_ok_display(raw: bool) -> bool:
@@ -317,9 +295,9 @@ class HipEngine:
         params = getattr(snap, "params", {}) or {}
         if attached and axis_id and axis_id in axes:
             ax = axes.get(axis_id)
-            pos, vel = self._read_axis_pos_vel(ax)
-            amp, tmp = self._read_amp_and_temp(params=params, snap=snap)
-            readouts = self._compute_readouts_state(
+            pos, vel = read_axis_pos_vel(ax)
+            amp, tmp = read_amp_and_temp(params=params, snap=snap)
+            readouts = compute_readouts_state(
                 ax=ax,
                 pos=pos,
                 vel=vel,
@@ -328,7 +306,7 @@ class HipEngine:
                 params=params,
                 snap=snap,
             )
-            cut_markers = self._compute_cut_markers_state(
+            cut_markers = compute_cut_markers_state(
                 snap=snap,
                 params=params,
                 estate=estate,
@@ -440,7 +418,7 @@ class HipEngine:
         )
         intents.extend(lifetick_intents)
 
-        intents = self._gate_motion_intents(intents, deadman=self.state.joy.deadman)
+        intents = gate_motion_intents(intents, deadman=self.state.joy.deadman)
 
         param_commit_dialog = self._maybe_build_param_commit_dialog(snap)
 
@@ -564,260 +542,6 @@ class HipEngine:
         return norm
 
     @staticmethod
-    def _compute_tick_text(
-        *,
-        snap: TelemetrySnapshot,
-        axis_id: str,
-        prev_device_tick: int | None,
-    ) -> tuple[str, int | None]:
-        if not axis_id:
-            return "--", None
-
-        axes = getattr(snap, "axes", None)
-        if not isinstance(axes, dict):
-            return "--", None
-
-        ax = axes.get(axis_id)
-        if ax is None:
-            return "--", None
-
-        cur_raw = getattr(ax, "device_tick", 0)
-        try:
-            cur = int(cur_raw)
-        except Exception:
-            return "--", None
-
-        delta, new_prev = compute_time_tick(prev_device_tick, cur)
-        return str(int(delta)), int(new_prev)
-
-    @staticmethod
-    def _parse_estop_word_from_snapshot(snap: TelemetrySnapshot) -> int:
-        fields = getattr(snap, "plc_uplink_fields", None)
-        if isinstance(fields, dict):
-            v = fields.get("EStopStatus")
-            if v is not None:
-                try:
-                    return int(str(v).strip())
-                except Exception:
-                    pass
-        return int(getattr(snap, "estop_status_word", 0) or 0)
-
-    @staticmethod
-    def _raw_uplink_float(snap: TelemetrySnapshot, key: str, default: float) -> float:
-        try:
-            raw = getattr(snap, "plc_uplink_fields", None)
-            if isinstance(raw, dict) and key in raw:
-                return float(raw.get(key, default) or default)
-        except Exception:
-            pass
-        return float(default)
-
-    @staticmethod
-    def _raw_tail_token(snap: TelemetrySnapshot, key: str) -> str:
-        try:
-            tail = getattr(snap, "plc_uplink_tail", {}) or {}
-            if isinstance(tail, dict):
-                v = tail.get(key, "") or ""
-                return str(v)
-        except Exception:
-            pass
-        return ""
-
-    @staticmethod
-    def _read_axis_pos_vel(ax) -> tuple[float, float]:
-        try:
-            pos = float(getattr(ax, "pos", 0.0) or 0.0)
-        except Exception:
-            pos = 0.0
-        try:
-            vel = float(getattr(ax, "vel", 0.0) or 0.0)
-        except Exception:
-            vel = 0.0
-        return pos, vel
-
-    @classmethod
-    def _read_amp_and_temp(cls, *, params: dict, snap: TelemetrySnapshot) -> tuple[float, float]:
-        def _pf(key: str, default: float) -> float:
-            try:
-                return float(params.get(key, default))
-            except Exception:
-                return float(default)
-
-        amp = _pf("ActCur", _pf("Amp", 0.0))
-        tmp = _pf("Temp", 20.0)
-
-        if "ActCur" not in params:
-            amp = cls._raw_uplink_float(snap, "ActCurUI", amp)
-        if "Temp" not in params:
-            tmp = cls._raw_uplink_float(snap, "CabTemperatureUI", tmp)
-        return amp, tmp
-
-    @classmethod
-    def _compute_readouts_state(
-        cls,
-        *,
-        ax,
-        pos: float,
-        vel: float,
-        amp: float,
-        temp: float,
-        params: dict,
-        snap: TelemetrySnapshot,
-    ) -> HipReadoutsState:
-        pos_text = fmt_f_unit(pos, "m", ndigits=2)
-        vel_text = f"{vel:.2f} m/s"
-        amp_text = fmt_i_unit(int(round(amp)), "A")
-        temp_text = f"{int(round(temp))}°"
-
-        try:
-            g_pos_min = float(params.get("PosMin", 0.0) or 0.0)
-        except Exception:
-            g_pos_min = 0.0
-        try:
-            g_pos_max = float(params.get("PosMax", 0.0) or 0.0)
-        except Exception:
-            g_pos_max = 0.0
-        if g_pos_max < g_pos_min:
-            g_pos_min, g_pos_max = g_pos_max, g_pos_min
-
-        try:
-            g_pos = float(params.get("GuidePosIst", 0.0) or 0.0)
-        except Exception:
-            g_pos = 0.0
-        if g_pos == 0.0:
-            g_pos = cls._raw_uplink_float(snap, "GuidePosIstUI", g_pos)
-
-        guider_min_text = f"{g_pos_min:.3f} m"
-        guider_max_text = f"{g_pos_max:.3f} m"
-        guider_val_text = f"{g_pos:.3f} m"
-
-        try:
-            vel_max = float(params.get("VelMax", 0.0) or 0.0)
-        except Exception:
-            vel_max = 0.0
-        if vel_max <= 0.0:
-            vel_max = 1.0
-
-        try:
-            vel_cmd = float(getattr(ax, "vel_cmd", vel) if ax is not None else vel)
-        except Exception:
-            vel_cmd = vel
-        scale = 1000.0
-        vel_cmd_min = int(round(-vel_max * scale))
-        vel_cmd_max = int(round(+vel_max * scale))
-        vel_cmd_val = int(round(vel_cmd * scale))
-
-        try:
-            user_min = float(params.get("UserMin", 0.0) or 0.0)
-        except Exception:
-            user_min = 0.0
-        try:
-            user_max = float(params.get("UserMax", 0.0) or 0.0)
-        except Exception:
-            user_max = 0.0
-        if user_max < user_min:
-            user_min, user_max = user_max, user_min
-        limit_min = int(round(user_min * scale))
-        limit_max = int(round(user_max * scale))
-        limit_val = int(round(pos * scale))
-
-        drum_diam = 0.5
-        try:
-            pitch = float(params.get("Pitch", 0.0) or 0.0)
-        except Exception:
-            pitch = 0.0
-        denom = 3.141592653589793 * drum_diam
-        ratio = (pitch / denom) if (denom > 0.0 and pitch > 0.0) else 0.0
-
-        try:
-            g_vel_meas = float(params.get("GuideIstSpeed", 0.0) or 0.0)
-        except Exception:
-            g_vel_meas = 0.0
-        if g_vel_meas == 0.0:
-            g_vel_meas = cls._raw_uplink_float(snap, "GuideIstSpeedUI", g_vel_meas)
-
-        g_vel_max = abs(vel_max) * ratio
-        if g_vel_max <= 0.0:
-            g_vel_max = 1.0
-        if g_vel_meas > g_vel_max:
-            g_vel_meas = g_vel_max
-        elif g_vel_meas < -g_vel_max:
-            g_vel_meas = -g_vel_max
-
-        guider_speed_min = int(round(-g_vel_max * scale))
-        guider_speed_max = int(round(+g_vel_max * scale))
-        guider_speed_val = int(round(g_vel_meas * scale))
-        guider_speed_text = f"{g_vel_meas:.3f} m/s"
-
-        return HipReadoutsState(
-            pos_text=str(pos_text),
-            vel_text=str(vel_text),
-            amp_text=str(amp_text),
-            temp_text=str(temp_text),
-            guider_min_text=str(guider_min_text),
-            guider_max_text=str(guider_max_text),
-            guider_val_text=str(guider_val_text),
-            guider_speed_text=str(guider_speed_text),
-            vel_cmd_min=int(vel_cmd_min),
-            vel_cmd_max=int(vel_cmd_max),
-            vel_cmd_val=int(vel_cmd_val),
-            limit_min=int(limit_min),
-            limit_max=int(limit_max),
-            limit_val=int(limit_val),
-            guider_range_min=int(round(g_pos_min * scale)),
-            guider_range_max=int(round(g_pos_max * scale)),
-            guider_range_val=int(round(g_pos * scale)),
-            guider_speed_min=int(guider_speed_min),
-            guider_speed_max=int(guider_speed_max),
-            guider_speed_val=int(guider_speed_val),
-        )
-
-    @classmethod
-    def _compute_cut_markers_state(
-        cls,
-        *,
-        snap: TelemetrySnapshot,
-        params: dict,
-        estate: str,
-    ) -> HipCutMarkersState:
-        try:
-            cut_pos = float(params.get("CutPos", 0.0) or 0.0)
-            cut_vel = float(params.get("CutVel", 0.0) or 0.0)
-            posdiff = float(params.get("PosDiffFor", 0.0) or 0.0)
-        except Exception:
-            cut_pos = 0.0
-            cut_vel = 0.0
-            posdiff = 0.0
-
-        in_estop = bool(getattr(snap, "estop", False))
-        try:
-            word = cls._parse_estop_word_from_snapshot(snap)
-            bits = decode_estop_word(int(word))
-            in_estop = any(bool(bits.get(k, False)) for k in ("master", "slave", "network", "estop1", "estop2"))
-        except Exception:
-            pass
-        if not in_estop and str(estate or "").upper() == "ESTOP":
-            in_estop = True
-
-        if not in_estop:
-            cut_pos_text = "--"
-            cut_vel_text = "--"
-            posdiff_text = "--"
-        else:
-            cut_pos_text = fmt_f_unit(cut_pos, "m", ndigits=2)
-            cut_vel_text = fmt_f_unit(cut_vel, "m/s", ndigits=2)
-            posdiff_text = fmt_f_unit(posdiff, "m", ndigits=2)
-
-        t_tok = cls._raw_tail_token(snap, "SystemTime")
-        cut_time_text = t_tok if t_tok else "--"
-        return HipCutMarkersState(
-            cut_time_text=str(cut_time_text),
-            cut_pos_text=str(cut_pos_text),
-            cut_vel_text=str(cut_vel_text),
-            posdiff_text=str(posdiff_text),
-        )
-
-    @staticmethod
     def _normalize_pos_chain(values: dict[str, float]) -> dict[str, float]:
         v = dict(values)
         need = {"HardMax", "UserMax", "UserMin", "HardMin"}
@@ -853,31 +577,6 @@ class HipEngine:
         v["PosMin"] = pos_min
         v["PosMax"] = pos_max
         return v
-
-    @staticmethod
-    def _compute_drive_status_texts(
-        *,
-        snap: TelemetrySnapshot,
-        axis_id: str,
-    ) -> tuple[str, str]:
-        if decode_drive_status is None:
-            return "", ""
-        if not axis_id:
-            return "", ""
-        axes = getattr(snap, "axes", None)
-        if not isinstance(axes, dict):
-            return "", ""
-        ax = axes.get(axis_id)
-        if ax is None:
-            return "", ""
-        main_word = int(getattr(ax, "status_word", 0) or 0)
-        slave_word = int(getattr(ax, "guide_status_word", 0) or 0)
-        try:
-            main = decode_drive_status(main_word)
-            slave = decode_drive_status(slave_word)
-            return str(main.summary()), str(slave.summary())
-        except Exception:
-            return "", ""
 
     def _compute_param_ui_state(self, *, edit_active: bool, edit_group: str, estate: str) -> HipParamUiState:
         groups = ("pos", "vel", "filter", "guider")
@@ -938,27 +637,6 @@ class HipEngine:
             return int(getattr(ax, "lifetick_age", 0) or 0)
         except Exception:
             return None
-
-    @staticmethod
-    def _compute_drive_status_summary(*, snap: TelemetrySnapshot, axis_id: str) -> str:
-        if decode_drive_status is None:
-            return ""
-        if not axis_id:
-            return ""
-        axes = getattr(snap, "axes", None)
-        if not isinstance(axes, dict):
-            return ""
-        ax = axes.get(axis_id)
-        if ax is None:
-            return ""
-        main_word = int(getattr(ax, "status_word", 0) or 0)
-        slave_word = int(getattr(ax, "guide_status_word", 0) or 0)
-        try:
-            main = decode_drive_status(main_word)
-            slave = decode_drive_status(slave_word)
-            return f"{main.summary()}|{slave.summary()}"
-        except Exception:
-            return ""
 
     @staticmethod
     def _compute_lifetick_echo_intents(
