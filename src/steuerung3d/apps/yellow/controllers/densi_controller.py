@@ -31,7 +31,7 @@ from steuerung3d.protocol.estop_bits import decode_estop_word
 
 from ..qtutil.bindings import YellowBindings
 from ..ports import CommandIn, TelemetryOut
-from .ui_watchdog import PerfWatchdog
+from ..qtutil.perf_watchdog import PerfWatchdog
 from ..binders.densi_qt_binder import DenSiQtBinder
 from ..engines.densi.engine import DenSiEngine
 from ..runtimes.densi_runtime import DensiRuntime

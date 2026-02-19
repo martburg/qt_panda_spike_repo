@@ -30,7 +30,7 @@ except Exception:  # pragma: no cover
 
 from ..qtutil.bindings import YellowBindings
 from ..ports import IntentOut, TelemetryIn
-from .ui_watchdog import PerfWatchdog
+from ..qtutil.perf_watchdog import PerfWatchdog
 from ..binders.hip_qt_binder import HipQtBinder
 from ..engines.hip.engine import HipEngine, HipUiInputs
 from ..runtimes.hip_runtime import HipRuntime

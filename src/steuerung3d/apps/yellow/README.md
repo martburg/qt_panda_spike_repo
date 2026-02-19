@@ -11,9 +11,9 @@ The app loads its UI from `ui_split/yellow3_merged.ui` via `ui_shell.py`.
 Edit the split parts and merge to refresh that runtime file.
 
 ## Legacy duplicates (quarantined)
-Older root-level UI artifacts are now in `archive_ui/`:
-- `archive_ui/yellow3.ui`
-- `archive_ui/yellow3_shell_marker.ui`
+Older root-level UI artifacts are now in `archive/yellow_ui/archive_ui/`:
+- `archive/yellow_ui/archive_ui/yellow3.ui`
+- `archive/yellow_ui/archive_ui/yellow3_shell_marker.ui`
 
 ## Files
 - `ui_split/yellow3_shell_marker.ui`
