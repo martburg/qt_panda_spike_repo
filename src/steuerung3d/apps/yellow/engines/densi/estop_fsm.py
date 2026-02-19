@@ -4,31 +4,32 @@ from __future__ import annotations
 
 from typing import Callable
 
+from ...domain import estop_facts
 from ...domain.estop_facts import (
     decode_estop_word,
     encode_estop_word,
     estop_cause_keys,
     estop_ok_keys,
-    ready_from_word,
-    reset_able_from_word,
 )
 
-from ...domain.ui_banner import BANNER_DYNAMIC_EXCLUDE, derive_banner_estate_from_word
+from ...domain.banner_facts import BANNER_DYNAMIC_EXCLUDE, derive_banner_estate_from_word
 from .types import EStopState
 
 
 def reset_able_from_estop_word(word: int) -> bool:
-    return bool(reset_able_from_word(int(word)))
+    """Compatibility wrapper: use domain.estop_facts instead."""
+    return bool(estop_facts.reset_able_from_word(int(word)))
 
 
 def ready_from_estop_word(word: int) -> bool:
-    return bool(ready_from_word(int(word)))
+    """Compatibility wrapper: use domain.estop_facts instead."""
+    return bool(estop_facts.ready_from_word(int(word)))
 
 
 def derive_estop_inputs(inj_estop_word: int) -> tuple[int, bool, bool]:
     word = int(inj_estop_word)
-    reset_able = bool(reset_able_from_word(word))
-    ready_for_sollvel = bool(ready_from_word(word))
+    reset_able = bool(estop_facts.reset_able_from_word(word))
+    ready_for_sollvel = bool(estop_facts.ready_from_word(word))
     return word, reset_able, ready_for_sollvel
 
 

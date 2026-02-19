@@ -8,7 +8,7 @@ from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import decode_estop_word
 from steuerung3d.util.tick import compute_time_tick
 
-from ...domain.ui_banner import derive_banner_estate_from_word
+from ...domain.banner_facts import derive_banner_estate_from_word
 from ...domain.ui_format import fmt_f_unit, fmt_i_unit
 from .viewmodel import HipCutMarkersState, HipReadoutsState
 

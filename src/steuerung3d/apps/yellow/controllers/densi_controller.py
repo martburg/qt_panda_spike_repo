@@ -27,7 +27,7 @@ try:
 except Exception:  # pragma: no cover
     StatusEmitter = None  # type: ignore
 
-from steuerung3d.protocol.estop_bits import decode_estop_word
+from ..domain import estop_facts
 
 from ..qtutil.bindings import YellowBindings
 from ..ports import CommandIn, TelemetryOut
@@ -156,20 +156,12 @@ class DenSiController:
     @staticmethod
     def _reset_able_from_estop_word(word: int) -> bool:
         """Return the reset_able bit, which is packed into EStopStatusWord."""
-        try:
-            bits = decode_estop_word(int(word))
-            return bool(bits.get("reset_able", False))
-        except Exception:
-            return False
+        return bool(estop_facts.reset_able_from_word(int(word)))
 
     @staticmethod
     def _ready_from_estop_word(word: int) -> bool:
         """Return the READY indicator from EStopStatusWord."""
-        try:
-            bits = decode_estop_word(int(word))
-            return bool(bits.get("ready", False))
-        except Exception:
-            return False
+        return bool(estop_facts.ready_from_word(int(word)))
 
     # ------------------------------------------------------------------
     # Param normalization helpers (engine hooks)

@@ -4,8 +4,12 @@ This package intentionally keeps deterministic device semantics (DenSi) out of
 Qt controllers. Controllers should remain wiring + rendering only.
 """
 
-from .densi.engine import DenSiEngine, DenSiTickResult
+from typing import TYPE_CHECKING
+
 from .densi.types import EStopState, L0Top, L0Sub
+
+if TYPE_CHECKING:
+    from .densi.engine import DenSiEngine, DenSiTickResult
 
 __all__ = [
     "DenSiEngine",
@@ -26,6 +30,10 @@ __all__ = [
 
 
 def __getattr__(name: str):
+    if name in {"DenSiEngine", "DenSiTickResult"}:
+        from .densi.engine import DenSiEngine, DenSiTickResult  # type: ignore
+
+        return locals()[name]
     if name in {
         "HipEngine",
         "HipAttachInputs",

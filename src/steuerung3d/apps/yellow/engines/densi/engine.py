@@ -42,8 +42,6 @@ from .estop_fsm import (
     apply_estop_state_machine,
     compute_estop_edge_and_update_state as _compute_estop_edge_and_update_state,
     derive_estop_inputs as _derive_estop_inputs,
-    ready_from_estop_word as _ready_from_estop_word,
-    reset_able_from_estop_word as _reset_able_from_estop_word,
     sync_reset_able_bit as _sync_reset_able_bit,
 )
 from .resync import handle_resync_cmd as _handle_resync_cmd
@@ -509,14 +507,6 @@ class DenSiEngine:
 
     def derive_estop_inputs(self) -> tuple[int, bool, bool]:
         return _derive_estop_inputs(int(self.inj_estop_word))
-
-    @staticmethod
-    def _reset_able_from_estop_word(word: int) -> bool:
-        return _reset_able_from_estop_word(int(word))
-
-    @staticmethod
-    def _ready_from_estop_word(word: int) -> bool:
-        return _ready_from_estop_word(int(word))
 
     def compute_moving_guard(self) -> bool:
         return compute_moving_guard(state=self.state, axis_ids=list(self.axis_ids))

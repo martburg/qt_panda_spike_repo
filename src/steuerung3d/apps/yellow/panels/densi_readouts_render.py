@@ -1,6 +1,6 @@
-"""Compatibility re-export for moved module.
+"""Compatibility re-export. Prefer importing from steuerung3d.apps.yellow.panels.hip.* or .densi.*.
 
-TODO: remove after callers switch to panels.densi.* imports.
+TODO: remove after vel+resync milestone.
 """
 
 from .densi.densi_readouts_render import *  # noqa: F401,F403

@@ -1,6 +1,6 @@
-"""Compatibility re-export for moved module.
+"""Compatibility re-export. Prefer importing from steuerung3d.apps.yellow.panels.hip.* or .densi.*.
 
-TODO: remove after callers switch to panels.hip.* imports.
+TODO: remove after vel+resync milestone.
 """
 
 from .hip.hip_sliders_render import *  # noqa: F401,F403
