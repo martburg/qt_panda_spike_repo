@@ -36,6 +36,7 @@ from steuerung3d.protocol.estop_bits import (
 
 from .types import EStopState, L0Top, L0Sub
 from .param_ops import apply_densi_param_ops
+from .setpoint_semantics import normalize_cmd_for_plant
 from ...domain.ui_banner import BANNER_DYNAMIC_EXCLUDE, derive_banner_estate_from_word
 
 
@@ -714,12 +715,13 @@ class DenSiEngine:
 
     def step_plant_with_clamp(self) -> None:
         cmd = self.ensure_last_cmd()
-        cmd_for_plant = cmd
-        if (not self.drive_ready) or bool(self.state.estop):
-            cmd_for_plant = replace(
-                cmd,
-                axes={a: AxisSetpoint(enable=False, vel=0.0) for a in self.axis_ids},
-            )
+        cmd_for_plant = normalize_cmd_for_plant(
+            cmd,
+            state=self.state,
+            dt_s=float(self.tb.dt_s),
+            axis_ids=list(self.axis_ids),
+            drive_ready=bool(self.drive_ready),
+        )
         self.device.step(self.state, cmd_for_plant, float(self.tb.dt_s))
 
     def maybe_latch_cut_markers(self, estop_edge: bool) -> None:

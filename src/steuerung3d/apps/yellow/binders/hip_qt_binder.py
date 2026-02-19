@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 
 from ..qtutil.ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
 from ..qtutil.param_widget_binder import ParamWidgetBinder
+from ..qtutil.modal_lock import ModalLock
 from ..qtutil.ui_update import (
     set_enabled,
     set_enabled_repolish,
@@ -66,6 +67,7 @@ class HipQtBinder:
     _estop_bindings: HipEstopBindings | None = None
     _readouts_bindings: HipReadoutsBindings | None = None
     _sliders_bindings: HipSlidersBindings | None = None
+    _modal_lock: ModalLock | None = None
 
     def __post_init__(self) -> None:
         self._wcache = WidgetCache(self.win)
@@ -159,9 +161,12 @@ class HipQtBinder:
             ]
         except Exception:
             self._modal_widgets = []
-        self._modal_locked = False
-        self._modal_prev_enabled: dict[QWidget, bool] = {}
-        self._modal_prev_tabbar_enabled: bool | None = None
+        self._modal_lock = ModalLock(
+            widgets=self._modal_widgets,
+            tabs=self._tabs_main,
+            enable_widget=set_enabled,
+            enable_line_edit=set_enabled_repolish,
+        )
 
         # Param input validators (numeric)
         self._init_param_inputs()
@@ -608,19 +613,10 @@ class HipQtBinder:
         uncheck_checkboxes(getattr(self, "_estop_checks", {}).values())
 
     def _apply_modal_param_lock(self, active: bool, group: str) -> None:
-        tabs = self._tabs_main
-        if active and not self._modal_locked:
-            self._modal_prev_enabled = {}
+        if self._modal_lock is None:
+            return
 
-            if tabs is not None:
-                self._modal_prev_tabbar_enabled = bool(tabs.tabBar().isEnabled())
-                set_enabled(tabs.tabBar(), False)
-
-            for w in self._modal_widgets:
-                if isinstance(w, (QPushButton, QLineEdit)):
-                    self._modal_prev_enabled[w] = bool(w.isEnabled())
-                    set_enabled(w, False)
-
+        if active:
             allow: list[QWidget] = []
             for _k, obj_name in _PARAM_WIDGETS.get(group, {}).items():
                 le = self._find_line_edit(obj_name)
@@ -641,30 +637,10 @@ class HipQtBinder:
                 if bc is not None:
                     allow.append(bc)
 
-            for w in allow:
-                if isinstance(w, QLineEdit):
-                    set_enabled_repolish(w, True)
-                else:
-                    set_enabled(w, True)
-
-            self._modal_locked = True
+            self._modal_lock.lock(allow=allow)
             return
 
-        if (not active) and self._modal_locked:
-            for w, was_enabled in list(self._modal_prev_enabled.items()):
-                try:
-                    if isinstance(w, QLineEdit):
-                        set_enabled_repolish(w, bool(was_enabled))
-                    else:
-                        set_enabled(w, bool(was_enabled))
-                except RuntimeError:
-                    pass
-            self._modal_prev_enabled.clear()
-
-            if tabs is not None and self._modal_prev_tabbar_enabled is not None:
-                set_enabled(tabs.tabBar(), bool(self._modal_prev_tabbar_enabled))
-            self._modal_prev_tabbar_enabled = None
-            self._modal_locked = False
+        self._modal_lock.unlock()
 
     def _set_param_group_enabled(self, group: str, enabled: bool) -> None:
         mapping = _PARAM_WIDGETS.get(group, {})
