@@ -66,6 +66,7 @@ class DenSiTickResult:
     reset_able: bool
     ready_for_sollvel: bool
     moving: bool
+    motion_ready: bool
 
     estop_word: int
     estop_bits: dict[str, bool]
@@ -86,6 +87,9 @@ class DenSiEngine:
     tb: Timebase
     state: MachineState
     device: SimDevice
+
+    # clock (injectable for deterministic tests)
+    now_s: Callable[[], float] = time.monotonic
 
     # connection
     disconnect_after_s: float = 2.0
@@ -142,6 +146,7 @@ class DenSiEngine:
         normalize_guider_range,
         enforce_pos_chain,
         enforce_guider_minmax,
+        now_s: Callable[[], float] | None = None,
     ) -> "DenSiEngine":
         tb = Timebase(dt_s=float(dt_s))
         state = MachineState()
@@ -153,6 +158,7 @@ class DenSiEngine:
             tb=tb,
             state=state,
             device=device,
+            now_s=(now_s or time.monotonic),
             normalize_pos_chain=normalize_pos_chain,
             normalize_guider_range=normalize_guider_range,
             enforce_pos_chain=enforce_pos_chain,
@@ -212,14 +218,33 @@ class DenSiEngine:
         during which the brake feedback may still be in the previous state.
 
         This is intentionally display-only (non-deterministic) and uses
-        `time.monotonic()` just like the legacy controller implementation.
+        `self.now_s()` (injectable clock), matching legacy monotonic seconds by default.
         """
         try:
             if self.taster_pressed_s is None:
                 return False
-            return (time.monotonic() - float(self.taster_pressed_s)) < float(self.brake_handoff_grace_s)
+            return (float(self.now_s()) - float(self.taster_pressed_s)) < float(self.brake_handoff_grace_s)
         except Exception:
             return False
+
+
+    def _update_display_grace_tracking(self) -> None:
+        """Update display-only brake grace tracking.
+
+        Uses an injectable monotonic-seconds clock (`now_s`) so tests can
+        be deterministic. This is UI nicety only; it must not affect the
+        authoritative ladder timing.
+        """
+        try:
+            bits = self._ensure_inj_bits()
+            taster = bool(bits.get("taster", False))
+            if taster and not bool(self.taster_prev_disp):
+                self.taster_pressed_s = float(self.now_s())
+            if not taster:
+                self.taster_pressed_s = None
+            self.taster_prev_disp = bool(taster)
+        except Exception:
+            return
 
     def ensure_last_cmd(self) -> CommandFrame:
         if self.last_cmd is None:
@@ -562,6 +587,7 @@ class DenSiEngine:
         Returns (word, bits, reset_able_changed).
         """
         self.apply_estop_state_machine()
+        self._update_display_grace_tracking()
         changed = bool(self.sync_reset_able_bit())
         word = int(self.inj_estop_word)
         bits = decode_estop_word(int(word))
@@ -641,7 +667,14 @@ class DenSiEngine:
         self.apply_estop_clamp_to_state()
         self.advance_tick()
 
-        # phase 7 (non-Qt semantics): lifetick + status words
+        # phase 7 (non-Qt semantics):
+        motion_ready = bool(
+            self.l0_top == L0Top.CONNECTED
+            and bool(getattr(self, "drive_ready", False))
+            and (not bool(getattr(self.state, "estop", False)))
+        )
+
+        # lifetick + status words
         self.step_lifetick()
         update_drive_status_words(
             state=self.state,
@@ -658,6 +691,7 @@ class DenSiEngine:
             reset_able=bool(reset_able),
             ready_for_sollvel=bool(ready_for_sollvel),
             moving=bool(moving),
+            motion_ready=bool(motion_ready),
             estop_word=int(estop_word),
             estop_bits=dict(bits),
             estop_edge=bool(estop_edge),

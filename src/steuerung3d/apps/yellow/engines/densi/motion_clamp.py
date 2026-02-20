@@ -10,10 +10,20 @@ from steuerung3d.core.state import MachineState
 
 
 def compute_moving_guard(*, state: MachineState, axis_ids: Iterable[str]) -> bool:
-    axis_id0 = next(iter(axis_ids), "")
-    ax0 = state.axes.get(axis_id0) if axis_id0 else None
+    """Return True if any axis is moving.
+
+    Stable for multi-axis: treat the system as moving if *any* axis velocity
+    magnitude exceeds a small threshold.
+    """
     try:
-        return bool(ax0 is not None and abs(float(getattr(ax0, "vel", 0.0) or 0.0)) > 1e-3)
+        for axis_id in axis_ids:
+            ax = state.axes.get(str(axis_id))
+            if ax is None:
+                continue
+            v = float(getattr(ax, "vel", 0.0) or 0.0)
+            if abs(v) > 1e-3:
+                return True
+        return False
     except Exception:
         return False
 
