@@ -3,11 +3,9 @@ from __future__ import annotations
 import argparse
 import sys
 import logging
-from pathlib import Path
 from typing import Tuple
 
 from steuerung3d.util.log_context import install_log_context
-from steuerung3d.config.toml_loader import load_toml
 
 from PySide6.QtWidgets import QApplication
 
@@ -31,15 +29,6 @@ def _parse_hostport(s: str) -> Tuple[str, int]:
     host, port_s = s.rsplit(":", 1)
     host = host.strip() or "127.0.0.1"
     return (host, int(port_s))
-
-
-def _load_config(path: str | None) -> dict:
-    if not path:
-        return {}
-    try:
-        return dict(load_toml(Path(path)))
-    except Exception:
-        return {}
 
 
 def main() -> int:
@@ -73,12 +62,6 @@ def main() -> int:
         level=getattr(logging, args.log_level.upper()),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-
-    cfg = _load_config(args.config or None)
-    engine_cfg = cfg.get("engine", {}) or {}
-    engine_mode = str(engine_cfg.get("mode", "old") or "old").strip().lower()
-    if engine_mode not in ("old", "shadow", "new"):
-        engine_mode = "old"
 
     axis_ids = [a.strip() for a in args.axis if a and a.strip()]
     if not axis_ids:
@@ -124,7 +107,6 @@ def main() -> int:
         telemetry_out=telemetry_out,
         axis_ids=axis_ids,
         dt_s=args.dt,
-        engine_mode=engine_mode,
     )
     # Start controller (timer + IO loop)
     if hasattr(ctl, "start"):
