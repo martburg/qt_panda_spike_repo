@@ -31,7 +31,7 @@ def _load_config(path: str | None) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--role", choices=("ip",), default="ip")
+    ap.add_argument("--role", choices=("ip", "pilot", "ft"), default="ip")
     ap.add_argument("--axis", default="", help="Optional: pin this HiP window to a single axis id.")
     ap.add_argument(
         "--telem-in",

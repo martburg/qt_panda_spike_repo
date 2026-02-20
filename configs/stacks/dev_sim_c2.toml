@@ -1,21 +1,20 @@
 [stack]
-name = "dev_real"
+name = "dev_sim_c2"
 
 [rig]
-# REAL stack: PLCs/DenSis are already running and emitting telemetry.
-# The supervisor starts core+tooling first, discovers live devices from telemetry,
-# then starts a HiP pool sized to the discovered devices.
-device_source = "real"
-# How long to listen for telemetry before provisioning the HiP pool.
-discovery_ms = 2000
-# Optional: expected axes list (documentation only, not used for spawning in REAL).
-axes = []
+# SIM stack: 4 simulated devices, 2 operator stations consuming C2.
+axes = ["Anton", "Debby", "Cecil", "Burt"]
+device_source = "sim"
 
 [net]
 bind_host = "127.0.0.1"
 cmd_base = 52001
 ui_telem_base = 51002
-dev_telem_in = "172.16.17.5:52020"  # example: device telemetry coming into the core
+# C2 rig telemetry (unicast fanout)
+c2_telem_pilot = "127.0.0.1:51100"
+c2_telem_ft = "127.0.0.1:51101"
+
+dev_telem_in = "127.0.0.1:52020"
 status_in = "127.0.0.1:51200"
 raw_in = "127.0.0.1:50100"
 intent = "127.0.0.1:51001"
@@ -28,27 +27,44 @@ args = [
   "--intent-in", "{net.intent}",
   "--dev-telem-in", "{net.dev_telem_in}",
   "--dev-cmd-base", "{net.cmd_base}",
-  "--dev-cmd-count", "4",  # adjust to your rig / or use explicit --dev-cmd-target
+  "--dev-cmd-count", "{len(rig.axes)}",
   "--ui-telem-base", "{net.ui_telem_base}",
-  "--ui-telem-count", "4",
+  "--ui-telem-count", "{len(rig.axes)}",
+  "--c2-telem-target", "{net.c2_telem_pilot}",
+  "--c2-telem-target", "{net.c2_telem_ft}",
+  "{repeat('--axis', rig.axes)}",
 ]
 
-# NOTE: in REAL mode we do NOT spawn DenSi sims.
 [services.densi]
 enabled = true
 module = "steuerung3d.apps.den_si"
 mode = "per_axis"
 config = "configs/services/densi.toml"
-args = []
+args = [
+  "--axis", "{axis}",
+  "--cmd-in", "{net.bind_host}:{net.cmd_base + axis_index}",
+  "--telem-out", "{net.dev_telem_in}",
+]
 
-[services.hip]
+[services.hip_pilot]
 enabled = true
 module = "steuerung3d.apps.hi_p"
 mode = "single"
-count = "auto"  # number of HiP windows = discovered devices (min 1)
 config = "configs/services/hip.toml"
 args = [
-  "--telem-in", "{net.bind_host}:{net.ui_telem_base}",
+  "--role", "pilot",
+  "--telem-in", "{net.c2_telem_pilot}",
+  "--intent-out", "{net.intent}",
+]
+
+[services.hip_ft]
+enabled = true
+module = "steuerung3d.apps.hi_p"
+mode = "single"
+config = "configs/services/hip.toml"
+args = [
+  "--role", "ft",
+  "--telem-in", "{net.c2_telem_ft}",
   "--intent-out", "{net.intent}",
 ]
 
@@ -66,5 +82,5 @@ config = "configs/joy2intent_bindings_gamepad.toml"
 args = [
   "--raw-in", "{net.raw_in}",
   "--intent-out", "{net.intent}",
-  # winches will be assigned in the UI once HiPs are attached.
+  "--winches", "{csv(rig.axes)}",
 ]

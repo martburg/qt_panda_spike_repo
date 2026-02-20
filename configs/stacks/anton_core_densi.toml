@@ -15,7 +15,7 @@ axes = ["Anton"]
 
 [net]
 bind_host = "127.0.0.1"
-intent_in = 51001
+intent = "127.0.0.1:51001"
 ui_telem_out = 51002
 
 # Device-side (PLC wire)
@@ -28,6 +28,7 @@ dev_telem_in = "127.0.0.1:52020"
 enabled = true
 module = "steuerung3d.apps.core_udp_service"
 args = [
+  "--intent-in", "{net.intent}",
   "--axis", "Anton",
   "--ui-telem-target", "127.0.0.1:51002",
   "--dev-cmd-base", "52001",

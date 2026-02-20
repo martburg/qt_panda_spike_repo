@@ -139,6 +139,15 @@ class UdpTelemetryOut:
         self.tx.send(snap)
 
 
+@dataclass
+class UdpTelemetryFanout:
+    outs: List[UdpTelemetryOut]
+
+    def publish_telemetry(self, snap: TelemetrySnapshot) -> None:
+        for out in list(self.outs or []):
+            out.publish_telemetry(snap)
+
+
 # ---------- Device seam ----------
 @dataclass
 class UdpCommandIn:

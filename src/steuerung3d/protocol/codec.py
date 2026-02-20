@@ -114,6 +114,14 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
             soll_speed=clamp_soll_speed(joy_in.get("soll_speed", 0.0)),
         )
 
+    lease_rig = str(payload.get("lease_rig", ""))
+    lease_axis_in = payload.get("lease_axis", {})
+    lease_axis: Dict[str, list[str]] = {}
+    if isinstance(lease_axis_in, dict):
+        for k, v in lease_axis_in.items():
+            if isinstance(v, (list, tuple)):
+                lease_axis[str(k)] = [str(x) for x in list(v)]
+
     return TelemetrySnapshot(
         tick=int(payload.get("tick", 0)),
         t_s=float(payload.get("t_s", 0.0)),
@@ -124,6 +132,8 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
         # rig workflow (optional)
         rig_mode=str(payload.get("rig_mode", "DISCOVERY")),
         densis=densis_out,
+        lease_rig=lease_rig,
+        lease_axis=lease_axis,
         # NEW
         estop_status_word=int(payload.get("estop_status_word", 0)),
         # parameters (optional)

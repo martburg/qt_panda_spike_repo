@@ -46,6 +46,9 @@ class MachineState:
     # Exclusive control claims: axis_id -> hip_id (set by ClaimAxis/ReleaseAxis)
     axis_claims: Dict[str, str] = field(default_factory=dict)
 
+    # Rig-level lease (exclusive). Core owns policy; default empty.
+    lease_rig: str = ""
+
     # high-level health/safety flags (v0.1)
     estop: bool = False
     fault: bool = False

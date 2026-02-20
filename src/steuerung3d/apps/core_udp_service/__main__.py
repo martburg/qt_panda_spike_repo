@@ -21,7 +21,7 @@ from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapsho
 from steuerung3d.protocol.core_runner import CoreRunner
 from steuerung3d.protocol.axis_router import AxisRouter
 from steuerung3d.protocol.udp_channels import (
-    UdpIntentIn, UdpTelemetryOut,
+    UdpIntentIn, UdpTelemetryOut, UdpTelemetryFanout,
 )
 from steuerung3d.protocol.udp_plc_channels import UdpPlcTelemetryIn, UdpPlcCommandOut
 
@@ -138,6 +138,26 @@ def main() -> int:
         default=0,
         help="Convenience: number of UI TelemetryOut targets to generate from base port.",
     )
+    ap.add_argument(
+        "--c2-telem-target",
+        action="append",
+        default=[],
+        help=(
+            "C2 Rig TelemetryOut target(s) as host:port. Repeatable. "
+            "If omitted, no C2 telemetry is emitted."
+        ),
+    )
+    ap.add_argument(
+        "--c2-telem-base",
+        default=None,
+        help="Convenience: base port for C2 telemetry targets (e.g. 51100).",
+    )
+    ap.add_argument(
+        "--c2-telem-count",
+        type=int,
+        default=0,
+        help="Convenience: number of C2 telemetry targets to generate from base port.",
+    )
     args = ap.parse_args()
 
     logging.basicConfig(
@@ -167,6 +187,16 @@ def main() -> int:
     if not ui_telem_targets:
         ui_telem_targets = [("127.0.0.1", 51002)]
     op_telem_outs = [UdpTelemetryOut.connect(t) for t in ui_telem_targets]
+
+    c2_telem_targets: List[Tuple[str, int]] = []
+    for s in args.c2_telem_target:
+        c2_telem_targets.append(_parse_hostport(s))
+    if args.c2_telem_base is not None and int(args.c2_telem_count) > 0:
+        base = int(str(args.c2_telem_base).strip())
+        for i in range(int(args.c2_telem_count)):
+            c2_telem_targets.append(("127.0.0.1", base + i))
+    c2_telem_outs = [UdpTelemetryOut.connect(t) for t in c2_telem_targets]
+    c2_fanout = UdpTelemetryFanout(outs=c2_telem_outs) if c2_telem_outs else None
 
     dev_telem_bind = _parse_hostport(args.dev_telem_in)
     dev_telem_in = UdpPlcTelemetryIn.bind(dev_telem_bind)
@@ -201,12 +231,14 @@ def main() -> int:
         "intents_in": 0,
         "dev_telem_in": 0,
         "ui_telem_out": 0,
+        "c2_telem_out": 0,
         "cmd_out": 0,
     }
     last_seen = {
         "intent_ts": None,
         "dev_telem_ts": None,
         "ui_telem_ts": None,
+        "c2_telem_ts": None,
         "cmd_ts": None,
     }
     t0 = time.monotonic()
@@ -221,6 +253,11 @@ def main() -> int:
         log.info("Operator: TelemetryOut target=%s", ui_telem_targets[0])
     else:
         log.info("Operator: TelemetryOut targets=%s", ui_telem_targets)
+    if c2_telem_targets:
+        if len(c2_telem_targets) == 1:
+            log.info("Operator: C2 TelemetryOut target=%s", c2_telem_targets[0])
+        else:
+            log.info("Operator: C2 TelemetryOut targets=%s", c2_telem_targets)
     if len(dev_cmd_targets) == 1:
         log.info("Device:   CommandOut target=%s", dev_cmd_targets[0])
     else:
@@ -383,9 +420,10 @@ def main() -> int:
             age_dev = None if last_seen["dev_telem_ts"] is None else now - last_seen["dev_telem_ts"]
             age_cmd = None if last_seen["cmd_ts"] is None else now - last_seen["cmd_ts"]
             age_ui  = None if last_seen["ui_telem_ts"] is None else now - last_seen["ui_telem_ts"]
+            age_c2  = None if last_seen["c2_telem_ts"] is None else now - last_seen["c2_telem_ts"]
 
             log.info(
-                "HB t=%.1fs mode=%s rig=%s estop=%s fault=%s claims=%d | intents=%d(age=%s) dev_telem=%d(age=%s) cmd_out=%d(age=%s) ui_telem_out=%d(age=%s)",
+                "HB t=%.1fs mode=%s rig=%s estop=%s fault=%s claims=%d | intents=%d(age=%s) dev_telem=%d(age=%s) cmd_out=%d(age=%s) ui_telem_out=%d(age=%s) c2_telem_out=%d(age=%s)",
                 now - t0,
                 getattr(getattr(state, "mode", ""), "value", getattr(state, "mode", "")),
                 getattr(state, "rig_mode", "DISCOVERY"),
@@ -396,6 +434,7 @@ def main() -> int:
                 stats["dev_telem_in"], "n/a" if age_dev is None else f"{age_dev:.2f}s",
                 stats["cmd_out"], "n/a" if age_cmd is None else f"{age_cmd:.2f}s",
                 stats["ui_telem_out"], "n/a" if age_ui is None else f"{age_ui:.2f}s",
+                stats["c2_telem_out"], "n/a" if age_c2 is None else f"{age_c2:.2f}s",
             )
             t_last_report = now
 
@@ -431,6 +470,11 @@ def main() -> int:
         # One HiP per axis: send a *sliced* snapshot to each UI target.
         router.publish_ui_snapshot(snap)
 
+        if c2_fanout is not None:
+            c2_fanout.publish_telemetry(snap)
+            stats["c2_telem_out"] += max(1, len(c2_telem_outs))
+            last_seen["c2_telem_ts"] = time.monotonic()
+
         # LIFETICK trace: Core -> HiP (TelemetrySnapshot.axes[axis].device_tick)
         for axis_id in axis_ids:
             try:
@@ -457,6 +501,7 @@ def main() -> int:
                 age_dev = None if last_seen["dev_telem_ts"] is None else (now - float(last_seen["dev_telem_ts"]))
                 age_cmd = None if last_seen["cmd_ts"] is None else (now - float(last_seen["cmd_ts"]))
                 age_ui  = None if last_seen["ui_telem_ts"] is None else (now - float(last_seen["ui_telem_ts"]))
+                age_c2  = None if last_seen["c2_telem_ts"] is None else (now - float(last_seen["c2_telem_ts"]))
 
                 estop_v = bool(getattr(snap, "estop", False))
                 fault_v = bool(getattr(snap, "fault", False))
@@ -498,6 +543,7 @@ def main() -> int:
                         "age_dev_ms": None if age_dev is None else age_dev * 1000.0,
                         "age_cmd_ms": None if age_cmd is None else age_cmd * 1000.0,
                         "age_ui_ms": None if age_ui is None else age_ui * 1000.0,
+                        "age_c2_ms": None if age_c2 is None else age_c2 * 1000.0,
                     },
                 )
             except Exception:

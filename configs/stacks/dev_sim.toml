@@ -13,13 +13,14 @@ ui_telem_base = 51002
 dev_telem_in = "127.0.0.1:52020"
 status_in = "127.0.0.1:51200"  # supervisor birds-eye heartbeat
 raw_in = "127.0.0.1:50100"      # inputd -> joy2intent
-intent_out = "127.0.0.1:51001"  # joy2intent -> core
+intent = "127.0.0.1:51001"  # joy2intent -> core
 
 [services.core]
 enabled = true
 module = "steuerung3d.apps.core_udp_service"
 mode = "single"
 args = [
+  "--intent-in", "{net.intent}",
   "--dev-telem-in", "{net.dev_telem_in}",
   "--dev-cmd-base", "{net.cmd_base}",
   "--dev-cmd-count", "{len(rig.axes)}",
@@ -47,6 +48,7 @@ count = "auto"  # one HiP window per axis (unattached by default)
 config = "configs/services/hip.toml"
 args = [
   "--telem-in", "{net.bind_host}:{net.ui_telem_base}",
+  "--intent-out", "{net.intent}",
 ]
 
 [services.inputd]
@@ -62,6 +64,6 @@ mode = "single"
 config = "configs/joy2intent_bindings_gamepad.toml"
 args = [
   "--raw-in", "{net.raw_in}",
-  "--intent-out", "{net.intent_out}",
+  "--intent-out", "{net.intent}",
   "--winches", "{csv(rig.axes)}",
 ]

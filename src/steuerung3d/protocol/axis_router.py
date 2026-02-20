@@ -149,6 +149,9 @@ class AxisRouter:
         densis = dict(getattr(snap, "densis", {}))
         densis_one = {axis_id: densis[axis_id]} if axis_id in densis else {}
 
+        lease_axis = dict(getattr(snap, "lease_axis", {}) or {})
+        lease_one = {axis_id: lease_axis[axis_id]} if axis_id in lease_axis else {}
+
         return TelemetrySnapshot(
             tick=int(getattr(snap, "tick", 0)),
             t_s=float(getattr(snap, "t_s", 0.0)),
@@ -158,6 +161,8 @@ class AxisRouter:
             axes=axes,
             rig_mode=str(getattr(snap, "rig_mode", "DISCOVERY")),
             densis=densis_one,
+            lease_rig=str(getattr(snap, "lease_rig", "")),
+            lease_axis=lease_one,
             estop_status_word=int(self.last_dev_estop_word_by_axis.get(axis_id, int(getattr(snap, "estop_status_word", 0)))),
             param_edit_active=bool(self.last_dev_param_edit_active_by_axis.get(axis_id, bool(getattr(snap, "param_edit_active", False)))),
             param_edit_group=str(self.last_dev_param_edit_group_by_axis.get(axis_id, str(getattr(snap, "param_edit_group", "")))),

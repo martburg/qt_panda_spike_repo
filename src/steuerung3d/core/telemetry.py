@@ -54,6 +54,10 @@ class TelemetrySnapshot:
     rig_mode: str = "DISCOVERY"
     densis: Dict[str, DensiTelemetry] = field(default_factory=dict)
 
+    # Leases (Core-owned authority surface)
+    lease_rig: str = ""
+    lease_axis: Dict[str, list[str]] = field(default_factory=dict)
+
     # NEW
     estop_status_word: int = 0
 
@@ -115,6 +119,16 @@ class TelemetrySnapshot:
         except Exception:
             densis = {}
 
+        lease_rig = str(getattr(state, "lease_rig", ""))
+        lease_axis: Dict[str, list[str]] = {}
+        try:
+            claims = dict(getattr(state, "axis_claims", {}) or {})
+            for axis_id, hip_id in claims.items():
+                if hip_id:
+                    lease_axis[str(axis_id)] = [str(hip_id)]
+        except Exception:
+            lease_axis = {}
+
         return cls(
             tick=int(state.tick),
             t_s=float(state.t_s),
@@ -124,6 +138,8 @@ class TelemetrySnapshot:
             axes=axes,
             rig_mode=str(getattr(state, "rig_mode", "DISCOVERY")),
             densis=densis,
+            lease_rig=lease_rig,
+            lease_axis=lease_axis,
             estop_status_word=int(getattr(state, "estop_status_word", 0)),
             param_edit_active=bool(getattr(state, "param_edit_active", False)),
             param_edit_group=str(getattr(state, "param_edit_group", "")),
