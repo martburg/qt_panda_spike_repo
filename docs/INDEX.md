@@ -42,4 +42,4 @@ This repo is a **src/** layout Python project.
 
 - Super-pruned stack graph: `docs/graphs/steuerung3d_stack_superpruned_graph.png`
 - Pruned stack graph: `docs/graphs/steuerung3d_stack_pruned_graph.png`
-- Dead code candidates report (snapshot): `docs/graphs/steuerung3d_dead_code_candidates.md`
+- Dead code candidates report (snapshot): `docs/graphs/obs_steuerung3d_dead_code_candidates.md`

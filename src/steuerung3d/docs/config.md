@@ -1,66 +1,119 @@
 # Configuration (TOML)
 
-All runtime entrypoints are configured via **TOML files** under the repo root `configs/` directory.
+This repo currently supports **two** configuration “surfaces”:
 
-## Shared conventions
+1) **Profile-driven stacks (recommended)** — `python -m steuerung3d up --profile …`  
+2) **Single-process demo runners** — `python -m steuerung3d.apps.<app> --config …`
 
-Most stacks have an `[app]` section with:
+The goal is to make local development easy *without* coupling core logic to any particular IO mechanism.
 
-- `dt_s` — tick step (seconds)
-- `realtime` — whether to sleep to real time (if the runner supports it)
-- `log_path` — JSONL output path (stacks that record)
+---
 
-## PLC stack (`configs/plc_stack.toml`)
+## 1) Profile-driven stacks (recommended)
 
-`[[plc_endpoints]]` maps axis ownership to PLC endpoints (UDP bind + target).
-See `docs/plc_stack.md`.
+Profiles live in:
 
-Run:
-```bash
-python -m steuerung3d.apps.plc_stack --config configs/plc_stack.toml
+- `configs/stacks/*.toml`
+
+They describe:
+
+- which **services** to run (core / hip / densi / joy2intent / inputd / …)
+- how to **wire** them (ports, endpoints, enabled flags)
+- axis expansion (e.g. one service per axis)
+
+CLI entry points:
+
+```powershell
+python -m steuerung3d profiles
+python -m steuerung3d up     --profile dev_sim
+python -m steuerung3d plan   --profile dev_sim
+python -m steuerung3d status --profile dev_sim
+python -m steuerung3d logs core --profile dev_sim --follow
+python -m steuerung3d down   --profile dev_sim
 ```
 
-## Dev stack (`configs/dev_stack.toml`)
+See also: `docs/STACK_BOOT_STATUS.md`
 
-SIM-first run of core + sim device + recording.
+---
 
-Run:
-```bash
-python -m steuerung3d.apps.dev_stack --config configs/dev_stack.toml
-```
+## 2) Single-process runners (still useful)
 
-## Replay player (`configs/replay_player.toml`)
+These are *not* the preferred long-term boot path, but they remain handy for quick isolated demos
+and for debugging specific seams.
 
-Offline replay of a JSONL session.
+### Dev stack (core + device adapter, single process)
 
-Run:
-```bash
-python -m steuerung3d.apps.replay_player path/to/session.jsonl --config configs/replay_player.toml
-```
+Config:
 
-## CLI client (`configs/cli_client.toml`)
-
-Human-driven intent publishing from terminal.
+- `configs/dev_plc.toml`
 
 Run:
-```bash
-python -m steuerung3d.apps.cli_client --config configs/cli_client.toml
+
+```powershell
+python -m steuerung3d.apps.dev_stack --config configs\dev_plc.toml
 ```
 
-## Core service (`configs/core_service.toml`)
+This runner can automatically fall back to a **UDP SIM fleet** when the configured controller IP
+(e.g. `172.16.17.5`) is not present on your host.
 
-Headless core runner for development.
+### PLC stack (edge adapter / seam tests)
+
+Config:
+
+- `configs/plc_stack.toml`
 
 Run:
-```bash
-python -m steuerung3d.apps.core_service --config configs/core_service.toml
+
+```powershell
+python -m steuerung3d.apps.plc_stack --config configs\plc_stack.toml
 ```
 
-## Log viewer (`configs/log_viewer.toml`)
+### Joystick pipeline demos
 
-Defaults for the `log_viewer` CLI.
+Configs:
+
+- `configs/joy2intent_gamepad.toml`
+- `configs/joy2intent_bindings_gamepad.toml`
+- `configs/inputd_gamepad.toml`
+
+Run (example):
+
+```powershell
+python -m steuerung3d.apps.joy2intent --config configs\joy2intent_gamepad.toml
+python -m steuerung3d.apps.inputd    --config configs\inputd_gamepad.toml
+```
+
+(Exact wiring for the end-to-end joystick → intent → core path is typically handled via a stack profile.)
+
+### Log viewer defaults
+
+Config:
+
+- `configs/log_viewer.toml`
 
 Run:
-```bash
-python -m steuerung3d.apps.log_viewer path/to/session.jsonl --config configs/log_viewer.toml
+
+```powershell
+python -m steuerung3d.apps.log_viewer <path/to/session.jsonl> --config configs\log_viewer.toml
 ```
+
+---
+
+## What’s intentionally *not* here
+
+Older docs referenced configs such as `configs/dev_stack.toml`, `configs/core_service.toml`,
+`configs/cli_client.toml`, `configs/replay_player.toml`. In this repo snapshot those files are **not present**,
+so those references were removed to avoid confusion.
+
+If/when those runners return, reintroduce the config docs alongside the actual files under `configs/`.
+
+---
+
+## Note about `src/steuerung3d/docs/`
+
+This repo keeps a *package-coupled* copy of selected docs under:
+
+- `src/steuerung3d/docs/…`
+
+Those files are meant for distribution alongside the Python package.
+When updating docs in `docs/`, mirror the same changes into `src/steuerung3d/docs/` (or regenerate the copies).
