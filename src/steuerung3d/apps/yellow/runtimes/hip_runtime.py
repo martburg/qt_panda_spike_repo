@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
-import os
 
 from steuerung3d.core.intents import ParamEditBegin
 from steuerung3d.core.telemetry import TelemetrySnapshot
@@ -88,7 +87,8 @@ class HipRuntime:
 
         mode = shadow_mode
         if mode is None:
-            mode = str(os.getenv("HIP_ENGINE_MODE", "old") or "old").strip().lower()
+            mode = "old"
+        mode = str(mode or "old").strip().lower()
         if mode not in ("old", "shadow", "new"):
             mode = "old"
         self._shadow_mode = mode

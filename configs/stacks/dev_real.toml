@@ -37,6 +37,7 @@ args = [
 enabled = true
 module = "steuerung3d.apps.den_si"
 mode = "per_axis"
+config = "configs/services/densi.toml"
 args = []
 
 [services.hip]
@@ -44,6 +45,7 @@ enabled = true
 module = "steuerung3d.apps.hi_p"
 mode = "single"
 count = "auto"  # number of HiP windows = discovered devices (min 1)
+config = "configs/services/hip.toml"
 args = [
   "--telem-in", "{net.bind_host}:{net.ui_telem_base}",
 ]

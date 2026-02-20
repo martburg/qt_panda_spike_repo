@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 import logging
+from pathlib import Path
 from typing import Tuple
 
 from steuerung3d.util.log_context import install_log_context
+from steuerung3d.config.toml_loader import load_toml
 
 from PySide6.QtWidgets import QApplication
 
@@ -32,6 +33,15 @@ def _parse_hostport(s: str) -> Tuple[str, int]:
     return (host, int(port_s))
 
 
+def _load_config(path: str | None) -> dict:
+    if not path:
+        return {}
+    try:
+        return dict(load_toml(Path(path)))
+    except Exception:
+        return {}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--role", choices=("cfc",), default="cfc")
@@ -54,6 +64,7 @@ def main() -> int:
         default="plc",
         help="Device wire protocol for DenSi I/O. 'plc' = ; delimited telegrams, 'json' = internal snapshots.",
     )
+    ap.add_argument("--config", default="", help="TOML config path for DenSi runtime.")
 
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
     args = ap.parse_args()
@@ -63,11 +74,13 @@ def main() -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
+    cfg = _load_config(args.config or None)
+    engine_cfg = cfg.get("engine", {}) or {}
+    engine_mode = str(engine_cfg.get("mode", "old") or "old").strip().lower()
+    if engine_mode not in ("old", "shadow", "new"):
+        engine_mode = "old"
+
     axis_ids = [a.strip() for a in args.axis if a and a.strip()]
-    if not axis_ids:
-        inst = (os.environ.get("ST3D_INSTANCE") or "").strip()
-        if inst:
-            axis_ids = [inst]
     if not axis_ids:
         axis_ids = ["X"]
 
@@ -111,6 +124,7 @@ def main() -> int:
         telemetry_out=telemetry_out,
         axis_ids=axis_ids,
         dt_s=args.dt,
+        engine_mode=engine_mode,
     )
     # Start controller (timer + IO loop)
     if hasattr(ctl, "start"):

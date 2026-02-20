@@ -44,6 +44,8 @@ class HiPController:
     intent_out: IntentOut
     telemetry_in: TelemetryIn
 
+    shadow_mode: str | None = None
+
     # If we stop receiving telemetry for this long, we go back to UNKNOWN
     stale_after_ms: int = 500
 
@@ -67,6 +69,7 @@ class HiPController:
             stale_after_ms=self.stale_after_ms,
             log=log,
             hip_id=str(getattr(self, "_hip_id", "") or ""),
+            shadow_mode=self.shadow_mode,
         )
 
         self._timer: QTimer | None = None

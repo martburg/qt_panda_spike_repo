@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 import logging
-import os
 import time
 
 from PySide6.QtCore import QTimer
@@ -50,6 +49,7 @@ class DenSiController:
     wire_proto: str = "json"  # json|plc
     dt_s: float = 0.01
     stale_after_ms: int = 500
+    engine_mode: str = "old"
 
     def __post_init__(self) -> None:
         """Bind widgets and initialize the DenSi device-side simulator."""
@@ -57,7 +57,7 @@ class DenSiController:
         self._init_observability()
         self._init_state_and_sim()
 
-        mode = str(os.getenv("DENSI_ENGINE_MODE", "old") or "old").strip().lower()
+        mode = str(getattr(self, "engine_mode", "old") or "old").strip().lower()
         if mode not in ("old", "shadow", "new"):
             mode = "old"
         self._densi_engine_mode = mode

@@ -4,8 +4,10 @@ import argparse
 import sys
 
 import logging
+from pathlib import Path
 
 from steuerung3d.util.log_context import install_log_context
+from steuerung3d.config.toml_loader import load_toml
 
 from PySide6.QtWidgets import QApplication
 
@@ -17,6 +19,15 @@ from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn
 from steuerung3d.apps.yellow.controllers.hip_controller import HiPController
 
 log = logging.getLogger("hi_p")
+
+
+def _load_config(path: str | None) -> dict:
+    if not path:
+        return {}
+    try:
+        return dict(load_toml(Path(path)))
+    except Exception:
+        return {}
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -32,6 +43,7 @@ def main() -> int:
         default="127.0.0.1:51001",
         help="IntentOut target host:port (default 127.0.0.1:51001).",
     )
+    ap.add_argument("--config", default="", help="TOML config path for HiP runtime.")
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
     args = ap.parse_args()
 
@@ -41,6 +53,11 @@ def main() -> int:
     )
     install_log_context(role="hi_p", axis=(args.axis or ""))
     log.info("log level = %s", args.log_level.upper())
+    cfg = _load_config(args.config or None)
+    engine_cfg = cfg.get("engine", {}) or {}
+    shadow_mode = str(engine_cfg.get("shadow_mode", "old") or "old").strip().lower()
+    if shadow_mode not in ("old", "shadow", "new"):
+        shadow_mode = "old"
     def _parse_hostport(s: str, default_host: str = "127.0.0.1"):
         s = (s or "").strip()
         if s.count(":") == 0:
@@ -61,7 +78,12 @@ def main() -> int:
     intent_out = UdpIntentOut.connect(intent_out_addr)
     telemetry_in = UdpTelemetryIn.bind(telem_in_addr)
 
-    ctl = HiPController(win=win, intent_out=intent_out, telemetry_in=telemetry_in)
+    ctl = HiPController(
+        win=win,
+        intent_out=intent_out,
+        telemetry_in=telemetry_in,
+        shadow_mode=shadow_mode,
+    )
     axis_label = (str(args.axis).strip() or "*")
     if str(args.axis).strip():
         ctl.set_fixed_axis(str(args.axis).strip(), lock_combo=True)
