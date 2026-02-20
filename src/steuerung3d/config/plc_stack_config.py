@@ -46,9 +46,6 @@ def load_plc_stack_config(path: Path) -> PlcStackConfig:
     Authoritative format:
       - [app]
       - [[plc_endpoints]] (list)
-
-    Optional back-compat:
-      - [plc_udp] (legacy single-endpoint) is mapped to one endpoint.
     """
     if not path.exists():
         raise FileNotFoundError(f"Config not found: {path}")
@@ -64,13 +61,8 @@ def load_plc_stack_config(path: Path) -> PlcStackConfig:
 
     endpoints_raw = raw.get("plc_endpoints", None)
 
-    # Back-compat: legacy single-endpoint section
     if endpoints_raw is None:
-        legacy = raw.get("plc_udp", None)
-        if legacy:
-            endpoints_raw = [_legacy_plc_udp_to_endpoint(legacy)]
-        else:
-            endpoints_raw = []
+        endpoints_raw = []
 
     if not isinstance(endpoints_raw, list):
         raise ValueError("TOML: plc_endpoints must be a list (use [[plc_endpoints]]).")
@@ -128,20 +120,4 @@ def _validate(endpoints: List[PlcEndpointConfig]) -> None:
             if ax in owned:
                 raise ValueError(f"Axis '{ax}' is owned by both '{owned[ax]}' and '{e.name}'")
             owned[ax] = e.name
-
-def _legacy_plc_udp_to_endpoint(legacy: dict) -> dict:
-    axis_ids = legacy.get("axis_ids", ["X"])
-    return {
-        "name": legacy.get("name", "plc"),
-        "bind_host": legacy.get("bind_host", "0.0.0.0"),
-        "bind_port": legacy.get("bind_port", legacy.get("rx_port", 50002)),
-        "target_host": legacy.get("target_host", "127.0.0.1"),
-        "target_port": legacy.get("target_port", legacy.get("tx_port", 50001)),
-        "axis_ids": axis_ids,
-        "delimiter": legacy.get("delimiter", ";"),
-        "encoding": legacy.get("encoding", "ascii"),
-        "float_fmt": legacy.get("float_fmt", "{:.6f}"),
-        "true_token": legacy.get("true_token", "1"),
-        "false_token": legacy.get("false_token", "0"),
-    }
 

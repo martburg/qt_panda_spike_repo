@@ -1,34 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
-# The upstream `transitions` package is convenient but not strictly required
-# for our needs. In minimal environments (CI, offline toolchains) it might not
-# be installed, so we provide a tiny compatible fallback.
-try:
-    from transitions import Machine  # type: ignore
-except Exception:  # pragma: no cover
-    class Machine:  # minimal subset used by AxisFSM
-        def __init__(self, model, states, initial, auto_transitions=False):
-            self.model = model
-            self.states = list(states)
-            self.model.state = initial
-            self._transitions = {}
-
-        def add_transition(self, trigger, source, dest):
-            self._transitions.setdefault(trigger, []).append((source, dest))
-            # Expose trigger as a method on the model (matches transitions API).
-            if not hasattr(self.model, trigger):
-                def _fn(_self=self, _tr=trigger):
-                    _self.trigger(_tr)
-                setattr(self.model, trigger, _fn)
-
-        def trigger(self, trigger):
-            cur = getattr(self.model, "state", None)
-            for src, dst in self._transitions.get(trigger, []):
-                if src == "*" or src == cur:
-                    self.model.state = dst
-                    return True
-            return False
+from transitions import Machine
 
 from .axis_types import AxisTelemetry, AxisRequest, AxisCommand
 

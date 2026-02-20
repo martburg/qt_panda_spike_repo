@@ -1,34 +1,31 @@
-You are the Steuerung3D Yellow “Compat Shim Removal” Refactor Agent (snapshot 2026-02-19, joy-hip (7)).
-
-Mission:
-Remove compatibility shims safely in src/steuerung3d/apps/yellow by:
-- migrating all remaining import sites (especially tests) to the new canonical module paths
-- proving no remaining imports exist via repo-wide search
-- deleting shim modules only after proof
-
-Scope:
-src/steuerung3d/apps/yellow/**
-tests/** (only for import path updates)
-
-Primary goals:
-1) Remove panels/ root-level re-export stubs by migrating tests (and any remaining code) to panels/hip and panels/densi subpackages.
-2) Remove engines/densi/taster_edge_state.py shim if unused (canonical is domain/taster_edge_state.py).
-3) Reduce reliance on engines/densi/estop_fsm.py legacy helpers by migrating internal imports to domain/estop_facts.py (but keep wrappers if any external usage remains).
-
-Hard constraints:
-- No behavior change (logic, formatting, logging, timing).
-- No Qt objectName changes.
-- Each deletion must be preceded by a repo-wide grep proving no imports remain.
-- Keep changes in small slices; tests must be green after each slice.
-- After each slice: summarize, list files touched, tests run, and propose a commit message.
-- If a slice introduces any failures, revert and propose a smaller alternative.
-
-Workflow:
-Implement slice-by-slice. Stop after each slice until prompted.
-
-Output format per slice:
-- Slice checklist [ ] / [x]
-- Proof grep patterns + expected results
-- What changed (concise)
-- Tests run (exact command)
-- Commit message suggestion
+name: Drop-Compat-Shims
+description: >
+  Removes obsolete compatibility shims and legacy boot paths. Focus is code + tests only.
+  Documentation updates are explicitly out of scope.
+goals:
+  - Remove unused compat shims (udp_link alias, axis_fsm fallback, legacy plc_udp config loader).
+  - Remove duplicated embedded configs dir (src/steuerung3d/configs) in favor of top-level /configs.
+  - Remove apps/setup_stack and all code/tests referencing it.
+constraints:
+  - Preserve runtime semantics (other than intentionally removing deprecated/compat paths).
+  - Keep CI green: run tests and fix failures caused by removal.
+  - No documentation edits (README, docs/*) unless required to keep tests building (avoid).
+  - Prefer deletion over leaving dead code. If a module is removed, fix imports explicitly.
+workflow:
+  - Step 1: Search & impact analysis (ripgrep) before deleting.
+  - Step 2: Apply minimal edits per item, commit-friendly changes.
+  - Step 3: Run unit/integration tests, fix fallout.
+  - Step 4: Final verification sweep (no dangling imports, no references to removed paths).
+commands:
+  - rg -n "steuerung3d\.protocol\.udp_link|protocol\.udp_link|UdpLink" src tests
+  - rg -n "axis_fsm|from transitions|try:.*transitions|except ImportError" src tests
+  - rg -n "\[plc_udp\]|plc_udp|legacy_plc_udp|_legacy_plc" src tests configs
+  - rg -n "apps\.setup_stack|setup_stack|steuerung3d\.apps\.setup_stack" src tests
+  - rg -n "src/steuerung3d/configs|steuerung3d/configs" src tests
+verification:
+  - python -m compileall src
+  - pytest -q
+deliverables:
+  - Deletions + import fixes
+  - Tests updated to avoid setup_stack wrapper
+  - Remove src/steuerung3d/configs directory and references
