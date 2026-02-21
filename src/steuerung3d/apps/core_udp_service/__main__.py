@@ -92,6 +92,15 @@ def _expand_targets(
     return targets
 
 
+def _expand_dev_cmd_targets(base: str, count: int, host: str) -> List[Tuple[str, int]]:
+    base_port = int(str(base).strip())
+    out: List[Tuple[str, int]] = []
+    cmd_host = _normalize_host(host)
+    for i in range(int(count)):
+        out.append((cmd_host, base_port + i))
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
@@ -121,15 +130,26 @@ def main() -> int:
         ),
     )
     ap.add_argument(
+        "--dev-cmd-host",
+        default="127.0.0.1",
+        help="Host used with --dev-cmd-base/--dev-cmd-count (default 127.0.0.1).",
+    )
+    ap.add_argument(
         "--dev-cmd-base",
         default=None,
-        help="Convenience: base port for Device CommandOut targets (e.g. 52001).",
+        help=(
+            "Convenience: base port for Device CommandOut targets (e.g. 52001). "
+            "Use with --dev-cmd-count and --dev-cmd-host for distributed setups."
+        ),
     )
     ap.add_argument(
         "--dev-cmd-count",
         type=int,
         default=0,
-        help="Convenience: number of Device CommandOut targets to generate from base port.",
+        help=(
+            "Convenience: number of Device CommandOut targets to generate from base port. "
+            "For distributed setups use --dev-cmd-host or explicit --dev-cmd-target host:port."
+        ),
     )
 
     ap.add_argument(
@@ -254,8 +274,9 @@ def main() -> int:
 
     if args.dev_cmd_base is not None and int(args.dev_cmd_count) > 0:
         base = int(str(args.dev_cmd_base).strip())
-        for i in range(int(args.dev_cmd_count)):
-            dev_cmd_targets.append(("127.0.0.1", base + i))
+        dev_cmd_targets.extend(
+            _expand_dev_cmd_targets(str(args.dev_cmd_base), int(args.dev_cmd_count), args.dev_cmd_host)
+        )
 
         # Guard against accidental port overlap (common on Windows).
         if dev_telem_bind[0] == "127.0.0.1" and dev_telem_bind[1] in range(base, base + int(args.dev_cmd_count)):

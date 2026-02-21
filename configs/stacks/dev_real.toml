@@ -45,7 +45,7 @@ args = []
 enabled = true
 module = "steuerung3d.apps.hi_p"
 mode = "single"
-count = "auto"  # number of HiP windows = discovered devices (min 1)
+count = 1  # count must be int; 'auto' removed to avoid confusion
 config = "configs/services/hip.toml"
 args = [
   "--telem-in", "{net.bind_host}:{net.ui_telem_base}",
