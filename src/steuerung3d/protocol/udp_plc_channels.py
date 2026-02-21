@@ -180,10 +180,10 @@ class UdpPlcCommandIn:
 
                 tick_ui_rx = _to_int(f.get("LifetickUIrx", "0"), 0)
                 vel = _to_float(f.get("SpeedSollIN", "0"), 0.0)
-                enable = _to_bool_token(f.get("ControlIN", "0"), False)
+                enable = _to_bool_token(f.get("ControlIN", "False"), False)
                 intent = _to_bool_token(f.get("Intent", "True"), True)
-                resync = _to_bool_token(f.get("ReSync", "0"), False)
-                gui_not_halt = _to_bool_token(f.get("GUINotHaltIN", "0"), False)
+                resync = _to_bool_token(f.get("ReSync", "False"), False)
+                gui_not_halt = _to_bool_token(f.get("GUINotHaltIN", "False"), False)
 
                 param_ops = []
                 modus = str(f.get("Modus", "") or "").strip().lower()
@@ -209,7 +209,7 @@ class UdpPlcCommandIn:
                     intent=bool(intent),
                     resync=bool(resync),
                     gui_not_halt=bool(gui_not_halt),
-                    estop_reset=_to_bool_token(f.get("EStopReset", "0"), False),
+                    estop_reset=_to_bool_token(f.get("EStopReset", "False"), False),
                     lifetick_echo={axis_id: tick_ui_rx},
                     param_ops=param_ops,
                 )
