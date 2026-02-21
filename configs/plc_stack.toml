@@ -24,8 +24,8 @@ axis_ids = ["X"]
 delimiter = ";"
 encoding = "ascii"
 float_fmt = "{:.6f}"
-true_token = "1"
-false_token = "0"
+true_token = "True"
+false_token = "False"
 
 [[plc_endpoints]]
 name = "Burt"
@@ -37,8 +37,8 @@ axis_ids = ["Y"]
 delimiter = ";"
 encoding = "ascii"
 float_fmt = "{:.6f}"
-true_token = "1"
-false_token = "0"
+true_token = "True"
+false_token = "False"
 
 [[plc_endpoints]]
 name = "Cecil"
@@ -50,8 +50,8 @@ axis_ids = ["Z"]
 delimiter = ";"
 encoding = "ascii"
 float_fmt = "{:.6f}"
-true_token = "1"
-false_token = "0"
+true_token = "True"
+false_token = "False"
 
 [[plc_endpoints]]
 name = "Debby"
@@ -63,5 +63,5 @@ axis_ids = ["W"]
 delimiter = ";"
 encoding = "ascii"
 float_fmt = "{:.6f}"
-true_token = "1"
-false_token = "0"
+true_token = "True"
+false_token = "False"

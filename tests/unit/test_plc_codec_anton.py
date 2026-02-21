@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from steuerung3d.protocol.legacy_plc import UPLINK_BASE_FIELDS, UPLINK_TAIL_FIELDS, parse_uplink
-from steuerung3d.protocol.plc_codec import decode_downlink
+from steuerung3d.protocol.plc_codec import decode_downlink, encode_downlink
 from steuerung3d.protocol.plc_wire import encode_plc_telemetry
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
+from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
 
 
 def test_decode_downlink_base_fields() -> None:
@@ -43,3 +44,27 @@ def test_encode_plc_uplink_has_eod_and_tail() -> None:
     parsed = parse_uplink(line)
     assert len(parsed.fields) == len(UPLINK_BASE_FIELDS)
     assert len(parsed.tail) == len(UPLINK_TAIL_FIELDS)
+
+
+def test_encode_downlink_uses_true_false_tokens() -> None:
+    cmd = CommandFrame(
+        tick=1,
+        t_s=0.0,
+        estop=False,
+        fault=False,
+        mode="IDLE",
+        axes={"Anton": AxisSetpoint(enable=True, vel=1.0)},
+        intent=True,
+        resync=False,
+        gui_not_halt=True,
+        estop_reset=True,
+    )
+
+    payload = encode_downlink(axis_id="Anton", frame=cmd, lifetick_ui_rx=7)
+    dec = decode_downlink(payload)
+    assert dec is not None
+    assert dec.fields.get("Intent") == "True"
+    assert dec.fields.get("ControlIN") == "True"
+    assert dec.fields.get("EStopReset") == "True"
+    assert dec.fields.get("ReSync") == "False"
+    assert dec.fields.get("GUINotHaltIN") == "True"

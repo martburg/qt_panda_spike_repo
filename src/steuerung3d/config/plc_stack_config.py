@@ -28,8 +28,8 @@ class PlcEndpointConfig:
     delimiter: str = ";"
     encoding: str = "ascii"
     float_fmt: str = "{:.6f}"
-    true_token: str = "1"
-    false_token: str = "0"
+    true_token: str = "True"
+    false_token: str = "False"
 
 @dataclass(frozen=True)
 class PlcStackConfig:
@@ -88,8 +88,8 @@ def load_plc_stack_config(path: Path) -> PlcStackConfig:
                 delimiter=str(e.get("delimiter", ";")),
                 encoding=str(e.get("encoding", "ascii")),
                 float_fmt=str(e.get("float_fmt", "{:.6f}")),
-                true_token=str(e.get("true_token", "1")),
-                false_token=str(e.get("false_token", "0")),
+                true_token=str(e.get("true_token", "True")),
+                false_token=str(e.get("false_token", "False")),
             )
         )
 

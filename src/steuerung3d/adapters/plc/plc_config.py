@@ -22,5 +22,5 @@ class PlcWireSpec:
 
     # Formatting tokens
     float_fmt: str = "{:.6f}"
-    true_token: str = "1"
-    false_token: str = "0"
+    true_token: str = "True"
+    false_token: str = "False"

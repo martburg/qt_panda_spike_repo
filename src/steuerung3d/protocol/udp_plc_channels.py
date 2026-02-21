@@ -154,6 +154,16 @@ class UdpPlcCommandIn:
             except Exception:
                 return default
 
+        def _to_bool_token(x: str, default: bool = False) -> bool:
+            if x is None:
+                return default
+            s = str(x).strip().lower()
+            if s in ("true", "t", "yes", "y", "on", "1"):
+                return True
+            if s in ("false", "f", "no", "n", "off", "0", ""):
+                return False
+            return default
+
         group_defaults = {
             "pos":    ["HardMax", "UserMax", "UserMin", "HardMin", "PosWin"],
             "vel":    ["VelMax", "VelWin", "AccMax", "AccMove", "DccMax", "MaxAmp", "VelMaxMot"],
@@ -170,10 +180,10 @@ class UdpPlcCommandIn:
 
                 tick_ui_rx = _to_int(f.get("LifetickUIrx", "0"), 0)
                 vel = _to_float(f.get("SpeedSollIN", "0"), 0.0)
-                enable = bool(_to_int(f.get("ControlIN", "0"), 0))
-                intent = str(f.get("Intent", "True")).strip().lower() not in ("false", "0", "", "none")
-                resync = bool(_to_int(f.get("ReSync", "0"), 0))
-                gui_not_halt = bool(_to_int(f.get("GUINotHaltIN", "0"), 0))
+                enable = _to_bool_token(f.get("ControlIN", "0"), False)
+                intent = _to_bool_token(f.get("Intent", "True"), True)
+                resync = _to_bool_token(f.get("ReSync", "0"), False)
+                gui_not_halt = _to_bool_token(f.get("GUINotHaltIN", "0"), False)
 
                 param_ops = []
                 modus = str(f.get("Modus", "") or "").strip().lower()
@@ -199,7 +209,7 @@ class UdpPlcCommandIn:
                     intent=bool(intent),
                     resync=bool(resync),
                     gui_not_halt=bool(gui_not_halt),
-                    estop_reset=bool(_to_int(f.get("EStopReset", "0"), 0)),
+                    estop_reset=_to_bool_token(f.get("EStopReset", "0"), False),
                     lifetick_echo={axis_id: tick_ui_rx},
                     param_ops=param_ops,
                 )

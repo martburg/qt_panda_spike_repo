@@ -103,6 +103,10 @@ def _fmt(x: float) -> str:
     # PLC uses LREAL/REAL parsing with '.' decimal.
     return f"{float(x):.6g}"
 
+def _bool_token(value: bool, true_token: str, false_token: str) -> str:
+    return str(true_token) if bool(value) else str(false_token)
+
+
 def encode_downlink(
     *,
     axis_id: str,
@@ -110,6 +114,8 @@ def encode_downlink(
     pid: str = "0",
     lifetick_ui_rx: int = 0,
     params: Optional[Dict[str, float]] = None,
+    true_token: str = "True",
+    false_token: str = "False",
 ) -> bytes:
     """Encode one downlink telegram for one axis (ASCII ';' delimited).
 
@@ -140,15 +146,15 @@ def encode_downlink(
         "Modus": modus,
         "OwnPID": str(pid),
         "ControlPIDTx": str(pid),
-        "Intent": "True" if intent else "False",
-        "ControlIN": "1" if enable else "0",
+        "Intent": _bool_token(intent, true_token, false_token),
+        "ControlIN": _bool_token(enable, true_token, false_token),
         "GuideControlUI": "0",
         "SpeedSollIN": _fmt(vel_eff),
         "GuideSollSpeedUI": "0",
         "PosSoll": _fmt(pos),
-        "EStopReset": "1" if bool(getattr(frame, "estop_reset", False)) else "0",
-        "ReSync": "1" if bool(getattr(frame, "resync", False)) else "0",
-        "GUINotHaltIN": "1" if bool(getattr(frame, "gui_not_halt", False)) else "0",
+        "EStopReset": _bool_token(bool(getattr(frame, "estop_reset", False)), true_token, false_token),
+        "ReSync": _bool_token(bool(getattr(frame, "resync", False)), true_token, false_token),
+        "GUINotHaltIN": _bool_token(bool(getattr(frame, "gui_not_halt", False)), true_token, false_token),
     }
 
     parts: List[str] = [base.get(k, "0") for k in DOWNLINK_BASE_FIELDS]
