@@ -47,7 +47,8 @@ from .estop_fsm import (
 )
 from .resync import handle_resync_cmd as _handle_resync_cmd
 from .param_ops import apply_densi_param_ops
-from .motion_clamp import apply_estop_clamp_to_state, compute_moving_guard, step_plant_with_clamp
+from .motion_clamp import apply_estop_clamp_to_state, compute_moving_guard
+from .plc_anton_vel_cmd import step_plc_anton_vel_cmd
 from .setpoint_semantics import normalize_cmd_for_plant
 
 
@@ -136,6 +137,9 @@ class DenSiEngine:
     enforce_pos_chain: Callable[[dict[str, float]], dict[str, float]] | None = None
     enforce_guider_minmax: Callable[[dict[str, float]], dict[str, float]] | None = None
 
+    # PLC-faithful vel_cmd behavior tuning
+    lifetick_stale_after_ticks: int = 50
+
     @classmethod
     def build_default(
         cls,
@@ -146,6 +150,7 @@ class DenSiEngine:
         normalize_guider_range,
         enforce_pos_chain,
         enforce_guider_minmax,
+        lifetick_stale_after_ticks: int | None = None,
         now_s: Callable[[], float] | None = None,
     ) -> "DenSiEngine":
         tb = Timebase(dt_s=float(dt_s))
@@ -163,6 +168,7 @@ class DenSiEngine:
             normalize_guider_range=normalize_guider_range,
             enforce_pos_chain=enforce_pos_chain,
             enforce_guider_minmax=enforce_guider_minmax,
+            lifetick_stale_after_ticks=int(lifetick_stale_after_ticks) if lifetick_stale_after_ticks is not None else 50,
         )
         eng.reset_to_fault_state()
         eng._seed_default_params()
@@ -185,6 +191,19 @@ class DenSiEngine:
         self.state.params.setdefault("GuiderMax", 0.5)
 
         self.state.params.setdefault("AccMax", 1.0)
+        self.state.params.setdefault("AccMove", 1.0)
+        self.state.params.setdefault("DccMax", 1.0)
+        self.state.params.setdefault("VelMax", 1.0)
+        self.state.params.setdefault("HardMax", 300.0)
+        self.state.params.setdefault("HardMin", 0.0)
+        self.state.params.setdefault("UserMax", 300.0)
+        self.state.params.setdefault("UserMin", 0.0)
+        self.state.params.setdefault("P", 0.0)
+        self.state.params.setdefault("I", 0.0)
+        self.state.params.setdefault("D", 0.0)
+        self.state.params.setdefault("IL", 0.0)
+        self.state.params.setdefault("GuideIstSpeed", 0.0)
+        self.state.params.setdefault("GuidePosIst", 0.0)
         self.state.params.setdefault("AxisAmp", 100.0)
 
         # Latched cut markers start cleared
@@ -603,6 +622,8 @@ class DenSiEngine:
         )
 
     def step_plant_with_clamp(self) -> None:
+        # PLC-faithful DenSi behavior (Anton): see docs/anton_vel_cmd_implementation_step.md
+        # Goals: deterministic gating, ramping, soft-limit braking, and PID trim overlay.
         cmd = self.ensure_last_cmd()
         cmd_for_plant = normalize_cmd_for_plant(
             cmd,
@@ -611,11 +632,13 @@ class DenSiEngine:
             axis_ids=list(self.axis_ids),
             drive_ready=bool(self.drive_ready),
         )
-        step_plant_with_clamp(
-            device=self.device,
+        step_plc_anton_vel_cmd(
             state=self.state,
             cmd=cmd_for_plant,
             dt_s=float(self.tb.dt_s),
+            axis_ids=list(self.axis_ids),
+            ready_for_sollvel=bool(self.drive_ready),
+            lifetick_stale_after_ticks=int(self.lifetick_stale_after_ticks),
         )
 
     def maybe_latch_cut_markers(self, estop_edge: bool) -> None:
