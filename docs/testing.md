@@ -20,6 +20,18 @@ Run everything (default):
 pytest -q
 ```
 
+## Reviewer checklist
+
+- Full suite:
+```bash
+pytest -q
+```
+
+- UDP telemetry fanout guard:
+```bash
+pytest -q tests/unit/test_udp_telemetry_fanout.py
+```
+
 ## PLC-wire integration regression guards
 
 ### 1) Core ⇄ HiP livetick echo roundtrip (PLC)

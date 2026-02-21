@@ -3,6 +3,10 @@
 This repo is a deliberately small “walking skeleton” that keeps the boundaries of the final system
 visible early.
 
+Canonical architecture references:
+- `docs/Architectural_Primer_v4_full.md` (full spec)
+- `docs/Architectural_Primer.md` (summary)
+
 ## Core principles
 
 - **Single source of truth:** `MachineState` owns the system state.

@@ -5,7 +5,7 @@ import logging
 
 import argparse
 import signal
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 from steuerung3d.util.log_context import install_log_context
 from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
@@ -65,6 +65,31 @@ def _parse_hostport(s: str, default_host: str = "127.0.0.1") -> Tuple[str, int]:
     host, port_s = s.rsplit(":", 1)
     host = host.strip() or default_host
     return (host, int(port_s))
+
+
+def _normalize_host(host: str, *, default_host: str = "127.0.0.1") -> str:
+    return (host or "").strip() or default_host
+
+
+def _expand_targets(
+    explicit_targets: List[str],
+    *,
+    base: Optional[str],
+    count: int,
+    base_host: str,
+    default_target: Optional[Tuple[str, int]],
+) -> List[Tuple[str, int]]:
+    targets: List[Tuple[str, int]] = []
+    for s in explicit_targets:
+        targets.append(_parse_hostport(s))
+    if base is not None and int(count) > 0:
+        base_port = int(str(base).strip())
+        host = _normalize_host(base_host)
+        for i in range(int(count)):
+            targets.append((host, base_port + i))
+    if not targets and default_target is not None:
+        targets = [default_target]
+    return targets
 
 
 def main() -> int:
@@ -128,6 +153,11 @@ def main() -> int:
         ),
     )
     ap.add_argument(
+        "--ui-telem-host",
+        default="127.0.0.1",
+        help="Host used with --ui-telem-base/--ui-telem-count (default 127.0.0.1).",
+    )
+    ap.add_argument(
         "--ui-telem-base",
         default=None,
         help="Convenience: base port for UI TelemetryOut broadcast (e.g. 51002).",
@@ -139,6 +169,11 @@ def main() -> int:
         help="Convenience: number of UI TelemetryOut targets to generate from base port.",
     )
     ap.add_argument(
+        "--ui-telem-disable",
+        action="store_true",
+        help="Disable UI TelemetryOut (C1) entirely.",
+    )
+    ap.add_argument(
         "--c2-telem-target",
         action="append",
         default=[],
@@ -146,6 +181,11 @@ def main() -> int:
             "C2 Rig TelemetryOut target(s) as host:port. Repeatable. "
             "If omitted, no C2 telemetry is emitted."
         ),
+    )
+    ap.add_argument(
+        "--c2-telem-host",
+        default="127.0.0.1",
+        help="Host used with --c2-telem-base/--c2-telem-count (default 127.0.0.1).",
     )
     ap.add_argument(
         "--c2-telem-base",
@@ -177,24 +217,30 @@ def main() -> int:
     op_intent_in = UdpIntentIn.bind(intent_in_bind)
 
     # UI telemetry targets
-    ui_telem_targets: List[Tuple[str, int]] = []
-    for s in args.ui_telem_target:
-        ui_telem_targets.append(_parse_hostport(s))
-    if args.ui_telem_base is not None and int(args.ui_telem_count) > 0:
-        base = int(str(args.ui_telem_base).strip())
-        for i in range(int(args.ui_telem_count)):
-            ui_telem_targets.append(("127.0.0.1", base + i))
-    if not ui_telem_targets:
-        ui_telem_targets = [("127.0.0.1", 51002)]
+    if args.ui_telem_disable and (
+        args.ui_telem_target
+        or args.ui_telem_base is not None
+        or int(args.ui_telem_count) > 0
+    ):
+        return _fatal("UI telemetry disabled but UI targets were provided.")
+
+    ui_telem_targets = _expand_targets(
+        args.ui_telem_target,
+        base=args.ui_telem_base,
+        count=int(args.ui_telem_count),
+        base_host=args.ui_telem_host,
+        default_target=None if args.ui_telem_disable else ("127.0.0.1", 51002),
+    )
     op_telem_outs = [UdpTelemetryOut.connect(t) for t in ui_telem_targets]
 
     c2_telem_targets: List[Tuple[str, int]] = []
-    for s in args.c2_telem_target:
-        c2_telem_targets.append(_parse_hostport(s))
-    if args.c2_telem_base is not None and int(args.c2_telem_count) > 0:
-        base = int(str(args.c2_telem_base).strip())
-        for i in range(int(args.c2_telem_count)):
-            c2_telem_targets.append(("127.0.0.1", base + i))
+    c2_telem_targets = _expand_targets(
+        args.c2_telem_target,
+        base=args.c2_telem_base,
+        count=int(args.c2_telem_count),
+        base_host=args.c2_telem_host,
+        default_target=None,
+    )
     c2_telem_outs = [UdpTelemetryOut.connect(t) for t in c2_telem_targets]
     c2_fanout = UdpTelemetryFanout(outs=c2_telem_outs) if c2_telem_outs else None
 
@@ -249,7 +295,9 @@ def main() -> int:
 
     log.info("=== core_udp_service starting ===")
     log.info("Operator: IntentIn  bind=%s", intent_in_bind)
-    if len(ui_telem_targets) == 1:
+    if args.ui_telem_disable:
+        log.info("Operator: TelemetryOut disabled")
+    elif len(ui_telem_targets) == 1:
         log.info("Operator: TelemetryOut target=%s", ui_telem_targets[0])
     else:
         log.info("Operator: TelemetryOut targets=%s", ui_telem_targets)
@@ -324,28 +372,29 @@ def main() -> int:
     axis_cmd_outs = {axis_id: dev_cmd_outs[i] for i, axis_id in enumerate(axis_ids)}
 
     # --- strict per-axis UI telemetry routing ---
-    if len(axis_ids) > 1:
-        if len(ui_telem_targets) != len(axis_ids):
-            msg = (
-                "Multi-axis run requires one UI telemetry target per axis (no broadcast).\n\n"
-                f"Axes ({len(axis_ids)}): {', '.join(axis_ids)}\n"
-                f"UI Telemetry targets provided ({len(ui_telem_targets)}): {ui_telem_targets}\n\n"
-                "Fix: provide N targets, e.g.\n"
-                "  --ui-telem-target 127.0.0.1:51002 --ui-telem-target 127.0.0.1:51003 ...\n"
-                "or use a local range, e.g.\n"
-                f"  --ui-telem-base 51002 --ui-telem-count {len(axis_ids)}\n"
-            )
-            return _fatal(msg)
-    else:
-        if len(ui_telem_targets) != 1:
-            msg = (
-                "Single-axis run requires exactly one UI telemetry target.\n\n"
-                f"Axis: {axis_ids[0] if axis_ids else 'X'}\n"
-                f"Targets provided ({len(ui_telem_targets)}): {ui_telem_targets}"
-            )
-            return _fatal(msg)
+    if not args.ui_telem_disable:
+        if len(axis_ids) > 1:
+            if len(ui_telem_targets) != len(axis_ids):
+                msg = (
+                    "Multi-axis run requires one UI telemetry target per axis (no broadcast).\n\n"
+                    f"Axes ({len(axis_ids)}): {', '.join(axis_ids)}\n"
+                    f"UI Telemetry targets provided ({len(ui_telem_targets)}): {ui_telem_targets}\n\n"
+                    "Fix: provide N targets, e.g.\n"
+                    "  --ui-telem-target 127.0.0.1:51002 --ui-telem-target 127.0.0.1:51003 ...\n"
+                    "or use a local range, e.g.\n"
+                    f"  --ui-telem-base 51002 --ui-telem-count {len(axis_ids)}\n"
+                )
+                return _fatal(msg)
+        else:
+            if len(ui_telem_targets) != 1:
+                msg = (
+                    "Single-axis run requires exactly one UI telemetry target.\n\n"
+                    f"Axis: {axis_ids[0] if axis_ids else 'X'}\n"
+                    f"Targets provided ({len(ui_telem_targets)}): {ui_telem_targets}"
+                )
+                return _fatal(msg)
 
-    axis_ui_outs = {axis_id: op_telem_outs[i] for i, axis_id in enumerate(axis_ids)}
+    axis_ui_outs = {axis_id: op_telem_outs[i] for i, axis_id in enumerate(axis_ids)} if op_telem_outs else {}
     for a in axis_ids:
         st.ensure_axis(a)
         st.ensure_axis_cmd(a)
@@ -467,8 +516,9 @@ def main() -> int:
         except Exception:
             pass
 
-        # One HiP per axis: send a *sliced* snapshot to each UI target.
-        router.publish_ui_snapshot(snap)
+        if not args.ui_telem_disable:
+            # One HiP per axis: send a *sliced* snapshot to each UI target.
+            router.publish_ui_snapshot(snap)
 
         if c2_fanout is not None:
             c2_fanout.publish_telemetry(snap)
@@ -488,10 +538,11 @@ def main() -> int:
             except Exception:
                 pass
 
-        stats["ui_telem_out"] += max(1, len(axis_ids))
-        last_seen["ui_telem_ts"] = time.monotonic()
+        if not args.ui_telem_disable:
+            stats["ui_telem_out"] += max(1, len(axis_ids))
+            last_seen["ui_telem_ts"] = time.monotonic()
 
-        log.debug("tx ui telem: tick=%s estop=%s fault=%s", snap.tick, snap.estop, snap.fault)
+            log.debug("tx ui telem: tick=%s estop=%s fault=%s", snap.tick, snap.estop, snap.fault)
 
         # Structured heartbeat for supervisor birds-eye (PLC telemetry remains unchanged).
         if status is not None:

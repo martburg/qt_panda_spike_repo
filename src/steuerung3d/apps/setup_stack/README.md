@@ -11,6 +11,9 @@ DenSi fleet       -> Dev Telem  UDP :52002
 HiP UI            -> shows per-axis state and commanded velocity
 ```
 
+Note: `setup_stack` is a legacy wrapper. `--single-hip` binds UI telemetry on a shared port.
+For strict per-axis unicast or C2-only wiring, use stack profiles.
+
 ## Run
 
 From repo root:

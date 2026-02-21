@@ -220,7 +220,14 @@ def main() -> int:
     ap.add_argument("--no-inputd", action="store_true", help="Do not launch inputd.")
     ap.add_argument("--no-joy2intent", action="store_true", help="Do not launch joy2intent.")
     ap.add_argument("--no-hip", action="store_true", help="Do not launch HiP window(s).")
-    ap.add_argument("--single-hip", action="store_true", help="Launch only one HiP window.")
+    ap.add_argument(
+        "--single-hip",
+        action="store_true",
+        help=(
+            "Launch only one HiP window (legacy shared UI telemetry bind). "
+            "Use stack profiles for strict per-axis or C2-only wiring."
+        ),
+    )
     ap.add_argument("--no-densi", action="store_true", help="Do not launch DenSi fleet.")
     ap.add_argument("--no-core", action="store_true", help="Do not launch core_udp_service.")
 
