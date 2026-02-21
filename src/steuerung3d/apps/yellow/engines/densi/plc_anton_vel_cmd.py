@@ -17,12 +17,13 @@ from typing import Iterable
 
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.state import MachineState
+from steuerung3d.common.staleness import age_ticks, is_stale
 
 
 @dataclass(frozen=True)
 class PlcAntonVelCmdConfig:
     lifetick_stale_after_ticks_active: int = 50
-    lifetick_stale_after_ticks_idle: int = 50
+    lifetick_stale_after_ticks_idle: int = 500
 
 
 def _f(params: dict[str, float], key: str, default: float) -> float:
@@ -67,15 +68,22 @@ def _soft_limit_cap(
 
 
 def _lifetick_is_stale(*, meta: dict, lifetick_rx: int, stale_after_ticks: int) -> bool:
-    last_rx = int(meta.get("plc_lifetick_rx", -1))
-    age = int(meta.get("plc_lifetick_age_ticks", 0))
-    if lifetick_rx != last_rx:
-        age = 0
-    else:
-        age += 1
-    meta["plc_lifetick_rx"] = int(lifetick_rx) & 0xFFFF
-    meta["plc_lifetick_age_ticks"] = int(age)
-    return bool(stale_after_ticks > 0 and age >= int(stale_after_ticks))
+    step_tick = int(meta.get("plc_lifetick_step_tick", 0)) + 1
+    meta["plc_lifetick_step_tick"] = int(step_tick)
+
+    last_rx = meta.get("plc_lifetick_rx", None)
+    last_rx_step = meta.get("plc_lifetick_rx_step_tick", None)
+
+    if last_rx is None or int(lifetick_rx) != int(last_rx):
+        last_rx = int(lifetick_rx) & 0xFFFF
+        last_rx_step = int(step_tick)
+
+    meta["plc_lifetick_rx"] = int(last_rx) & 0xFFFF
+    meta["plc_lifetick_rx_step_tick"] = int(last_rx_step) if last_rx_step is not None else None
+
+    age = age_ticks(step_tick, last_rx_step)
+    meta["plc_lifetick_age_ticks"] = int(age or 0)
+    return is_stale(step_tick, last_rx_step, int(stale_after_ticks))
 
 
 def _pid_trim(

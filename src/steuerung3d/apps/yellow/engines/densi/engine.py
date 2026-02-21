@@ -139,7 +139,7 @@ class DenSiEngine:
 
     # PLC-faithful vel_cmd behavior tuning
     lifetick_stale_after_ticks_active: int = 50
-    lifetick_stale_after_ticks_idle: int = 50
+    lifetick_stale_after_ticks_idle: int = 500
 
     @classmethod
     def build_default(
@@ -171,7 +171,7 @@ class DenSiEngine:
             enforce_pos_chain=enforce_pos_chain,
             enforce_guider_minmax=enforce_guider_minmax,
             lifetick_stale_after_ticks_active=int(lifetick_stale_after_ticks_active) if lifetick_stale_after_ticks_active is not None else 50,
-            lifetick_stale_after_ticks_idle=int(lifetick_stale_after_ticks_idle) if lifetick_stale_after_ticks_idle is not None else 50,
+            lifetick_stale_after_ticks_idle=int(lifetick_stale_after_ticks_idle) if lifetick_stale_after_ticks_idle is not None else 500,
         )
         eng.reset_to_fault_state()
         eng._seed_default_params()

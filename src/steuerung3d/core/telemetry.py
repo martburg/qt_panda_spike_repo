@@ -8,6 +8,8 @@ from steuerung3d.core.mode import Mode
 from steuerung3d.core.state import AxisState, MachineState
 from steuerung3d.core.param_registry import eps_for_param
 from steuerung3d.core.joy_state import JoyState
+from steuerung3d.common.staleness import age_ticks, is_stale
+from steuerung3d.core.rig_logic import note_densi_seen
 
 @dataclass(frozen=True)
 class AxisTelemetry:
@@ -109,8 +111,13 @@ class TelemetrySnapshot:
         try:
             offline_after = int(getattr(state, "densi_offline_after_ticks", 200))
             for dev_id, d in dict(getattr(state, "densi_registry", {})).items():
-                age = int(state.tick) - int(getattr(d, "last_seen_core_tick", -10**9))
-                online = age <= offline_after
+                last_seen = int(getattr(d, "last_seen_core_tick", -1))
+                if last_seen < 0:
+                    age = int(offline_after) + 1
+                    online = False
+                else:
+                    age = int(age_ticks(int(state.tick), int(last_seen)) or 0)
+                    online = not is_stale(int(state.tick), int(last_seen), int(offline_after) + 1)
                 densis[str(dev_id)] = DensiTelemetry(
                     device_id=str(dev_id),
                     online=bool(online),
@@ -252,6 +259,7 @@ def apply_measured_snapshot(state: MachineState, snap: TelemetrySnapshot) -> Non
 
     for axis_id, ax_t in snap.axes.items():
         ax: AxisState = state.ensure_axis(axis_id)
+        note_densi_seen(state, axis_id, device_tick=int(getattr(snap, "tick", 0)))
         ax.pos = float(ax_t.pos)
         ax.vel = float(ax_t.vel)
         ax.enabled = bool(ax_t.enabled)

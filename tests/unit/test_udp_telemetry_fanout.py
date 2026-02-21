@@ -47,3 +47,24 @@ def test_udp_telemetry_fanout_delivers_to_two_targets() -> None:
 
     assert got1, "first fanout target did not receive telemetry"
     assert got2, "second fanout target did not receive telemetry"
+
+
+class _FailingOut:
+    def publish_telemetry(self, _snap: TelemetrySnapshot) -> None:
+        raise OSError("unreachable")
+
+
+def test_udp_telemetry_fanout_continues_on_failure() -> None:
+    p1 = _free_port()
+    rx1 = UdpTelemetryIn.bind(("127.0.0.1", p1))
+
+    outs = [UdpTelemetryOut.connect(("127.0.0.1", p1))]
+    outs.extend(_FailingOut() for _ in range(7))
+
+    fanout = UdpTelemetryFanout(outs=outs)
+    snap = TelemetrySnapshot(tick=1, t_s=0.0, mode="IDLE", estop=False, fault=False, axes={})
+
+    fanout.publish_telemetry(snap)
+
+    got = _drain_until(rx1)
+    assert got, "reachable fanout target did not receive telemetry"

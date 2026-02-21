@@ -12,6 +12,7 @@ _lt_last_cmd_log_by_axis: dict[str, float] = {}
 
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, coerce_param_ops
 from steuerung3d.core.state import MachineState
+from steuerung3d.core.rig_logic import densi_online
 
 
 def _axis_lease_allows(state: MachineState, axis_id: str) -> bool:
@@ -27,6 +28,10 @@ def _axis_lease_allows(state: MachineState, axis_id: str) -> bool:
 def build_command_frame(state: MachineState) -> CommandFrame:
     axes: Dict[str, AxisSetpoint] = {}
     for axis_id, cmd in state.axis_cmd.items():
+        if hasattr(state, "densi_registry") and axis_id in dict(getattr(state, "densi_registry", {})):
+            if not densi_online(state, axis_id):
+                axes[axis_id] = AxisSetpoint(enable=False, vel=0.0)
+                continue
         if not _axis_lease_allows(state, axis_id):
             axes[axis_id] = AxisSetpoint(enable=False, vel=0.0)
             continue

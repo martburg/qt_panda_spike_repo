@@ -145,7 +145,10 @@ class UdpTelemetryFanout:
 
     def publish_telemetry(self, snap: TelemetrySnapshot) -> None:
         for out in list(self.outs or []):
-            out.publish_telemetry(snap)
+            try:
+                out.publish_telemetry(snap)
+            except Exception:
+                log.debug("udp fanout send failed", exc_info=True)
 
 
 # ---------- Device seam ----------

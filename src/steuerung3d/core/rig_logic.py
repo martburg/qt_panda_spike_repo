@@ -5,6 +5,7 @@ from typing import Dict, Tuple
 
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.rig_types import RigMode, RigSyncConfig, RecoverPlan
+from steuerung3d.common.staleness import is_stale
 
 
 def _normalize_rig_mode(value) -> RigMode:
@@ -49,7 +50,7 @@ def densi_online(state: MachineState, device_id: str) -> bool:
     timeout = int(getattr(state, "densi_offline_after_ticks", 200))
     if d.last_seen_core_tick < 0:
         return False
-    return (int(state.tick) - int(d.last_seen_core_tick)) <= timeout
+    return not is_stale(int(state.tick), int(d.last_seen_core_tick), int(timeout) + 1)
 
 
 def frozen(state: MachineState) -> bool:

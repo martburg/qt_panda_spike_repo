@@ -32,6 +32,10 @@ pytest -q
 pytest -q tests/unit/test_udp_telemetry_fanout.py
 ```
 
+- Performance guard:
+	- fanout robustness test passes
+	- no new per-tick INFO logs in hot loops
+
 ## PLC-wire integration regression guards
 
 ### 1) Core ⇄ HiP livetick echo roundtrip (PLC)
