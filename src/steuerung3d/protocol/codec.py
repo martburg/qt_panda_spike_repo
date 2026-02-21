@@ -18,6 +18,10 @@ from steuerung3d.core.intents import (
     SmoothStop,
     ClaimAxis,
     ReleaseAxis,
+    RequestRigLease,
+    ReleaseRigLease,
+    RequestAxisLease,
+    ReleaseAxisLease,
     SetEstop,
     RequestEstopReset,   # NEW
     RequestResync,
@@ -48,6 +52,10 @@ _INTENT_TYPE_MAP = {
     "smooth_stop": SmoothStop,
     "claim_axis": ClaimAxis,
     "release_axis": ReleaseAxis,
+    "request_rig_lease": RequestRigLease,
+    "release_rig_lease": ReleaseRigLease,
+    "request_axis_lease": RequestAxisLease,
+    "release_axis_lease": ReleaseAxisLease,
     "set_estop": SetEstop,
     "estop_reset": RequestEstopReset,   # NEW
     "resync": RequestResync,
@@ -115,12 +123,19 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
         )
 
     lease_rig = str(payload.get("lease_rig", ""))
+    lease_rig_holder = str(payload.get("lease_rig_holder", lease_rig))
     lease_axis_in = payload.get("lease_axis", {})
     lease_axis: Dict[str, list[str]] = {}
     if isinstance(lease_axis_in, dict):
         for k, v in lease_axis_in.items():
             if isinstance(v, (list, tuple)):
                 lease_axis[str(k)] = [str(x) for x in list(v)]
+    lease_axis_holders_in = payload.get("lease_axis_holders", {})
+    lease_axis_holders: Dict[str, list[str]] = {}
+    if isinstance(lease_axis_holders_in, dict):
+        for k, v in lease_axis_holders_in.items():
+            if isinstance(v, (list, tuple)):
+                lease_axis_holders[str(k)] = [str(x) for x in list(v)]
 
     return TelemetrySnapshot(
         tick=int(payload.get("tick", 0)),
@@ -134,6 +149,9 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
         densis=densis_out,
         lease_rig=lease_rig,
         lease_axis=lease_axis,
+        lease_rig_holder=lease_rig_holder,
+        lease_axis_holders=lease_axis_holders if lease_axis_holders else dict(lease_axis),
+        lease_denial_reason=str(payload.get("lease_denial_reason", "")),
         # NEW
         estop_status_word=int(payload.get("estop_status_word", 0)),
         # parameters (optional)

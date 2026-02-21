@@ -1,5 +1,5 @@
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, SetEstop
+from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, SetEstop, RequestAxisLease
 from steuerung3d.core.mode import Mode
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.state_machine import enforce_mode_actions
@@ -22,10 +22,12 @@ def test_idle_to_live_and_back():
 def test_motion_intents_blocked_outside_live():
     st = MachineState()
     st.ensure_axis("X")
+    hip_id = "hipA"
+    apply_intent(st, RequestAxisLease(axis_id="X", hip_id=hip_id, req_id="lease-1"))
 
     # In IDLE: enabling/jogging should do nothing (policy in v0.1)
-    apply_intent(st, EnableAxis(axis_id="X", enable=True))
-    apply_intent(st, JogAxis(axis_id="X", vel=1.0))
+    apply_intent(st, EnableAxis(axis_id="X", enable=True, hip_id=hip_id))
+    apply_intent(st, JogAxis(axis_id="X", vel=1.0, hip_id=hip_id))
     enforce_mode_actions(st)
 
     assert st.mode == Mode.IDLE
@@ -33,8 +35,8 @@ def test_motion_intents_blocked_outside_live():
 
     # Arm LIVE: now they take effect (in command state)
     apply_intent(st, ArmLiveMode())
-    apply_intent(st, EnableAxis(axis_id="X", enable=True))
-    apply_intent(st, JogAxis(axis_id="X", vel=1.0))
+    apply_intent(st, EnableAxis(axis_id="X", enable=True, hip_id=hip_id))
+    apply_intent(st, JogAxis(axis_id="X", vel=1.0, hip_id=hip_id))
 
     assert st.mode == Mode.LIVE
     cmd = st.axis_cmd["X"]

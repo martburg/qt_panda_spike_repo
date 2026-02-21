@@ -46,7 +46,8 @@ def test_densi_engine_plc_vel_cmd_loop() -> None:
         normalize_guider_range=lambda v: v,
         enforce_pos_chain=lambda v: v,
         enforce_guider_minmax=lambda v: v,
-        lifetick_stale_after_ticks=50,
+        lifetick_stale_after_ticks_active=50,
+        lifetick_stale_after_ticks_idle=50,
     )
     _arm_engine(eng)
 

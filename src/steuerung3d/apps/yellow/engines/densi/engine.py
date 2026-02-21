@@ -138,7 +138,8 @@ class DenSiEngine:
     enforce_guider_minmax: Callable[[dict[str, float]], dict[str, float]] | None = None
 
     # PLC-faithful vel_cmd behavior tuning
-    lifetick_stale_after_ticks: int = 50
+    lifetick_stale_after_ticks_active: int = 50
+    lifetick_stale_after_ticks_idle: int = 50
 
     @classmethod
     def build_default(
@@ -150,7 +151,8 @@ class DenSiEngine:
         normalize_guider_range,
         enforce_pos_chain,
         enforce_guider_minmax,
-        lifetick_stale_after_ticks: int | None = None,
+        lifetick_stale_after_ticks_active: int | None = None,
+        lifetick_stale_after_ticks_idle: int | None = None,
         now_s: Callable[[], float] | None = None,
     ) -> "DenSiEngine":
         tb = Timebase(dt_s=float(dt_s))
@@ -168,7 +170,8 @@ class DenSiEngine:
             normalize_guider_range=normalize_guider_range,
             enforce_pos_chain=enforce_pos_chain,
             enforce_guider_minmax=enforce_guider_minmax,
-            lifetick_stale_after_ticks=int(lifetick_stale_after_ticks) if lifetick_stale_after_ticks is not None else 50,
+            lifetick_stale_after_ticks_active=int(lifetick_stale_after_ticks_active) if lifetick_stale_after_ticks_active is not None else 50,
+            lifetick_stale_after_ticks_idle=int(lifetick_stale_after_ticks_idle) if lifetick_stale_after_ticks_idle is not None else 50,
         )
         eng.reset_to_fault_state()
         eng._seed_default_params()
@@ -632,13 +635,20 @@ class DenSiEngine:
             axis_ids=list(self.axis_ids),
             drive_ready=bool(self.drive_ready),
         )
+        params = dict(getattr(self.state, "params", {}) or {})
+        ramp_mode_ok = bool(int(params.get("RampModeOk", params.get("DriveModeOk", 1)) or 0))
+        deadman_active = bool(getattr(getattr(self.state, "joy", None), "deadman", False))
+
         step_plc_anton_vel_cmd(
             state=self.state,
             cmd=cmd_for_plant,
             dt_s=float(self.tb.dt_s),
             axis_ids=list(self.axis_ids),
             ready_for_sollvel=bool(self.drive_ready),
-            lifetick_stale_after_ticks=int(self.lifetick_stale_after_ticks),
+            lifetick_stale_after_ticks_active=int(self.lifetick_stale_after_ticks_active),
+            lifetick_stale_after_ticks_idle=int(self.lifetick_stale_after_ticks_idle),
+            deadman_active=bool(deadman_active),
+            ramp_mode_ok=bool(ramp_mode_ok),
         )
 
     def maybe_latch_cut_markers(self, estop_edge: bool) -> None:

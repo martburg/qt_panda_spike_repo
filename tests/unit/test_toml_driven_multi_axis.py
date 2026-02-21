@@ -7,7 +7,7 @@ import pytest
 from steuerung3d.config.plc_stack_config import load_plc_stack_config
 from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
 from steuerung3d.adapters.sim.device import SimDevice
-from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, SetEstop
+from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, RequestAxisLease, SetEstop
 
 from steuerung3d.apps.plc_stack.builder import build_core
 
@@ -128,10 +128,13 @@ axis_ids = ["Y"]
     tr.publish_intent(ArmLiveMode())
     eng.step_once()
 
-    tr.publish_intent(EnableAxis(axis_id="X", enable=True))
-    tr.publish_intent(EnableAxis(axis_id="Y", enable=True))
-    tr.publish_intent(JogAxis(axis_id="X", vel=0.4))
-    tr.publish_intent(JogAxis(axis_id="Y", vel=-0.1))
+    hip_id = "hip-test"
+    tr.publish_intent(RequestAxisLease(axis_id="X", hip_id=hip_id, req_id="lease-x"))
+    tr.publish_intent(RequestAxisLease(axis_id="Y", hip_id=hip_id, req_id="lease-y"))
+    tr.publish_intent(EnableAxis(axis_id="X", enable=True, hip_id=hip_id))
+    tr.publish_intent(EnableAxis(axis_id="Y", enable=True, hip_id=hip_id))
+    tr.publish_intent(JogAxis(axis_id="X", vel=0.4, hip_id=hip_id))
+    tr.publish_intent(JogAxis(axis_id="Y", vel=-0.1, hip_id=hip_id))
 
     for _ in range(50):
         eng.step_once()

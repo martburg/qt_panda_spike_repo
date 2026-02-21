@@ -9,7 +9,7 @@ from steuerung3d.adapters.sim.device import SimDevice
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, SetEstop
+from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, SetEstop, RequestAxisLease
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.command_frame import CommandFrame
 
@@ -64,14 +64,17 @@ def test_command_frame_sequence_regression_hash():
     )
 
     # Deterministic intent schedule
+    hip_id = "hipA"
+    for a in axis_ids:
+        transport.publish_intent(RequestAxisLease(axis_id=a, hip_id=hip_id, req_id=f"lease-{a}"))
     transport.publish_intent(ArmLiveMode())  # tick=0
     eng.step_once()  # tick=1
 
     for a in axis_ids:
-        transport.publish_intent(EnableAxis(axis_id=a, enable=True))  # tick=1
+        transport.publish_intent(EnableAxis(axis_id=a, enable=True, hip_id=hip_id))  # tick=1
 
-    transport.publish_intent(JogAxis(axis_id="X", vel=0.5))
-    transport.publish_intent(JogAxis(axis_id="Y", vel=-0.25))
+    transport.publish_intent(JogAxis(axis_id="X", vel=0.5, hip_id=hip_id))
+    transport.publish_intent(JogAxis(axis_id="Y", vel=-0.25, hip_id=hip_id))
 
     eng.run_for_ticks(20)
 

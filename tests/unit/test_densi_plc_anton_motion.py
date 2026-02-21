@@ -49,7 +49,10 @@ def test_accel_ramp_limits_velocity() -> None:
         dt_s=1.0,
         axis_ids=["Anton"],
         ready_for_sollvel=True,
-        lifetick_stale_after_ticks=50,
+        lifetick_stale_after_ticks_active=50,
+        lifetick_stale_after_ticks_idle=50,
+        deadman_active=True,
+        ramp_mode_ok=True,
     )
 
     ax = st.axes["Anton"]
@@ -70,7 +73,10 @@ def test_soft_limit_braking_caps_speed() -> None:
         dt_s=1.0,
         axis_ids=["Anton"],
         ready_for_sollvel=True,
-        lifetick_stale_after_ticks=50,
+        lifetick_stale_after_ticks_active=50,
+        lifetick_stale_after_ticks_idle=50,
+        deadman_active=True,
+        ramp_mode_ok=True,
     )
 
     ax = st.axes["Anton"]
@@ -88,7 +94,10 @@ def test_lifetick_stale_gate_forces_zero_speed() -> None:
             dt_s=0.1,
             axis_ids=["Anton"],
             ready_for_sollvel=True,
-            lifetick_stale_after_ticks=2,
+            lifetick_stale_after_ticks_active=2,
+            lifetick_stale_after_ticks_idle=2,
+            deadman_active=True,
+            ramp_mode_ok=True,
         )
 
     ax = st.axes["Anton"]
@@ -107,8 +116,70 @@ def test_position_trim_adds_velocity_bias() -> None:
         dt_s=0.1,
         axis_ids=["Anton"],
         ready_for_sollvel=True,
-        lifetick_stale_after_ticks=50,
+        lifetick_stale_after_ticks_active=50,
+        lifetick_stale_after_ticks_idle=50,
+        deadman_active=True,
+        ramp_mode_ok=True,
     )
+
+
+def test_deadman_threshold_uses_active_ticks() -> None:
+    st = _mk_state()
+    cmd = _mk_cmd(vel=2.0, lifetick=42)
+
+    for _ in range(2):
+        step_plc_anton_vel_cmd(
+            state=st,
+            cmd=cmd,
+            dt_s=0.1,
+            axis_ids=["Anton"],
+            ready_for_sollvel=True,
+            lifetick_stale_after_ticks_active=1,
+            lifetick_stale_after_ticks_idle=10,
+            deadman_active=True,
+            ramp_mode_ok=True,
+        )
+
+    ax = st.axes["Anton"]
+    assert abs(ax.vel) <= 1e-6
+
+
+def test_idle_threshold_allows_motion_longer() -> None:
+    st = _mk_state()
+    cmd = _mk_cmd(vel=2.0, lifetick=42)
+
+    for _ in range(2):
+        step_plc_anton_vel_cmd(
+            state=st,
+            cmd=cmd,
+            dt_s=0.1,
+            axis_ids=["Anton"],
+            ready_for_sollvel=True,
+            lifetick_stale_after_ticks_active=1,
+            lifetick_stale_after_ticks_idle=10,
+            deadman_active=False,
+            ramp_mode_ok=True,
+        )
 
     ax = st.axes["Anton"]
     assert ax.vel > 0.0
+
+
+def test_ramp_mode_gate_forces_zero_speed() -> None:
+    st = _mk_state()
+    cmd = _mk_cmd(vel=2.0, lifetick=1)
+
+    step_plc_anton_vel_cmd(
+        state=st,
+        cmd=cmd,
+        dt_s=0.1,
+        axis_ids=["Anton"],
+        ready_for_sollvel=True,
+        lifetick_stale_after_ticks_active=50,
+        lifetick_stale_after_ticks_idle=50,
+        deadman_active=True,
+        ramp_mode_ok=False,
+    )
+
+    ax = st.axes["Anton"]
+    assert abs(ax.vel) <= 1e-6

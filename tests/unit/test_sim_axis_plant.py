@@ -4,7 +4,7 @@ from steuerung3d.adapters.sim.axis_plant import AxisPlantParams, SimAxisPlant
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, SetEstop
+from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, SetEstop, RequestAxisLease
 from steuerung3d.core.state import MachineState
 
 
@@ -25,9 +25,11 @@ def test_sim_plant_acc_limits_and_estop():
     )
 
     # Arm LIVE and command motion
+    hip_id = "hipA"
+    apply_intent(st, RequestAxisLease(axis_id="X", hip_id=hip_id, req_id="lease-1"))
     apply_intent(st, ArmLiveMode())
-    apply_intent(st, EnableAxis(axis_id="X", enable=True))
-    apply_intent(st, JogAxis(axis_id="X", vel=5.0))
+    apply_intent(st, EnableAxis(axis_id="X", enable=True, hip_id=hip_id))
+    apply_intent(st, JogAxis(axis_id="X", vel=5.0, hip_id=hip_id))
 
     # After 1 tick, max dv = acc*dt = 0.01 -> vel should be 0.01
     eng.step_once()

@@ -43,6 +43,40 @@ class ReleaseAxis:
 
 
 @dataclass(frozen=True)
+class RequestRigLease:
+    """Request exclusive rig/world lease."""
+    type: Literal["request_rig_lease"] = "request_rig_lease"
+    hip_id: str = ""
+    req_id: str = ""
+
+
+@dataclass(frozen=True)
+class ReleaseRigLease:
+    """Release rig/world lease."""
+    type: Literal["release_rig_lease"] = "release_rig_lease"
+    hip_id: str = ""
+    req_id: str = ""
+
+
+@dataclass(frozen=True)
+class RequestAxisLease:
+    """Request axis lease (set-valued holders per axis)."""
+    type: Literal["request_axis_lease"] = "request_axis_lease"
+    axis_id: str = ""
+    hip_id: str = ""
+    req_id: str = ""
+
+
+@dataclass(frozen=True)
+class ReleaseAxisLease:
+    """Release axis lease for a holder."""
+    type: Literal["release_axis_lease"] = "release_axis_lease"
+    axis_id: str = ""
+    hip_id: str = ""
+    req_id: str = ""
+
+
+@dataclass(frozen=True)
 class SetEstop:
     type: Literal["set_estop"] = "set_estop"
     estop: bool = True
@@ -234,4 +268,8 @@ Intent = Union[
     ParamCancel,
     EchoLifeTick,
     JoyStateUpdate,
+    RequestRigLease,
+    ReleaseRigLease,
+    RequestAxisLease,
+    ReleaseAxisLease,
 ]

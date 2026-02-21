@@ -57,6 +57,9 @@ class TelemetrySnapshot:
     # Leases (Core-owned authority surface)
     lease_rig: str = ""
     lease_axis: Dict[str, list[str]] = field(default_factory=dict)
+    lease_rig_holder: str = ""
+    lease_axis_holders: Dict[str, list[str]] = field(default_factory=dict)
+    lease_denial_reason: str = ""
 
     # NEW
     estop_status_word: int = 0
@@ -121,13 +124,26 @@ class TelemetrySnapshot:
 
         lease_rig = str(getattr(state, "lease_rig", ""))
         lease_axis: Dict[str, list[str]] = {}
+        lease_axis_holders: Dict[str, list[str]] = {}
         try:
-            claims = dict(getattr(state, "axis_claims", {}) or {})
-            for axis_id, hip_id in claims.items():
-                if hip_id:
-                    lease_axis[str(axis_id)] = [str(hip_id)]
+            lease_axis_holders = {
+                str(k): [str(x) for x in list(v)]
+                for k, v in dict(getattr(state, "lease_axis_holders", {}) or {}).items()
+                if isinstance(v, (list, tuple))
+            }
         except Exception:
-            lease_axis = {}
+            lease_axis_holders = {}
+
+        if lease_axis_holders:
+            lease_axis = dict(lease_axis_holders)
+        else:
+            try:
+                claims = dict(getattr(state, "axis_claims", {}) or {})
+                for axis_id, hip_id in claims.items():
+                    if hip_id:
+                        lease_axis[str(axis_id)] = [str(hip_id)]
+            except Exception:
+                lease_axis = {}
 
         return cls(
             tick=int(state.tick),
@@ -140,6 +156,9 @@ class TelemetrySnapshot:
             densis=densis,
             lease_rig=lease_rig,
             lease_axis=lease_axis,
+            lease_rig_holder=lease_rig,
+            lease_axis_holders=lease_axis_holders if lease_axis_holders else dict(lease_axis),
+            lease_denial_reason=str(getattr(state, "lease_last_denial_reason", "")),
             estop_status_word=int(getattr(state, "estop_status_word", 0)),
             param_edit_active=bool(getattr(state, "param_edit_active", False)),
             param_edit_group=str(getattr(state, "param_edit_group", "")),

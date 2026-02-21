@@ -48,6 +48,10 @@ class MachineState:
 
     # Rig-level lease (exclusive). Core owns policy; default empty.
     lease_rig: str = ""
+    # Axis leases (set-valued holders per axis)
+    lease_axis_holders: Dict[str, list[str]] = field(default_factory=dict)
+    # Last lease denial reason (for telemetry)
+    lease_last_denial_reason: str = ""
 
     # high-level health/safety flags (v0.1)
     estop: bool = False

@@ -21,7 +21,8 @@ from steuerung3d.core.state import MachineState
 
 @dataclass(frozen=True)
 class PlcAntonVelCmdConfig:
-    lifetick_stale_after_ticks: int = 50
+    lifetick_stale_after_ticks_active: int = 50
+    lifetick_stale_after_ticks_idle: int = 50
 
 
 def _f(params: dict[str, float], key: str, default: float) -> float:
@@ -109,7 +110,10 @@ def step_plc_anton_vel_cmd(
     dt_s: float,
     axis_ids: Iterable[str],
     ready_for_sollvel: bool,
-    lifetick_stale_after_ticks: int,
+    lifetick_stale_after_ticks_active: int,
+    lifetick_stale_after_ticks_idle: int,
+    deadman_active: bool,
+    ramp_mode_ok: bool,
 ) -> None:
     params = dict(getattr(state, "params", {}) or {})
     for axis_id in axis_ids:
@@ -124,15 +128,16 @@ def step_plc_anton_vel_cmd(
         # Lifetick echo stale gate (tick-based).
         echo_map = getattr(cmd, "lifetick_echo", {}) if isinstance(getattr(cmd, "lifetick_echo", {}), dict) else {}
         lifetick_rx = int(echo_map.get(axis_id, int(getattr(cmd, "tick", 0)))) & 0xFFFF
+        stale_after = int(lifetick_stale_after_ticks_active if deadman_active else lifetick_stale_after_ticks_idle)
         stale = _lifetick_is_stale(
             meta=ax.meta,
             lifetick_rx=lifetick_rx,
-            stale_after_ticks=int(lifetick_stale_after_ticks),
+            stale_after_ticks=stale_after,
         )
 
         # Commanded speed from SpeedSollIN (AxisSetpoint.vel).
         desired = float(getattr(sp, "vel", 0.0)) if sp is not None else 0.0
-        if (not control_enabled) or stale:
+        if (not control_enabled) or stale or (not bool(ramp_mode_ok)):
             desired = 0.0
 
         # Clamp to SpeedMaxUI.

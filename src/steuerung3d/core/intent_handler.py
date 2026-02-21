@@ -10,6 +10,10 @@ from steuerung3d.core.intents import (
     EnableAxis,
     ClaimAxis,
     ReleaseAxis,
+    RequestRigLease,
+    ReleaseRigLease,
+    RequestAxisLease,
+    ReleaseAxisLease,
     JogAxis,
     JogWinch,
     JogCartesian,
@@ -67,6 +71,27 @@ def _txn_seen_or_mark(state: MachineState, req_id: str, *, max_keep: int = 512) 
     return False
 
 
+def _set_lease_denial(state: MachineState, reason: str, req_id: str = "") -> None:
+    state.lease_last_denial_reason = str(reason or "")
+    if req_id:
+        state.core_acks.append(f"{req_id}:deny:{reason}")
+
+
+def _axis_lease_holders(state: MachineState, axis_id: str) -> list[str]:
+    holders = getattr(state, "lease_axis_holders", {}) or {}
+    vals = holders.get(axis_id, []) if isinstance(holders, dict) else []
+    if not isinstance(vals, (list, tuple)):
+        return []
+    return [str(x) for x in list(vals) if str(x)]
+
+
+def _axis_lease_allows(state: MachineState, axis_id: str, hip_id: str) -> bool:
+    holders = _axis_lease_holders(state, axis_id)
+    if not holders:
+        return False
+    return str(hip_id or "") in holders
+
+
 def apply_intent(state: MachineState, intent: Intent) -> None:
     """
     Apply an intent to MachineState.
@@ -117,6 +142,76 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             else:
                 if req_id:
                     state.core_acks.append(f"{req_id}:noop")
+            return
+
+        # --- LEASES (rig + axis) ---
+        case RequestRigLease(hip_id=hip_id, req_id=req_id):
+            if _txn_seen_or_mark(state, req_id):
+                return
+            hip_id = str(hip_id or "")
+            if not hip_id:
+                return
+            cur = str(getattr(state, "lease_rig", "") or "")
+            if cur in ("", hip_id):
+                state.lease_rig = hip_id
+                state.lease_last_denial_reason = ""
+                _txn_ack(state, req_id)
+            else:
+                _set_lease_denial(state, f"rig_held_by:{cur}", req_id=req_id)
+            return
+
+        case ReleaseRigLease(hip_id=hip_id, req_id=req_id):
+            if _txn_seen_or_mark(state, req_id):
+                return
+            hip_id = str(hip_id or "")
+            cur = str(getattr(state, "lease_rig", "") or "")
+            if hip_id and cur == hip_id:
+                state.lease_rig = ""
+                state.lease_last_denial_reason = ""
+                _txn_ack(state, req_id)
+            else:
+                _set_lease_denial(state, "rig_not_held", req_id=req_id)
+            return
+
+        case RequestAxisLease(axis_id=axis_id, hip_id=hip_id, req_id=req_id):
+            if _txn_seen_or_mark(state, req_id):
+                return
+            axis_id = str(axis_id or "")
+            hip_id = str(hip_id or "")
+            if not axis_id or not hip_id:
+                return
+            holders = _axis_lease_holders(state, axis_id)
+            if holders and hip_id not in holders:
+                _set_lease_denial(state, f"axis_held_by:{','.join(holders)}", req_id=req_id)
+                return
+            holders = list(dict.fromkeys(holders + [hip_id]))
+            if not hasattr(state, "lease_axis_holders"):
+                state.lease_axis_holders = {}
+            state.lease_axis_holders[axis_id] = holders
+            state.lease_last_denial_reason = ""
+            _txn_ack(state, req_id)
+            return
+
+        case ReleaseAxisLease(axis_id=axis_id, hip_id=hip_id, req_id=req_id):
+            if _txn_seen_or_mark(state, req_id):
+                return
+            axis_id = str(axis_id or "")
+            hip_id = str(hip_id or "")
+            if not axis_id or not hip_id:
+                return
+            holders = _axis_lease_holders(state, axis_id)
+            if hip_id not in holders:
+                _set_lease_denial(state, "axis_not_held", req_id=req_id)
+                return
+            holders = [h for h in holders if h != hip_id]
+            if not hasattr(state, "lease_axis_holders"):
+                state.lease_axis_holders = {}
+            if holders:
+                state.lease_axis_holders[axis_id] = holders
+            else:
+                state.lease_axis_holders.pop(axis_id, None)
+            state.lease_last_denial_reason = ""
+            _txn_ack(state, req_id)
             return
 
         # --- UI livetick echo (not safety-critical) ---
@@ -305,6 +400,9 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
     match intent:
         case EnableAxis(axis_id=axis_id, enable=enable, hip_id=hip_id):
             state.ensure_axis(axis_id)
+            if not _axis_lease_allows(state, axis_id, hip_id):
+                state.lease_last_denial_reason = f"axis_lease_required:{axis_id}"
+                return
             claim = state.axis_claims.get(axis_id, "")
             if claim and hip_id and claim != hip_id:
                 return
@@ -319,6 +417,9 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
 
         case JogAxis(axis_id=axis_id, vel=vel, hip_id=hip_id):
             state.ensure_axis(axis_id)
+            if not _axis_lease_allows(state, axis_id, hip_id):
+                state.lease_last_denial_reason = f"axis_lease_required:{axis_id}"
+                return
             claim = state.axis_claims.get(axis_id, "")
             if claim and hip_id and claim != hip_id:
                 return
@@ -333,6 +434,9 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             # Semantic alias: winches are axes at this layer.
             axis_id = str(winch_id)
             state.ensure_axis(axis_id)
+            if not _axis_lease_allows(state, axis_id, hip_id):
+                state.lease_last_denial_reason = f"axis_lease_required:{axis_id}"
+                return
             claim = state.axis_claims.get(axis_id, "")
             if claim and hip_id and claim != hip_id:
                 return
@@ -346,8 +450,15 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
         case JogCartesian(vx=vx, vy=vy, vz=vz, hip_id=hip_id):
             # v0.1: if the system has axes named X/Y/Z, map directly to JogAxis.
             # Otherwise ignore (kinematics layer not implemented yet).
+            lease_rig = str(getattr(state, "lease_rig", "") or "")
+            if not lease_rig or (hip_id and lease_rig != hip_id):
+                state.lease_last_denial_reason = "rig_lease_required"
+                return
             for axis_id, vel in (("X", vx), ("Y", vy), ("Z", vz)):
                 if axis_id in state.axes or axis_id in state.axis_cmd:
+                    if not _axis_lease_allows(state, axis_id, hip_id):
+                        state.lease_last_denial_reason = f"axis_lease_required:{axis_id}"
+                        continue
                     claim = state.axis_claims.get(axis_id, "")
                     if claim and hip_id and claim != hip_id:
                         continue

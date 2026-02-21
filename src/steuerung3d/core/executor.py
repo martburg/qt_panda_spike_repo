@@ -14,11 +14,23 @@ from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, coerce_pa
 from steuerung3d.core.state import MachineState
 
 
+def _axis_lease_allows(state: MachineState, axis_id: str) -> bool:
+    holders = getattr(state, "lease_axis_holders", {}) or {}
+    if not isinstance(holders, dict):
+        return False
+    vals = holders.get(axis_id, [])
+    if not isinstance(vals, (list, tuple)):
+        return False
+    return len([v for v in list(vals) if str(v)]) > 0
+
+
 def build_command_frame(state: MachineState) -> CommandFrame:
-    axes: Dict[str, AxisSetpoint] = {
-        axis_id: AxisSetpoint(enable=cmd.enable, vel=cmd.vel)
-        for axis_id, cmd in state.axis_cmd.items()
-    }
+    axes: Dict[str, AxisSetpoint] = {}
+    for axis_id, cmd in state.axis_cmd.items():
+        if not _axis_lease_allows(state, axis_id):
+            axes[axis_id] = AxisSetpoint(enable=False, vel=0.0)
+            continue
+        axes[axis_id] = AxisSetpoint(enable=cmd.enable, vel=cmd.vel)
     lifetick_echo = dict(getattr(state, "lifetick_echo_by_axis", {}))
 
     # LifeTick echo map is updated frequently; keep at DEBUG to avoid log spam.
