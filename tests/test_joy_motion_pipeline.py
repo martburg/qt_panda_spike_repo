@@ -5,7 +5,7 @@ from typing import Iterable
 from steuerung3d.apps.yellow.engines.hip.engine import HipEngine, HipStepInputs, HipUiInputs
 from steuerung3d.core.executor import build_command_frame
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogWinch, RequestAxisLease
+from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogWinch, JoyStateUpdate, RequestAxisLease
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
@@ -97,3 +97,49 @@ def test_joy_motion_end_to_end_gating_and_sign() -> None:
     joy = JoyState(deadman=True, select_hip=False, soll_speed=0.4)
     intents = _step_engine(axis_id=axis_id, joy=joy, claimed_by="other", hip_id=hip_id)
     assert not any(isinstance(i, JogWinch) for i in intents)
+
+
+def _setup_core_motion_state(*, axis_id: str, hip_id: str, vel_max: float) -> MachineState:
+    st = MachineState()
+    st.params["VelMax"] = float(vel_max)
+    st.ensure_axis(axis_id)
+    apply_intent(st, ArmLiveMode())
+    apply_intent(st, RequestAxisLease(axis_id=axis_id, hip_id=hip_id, req_id="lease-joy"))
+    apply_intent(st, EnableAxis(axis_id=axis_id, enable=True, hip_id=hip_id))
+    return st
+
+
+def test_joy_state_update_scales_velocity_by_velmax() -> None:
+    axis_id = "Anton"
+    hip_id = "hip-test"
+    vel_max = 2.5
+
+    st = _setup_core_motion_state(axis_id=axis_id, hip_id=hip_id, vel_max=vel_max)
+    apply_intent(st, JoyStateUpdate(deadman=True, select_hip=False, soll_speed=-1.0))
+
+    cmd = st.axis_cmd[axis_id]
+    assert cmd.vel == -vel_max
+
+
+def test_joy_state_update_deadman_false_stops() -> None:
+    axis_id = "Anton"
+    hip_id = "hip-test"
+    vel_max = 2.5
+
+    st = _setup_core_motion_state(axis_id=axis_id, hip_id=hip_id, vel_max=vel_max)
+    apply_intent(st, JoyStateUpdate(deadman=False, select_hip=False, soll_speed=1.0))
+
+    cmd = st.axis_cmd[axis_id]
+    assert cmd.vel == 0.0
+
+
+def test_joy_state_update_flows_into_command_frame() -> None:
+    axis_id = "Anton"
+    hip_id = "hip-test"
+    vel_max = 1.75
+
+    st = _setup_core_motion_state(axis_id=axis_id, hip_id=hip_id, vel_max=vel_max)
+    apply_intent(st, JoyStateUpdate(deadman=True, select_hip=False, soll_speed=1.0))
+
+    cmd = build_command_frame(st)
+    assert cmd.axes[axis_id].vel == vel_max

@@ -176,6 +176,20 @@ Run the dev stack with `device.kind = "plc_twincat_legacy_fleet"`.
 - Off-network: it should automatically use loopback UDP PLC simulators.
 - On-network: it should bind to the configured `controller_ip` and use the real adapter.
 
+## Test F — Joy deadman -> DenSi vel_cmd (SIM)
+
+Run profile:
+
+```powershell
+python -m steuerung3d up --profile 1dev_sim
+```
+
+Steps:
+- Enable deadman.
+- Move joystick to command motion.
+- Verify DenSi cmd velocity changes (Wireshark or telemetry log).
+- Release deadman -> velocity returns to 0.
+
 ## Regression guard added (why Test C won’t silently break again)
 
 `udp_channels.py` imports helpers from `protocol.codec`. A refactor can accidentally remove them and only break the apps at runtime.
