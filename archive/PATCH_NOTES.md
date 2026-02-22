@@ -76,3 +76,42 @@ Summary:
 
 Follow-ups:
 - Ensure pytest environment includes the transitions dependency or vendor it in dev setup.
+
+## BirdsEyeMotionDiagnostics Phase 0 (discovery)
+
+Baseline tests:
+- pytest -q fails during collection: missing dependency "transitions" (tests/test_axis_fsm.py imports core/axis_fsm.py).
+
+Birds-eye/status transport:
+- Structured status heartbeat lives in core/status.py (StatusEmitter.emit_every).
+- Yellow runtimes use apps/yellow/runtimes/runtime_utils.py::emit_status to send heartbeats.
+- Supervisor collects in core/stack_runtime.py (StatusCollector + format_birds_eye).
+
+Hook points for motion diagnostics:
+- HiP: apps/yellow/runtimes/hip_runtime.py::_emit_status() builds summary/fields and already includes joy fields. If needed, hip_controller.py::poll_once() has rt_result.intents + snap access just before intents are published.
+- Core: apps/core_udp_service/__main__.py::on_snapshot() emits status via status.emit_every with tick/mode/estop/fault and age metrics; this is the place to add intent/cmd diagnostics per tick.
+- DenSi: apps/yellow/runtimes/densi_runtime.py::_emit_status() emits status based on last_cmd and engine state; this is the stable place to add cmd rx/apply diagnostics. den_si/__main__.py wires DenSiController which owns DensiRuntime.
+
+## HipModeTruthFix Phase 0 (discovery)
+
+Baseline tests:
+- pytest -q fails during collection: missing dependency "transitions" (tests/test_axis_fsm.py imports core/axis_fsm.py).
+
+Where UI shows EStop/Armed/Ready:
+- HiP banner estate is computed from the Safety PLC estop word via derive_banner_estate_from_word in apps/yellow/domain/banner_facts.py and wired into the banner VM in apps/yellow/panels/hip/hip_banner_vm.py.
+- The banner label reads ESTOP/IDLE/ARMED/READY and is rendered in apps/yellow/panels/hip/hip_banner_render.py via HipViewModel.banner.estate.
+
+Where birds-eye hip "mode" is sourced:
+- hip_runtime.py::_emit_status() uses self._last_mode (from TelemetrySnapshot.mode) for the status summary/fields.
+- _last_mode is updated per tick from snap.mode in hip_runtime.py::tick().
+
+Mismatch:
+- UI estate reflects Safety PLC estop ladder state (estop word bits), while birds-eye hip "mode" reflects controller mode (snap.mode). When the PLC ladder shows ARMED/READY/ESTOP but snap.mode is IDLE, birds-eye reports mode=IDLE even though UI shows ARMED/READY/ESTOP.
+
+Target source-of-truth (candidate):
+- Use the same banner estate used by HiP UI (banner.estate from hip_banner_vm) or the underlying estop word decode (banner_facts.derive_banner_estate_from_word) as the hip status "mode".
+
+## HipModeTruthFix Phase 3 (tests)
+
+Summary:
+- Added unit tests to lock banner estate mapping and ensure HiP status mode uses the UI estate.

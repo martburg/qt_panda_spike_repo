@@ -247,21 +247,68 @@ class DensiRuntime:
         mode = self._last_mode or ""
         online = bool(self._seen_first_cmd) and (not stale)
         age_disp = format_age_ms(age_ms)
-        summary = f"axis={axis or '-'} mode={mode or '-'} online={int(online)} age_ms={age_disp}"
+        cmd = self._last_cmd
+        cmd_mode = str(getattr(cmd, "mode", "") or "") if cmd is not None else ""
+        cmd_intent = bool(getattr(cmd, "intent", False)) if cmd is not None else False
+        cmd_enable = False
+        cmd_vel = 0.0
+        try:
+            if cmd is not None and axis:
+                sp = (getattr(cmd, "axes", {}) or {}).get(axis)
+                if sp is not None:
+                    cmd_enable = bool(getattr(sp, "enable", False))
+                    cmd_vel = float(getattr(sp, "vel", 0.0) or 0.0)
+        except Exception:
+            cmd_enable = False
+            cmd_vel = 0.0
+
+        ready_for_sollvel = bool(getattr(self.engine, "drive_ready", False))
+        estop_now = bool(getattr(self.engine.state, "estop", False))
+        fault_now = bool(getattr(self.engine.state, "fault", False))
+
+        vel_applied = 0.0
+        pos_applied = 0.0
+        lifetick_age_ticks = None
+        try:
+            ax = (getattr(self.engine.state, "axes", {}) or {}).get(axis)
+            if ax is not None:
+                vel_applied = float(getattr(ax, "vel", 0.0) or 0.0)
+                pos_applied = float(getattr(ax, "pos", 0.0) or 0.0)
+                lifetick_age_ticks = int(getattr(ax, "meta", {}).get("plc_lifetick_age_ticks", 0))
+        except Exception:
+            vel_applied = 0.0
+            pos_applied = 0.0
+            lifetick_age_ticks = None
+
+        summary = (
+            f"densi axis={axis or '-'} ctrl={int(cmd_enable)} "
+            f"soll={cmd_vel:+.2f} ready={int(ready_for_sollvel)} "
+            f"estop={int(estop_now)} applied={vel_applied:+.2f}"
+        )
 
         emit_status(
             self._status,
             level=level,
             summary=summary,
             fields={
+                "component": "densi",
                 "axis": axis,
                 "mode": mode,
                 "online": bool(online),
                 "age_ms": (-1 if age_ms is None else float(age_ms)),
                 "stale": bool(stale),
-                "estop": bool(self._last_estop),
-                "fault": bool(self._last_fault),
+                "estop": bool(estop_now),
+                "fault": bool(fault_now),
                 "tick": int(getattr(self.engine.state, "tick", 0) or 0),
+                "last_cmd_rx_age_ms": (-1 if age_ms is None else float(age_ms)),
+                "cmd_mode": str(cmd_mode),
+                "cmd_intent": bool(cmd_intent),
+                "cmd_enable": bool(cmd_enable),
+                "cmd_vel": float(cmd_vel),
+                "ready_for_sollvel": bool(ready_for_sollvel),
+                "vel_applied": float(vel_applied),
+                "pos": float(pos_applied),
+                "lifetick_age_ticks": lifetick_age_ticks,
             },
             log=self._log,
             exc_tag="densi.status.emit",

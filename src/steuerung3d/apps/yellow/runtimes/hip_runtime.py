@@ -359,7 +359,10 @@ class HipRuntime:
         stale = compute_stale(age_ms, self._stale_after_ms)
         level = compute_status_level(self._last_estop, self._last_fault, stale)
         axis = str(getattr(self.engine.state, "selected_axis", "") or "") or (self._fixed_axis or "")
-        mode = self._last_mode or ""
+        estate = str(self._last_estate or "")
+        mode = estate or (self._last_mode or "")
+        armed = bool(str(estate or "").upper() in ("ARMED", "READY"))
+        ready = bool(str(estate or "").upper() == "READY")
         age_disp = format_age_ms(age_ms)
         joy = getattr(self.engine.state, "joy", JoyState())
         dm = 1 if bool(getattr(joy, "deadman", False)) else 0
@@ -374,6 +377,9 @@ class HipRuntime:
             fields={
                 "axis": axis,
                 "mode": mode,
+                "estate": str(estate or ""),
+                "armed": bool(armed),
+                "ready": bool(ready),
                 "age_ms": (-1 if age_ms is None else float(age_ms)),
                 "stale": bool(stale),
                 "estop": bool(self._last_estop),

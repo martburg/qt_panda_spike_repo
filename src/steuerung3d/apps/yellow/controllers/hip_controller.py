@@ -123,6 +123,109 @@ class HiPController:
     def _publish_intent(self, intent: object) -> None:
         self.intent_out.publish_intent(intent)
 
+    def _emit_birdseye_motion(self, *, snap, intents: list[object], estate: str) -> None:
+        status = getattr(self, "_status", None)
+        if status is None:
+            return
+
+        axis_selected = ""
+        try:
+            axis_selected = str(getattr(self._hip_engine.state, "selected_axis", "") or "")
+        except Exception:
+            axis_selected = ""
+        if not axis_selected:
+            axis_selected = str(getattr(self, "_fixed_axis", "") or "")
+
+        joy = None
+        try:
+            joy = getattr(self._hip_engine.state, "joy", None)
+        except Exception:
+            joy = None
+        if joy is None:
+            joy = getattr(snap, "joy", None)
+
+        joy_soll_speed_norm = 0.0
+        dm = False
+        sel = False
+        try:
+            joy_soll_speed_norm = float(getattr(joy, "soll_speed", 0.0) or 0.0)
+            dm = bool(getattr(joy, "deadman", False))
+            sel = bool(getattr(joy, "select_hip", False))
+        except Exception:
+            joy_soll_speed_norm = 0.0
+            dm = False
+            sel = False
+
+        velmax = 0.0
+        try:
+            params = getattr(snap, "params", {}) or {}
+            velmax = float(params.get("VelMax", 0.0) or 0.0)
+        except Exception:
+            velmax = 0.0
+        if velmax < 0.0:
+            velmax = 0.0
+
+        joy_rate_mps = joy_soll_speed_norm * velmax if velmax > 0.0 else 0.0
+
+        estop = bool(getattr(snap, "estop", False))
+        fault = bool(getattr(snap, "fault", False))
+        mode = str(estate or "")
+        armed = bool(str(estate or "").upper() in ("ARMED", "READY"))
+        ready = bool(str(estate or "").upper() == "READY")
+
+        enable = None
+        try:
+            axes = getattr(snap, "axes", None) or {}
+            if axis_selected and isinstance(axes, dict):
+                ax = axes.get(axis_selected)
+                if ax is not None:
+                    if hasattr(ax, "enable_cmd"):
+                        enable = bool(getattr(ax, "enable_cmd", False))
+                    elif hasattr(ax, "enabled"):
+                        enable = bool(getattr(ax, "enabled", False))
+        except Exception:
+            enable = None
+
+        types = []
+        try:
+            types = sorted({type(i).__name__ for i in (intents or [])})
+        except Exception:
+            types = []
+        intents_out_types = ",".join(types)
+        intents_out_count = int(len(intents or []))
+
+        summary = (
+            f"hip axis={axis_selected or '-'} mode={mode or '-'} dm={int(dm)} sel={int(sel)} "
+            f"estop={int(estop)} v={joy_rate_mps:+.2f}m/s out=[{intents_out_types}]"
+        )
+
+        fields = {
+            "component": "hip",
+            "axis_selected": str(axis_selected or ""),
+            "deadman": bool(dm),
+            "select_hip": bool(sel),
+            "joy_soll_speed_norm": float(joy_soll_speed_norm),
+            "velmax": float(velmax),
+            "joy_rate_mps": float(joy_rate_mps),
+            "intents_out_types": str(intents_out_types),
+            "intents_out_count": int(intents_out_count),
+            "estop": bool(estop),
+            "fault": bool(fault),
+            "mode": str(mode),
+            "estate": str(estate or ""),
+            "armed": bool(armed),
+            "ready": bool(ready),
+            "sel": bool(sel),
+            "dm": bool(dm),
+        }
+        if enable is not None:
+            fields["enable"] = bool(enable)
+
+        try:
+            status.emit_every(level="OK", summary=summary, fields=fields)
+        except Exception:
+            return
+
     # -------------------------------------------------------------------------
     # Polling
     # -------------------------------------------------------------------------
@@ -171,6 +274,18 @@ class HiPController:
                     except Exception:
                         pass
                 self._wd.mark("render")
+
+                if rt_result.snap is not None:
+                    estate = ""
+                    try:
+                        estate = str(getattr(getattr(rt_result.view_model, "banner", None), "estate", "") or "")
+                    except Exception:
+                        estate = ""
+                    self._emit_birdseye_motion(
+                        snap=rt_result.snap,
+                        intents=list(rt_result.intents or []),
+                        estate=estate,
+                    )
 
                 for intent in list(rt_result.intents or []):
                     self._publish_intent(intent)

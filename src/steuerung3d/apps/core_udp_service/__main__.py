@@ -301,6 +301,10 @@ def main() -> int:
         "c2_telem_out": 0,
         "cmd_out": 0,
     }
+    last_intents_meta = {
+        "count": 0,
+        "types": [],
+    }
     last_seen = {
         "intent_ts": None,
         "dev_telem_ts": None,
@@ -431,6 +435,12 @@ def main() -> int:
         if ints:
             stats["intents_in"] += len(ints)
             last_seen["intent_ts"] = time.monotonic()
+            try:
+                last_intents_meta["count"] = int(len(ints))
+                last_intents_meta["types"] = sorted({type(i).__name__ for i in ints})
+            except Exception:
+                last_intents_meta["count"] = int(len(ints))
+                last_intents_meta["types"] = []
             log.debug("rx intents: %d (last=%s)", len(ints), type(ints[-1]).__name__)
         return ints
 
@@ -586,11 +596,13 @@ def main() -> int:
                         stale = True
                 level = "ERR" if (estop_v or fault_v) else ("WARN" if stale else "OK")
 
+                intents_types = last_intents_meta.get("types", []) or []
+                intents_types_str = ",".join([str(t) for t in intents_types])
                 summary = (
+                    f"core in=[{intents_types_str}] "
+                    f"n={int(last_intents_meta.get('count', 0))} "
                     f"tick={int(getattr(snap, 'tick', 0))} mode={mode_v} "
-                    f"estop={int(estop_v)} fault={int(fault_v)} "
-                    f"age_int_ms={-1 if age_int is None else int(age_int*1000)} "
-                    f"age_dev_ms={-1 if age_dev is None else int(age_dev*1000)}"
+                    f"estop={int(estop_v)} fault={int(fault_v)}"
                 )
 
                 # Discovered devices (REAL) or spawned sims (SIM): expose as fields so the
@@ -601,14 +613,33 @@ def main() -> int:
                 except Exception:
                     devices = []
 
+                axes_snapshot = []
+                try:
+                    axis_cmd = dict(getattr(st, "axis_cmd", {}) or {})
+                    for axis_id in axis_ids:
+                        cmd = axis_cmd.get(axis_id)
+                        axes_snapshot.append(
+                            {
+                                "axis_id": str(axis_id),
+                                "cmd_enable": bool(getattr(cmd, "enable", False)) if cmd is not None else False,
+                                "cmd_vel": float(getattr(cmd, "vel", 0.0) or 0.0) if cmd is not None else 0.0,
+                            }
+                        )
+                except Exception:
+                    axes_snapshot = []
+
                 status.emit_every(
                     level=level,
                     summary=summary,
                     fields={
+                        "component": "core",
                         "tick": int(getattr(snap, "tick", 0) or 0),
                         "mode": str(mode_v),
                         "estop": estop_v,
                         "fault": fault_v,
+                        "intents_in_count": int(last_intents_meta.get("count", 0)),
+                        "intents_in_types": intents_types_str,
+                        "axes": axes_snapshot,
                         "devices": devices[:32],
                         "devices_n": len(devices),
                         "age_int_ms": None if age_int is None else age_int * 1000.0,
