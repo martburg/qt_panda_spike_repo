@@ -12,10 +12,20 @@ def is_motion_intent(intent: object) -> bool:
     return isinstance(intent, (EnableAxis, JogAxis, JogWinch, JogCartesian, SmoothStop))
 
 
+def _is_safe_release_intent(intent: object) -> bool:
+    if isinstance(intent, EnableAxis):
+        return not bool(getattr(intent, "enable", False))
+    if isinstance(intent, JogWinch):
+        return float(getattr(intent, "rate", 0.0) or 0.0) == 0.0
+    if isinstance(intent, JogAxis):
+        return float(getattr(intent, "vel", 0.0) or 0.0) == 0.0
+    return False
+
+
 def gate_motion_intents(intents: Iterable[object], *, deadman: bool) -> list[object]:
     if bool(deadman):
         return list(intents)
-    return [i for i in intents if not is_motion_intent(i)]
+    return [i for i in intents if (not is_motion_intent(i)) or _is_safe_release_intent(i)]
 
 
 def claim_allowed(
@@ -42,6 +52,18 @@ def should_emit_speed(
     last = last_sent_speed_by_axis.get(axis_id)
     if last is None or abs(float(speed) - float(last)) > float(eps):
         last_sent_speed_by_axis[axis_id] = float(speed)
+        return True
+    return False
+
+
+def should_emit_enable(
+    last_sent_enable_by_axis: dict[str, bool],
+    axis_id: str,
+    enable: bool,
+) -> bool:
+    last = last_sent_enable_by_axis.get(axis_id)
+    if last is None or bool(enable) != bool(last):
+        last_sent_enable_by_axis[axis_id] = bool(enable)
         return True
     return False
 

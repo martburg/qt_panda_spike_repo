@@ -231,30 +231,6 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
                 select_hip=bool(_select_hip),
                 soll_speed=clamp_soll_speed(float(_soll_speed)),
             )
-
-            axis_ids = list(getattr(state, "axis_cmd", {}).keys()) or list(getattr(state, "axes", {}).keys())
-            axis_id = axis_ids[0] if len(axis_ids) == 1 else ""
-            if not axis_id:
-                return
-
-            vel_max = 0.0
-            if "VelMax" not in getattr(state, "params", {}):
-                log.debug("JoyStateUpdate: VelMax missing; defaulting to 0.0")
-            else:
-                try:
-                    vel_max = float(getattr(state, "params", {}).get("VelMax", 0.0))
-                except Exception:
-                    vel_max = 0.0
-                    log.debug("JoyStateUpdate: VelMax invalid; defaulting to 0.0")
-
-            speed = float(state.joy.soll_speed) * float(vel_max)
-            if not bool(state.joy.deadman):
-                speed = 0.0
-
-            lease_holders = _axis_lease_holders(state, axis_id)
-            hip_id = lease_holders[0] if len(lease_holders) == 1 else ""
-
-            apply_intent(state, JogWinch(winch_id=str(axis_id), rate=float(speed), hip_id=str(hip_id)))
             return
 
         # --- SAFETY / GLOBAL REQUESTS ---

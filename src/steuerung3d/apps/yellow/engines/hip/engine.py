@@ -8,11 +8,14 @@ comparison before cutover.
 from __future__ import annotations
 
 from dataclasses import asdict
+import logging
 from typing import Any, Iterable
 
 from steuerung3d.core.intents import (
     ClaimAxis,
     EchoLifeTick,
+    EnableAxis,
+    JogWinch,
     ReleaseAxis,
     RequestEstopReset,
     RequestResync,
@@ -33,6 +36,7 @@ from .intent_policy import (
     gate_motion_intents,
     get_claim_owner,
     is_motion_intent,
+    should_emit_enable,
     should_emit_speed,
 )
 from .presentation import (
@@ -62,6 +66,8 @@ from .types import (
     HipUiInputs,
 )
 from .viewmodel import HipCutMarkersState, HipDriveStatusState, HipReadoutsState, HipViewModel
+
+log = logging.getLogger("hi_p")
 
 class HipEngine:
     """Minimal HipEngine surface (shadow-mode only)."""
@@ -146,20 +152,55 @@ class HipEngine:
         attached = bool(selected_axis or fixed_axis)
         mode_now = str(getattr(snap, "mode", "") or "")
 
-        if axis_id and self.state.joy.deadman and str(mode_now).upper() == "LIVE":
-            owner = get_claim_owner(snap, axis_id)
+        motion_axis_id = axis_id
+        if not motion_axis_id and len(axis_ids) == 1:
+            motion_axis_id = axis_ids[0]
+
+        params = getattr(snap, "params", {}) or {}
+
+        if motion_axis_id and str(mode_now).upper() == "LIVE":
+            owner = get_claim_owner(snap, motion_axis_id)
             if owner == str(hip_id or ""):
-                intent = map_soll_speed_to_jog_winch(
-                    winch_id=axis_id,
-                    soll_speed=float(self.state.joy.soll_speed),
-                    hip_id=hip_id,
-                )
-                if intent is not None and should_emit_speed(
-                    self.state.last_sent_speed_by_axis,
-                    axis_id,
-                    float(intent.rate),
-                ):
-                    intents.append(intent)
+                if self.state.joy.deadman:
+                    try:
+                        vel_max_mps = float(params.get("VelMax", 0.0) or 0.0)
+                    except Exception:
+                        vel_max_mps = 0.0
+                    if vel_max_mps <= 0.0 and abs(float(self.state.joy.soll_speed)) > 0.0:
+                        log.debug("HiP vel_max unavailable for axis %s", motion_axis_id)
+
+                    if should_emit_enable(
+                        self.state.last_sent_enable_by_axis,
+                        motion_axis_id,
+                        True,
+                    ):
+                        intents.append(EnableAxis(axis_id=motion_axis_id, enable=True, hip_id=hip_id))
+
+                    intent = map_soll_speed_to_jog_winch(
+                        winch_id=motion_axis_id,
+                        soll_speed=float(self.state.joy.soll_speed),
+                        vel_max=float(vel_max_mps),
+                        hip_id=hip_id,
+                    )
+                    if intent is not None and should_emit_speed(
+                        self.state.last_sent_speed_by_axis,
+                        motion_axis_id,
+                        float(intent.rate),
+                    ):
+                        intents.append(intent)
+                else:
+                    if should_emit_speed(
+                        self.state.last_sent_speed_by_axis,
+                        motion_axis_id,
+                        0.0,
+                    ):
+                        intents.append(JogWinch(winch_id=motion_axis_id, rate=0.0, hip_id=hip_id))
+                    if should_emit_enable(
+                        self.state.last_sent_enable_by_axis,
+                        motion_axis_id,
+                        False,
+                    ):
+                        intents.append(EnableAxis(axis_id=motion_axis_id, enable=False, hip_id=hip_id))
 
         if self.state.joy.select_hip and axis_id:
             owner = get_claim_owner(snap, axis_id)
@@ -236,7 +277,6 @@ class HipEngine:
 
         readouts = None
         cut_markers = None
-        params = getattr(snap, "params", {}) or {}
         if attached and axis_id and axis_id in axes:
             ax = axes.get(axis_id)
             pos, vel = read_axis_pos_vel(ax)

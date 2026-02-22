@@ -190,6 +190,20 @@ Steps:
 - Verify DenSi cmd velocity changes (Wireshark or telemetry log).
 - Release deadman -> velocity returns to 0.
 
+## Test G — HiP joystick scaling + deadman gate (SIM)
+
+Run profile:
+
+```powershell
+python -m steuerung3d up --profile 1dev_sim
+```
+
+Steps:
+- Move joystick and confirm the HiP UI shows the motion input changing.
+- Hold deadman and move joystick: DenSi cmd velocity should be non-zero.
+- Release deadman: DenSi cmd velocity returns to 0 and axis disables.
+- Full deflection should yield approximately $\pm VelMax$ (from HiP params/telemetry).
+
 ## Regression guard added (why Test C won’t silently break again)
 
 `udp_channels.py` imports helpers from `protocol.codec`. A refactor can accidentally remove them and only break the apps at runtime.

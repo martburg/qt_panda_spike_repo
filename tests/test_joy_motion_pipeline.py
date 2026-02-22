@@ -22,7 +22,7 @@ def _ui(axis_id: str) -> HipUiInputs:
     )
 
 
-def _snap(axis_id: str, *, joy: JoyState, claimed_by: str) -> TelemetrySnapshot:
+def _snap(axis_id: str, *, joy: JoyState, claimed_by: str, vel_max: float = 1.0) -> TelemetrySnapshot:
     return TelemetrySnapshot(
         tick=1,
         t_s=0.0,
@@ -40,13 +40,21 @@ def _snap(axis_id: str, *, joy: JoyState, claimed_by: str) -> TelemetrySnapshot:
                 last_seen_age_ticks=0,
             )
         },
+        params={"VelMax": float(vel_max)},
         joy=joy,
     )
 
 
-def _step_engine(*, axis_id: str, joy: JoyState, claimed_by: str, hip_id: str) -> list[object]:
+def _step_engine(
+    *,
+    axis_id: str,
+    joy: JoyState,
+    claimed_by: str,
+    hip_id: str,
+    vel_max: float = 1.0,
+) -> list[object]:
     eng = HipEngine(hip_id=hip_id)
-    snap = _snap(axis_id, joy=joy, claimed_by=claimed_by)
+    snap = _snap(axis_id, joy=joy, claimed_by=claimed_by, vel_max=vel_max)
     inputs = HipStepInputs(
         snap=snap,
         hip_id=hip_id,
@@ -74,15 +82,17 @@ def test_joy_motion_end_to_end_gating_and_sign() -> None:
     axis_id = "Anton"
     hip_id = "hip-test"
 
-    # A) deadman false => no JogWinch
+    # A) deadman false => JogWinch(0) + EnableAxis(False)
     joy = JoyState(deadman=False, select_hip=False, soll_speed=0.8)
     intents = _step_engine(axis_id=axis_id, joy=joy, claimed_by=hip_id, hip_id=hip_id)
-    assert not any(isinstance(i, JogWinch) for i in intents)
+    assert any(isinstance(i, JogWinch) and i.rate == 0.0 for i in intents)
+    assert any(isinstance(i, EnableAxis) and i.enable is False for i in intents)
 
-    # B) deadman true + owned => JogWinch with correct sign, drives CommandFrame vel
+    # B) deadman true + owned => EnableAxis(True) + JogWinch with scaled sign
     joy = JoyState(deadman=True, select_hip=False, soll_speed=-0.6)
-    intents = _step_engine(axis_id=axis_id, joy=joy, claimed_by=hip_id, hip_id=hip_id)
-    assert any(isinstance(i, JogWinch) and i.rate == -0.6 for i in intents)
+    intents = _step_engine(axis_id=axis_id, joy=joy, claimed_by=hip_id, hip_id=hip_id, vel_max=2.0)
+    assert any(isinstance(i, EnableAxis) and i.enable is True for i in intents)
+    assert any(isinstance(i, JogWinch) and i.rate == -1.2 for i in intents)
 
     st = MachineState()
     apply_intent(st, ArmLiveMode())
@@ -91,55 +101,26 @@ def test_joy_motion_end_to_end_gating_and_sign() -> None:
     _apply_intents(st, intents)
 
     cmd = build_command_frame(st)
-    assert cmd.axes[axis_id].vel == -0.6
+    assert cmd.axes[axis_id].vel == -1.2
 
     # C) owned false => no JogWinch
     joy = JoyState(deadman=True, select_hip=False, soll_speed=0.4)
     intents = _step_engine(axis_id=axis_id, joy=joy, claimed_by="other", hip_id=hip_id)
     assert not any(isinstance(i, JogWinch) for i in intents)
+    assert not any(isinstance(i, EnableAxis) for i in intents)
 
 
-def _setup_core_motion_state(*, axis_id: str, hip_id: str, vel_max: float) -> MachineState:
+def test_joy_state_update_does_not_drive_motion() -> None:
+    axis_id = "Anton"
+    hip_id = "hip-test"
+
     st = MachineState()
-    st.params["VelMax"] = float(vel_max)
     st.ensure_axis(axis_id)
     apply_intent(st, ArmLiveMode())
     apply_intent(st, RequestAxisLease(axis_id=axis_id, hip_id=hip_id, req_id="lease-joy"))
     apply_intent(st, EnableAxis(axis_id=axis_id, enable=True, hip_id=hip_id))
-    return st
 
-
-def test_joy_state_update_scales_velocity_by_velmax() -> None:
-    axis_id = "Anton"
-    hip_id = "hip-test"
-    vel_max = 2.5
-
-    st = _setup_core_motion_state(axis_id=axis_id, hip_id=hip_id, vel_max=vel_max)
     apply_intent(st, JoyStateUpdate(deadman=True, select_hip=False, soll_speed=-1.0))
 
-    cmd = st.axis_cmd[axis_id]
-    assert cmd.vel == -vel_max
-
-
-def test_joy_state_update_deadman_false_stops() -> None:
-    axis_id = "Anton"
-    hip_id = "hip-test"
-    vel_max = 2.5
-
-    st = _setup_core_motion_state(axis_id=axis_id, hip_id=hip_id, vel_max=vel_max)
-    apply_intent(st, JoyStateUpdate(deadman=False, select_hip=False, soll_speed=1.0))
-
-    cmd = st.axis_cmd[axis_id]
-    assert cmd.vel == 0.0
-
-
-def test_joy_state_update_flows_into_command_frame() -> None:
-    axis_id = "Anton"
-    hip_id = "hip-test"
-    vel_max = 1.75
-
-    st = _setup_core_motion_state(axis_id=axis_id, hip_id=hip_id, vel_max=vel_max)
-    apply_intent(st, JoyStateUpdate(deadman=True, select_hip=False, soll_speed=1.0))
-
     cmd = build_command_frame(st)
-    assert cmd.axes[axis_id].vel == vel_max
+    assert cmd.axes[axis_id].vel == 0.0

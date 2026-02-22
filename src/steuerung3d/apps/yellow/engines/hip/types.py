@@ -104,6 +104,7 @@ class HipState:
     joy: JoyState = field(default_factory=JoyState)
     last_claim_attempt_ns_by_axis: dict[str, int] = field(default_factory=dict)
     last_sent_speed_by_axis: dict[str, float] = field(default_factory=dict)
+    last_sent_enable_by_axis: dict[str, bool] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

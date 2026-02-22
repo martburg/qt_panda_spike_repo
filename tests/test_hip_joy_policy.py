@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from steuerung3d.apps.yellow.engines.hip.engine import HipEngine, HipStepInputs, HipUiInputs
-from steuerung3d.core.intents import ClaimAxis, JogAxis, JogWinch
+from steuerung3d.core.intents import ClaimAxis, EnableAxis, JogAxis, JogWinch
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot, DensiTelemetry
 
@@ -19,7 +19,13 @@ def _ui(axis_id: str) -> HipUiInputs:
     )
 
 
-def _snap(axis_id: str, *, joy: JoyState | None = None, claimed_by: str = "") -> TelemetrySnapshot:
+def _snap(
+    axis_id: str,
+    *,
+    joy: JoyState | None = None,
+    claimed_by: str = "",
+    vel_max: float = 1.0,
+) -> TelemetrySnapshot:
     densis = {}
     if claimed_by is not None:
         densis = {
@@ -40,6 +46,7 @@ def _snap(axis_id: str, *, joy: JoyState | None = None, claimed_by: str = "") ->
         fault=False,
         axes={axis_id: AxisTelemetry(pos=0.0, vel=0.0, enabled=True, fault=False)},
         densis=densis,
+        params={"VelMax": float(vel_max)},
         joy=joy if joy is not None else JoyState(),
     )
 
@@ -112,7 +119,7 @@ def test_soll_speed_negative_is_clamped_and_stored() -> None:
 def test_soll_speed_emits_jog_winch_when_deadman_held() -> None:
     eng = HipEngine(hip_id="hip-test")
     joy = JoyState(deadman=True, select_hip=False, soll_speed=0.4)
-    snap = _snap("Anton", joy=joy, claimed_by="hip-test")
+    snap = _snap("Anton", joy=joy, claimed_by="hip-test", vel_max=2.0)
 
     inputs = HipStepInputs(
         snap=snap,
@@ -130,13 +137,14 @@ def test_soll_speed_emits_jog_winch_when_deadman_held() -> None:
     )
 
     res = eng.step(inputs)
-    assert any(isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate == 0.4 for i in res.intents)
+    assert any(isinstance(i, EnableAxis) and i.axis_id == "Anton" and i.enable for i in res.intents)
+    assert any(isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate == 0.8 for i in res.intents)
 
 
 def test_soll_speed_repeat_is_throttled() -> None:
     eng = HipEngine(hip_id="hip-test")
     joy = JoyState(deadman=True, select_hip=False, soll_speed=0.2)
-    snap = _snap("Anton", joy=joy, claimed_by="hip-test")
+    snap = _snap("Anton", joy=joy, claimed_by="hip-test", vel_max=1.5)
 
     inputs = HipStepInputs(
         snap=snap,
