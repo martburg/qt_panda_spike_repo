@@ -12,4 +12,4 @@ Python source tree (package code plus some development artifacts).
 
 ## Notes
 
-- This README was auto-generated to help orient the repo. If something is inaccurate, update it to match reality.
+-
