@@ -249,3 +249,69 @@ def test_soll_speed_repeat_is_throttled() -> None:
     res2 = eng.step(inputs)
     assert any(isinstance(i, JogWinch) and i.rate == 0.0 for i in res1.intents)
     assert not any(isinstance(i, JogWinch) for i in res2.intents)
+
+
+def test_single_actionable_axis_fallback_selects_in_scope_axis() -> None:
+    class _AxisWithScope:
+        def __init__(self, *, in_scope: bool, fault: bool = False) -> None:
+            self.pos = 0.0
+            self.vel = 0.0
+            self.enabled = True
+            self.fault = fault
+            self.in_scope = in_scope
+
+    eng = HipEngine(hip_id="hip-test")
+    joy = JoyState(deadman=True, select_hip=True, soll_speed=0.5)
+    axes = {
+        "Anton": _AxisWithScope(in_scope=True, fault=False),
+        "Debby": _AxisWithScope(in_scope=False, fault=False),
+    }
+    densis = {
+        "Anton": DensiTelemetry(
+            device_id="Anton",
+            online=True,
+            claimed_by_hip="hip-test",
+            participating=False,
+            anchor_xyz=None,
+            last_seen_age_ticks=0,
+        ),
+        "Debby": DensiTelemetry(
+            device_id="Debby",
+            online=True,
+            claimed_by_hip="other",
+            participating=False,
+            anchor_xyz=None,
+            last_seen_age_ticks=0,
+        ),
+    }
+    snap = TelemetrySnapshot(
+        tick=1,
+        t_s=0.0,
+        core_mode="LIVE",
+        estop=False,
+        fault=False,
+        axes=axes,
+        densis=densis,
+        params={"VelMax": 2.0},
+        estop_status_word=_ready_estop_word(),
+        joy=joy,
+    )
+
+    inputs = HipStepInputs(
+        snap=snap,
+        hip_id="hip-test",
+        last_rx_ns=0,
+        now_ns=0,
+        stale_after_ms=500,
+        fixed_axis="",
+        lock_axis_combo=False,
+        last_mode="IDLE",
+        last_estate="IDLE",
+        ui=_ui(""),
+        core_acks=[],
+        joy=joy,
+    )
+
+    res = eng.step(inputs)
+    assert any(isinstance(i, EnableAxis) and i.axis_id == "Anton" and i.enable for i in res.intents)
+    assert any(isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate == 1.0 for i in res.intents)

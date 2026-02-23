@@ -155,6 +155,23 @@ class HipEngine:
         motion_axis_id = axis_id
         if not motion_axis_id and len(axis_ids) == 1:
             motion_axis_id = axis_ids[0]
+        if (not motion_axis_id) and self.state.joy.deadman and self.state.joy.select_hip:
+            actionable: list[str] = []
+            for axis_key in axis_ids:
+                ax = axes.get(axis_key)
+                if ax is None:
+                    continue
+                in_scope = getattr(ax, "in_scope", True)
+                if in_scope is None:
+                    in_scope = True
+                if not bool(in_scope):
+                    continue
+                if bool(getattr(ax, "fault", False)):
+                    continue
+                actionable.append(str(axis_key))
+            if len(actionable) == 1:
+                # Single-axis bring-up: avoid ambiguous selection mapping.
+                motion_axis_id = actionable[0]
 
         params = getattr(snap, "params", {}) or {}
 
