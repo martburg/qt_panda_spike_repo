@@ -163,5 +163,5 @@ def test_soll_speed_repeat_is_throttled() -> None:
 
     res1 = eng.step(inputs)
     res2 = eng.step(inputs)
-    assert any(isinstance(i, JogWinch) for i in res1.intents)
+    assert any(isinstance(i, JogWinch) and i.rate == 0.0 for i in res1.intents)
     assert not any(isinstance(i, JogWinch) for i in res2.intents)
