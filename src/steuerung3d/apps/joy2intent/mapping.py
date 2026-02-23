@@ -189,6 +189,10 @@ def synthesize_intents(
 
     selected_set = set(selected)
 
+    if deadman and select_hip and (not selected_set) and len(rig_ids) == 1:
+        # Single-winch fallback for ambiguous select button mappings during bring-up.
+        selected_set = {rig_ids[0]}
+
     # Deadman released: disable any previously enabled winches.
     if not deadman:
         prev_deadman = bool(getattr(st, 'prev_deadman', getattr(st, 'deadman_prev', False)))

@@ -36,6 +36,26 @@ def _lim() -> JoyLimits:
     return JoyLimits(max_winch_mps=0.3, fine_scale=0.2)
 
 
+def test_single_winch_select_hip_fallback_emits_enable_and_jog() -> None:
+    st = JoyState()
+    bind = JoyBindings(
+        axes={"manual_jog": 1},
+        buttons={"deadman": 5, "select_hip": 3},
+        select_buttons=[0, 1, 2, 3],
+        invert={"manual_jog": False},
+        deadzone=0.05,
+        expo=1.5,
+    )
+    rig = JoyRig(winches=["Anton"])
+    lim = _lim()
+
+    rc = _rc(axes=[0.0, 0.8], pressed=(5, 3))
+    intents = synthesize_intents(st, rc, bind, rig, lim)
+
+    assert any(isinstance(i, EnableAxis) and i.axis_id == "Anton" and i.enable for i in intents)
+    assert any(isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate > 0.0 for i in intents)
+
+
 def test_setup_manual_multi_select_emits_enable_and_jog_for_all_selected() -> None:
     st = JoyState()
     bind = _bind()
