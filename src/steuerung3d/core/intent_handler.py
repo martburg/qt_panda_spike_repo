@@ -92,6 +92,24 @@ def _axis_lease_allows(state: MachineState, axis_id: str, hip_id: str) -> bool:
     return str(hip_id or "") in holders
 
 
+def _axis_reset_allowed(state: MachineState, axis_id: str, hip_id: str) -> tuple[bool, str]:
+    axis_id = str(axis_id or "")
+    hip_id = str(hip_id or "")
+    if not axis_id:
+        return False, "missing_axis"
+    if not hip_id:
+        return False, "missing_hip"
+    claim_owner = str(state.axis_claims.get(axis_id, "") or "")
+    if claim_owner and hip_id == claim_owner:
+        return True, "claim_owner"
+    holders = _axis_lease_holders(state, axis_id)
+    if hip_id in holders:
+        return True, "lease_holder"
+    if claim_owner or holders:
+        return False, "not_owner"
+    return False, "no_owner"
+
+
 def apply_intent(state: MachineState, intent: Intent) -> None:
     """
     Apply an intent to MachineState.
@@ -258,17 +276,22 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             axis_id = str(axis_id or "")
             hip_id = str(hip_id or "")
 
+            allowed, _reason = _axis_reset_allowed(state, axis_id, hip_id)
+            if not allowed:
+                key = axis_id or "<none>"
+                state.estop_reset_denied_count_by_axis[key] = int(
+                    state.estop_reset_denied_count_by_axis.get(key, 0)
+                ) + 1
+                return
+
             if axis_id:
-                owner = state.axis_claims.get(axis_id, "")
-                if owner and hip_id and owner != hip_id:
-                    return
-                if hasattr(state, "estop_reset_req_by_axis"):
-                    state.estop_reset_req_by_axis[axis_id] = True
-                else:
-                    state.estop_reset_req = True
+                state.estop_reset_req_by_axis[axis_id] = True
             else:
-                # Backward-compat (single-axis): allow global pulse.
-                state.estop_reset_req = True
+                key = axis_id or "<none>"
+                state.estop_reset_denied_count_by_axis[key] = int(
+                    state.estop_reset_denied_count_by_axis.get(key, 0)
+                ) + 1
+                return
 
             normalize_mode(state)
             enforce_mode_actions(state)

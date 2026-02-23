@@ -24,6 +24,8 @@ from steuerung3d.protocol.udp_channels import (
     UdpIntentIn, UdpTelemetryOut, UdpTelemetryFanout,
 )
 from steuerung3d.protocol.udp_plc_channels import UdpPlcTelemetryIn, UdpPlcCommandOut
+from steuerung3d.protocol.estop_bits import decode_estop_word
+from steuerung3d.apps.yellow.domain.banner_facts import derive_banner_estate_from_word
 
 log = logging.getLogger("core_udp_service")
 
@@ -598,11 +600,72 @@ def main() -> int:
 
                 intents_types = last_intents_meta.get("types", []) or []
                 intents_types_str = ",".join([str(t) for t in intents_types])
+                reset_denied_by_axis = dict(getattr(st, "estop_reset_denied_count_by_axis", {}) or {})
+                reset_denied_total = 0
+                try:
+                    reset_denied_total = sum(int(v) for v in reset_denied_by_axis.values())
+                except Exception:
+                    reset_denied_total = 0
+
+                axes_snapshot = []
+                blocked_by = []
+                try:
+                    axis_cmd = dict(getattr(st, "axis_cmd", {}) or {})
+                    for axis_id in axis_ids:
+                        estop_word = int(router.last_dev_estop_word_by_axis.get(axis_id, int(getattr(snap, "estop_status_word", 0)) or 0))
+                        bits = {}
+                        estate = ""
+                        try:
+                            bits = decode_estop_word(estop_word)
+                            estate = derive_banner_estate_from_word(estop_word, within_brake_grace=lambda: False)
+                        except Exception:
+                            bits = {}
+                            estate = ""
+
+                        armed = bool(str(estate).upper() in ("ARMED", "READY"))
+                        ready = bool(str(estate).upper() == "READY")
+
+                        cmd = axis_cmd.get(axis_id)
+                        started = bool(cmd and (bool(getattr(cmd, "enable", False)) or abs(float(getattr(cmd, "vel", 0.0) or 0.0)) > 0.0))
+
+                        owner = str(st.axis_claims.get(axis_id, "") or "")
+                        if not owner:
+                            holders = list(getattr(st, "lease_axis_holders", {}).get(axis_id, []) or [])
+                            owner = str(holders[0]) if holders else ""
+
+                        reset_allowed = bool(owner) and bool(bits.get("reset_able", False))
+                        estop_axis = bool(str(estate).upper() == "ESTOP")
+                        fault_axis = bool(getattr(st, "fault", False))
+
+                        axes_snapshot.append(
+                            {
+                                "axis_id": str(axis_id),
+                                "in_scope": True,
+                                "estop": bool(estop_axis),
+                                "fault": bool(fault_axis),
+                                "started": bool(started),
+                                "armed": bool(armed),
+                                "ready": bool(ready),
+                                "owner_hip_id": str(owner or ""),
+                                "reset_allowed": bool(reset_allowed),
+                            }
+                        )
+
+                        if estate and str(estate).upper() != "READY":
+                            blocked_by.append(f"{axis_id}:{estate}")
+                        elif fault_axis:
+                            blocked_by.append(f"{axis_id}:fault")
+                except Exception:
+                    axes_snapshot = []
+                    blocked_by = []
+
+                blocked_by = blocked_by[:3]
+                blocked_summary = ",".join(blocked_by)
+
                 summary = (
-                    f"core in=[{intents_types_str}] "
-                    f"n={int(last_intents_meta.get('count', 0))} "
-                    f"tick={int(getattr(snap, 'tick', 0))} mode={mode_v} "
-                    f"estop={int(estop_v)} fault={int(fault_v)}"
+                    f"core_mode={mode_v} blocked_by=[{blocked_summary}] "
+                    f"in=[{intents_types_str}] n={int(last_intents_meta.get('count', 0))} "
+                    f"reset_denied={int(reset_denied_total)}"
                 )
 
                 # Discovered devices (REAL) or spawned sims (SIM): expose as fields so the
@@ -613,26 +676,13 @@ def main() -> int:
                 except Exception:
                     devices = []
 
-                axes_snapshot = []
-                try:
-                    axis_cmd = dict(getattr(st, "axis_cmd", {}) or {})
-                    for axis_id in axis_ids:
-                        cmd = axis_cmd.get(axis_id)
-                        axes_snapshot.append(
-                            {
-                                "axis_id": str(axis_id),
-                                "cmd_enable": bool(getattr(cmd, "enable", False)) if cmd is not None else False,
-                                "cmd_vel": float(getattr(cmd, "vel", 0.0) or 0.0) if cmd is not None else 0.0,
-                            }
-                        )
-                except Exception:
-                    axes_snapshot = []
-
                 status.emit_every(
                     level=level,
                     summary=summary,
                     fields={
                         "component": "core",
+                        "core_mode": str(mode_v),
+                        "blocked_by": list(blocked_by),
                         "tick": int(getattr(snap, "tick", 0) or 0),
                         "mode": str(mode_v),
                         "estop": estop_v,
@@ -640,6 +690,8 @@ def main() -> int:
                         "intents_in_count": int(last_intents_meta.get("count", 0)),
                         "intents_in_types": intents_types_str,
                         "axes": axes_snapshot,
+                        "reset_denied_total": int(reset_denied_total),
+                        "reset_denied_by_axis": dict(reset_denied_by_axis),
                         "devices": devices[:32],
                         "devices_n": len(devices),
                         "age_int_ms": None if age_int is None else age_int * 1000.0,

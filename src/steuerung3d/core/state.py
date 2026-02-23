@@ -59,6 +59,8 @@ class MachineState:
     estop_reset_req: bool = False  # legacy/global (single-axis)
     # NEW: per-axis one-shot request (preferred for multi-axis)
     estop_reset_req_by_axis: Dict[str, bool] = field(default_factory=dict)
+    # Policy diagnostics: denied reset requests per axis
+    estop_reset_denied_count_by_axis: Dict[str, int] = field(default_factory=dict)
 
     # Legacy ReSync pulse (clears cut marker latches / recover flow)
     resync_req: bool = False  # legacy/global (single-axis)

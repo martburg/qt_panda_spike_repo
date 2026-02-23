@@ -115,3 +115,33 @@ Target source-of-truth (candidate):
 
 Summary:
 - Added unit tests to lock banner estate mapping and ensure HiP status mode uses the UI estate.
+
+## ResetPolicyAndCoreBirdsEye Phase 0 (discovery)
+
+Baseline tests:
+- pytest -q fails during collection: missing dependency "transitions" (tests/test_axis_fsm.py imports core/axis_fsm.py).
+
+Reset intent type(s) and routing:
+- Intent: RequestEstopReset in core/intents.py (fields: axis_id, hip_id).
+- Emitted from HiP UI path: apps/yellow/engines/hip/engine.py when btnEStopReset is clicked.
+- Core handling in core/intent_handler.py: RequestEstopReset sets state.estop_reset_req_by_axis[axis_id] (or legacy estop_reset_req) with owner check against state.axis_claims.
+- Core -> DenSi routing: core/executor.py builds CommandFrame.estop_reset from state.estop_reset_req (legacy), then core_udp_service device_step maps estop_reset_req_by_axis into per-axis frames via AxisRouter.publish_command_frames (estop_reset field in per-axis CommandFrame).
+- Device-side consumption: DenSi engine reads CommandFrame.estop_reset in apps/yellow/engines/densi/engine.py::handle_estop_reset_cmd.
+
+hip_id origin and transport:
+- hip_id generated in apps/yellow/controllers/hip_controller.py and passed into HipRuntime/HipEngine; attached to RequestEstopReset intent in HipEngine.
+- Protocol codec passes hip_id through intent encode/decode (protocol/codec.py).
+
+Axis ownership/attachment state:
+- Core owns exclusive claims: state.axis_claims (axis_id -> hip_id) in core/state.py.
+- Lease holders: state.lease_axis_holders (axis_id -> list[hip_id]) used by _axis_lease_allows in core/intent_handler.py.
+- Telemetry exposes lease_axis / lease_axis_holders via core/telemetry.py; AxisRouter slices per-axis in protocol/axis_router.py.
+
+Draft design (phase 1+) notes:
+- Enforce RequestEstopReset axis scoping: only allow if hip_id matches claim owner or lease holder for axis.
+- Safe default: deny if owner/hip_id missing.
+- Emit birds-eye policy fields from Core with per-axis ownership, estop/reset eligibility, and last reset request details.
+
+Proposed birds-eye field list (Core line):
+- core_mode, blocked_by, last_reset_request{axis_id, hip_id, allowed, reason}
+- per-axis list: axis_id, in_scope, estop/fault/ready/armed, owner_hip_id, reset_allowed, reset_denied_count
