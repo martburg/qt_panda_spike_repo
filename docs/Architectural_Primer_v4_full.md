@@ -74,6 +74,103 @@ The Core is the single authority for:
 External services may provide information.\
 Only the Core may generate actuator commands.
 
+### 4.1 Canonical CoreMode (Stage-2) Safety and Drive State Model
+
+This project uses **one** authoritative global mode model called **CoreMode**.
+All components (Core, HiP, device adapters, diagnostics, tests, and docs) must
+use **CoreMode**. Legacy/compatibility modes are intentionally not part of the
+architecture.
+
+Den-Si local safety logic (including brake grace timing and readiness) remains
+authoritative for per-axis safety state; the Core aggregates those facts into a
+single global **CoreMode**.
+
+#### 4.1.1 CoreMode states
+
+CoreMode is a finite set of global states:
+
+- **ESTOP**: Any hard E-stop source is active (non-ignorable under current key policy).
+- **FAULT**: A resettable E-stop/fault source is active (SafetyPLC already performs latching).
+- **IDLE**: Safe, non-moving state used for parameter edits and Resync operations.
+- **ARMED**: Axis taster has been activated and brakes may be within a grace period.
+- **READY**: Axes are ready to move but Deadman is not held.
+- **LIVE**: Deadman is held while READY; movement is permitted (subject to Select gating).
+
+#### 4.1.2 Key policy (per-axis)
+
+Each axis can operate under a key policy that changes which safety sources are considered:
+
+- **Key0 (no key active)**: consider Master, Guider, Network, E-Stop1, E-Stop2 as **hard** sources;  and all other safety bits as **fault/resettable** sources.
+- **Key1 active**: ignore **Network** and **TwinSAFE groups** for that axis.
+- **Key2 active**: ignore everything ignored by Key1, plus **Guider** and **ENC** for that axis.
+
+Key policy is evaluated per axis based on Den-Si telemetry (e.g., chkEsKey1/chkEsKey2).
+
+#### 4.1.3 Eligible axes for global aggregation
+
+For the *global* CoreMode aggregation, **only axes with Key0 (no key active) are eligible**:
+
+- `eligible_axes = { axis | key_mode(axis) == Key0 }`
+
+Axes with Key1/Key2 are excluded from determining the global CoreMode.  
+(Their per-axis safety state still exists and is visible in telemetry/diagnostics.)
+
+If `eligible_axes` is empty, the system must remain in a safe non-moving state
+(e.g., **FAULT**) and report an explicit blocked reason (e.g., `NO_KEY0_AXES`).
+
+#### 4.1.4 Combinational CoreMode derivation (no latching in Core)
+
+CoreMode is derived deterministically each tick from the latest aggregated safety facts:
+
+1. **ESTOP** if any eligible axis has an effective *hard* E-stop active.
+2. **FAULT** else if any eligible axis has an effective *fault/resettable* E-stop active.
+3. **IDLE** else if not all eligible axes are `armed==1`.
+4. **ARMED** else if all eligible axes are armed, but not all eligible axes are `ready==1`.
+5. **READY** else (all eligible axes ready) and `deadman==0`.
+6. **LIVE** if (all eligible axes ready) and `deadman==1`.
+
+Notes:
+
+- The Core does **not** latch fault conditions; SafetyPLC local logic already provides the intended
+  reset/latch behavior.
+- Transition **READY → LIVE** is driven solely by Deadman.
+- Leaving LIVE occurs when Deadman is released (LIVE → READY).
+
+#### 4.1.5 Motion permission gating inside LIVE (Select gating)
+
+CoreMode=LIVE indicates that motion is permitted *in principle*. Actual non-zero motion additionally requires:
+
+- `deadman == 1` (implied by LIVE), and
+- `selected == 1` (operator Select)
+
+Policy:
+
+- If `selected == 0`, commanded speed must be treated as **0** (no movement), even while in LIVE.
+- Only when `selected == 1` may non-zero speed be applied.
+
+This ensures the operator flow:
+
+`IDLE → (Taster) ARMED → (Brakes ready) READY → (Deadman) LIVE → (Select) non-zero motion allowed`
+
+#### 4.1.6 Mermaid state diagram
+
+```mermaid
+stateDiagram-v2
+  [*] --> ESTOP
+  ESTOP --> FAULT: hard_estop cleared\nfault_estop active
+  ESTOP --> IDLE: hard_estop cleared\nfault_estop cleared
+  FAULT --> IDLE: fault_estop cleared
+  IDLE --> ARMED: all eligible axes armed
+  ARMED --> READY: all eligible axes ready
+  READY --> LIVE: deadman=1
+  LIVE --> READY: deadman=0
+
+  note right of LIVE
+    selected=0 => speed=0
+    selected=1 => speed follows joystick
+  end note
+```
+
 ------------------------------------------------------------------------
 
 ## 5. Deterministic Timebase and Staleness Rules
