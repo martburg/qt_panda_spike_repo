@@ -408,7 +408,10 @@ class HipRuntime:
         dm = 1 if bool(getattr(joy, "deadman", False)) else 0
         sel = 1 if bool(getattr(joy, "select_hip", False)) else 0
         sp = float(getattr(joy, "soll_speed", 0.0))
-        summary = f"axis={axis or '-'} mode={mode or '-'} age_ms={age_disp} JOY dm={dm} sel={sel} sp={sp:+.2f}"
+        summary = (
+            f"axis={axis or '-'} core_mode={mode or '-'} legacy_mode={estate or '-'} "
+            f"age_ms={age_disp} JOY dm={dm} sel={sel} sp={sp:+.2f}"
+        )
 
         emit_status(
             self._status,

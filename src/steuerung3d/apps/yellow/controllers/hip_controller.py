@@ -195,7 +195,8 @@ class HiPController:
         intents_out_count = int(len(intents or []))
 
         summary = (
-            f"hip axis={axis_selected or '-'} mode={core_mode or '-'} dm={int(dm)} sel={int(sel)} "
+            f"hip axis={axis_selected or '-'} core_mode={core_mode or '-'} "
+            f"legacy_mode={estate or '-'} dm={int(dm)} sel={int(sel)} "
             f"estop={int(estop)} v={joy_rate_mps:+.2f}m/s out=[{intents_out_types}]"
         )
 
