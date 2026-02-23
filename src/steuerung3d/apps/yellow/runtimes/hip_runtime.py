@@ -28,6 +28,7 @@ except Exception:  # pragma: no cover
 from ..domain.param_txn import RetryEvent
 from ..domain.ui_estop import infer_estop_profile
 from ..engines.hip.engine import HipEngine, HipStepInputs, HipStepResult, HipUiInputs
+from ..engines.hip.intent_policy import get_claim_owner
 from ..engines.hip.types import HipPresentationData
 from ..engines.hip.viewmodel import HipViewModel
 from ..panels.hip.hip_banner_vm import compute_hip_banner_vm
@@ -93,6 +94,7 @@ class HipRuntime:
             mode = "old"
         self._shadow_mode = mode
         self._shadow_rl = RateLimiter(min_interval_s=6.0)
+        self._dbg_rl = RateLimiter(min_interval_s=1.0)
 
         self._last_rx_ns: int | None = None
         self._seen_first_telem = False
@@ -187,6 +189,38 @@ class HipRuntime:
 
         if self._shadow_mode == "shadow":
             self._diff_shadow(engine_vm=vm, legacy_vm=legacy_vm)
+
+        if self._dbg_rl.allow("hip_motion_dbg"):
+            axes = getattr(snap, "axes", {})
+            if not isinstance(axes, dict):
+                axes = {}
+            axis_ids = sorted(list(axes.keys()))
+            selected_axis = str(getattr(self.engine.state, "selected_axis", "") or "")
+            fixed_axis = str(self._fixed_axis or "")
+            motion_axis = selected_axis or fixed_axis
+            if not motion_axis and len(axis_ids) == 1:
+                motion_axis = axis_ids[0]
+
+            owner = get_claim_owner(snap, motion_axis) if motion_axis else ""
+            core_mode = str(getattr(snap, "core_mode", ""))
+            legacy_mode = str(getattr(snap, "mode", ""))
+            joy = getattr(snap, "joy", JoyState())
+            dm = bool(getattr(joy, "deadman", False))
+            sel = bool(getattr(joy, "select_hip", False))
+            sp = float(getattr(joy, "soll_speed", 0.0) or 0.0)
+
+            motion_enabled = bool(motion_axis) and core_mode.upper() == "LIVE" and owner == self._hip_id and dm
+            self._log.info(
+                "hip_motion_dbg core_mode=%s legacy_mode=%s dm=%s sel=%s sp=%.3f motion_enabled=%s axis=%s owner=%s",
+                core_mode,
+                legacy_mode,
+                int(dm),
+                int(sel),
+                sp,
+                int(motion_enabled),
+                motion_axis or "",
+                owner,
+            )
 
         if vm.param_writeback_values and vm.param_writeback_group:
             self._log.info(
