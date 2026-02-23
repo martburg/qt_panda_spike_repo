@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable
 
+from steuerung3d.core.core_mode import CoreMode
+
 
 @dataclass(frozen=True)
 class AxisSafetyFacts:
@@ -36,7 +38,7 @@ class BlockedReason:
 
 @dataclass(frozen=True)
 class AggregateResult:
-    core_mode: str
+    core_mode: CoreMode
     blocked_by: list[BlockedReason] = field(default_factory=list)
     axis_gate: dict[str, dict[str, object]] = field(default_factory=dict)
 
@@ -105,25 +107,25 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
 
     if not in_scope:
         blocked_by.append(BlockedReason("MISSING", None, "no_in_scope_axes"))
-        return AggregateResult(core_mode="ESTOP", blocked_by=blocked_by, axis_gate=axis_gate)
+        return AggregateResult(core_mode=CoreMode.ESTOP, blocked_by=blocked_by, axis_gate=axis_gate)
 
     if has_missing_or_stale:
-        return AggregateResult(core_mode="ESTOP", blocked_by=blocked_by, axis_gate=axis_gate)
+        return AggregateResult(core_mode=CoreMode.ESTOP, blocked_by=blocked_by, axis_gate=axis_gate)
 
     estop_axes = [axis for axis in in_scope if bool(axis.axis_estop)]
     if estop_axes:
         blocked_by.extend([BlockedReason("ESTOP", axis.axis_id, None) for axis in estop_axes])
-        return AggregateResult(core_mode="ESTOP", blocked_by=blocked_by, axis_gate=axis_gate)
+        return AggregateResult(core_mode=CoreMode.ESTOP, blocked_by=blocked_by, axis_gate=axis_gate)
 
     fault_axes = [axis for axis in in_scope if bool(axis.axis_fault)]
     if fault_axes:
         blocked_by.extend([BlockedReason("FAULT", axis.axis_id, None) for axis in fault_axes])
-        return AggregateResult(core_mode="ESTOP", blocked_by=blocked_by, axis_gate=axis_gate)
+        return AggregateResult(core_mode=CoreMode.ESTOP, blocked_by=blocked_by, axis_gate=axis_gate)
 
     not_started = [axis for axis in in_scope if not bool(axis.axis_started)]
     if not_started:
         blocked_by.extend([BlockedReason("NOT_STARTED", axis.axis_id, None) for axis in not_started])
-        return AggregateResult(core_mode="IDLE", blocked_by=blocked_by, axis_gate=axis_gate)
+        return AggregateResult(core_mode=CoreMode.IDLE, blocked_by=blocked_by, axis_gate=axis_gate)
 
     not_ready: list[AxisSafetyFacts] = []
     for axis in in_scope:
@@ -136,10 +138,10 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
 
     if not_ready:
         blocked_by.extend([BlockedReason("NOT_READY", axis.axis_id, None) for axis in not_ready])
-        return AggregateResult(core_mode="ARMED", blocked_by=blocked_by, axis_gate=axis_gate)
+        return AggregateResult(core_mode=CoreMode.ARMED, blocked_by=blocked_by, axis_gate=axis_gate)
 
     if inputs.live_request and inputs.joy_deadman and inputs.joy_select:
-        return AggregateResult(core_mode="LIVE", blocked_by=blocked_by, axis_gate=axis_gate)
+        return AggregateResult(core_mode=CoreMode.LIVE, blocked_by=blocked_by, axis_gate=axis_gate)
 
     if not inputs.live_request:
         blocked_by.append(BlockedReason("NO_LIVE_REQUEST", None, None))
@@ -149,7 +151,7 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
         if not inputs.joy_select:
             blocked_by.append(BlockedReason("NO_SELECT", None, None))
 
-    return AggregateResult(core_mode="READY", blocked_by=blocked_by, axis_gate=axis_gate)
+    return AggregateResult(core_mode=CoreMode.READY, blocked_by=blocked_by, axis_gate=axis_gate)
 
 
 def aggregate_and_store(state, inputs: AggregateInputs) -> AggregateResult:

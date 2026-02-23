@@ -25,6 +25,7 @@ def _snap(axis_id: str, *, joy: JoyState) -> TelemetrySnapshot:
         tick=1,
         t_s=0.0,
         mode="IDLE",
+        core_mode="IDLE",
         estop=False,
         fault=False,
         axes={axis_id: AxisTelemetry(pos=0.0, vel=0.0, enabled=True, fault=False)},

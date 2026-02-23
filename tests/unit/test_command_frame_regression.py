@@ -12,6 +12,7 @@ from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, SetEstop, RequestAxisLease
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.mode import Mode
+from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.command_frame import CommandFrame
 
 from steuerung3d.protocol.codec import encode_command_frame
@@ -49,7 +50,7 @@ def test_command_frame_sequence_regression_hash():
     st = MachineState()
     for a in axis_ids:
         st.ensure_axis(a)
-    st.core_mode = "LIVE"
+    st.core_mode = CoreMode.LIVE
     st.mode = Mode.LIVE
 
     frames: List[CommandFrame] = []

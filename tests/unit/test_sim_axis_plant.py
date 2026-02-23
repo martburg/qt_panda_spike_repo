@@ -7,13 +7,14 @@ from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.intents import EnableAxis, JogAxis, SetEstop, RequestAxisLease
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.mode import Mode
+from steuerung3d.core.core_mode import CoreMode
 
 
 def test_sim_plant_acc_limits_and_estop():
     tb = Timebase(dt_s=0.01)
     st = MachineState()
     st.ensure_axis("X")
-    st.core_mode = "LIVE"
+    st.core_mode = CoreMode.LIVE
     st.mode = Mode.LIVE
 
     plant = SimAxisPlant(params={"X": AxisPlantParams(max_vel=10.0, max_acc=1.0)})

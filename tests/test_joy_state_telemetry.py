@@ -5,6 +5,7 @@ from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.intents import JoyStateUpdate
 from steuerung3d.core.joy_state import JoyState
+from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.state import MachineState
 from steuerung3d.protocol.transport import InMemTransport
 
@@ -49,3 +50,22 @@ def test_joy_state_defaults_when_absent() -> None:
     eng.step_once()
     assert len(snaps) == 1
     assert snaps[0].joy == JoyState()
+
+
+def test_snapshot_includes_core_mode() -> None:
+    tb = Timebase(dt_s=0.01)
+    st = MachineState()
+    st.core_mode = CoreMode.ARMED
+    snaps = []
+
+    eng = CoreEngine(
+        timebase=tb,
+        state=st,
+        drain_intents=lambda: [],
+        handle_intent=apply_intent,
+        on_snapshot=snaps.append,
+    )
+
+    eng.step_once()
+    assert len(snaps) == 1
+    assert snaps[0].core_mode == CoreMode.ARMED.value

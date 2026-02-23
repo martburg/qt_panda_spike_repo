@@ -17,6 +17,7 @@ from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.command_frame import CommandFrame, coerce_param_ops
 from steuerung3d.core.state import MachineState
+from steuerung3d.core.core_mode import CoreMode, core_mode_value
 from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapshot
 from steuerung3d.protocol.core_runner import CoreRunner
 from steuerung3d.protocol.axis_router import AxisRouter
@@ -566,7 +567,7 @@ def main() -> int:
             )
             state.core_live_request_seen = live_request
             state.core_live_request = False
-            if live_request and result.core_mode != "LIVE":
+            if live_request and result.core_mode != CoreMode.LIVE:
                 codes: list[str] = []
                 for item in list(result.blocked_by or []):
                     code = str(getattr(item, "code", item))
@@ -678,7 +679,11 @@ def main() -> int:
 
                 estop_v = bool(getattr(snap, "estop", False))
                 fault_v = bool(getattr(snap, "fault", False))
-                mode_v = str(getattr(st, "core_mode", getattr(getattr(snap, "mode", ""), "value", getattr(snap, "mode", ""))))
+                mode_v = (
+                    core_mode_value(getattr(st, "core_mode", ""))
+                    or str(getattr(snap, "core_mode", ""))
+                    or str(getattr(getattr(snap, "mode", ""), "value", getattr(snap, "mode", "")))
+                )
 
                 # Simple policy: ERR on estop/fault; WARN on stale inputs; else OK.
                 stale = False

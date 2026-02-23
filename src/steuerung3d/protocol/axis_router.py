@@ -156,6 +156,7 @@ class AxisRouter:
             tick=int(getattr(snap, "tick", 0)),
             t_s=float(getattr(snap, "t_s", 0.0)),
             mode=str(getattr(snap, "mode", "")),
+            core_mode=str(getattr(snap, "core_mode", "")) or str(getattr(snap, "mode", "")),
             estop=bool(getattr(snap, "estop", False)),
             fault=bool(getattr(snap, "fault", False)),
             axes=axes,

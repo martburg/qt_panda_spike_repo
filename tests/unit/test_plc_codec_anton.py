@@ -33,6 +33,7 @@ def test_encode_plc_uplink_has_eod_and_tail() -> None:
         tick=1,
         t_s=0.1,
         mode="IDLE",
+        core_mode="IDLE",
         estop=False,
         fault=False,
         axes={"Anton": AxisTelemetry(pos=1.0, vel=2.0, enabled=True, fault=False)},

@@ -14,6 +14,7 @@ def test_inmem_transport_roundtrip():
         tick=1,
         t_s=0.01,
         mode="IDLE",
+        core_mode="IDLE",
         estop=True,
         fault=False,
         axes={"X": AxisTelemetry(pos=0.0, vel=0.0, enabled=False, fault=False)},

@@ -106,6 +106,7 @@ class PlcCodec:
                 tick=tick,
                 t_s=t_s,
                 mode=mode,
+                core_mode=mode,
                 estop=estop,
                 fault=fault,
                 axes=axes_out,

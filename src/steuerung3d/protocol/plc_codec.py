@@ -330,6 +330,7 @@ def decode_uplink_to_snapshot(payload: bytes) -> Optional[TelemetrySnapshot]:
             tick=tick,
             t_s=float(t_s),
             mode="IDLE",  # device telemetry does not control core mode; core keeps its own state machine
+            core_mode="IDLE",
             estop=bool(estop_active),
             fault=False,
             axes={axis_name: ax},

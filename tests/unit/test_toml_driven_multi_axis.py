@@ -9,6 +9,7 @@ from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
 from steuerung3d.adapters.sim.device import SimDevice
 from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, RequestAxisLease, SetEstop
 from steuerung3d.core.mode import Mode
+from steuerung3d.core.core_mode import CoreMode
 
 from steuerung3d.apps.plc_stack.builder import build_core
 
@@ -125,7 +126,7 @@ axis_ids = ["Y"]
     eng = rt.engine
     st = rt.state
 
-    st.core_mode = "LIVE"
+    st.core_mode = CoreMode.LIVE
     st.mode = Mode.LIVE
 
     # Activate + enable both axes and jog them differently.

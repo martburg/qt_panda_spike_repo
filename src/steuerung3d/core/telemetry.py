@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Dict
 
 from steuerung3d.core.mode import Mode
+from steuerung3d.core.core_mode import core_mode_value
 from steuerung3d.core.state import AxisState, MachineState
 from steuerung3d.core.param_registry import eps_for_param
 from steuerung3d.core.joy_state import JoyState
@@ -48,6 +49,7 @@ class TelemetrySnapshot:
     tick: int
     t_s: float
     mode: str
+    core_mode: str
     estop: bool
     fault: bool
     axes: Dict[str, AxisTelemetry]
@@ -156,6 +158,7 @@ class TelemetrySnapshot:
             tick=int(state.tick),
             t_s=float(state.t_s),
             mode=state.mode.value if hasattr(state.mode, "value") else str(state.mode),
+            core_mode=core_mode_value(getattr(state, "core_mode", "")),
             estop=bool(state.estop),
             fault=bool(state.fault),
             axes=axes,

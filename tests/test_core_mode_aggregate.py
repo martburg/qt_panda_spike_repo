@@ -5,6 +5,7 @@ from steuerung3d.core.mode_aggregate import (
     AxisSafetyFacts,
     aggregate_core_mode,
 )
+from steuerung3d.core.core_mode import CoreMode
 
 
 def _axis(
@@ -49,7 +50,7 @@ def test_out_of_scope_axis_does_not_block() -> None:
             joy_select=False,
         )
     )
-    assert res.core_mode == "READY"
+    assert res.core_mode == CoreMode.READY
     assert "ESTOP" not in _codes(res)
 
 
@@ -63,7 +64,7 @@ def test_all_axes_out_of_scope_goes_estop() -> None:
             stale_after_ms=100,
         )
     )
-    assert res.core_mode == "ESTOP"
+    assert res.core_mode == CoreMode.ESTOP
     assert "MISSING" in _codes(res)
 
 
@@ -71,7 +72,7 @@ def test_stale_blocks_estop() -> None:
     res = aggregate_core_mode(
         AggregateInputs(axes=[_axis("A", axis_age_ms=150)], stale_after_ms=100)
     )
-    assert res.core_mode == "ESTOP"
+    assert res.core_mode == CoreMode.ESTOP
     assert "STALE" in _codes(res)
 
 
@@ -82,7 +83,7 @@ def test_stale_overrides_estop_and_fault() -> None:
             stale_after_ms=100,
         )
     )
-    assert res.core_mode == "ESTOP"
+    assert res.core_mode == CoreMode.ESTOP
     assert "STALE" in _codes(res)
     assert "ESTOP" not in _codes(res)
     assert "FAULT" not in _codes(res)
@@ -92,7 +93,7 @@ def test_missing_blocks_estop() -> None:
     res = aggregate_core_mode(
         AggregateInputs(axes=[_axis("A", axis_started=None)], stale_after_ms=100)
     )
-    assert res.core_mode == "ESTOP"
+    assert res.core_mode == CoreMode.ESTOP
     assert "MISSING" in _codes(res)
 
 
@@ -100,7 +101,7 @@ def test_estop_blocks() -> None:
     res = aggregate_core_mode(
         AggregateInputs(axes=[_axis("A", axis_estop=True)], stale_after_ms=100)
     )
-    assert res.core_mode == "ESTOP"
+    assert res.core_mode == CoreMode.ESTOP
     assert "ESTOP" in _codes(res)
 
 
@@ -108,7 +109,7 @@ def test_estop_takes_precedence_over_fault() -> None:
     res = aggregate_core_mode(
         AggregateInputs(axes=[_axis("A", axis_estop=True, axis_fault=True)], stale_after_ms=100)
     )
-    assert res.core_mode == "ESTOP"
+    assert res.core_mode == CoreMode.ESTOP
     assert "ESTOP" in _codes(res)
     assert "FAULT" not in _codes(res)
 
@@ -117,7 +118,7 @@ def test_fault_blocks() -> None:
     res = aggregate_core_mode(
         AggregateInputs(axes=[_axis("A", axis_fault=True)], stale_after_ms=100)
     )
-    assert res.core_mode == "ESTOP"
+    assert res.core_mode == CoreMode.ESTOP
     assert "FAULT" in _codes(res)
 
 
@@ -125,7 +126,7 @@ def test_not_started_goes_idle() -> None:
     res = aggregate_core_mode(
         AggregateInputs(axes=[_axis("A", axis_started=False)], stale_after_ms=100)
     )
-    assert res.core_mode == "IDLE"
+    assert res.core_mode == CoreMode.IDLE
     assert "NOT_STARTED" in _codes(res)
 
 
@@ -136,7 +137,7 @@ def test_multi_axis_not_started_keeps_idle() -> None:
             stale_after_ms=100,
         )
     )
-    assert res.core_mode == "IDLE"
+    assert res.core_mode == CoreMode.IDLE
     assert "NOT_STARTED" in _codes(res)
 
 
@@ -147,7 +148,7 @@ def test_taster_enabled_ready_gate() -> None:
             stale_after_ms=100,
         )
     )
-    assert res.core_mode == "ARMED"
+    assert res.core_mode == CoreMode.ARMED
     assert "NOT_READY" in _codes(res)
 
 
@@ -161,7 +162,7 @@ def test_multi_axis_not_ready_stays_armed() -> None:
             stale_after_ms=100,
         )
     )
-    assert res.core_mode == "ARMED"
+    assert res.core_mode == CoreMode.ARMED
     assert "NOT_READY" in _codes(res)
 
 
@@ -179,7 +180,7 @@ def test_taster_disabled_does_not_require_ready() -> None:
             stale_after_ms=100,
         )
     )
-    assert res.core_mode == "READY"
+    assert res.core_mode == CoreMode.READY
 
 
 def test_live_requires_ready_request_deadman_select() -> None:
@@ -192,7 +193,7 @@ def test_live_requires_ready_request_deadman_select() -> None:
             joy_select=True,
         )
     )
-    assert res.core_mode == "LIVE"
+    assert res.core_mode == CoreMode.LIVE
 
 
 def test_live_drops_to_ready_without_deadman() -> None:
@@ -205,5 +206,5 @@ def test_live_drops_to_ready_without_deadman() -> None:
             joy_select=True,
         )
     )
-    assert res.core_mode == "READY"
+    assert res.core_mode == CoreMode.READY
     assert "NO_DEADMAN" in _codes(res)

@@ -8,6 +8,7 @@ from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, SetEstop, RequestAxisLease
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.mode import Mode
+from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.protocol.recording import JsonlRecorder, LoggedTransport, JsonlReader
 from steuerung3d.protocol.transport import InMemTransport
 
@@ -23,7 +24,7 @@ def test_record_and_replay(tmp_path: Path):
     tb = Timebase(dt_s=0.01)
     st = MachineState()
     st.ensure_axis("X")
-    st.core_mode = "LIVE"
+    st.core_mode = CoreMode.LIVE
     st.mode = Mode.LIVE
 
     eng = CoreEngine(

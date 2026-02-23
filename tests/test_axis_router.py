@@ -88,6 +88,7 @@ def test_router_slices_ui_snapshot_and_pins_device_scoped_fields():
         tick=1,
         t_s=0.02,
         mode="LIVE",
+        core_mode="LIVE",
         estop=False,
         fault=False,
         axes={"X": AxisTelemetry(pos=0.0, vel=0.0, enabled=True, fault=False)},
@@ -111,6 +112,7 @@ def test_router_slices_ui_snapshot_and_pins_device_scoped_fields():
         tick=2,
         t_s=0.04,
         mode="LIVE",
+        core_mode="LIVE",
         estop=False,
         fault=False,
         axes={

@@ -10,6 +10,7 @@ def _snap(*, tick: int, params: dict[str, float]) -> TelemetrySnapshot:
         tick=int(tick),
         t_s=0.0,
         mode="IDLE",
+        core_mode="IDLE",
         estop=False,
         fault=False,
         axes={},

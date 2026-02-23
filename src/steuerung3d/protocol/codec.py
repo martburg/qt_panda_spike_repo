@@ -141,6 +141,7 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
         tick=int(payload.get("tick", 0)),
         t_s=float(payload.get("t_s", 0.0)),
         mode=str(payload.get("mode", "IDLE")),
+        core_mode=str(payload.get("core_mode", payload.get("mode", "IDLE"))),
         estop=bool(payload.get("estop", False)),
         fault=bool(payload.get("fault", False)),
         axes=axes_out,

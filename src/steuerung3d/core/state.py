@@ -6,6 +6,7 @@ from typing import Dict, Any
 from steuerung3d.core.command_frame import ParamOp
 
 from steuerung3d.core.mode import Mode
+from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.joy_state import JoyState
 
 
@@ -113,7 +114,7 @@ class MachineState:
     joy: JoyState = field(default_factory=JoyState)
 
     # --- core mode aggregation (Stage 2) ---
-    core_mode: str = "ESTOP"
+    core_mode: CoreMode = CoreMode.ESTOP
     core_blocked_by: list[object] = field(default_factory=list)
     core_axis_gate: Dict[str, Dict[str, object]] = field(default_factory=dict)
     core_live_request: bool = False

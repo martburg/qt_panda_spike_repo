@@ -1,6 +1,7 @@
 from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, SetEstop, RequestAxisLease
 from steuerung3d.core.mode import Mode
+from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.state_machine import enforce_mode_actions
 
@@ -35,7 +36,7 @@ def test_motion_intents_blocked_outside_live():
     assert st.axis_cmd.get("X") is None
 
     # Mark core LIVE: now they take effect (in command state)
-    st.core_mode = "LIVE"
+    st.core_mode = CoreMode.LIVE
     apply_intent(st, EnableAxis(axis_id="X", enable=True, hip_id=hip_id))
     apply_intent(st, JogAxis(axis_id="X", vel=1.0, hip_id=hip_id))
 

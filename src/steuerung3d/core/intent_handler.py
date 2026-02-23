@@ -31,6 +31,7 @@ from steuerung3d.core.intents import (
 )
 from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
 from steuerung3d.core.mode import Mode
+from steuerung3d.core.core_mode import CoreMode, core_mode_value
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.command_frame import ParamEditBeginOp, ParamWriteOp, ParamCancelOp
 from steuerung3d.core.state_machine import enforce_mode_actions, normalize_mode
@@ -410,9 +411,9 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
     # --- MODE-GATED INTENTS (LIVE only) ---
     normalize_mode(state)
 
-    core_mode = str(getattr(state, "core_mode", "") or "").upper()
+    core_mode = core_mode_value(getattr(state, "core_mode", "")).upper()
     if core_mode:
-        is_live = core_mode == "LIVE"
+        is_live = core_mode == CoreMode.LIVE.value
     else:
         is_live = state.mode == Mode.LIVE
 

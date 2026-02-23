@@ -7,6 +7,7 @@ from steuerung3d.core.executor import build_command_frame
 from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.intents import EnableAxis, JogWinch, JoyStateUpdate, RequestAxisLease
 from steuerung3d.core.joy_state import JoyState
+from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
 
@@ -27,6 +28,7 @@ def _snap(axis_id: str, *, joy: JoyState, claimed_by: str, vel_max: float = 1.0)
         tick=1,
         t_s=0.0,
         mode="LIVE",
+        core_mode="LIVE",
         estop=False,
         fault=False,
         axes={axis_id: AxisTelemetry(pos=0.0, vel=0.0, enabled=True, fault=False)},
@@ -95,7 +97,7 @@ def test_joy_motion_end_to_end_gating_and_sign() -> None:
     assert any(isinstance(i, JogWinch) and i.rate == -1.2 for i in intents)
 
     st = MachineState()
-    st.core_mode = "LIVE"
+    st.core_mode = CoreMode.LIVE
     apply_intent(st, RequestAxisLease(axis_id=axis_id, hip_id=hip_id, req_id="lease-anton"))
     apply_intent(st, EnableAxis(axis_id=axis_id, enable=True, hip_id=hip_id))
     _apply_intents(st, intents)
@@ -116,7 +118,7 @@ def test_joy_state_update_does_not_drive_motion() -> None:
 
     st = MachineState()
     st.ensure_axis(axis_id)
-    st.core_mode = "LIVE"
+    st.core_mode = CoreMode.LIVE
     apply_intent(st, RequestAxisLease(axis_id=axis_id, hip_id=hip_id, req_id="lease-joy"))
     apply_intent(st, EnableAxis(axis_id=axis_id, enable=True, hip_id=hip_id))
 
