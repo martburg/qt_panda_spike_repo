@@ -105,6 +105,8 @@ class HipState:
     last_claim_attempt_ns_by_axis: dict[str, int] = field(default_factory=dict)
     last_sent_speed_by_axis: dict[str, float] = field(default_factory=dict)
     last_sent_enable_by_axis: dict[str, bool] = field(default_factory=dict)
+    joy_jog_active: bool = False
+    joy_jog_axis: str = ""
 
 
 @dataclass(frozen=True)

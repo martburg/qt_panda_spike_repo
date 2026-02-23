@@ -69,9 +69,30 @@ def should_emit_enable(
 
 
 def get_claim_owner(snap: TelemetrySnapshot, axis_id: str) -> str:
+    # 1) Prefer DenSi registry ownership if present
     densis = getattr(snap, "densis", None)
     if isinstance(densis, dict):
         d = densis.get(axis_id)
         if d is not None:
-            return str(getattr(d, "claimed_by_hip", "") or "")
+            owner = str(getattr(d, "claimed_by_hip", "") or "")
+            if owner:
+                return owner
+
+    # 2) Fall back to core lease/claim surface exposed in TelemetrySnapshot
+    holders = getattr(snap, "lease_axis_holders", None)
+    if isinstance(holders, dict):
+        v = holders.get(axis_id)
+        if isinstance(v, (list, tuple)) and v:
+            owner = str(v[0] or "")
+            if owner:
+                return owner
+
+    lease_axis = getattr(snap, "lease_axis", None)
+    if isinstance(lease_axis, dict):
+        v = lease_axis.get(axis_id)
+        if isinstance(v, (list, tuple)) and v:
+            owner = str(v[0] or "")
+            if owner:
+                return owner
+
     return ""

@@ -158,55 +158,157 @@ class HipEngine:
 
         params = getattr(snap, "params", {}) or {}
 
-        if motion_axis_id and str(mode_now).upper() == "LIVE":
-            owner = get_claim_owner(snap, motion_axis_id)
-            if owner == str(hip_id or ""):
-                if self.state.joy.deadman:
-                    try:
-                        vel_max_mps = float(params.get("VelMax", 0.0) or 0.0)
-                    except Exception:
-                        vel_max_mps = 0.0
-                    if vel_max_mps <= 0.0 and abs(float(self.state.joy.soll_speed)) > 0.0:
-                        log.debug("HiP vel_max unavailable for axis %s", motion_axis_id)
+        now_s = float(inputs.now_ns) / 1e9
+        estop_word = int(parse_estop_word_from_snapshot(snap))
+        logical = decode_estop_word(estop_word)
 
-                    effective_speed = (
-                        float(self.state.joy.soll_speed)
-                        if self.state.joy.select_hip
-                        else 0.0
-                    )
+        axis_id_for_estate = axis_id
+        if not axis_id_for_estate:
+            if axis_ids:
+                axis_id_for_estate = axis_ids[0]
+            else:
+                axis_id_for_estate = "X"
 
-                    if should_emit_enable(
-                        self.state.last_sent_enable_by_axis,
-                        motion_axis_id,
-                        True,
-                    ):
-                        intents.append(EnableAxis(axis_id=motion_axis_id, enable=True, hip_id=hip_id))
+        taster = bool(logical.get("taster", False))
+        self._update_taster_edge(axis_id_for_estate, taster, now_s)
+        within_banner = self._within_brake_grace(axis_id_for_estate, now_s, 2.0)
+        within_brake = self._within_brake_grace(axis_id_for_estate, now_s, 3.0)
 
-                    intent = map_soll_speed_to_jog_winch(
-                        winch_id=motion_axis_id,
-                        soll_speed=float(effective_speed),
-                        vel_max=float(vel_max_mps),
-                        hip_id=hip_id,
-                    )
-                    if intent is not None and should_emit_speed(
-                        self.state.last_sent_speed_by_axis,
-                        motion_axis_id,
-                        float(intent.rate),
-                    ):
-                        intents.append(intent)
-                else:
-                    if should_emit_speed(
-                        self.state.last_sent_speed_by_axis,
-                        motion_axis_id,
-                        0.0,
-                    ):
-                        intents.append(JogWinch(winch_id=motion_axis_id, rate=0.0, hip_id=hip_id))
-                    if should_emit_enable(
-                        self.state.last_sent_enable_by_axis,
-                        motion_axis_id,
-                        False,
-                    ):
-                        intents.append(EnableAxis(axis_id=motion_axis_id, enable=False, hip_id=hip_id))
+        estate = compute_banner_estate(
+            estop_word=int(estop_word),
+            within_brake_grace=bool(within_banner),
+        )
+
+        profile = infer_estop_profile(logical)
+
+        estop = bool(getattr(snap, "estop", False))
+        fault = bool(getattr(snap, "fault", False))
+
+        prev_jog_active = bool(self.state.joy_jog_active)
+        prev_jog_axis = str(self.state.joy_jog_axis or "")
+
+        axis_in_scope = bool(motion_axis_id and motion_axis_id in axes)
+        axis = axes.get(motion_axis_id) if axis_in_scope else None
+        axis_fault = bool(getattr(axis, "fault", False)) if axis is not None else False
+
+        owner = get_claim_owner(snap, motion_axis_id) if motion_axis_id else ""
+        owner_ok = owner == str(hip_id or "")
+
+        speed = float(self.state.joy.soll_speed)
+        speed_active = abs(speed) > 1e-3
+        armed_ok = str(estate or "").upper() in ("ARMED", "READY")
+        ready_ok = bool(logical.get("ready", False))
+
+        jog_allowed = (
+            axis_in_scope
+            and (str(mode_now).upper() == "LIVE")
+            and (not estop)
+            and (not fault)
+            and (not axis_fault)
+            and bool(taster)
+            and bool(armed_ok)
+            and bool(ready_ok)
+            and owner_ok
+            and self.state.joy.deadman
+            and self.state.joy.select_hip
+            and speed_active
+        )
+
+        def _jog_block_reason() -> str:
+            if not motion_axis_id:
+                return "no_axis"
+            if not axis_in_scope:
+                return "axis_missing"
+            if str(mode_now).upper() != "LIVE":
+                return f"mode={str(mode_now)}"
+            if estop:
+                return "estop"
+            if fault or axis_fault:
+                return "fault"
+            if not taster:
+                return "taster"
+            if not armed_ok:
+                return "armed"
+            if not ready_ok:
+                return "ready"
+            if not owner_ok:
+                return f"owner={owner or '-'}"
+            if not self.state.joy.deadman:
+                return "deadman"
+            if not self.state.joy.select_hip:
+                return "select"
+            if not speed_active:
+                return "zero_speed"
+            return "unknown"
+
+        if prev_jog_active and prev_jog_axis and prev_jog_axis != str(motion_axis_id or ""):
+            if should_emit_speed(
+                self.state.last_sent_speed_by_axis,
+                prev_jog_axis,
+                0.0,
+            ):
+                intents.append(JogWinch(winch_id=prev_jog_axis, rate=0.0, hip_id=hip_id))
+
+        jog_rate = 0.0
+        stop_reason = ""
+        if jog_allowed:
+            try:
+                vel_max_mps = float(params.get("VelMax", 0.0) or 0.0)
+            except Exception:
+                vel_max_mps = 0.0
+            if vel_max_mps <= 0.0 and abs(float(speed)) > 0.0:
+                log.debug("HiP vel_max unavailable for axis %s", motion_axis_id)
+
+            if should_emit_enable(
+                self.state.last_sent_enable_by_axis,
+                motion_axis_id,
+                True,
+            ):
+                intents.append(EnableAxis(axis_id=motion_axis_id, enable=True, hip_id=hip_id))
+
+            intent = map_soll_speed_to_jog_winch(
+                winch_id=motion_axis_id,
+                soll_speed=float(speed),
+                vel_max=float(vel_max_mps),
+                hip_id=hip_id,
+            )
+            if intent is not None:
+                jog_rate = float(intent.rate)
+                if should_emit_speed(
+                    self.state.last_sent_speed_by_axis,
+                    motion_axis_id,
+                    float(intent.rate),
+                ):
+                    intents.append(intent)
+        else:
+            stop_axis_id = prev_jog_axis or str(motion_axis_id or "")
+            if stop_axis_id:
+                if should_emit_speed(
+                    self.state.last_sent_speed_by_axis,
+                    stop_axis_id,
+                    0.0,
+                ):
+                    intents.append(JogWinch(winch_id=stop_axis_id, rate=0.0, hip_id=hip_id))
+                if (not self.state.joy.deadman) and should_emit_enable(
+                    self.state.last_sent_enable_by_axis,
+                    stop_axis_id,
+                    False,
+                ):
+                    intents.append(EnableAxis(axis_id=stop_axis_id, enable=False, hip_id=hip_id))
+            stop_reason = _jog_block_reason()
+
+        if prev_jog_active and (not jog_allowed or prev_jog_axis != str(motion_axis_id or "")):
+            axis_for_log = prev_jog_axis or str(motion_axis_id or "")
+            if axis_for_log:
+                reason = stop_reason if not jog_allowed else "axis_changed"
+                log.info("JOY jog stopped axis=%s reason=%s", axis_for_log, reason)
+
+        if jog_allowed and (not prev_jog_active or prev_jog_axis != str(motion_axis_id or "")):
+            if motion_axis_id:
+                log.info("JOY jog enabled axis=%s vel=%.3f", motion_axis_id, jog_rate)
+
+        self.state.joy_jog_active = bool(jog_allowed)
+        self.state.joy_jog_axis = str(motion_axis_id or "") if jog_allowed else ""
 
         if self.state.joy.select_hip and axis_id:
             owner = get_claim_owner(snap, axis_id)
@@ -241,40 +343,14 @@ class HipEngine:
             age_ms = int((int(inputs.now_ns) - int(inputs.last_rx_ns)) / 1_000_000.0)
         stale = (age_ms is None) or (age_ms >= int(inputs.stale_after_ms))
 
-        estop = bool(getattr(snap, "estop", False))
-        fault = bool(getattr(snap, "fault", False))
-
         main_text, slave_text = compute_drive_status_texts(snap=snap, axis_id=axis_id)
         drive_status_summary = f"{main_text}|{slave_text}" if (main_text or slave_text) else ""
         drive_status = HipDriveStatusState(main_text=str(main_text), slave_text=str(slave_text))
-
-        now_s = float(inputs.now_ns) / 1e9
-        estop_word = int(parse_estop_word_from_snapshot(snap))
-        logical = decode_estop_word(estop_word)
-
-        axis_id_for_estate = axis_id
-        if not axis_id_for_estate:
-            if axis_ids:
-                axis_id_for_estate = axis_ids[0]
-            else:
-                axis_id_for_estate = "X"
-
-        taster = bool(logical.get("taster", False))
-        self._update_taster_edge(axis_id_for_estate, taster, now_s)
-        within_banner = self._within_brake_grace(axis_id_for_estate, now_s, 2.0)
-        within_brake = self._within_brake_grace(axis_id_for_estate, now_s, 3.0)
-
-        estate = compute_banner_estate(
-            estop_word=int(estop_word),
-            within_brake_grace=bool(within_banner),
-        )
 
         def _brake_ok_display(raw: bool) -> bool:
             if bool(taster) and bool(within_brake):
                 return True
             return bool(raw)
-
-        profile = infer_estop_profile(logical)
 
         joy = getattr(snap, "joy", None) or JoyState()
         joy_deadman = bool(getattr(joy, "deadman", False))

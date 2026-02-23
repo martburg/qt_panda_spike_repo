@@ -10,6 +10,7 @@ from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
+from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS, encode_estop_word
 
 
 def _ui(axis_id: str) -> HipUiInputs:
@@ -23,6 +24,15 @@ def _ui(axis_id: str) -> HipUiInputs:
     )
 
 
+def _ready_estop_word() -> int:
+    bits = {k: True for k in ESTOP_OK_KEYS}
+    bits["taster"] = True
+    bits["schuetz"] = True
+    for k in ESTOP_CAUSE_KEYS:
+        bits[k] = False
+    return encode_estop_word(bits)
+
+
 def _snap(axis_id: str, *, joy: JoyState, claimed_by: str, vel_max: float = 1.0) -> TelemetrySnapshot:
     return TelemetrySnapshot(
         tick=1,
@@ -31,6 +41,7 @@ def _snap(axis_id: str, *, joy: JoyState, claimed_by: str, vel_max: float = 1.0)
         estop=False,
         fault=False,
         axes={axis_id: AxisTelemetry(pos=0.0, vel=0.0, enabled=True, fault=False)},
+        estop_status_word=_ready_estop_word(),
         densis={
             axis_id: DensiTelemetry(
                 device_id=axis_id,
@@ -105,11 +116,11 @@ def test_joy_motion_end_to_end_gating_and_sign() -> None:
     cmd = build_command_frame(st)
     assert cmd.axes[axis_id].vel == -1.2
 
-    # C) owned false => no JogWinch
+    # C) owned false => no JogWinch (allow stop intent)
     joy = JoyState(deadman=True, select_hip=False, soll_speed=0.4)
     intents = _step_engine(axis_id=axis_id, joy=joy, claimed_by="other", hip_id=hip_id)
-    assert not any(isinstance(i, JogWinch) for i in intents)
-    assert not any(isinstance(i, EnableAxis) for i in intents)
+    assert not any(isinstance(i, JogWinch) and abs(float(i.rate)) > 1e-6 for i in intents)
+    assert not any(isinstance(i, EnableAxis) and i.enable for i in intents)
 
 
 def test_joy_state_update_does_not_drive_motion() -> None:

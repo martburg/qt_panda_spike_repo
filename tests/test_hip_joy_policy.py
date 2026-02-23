@@ -6,6 +6,7 @@ from steuerung3d.apps.yellow.engines.hip.engine import HipEngine, HipStepInputs,
 from steuerung3d.core.intents import ClaimAxis, EnableAxis, JogAxis, JogWinch
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot, DensiTelemetry
+from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS, encode_estop_word
 
 
 def _ui(axis_id: str) -> HipUiInputs:
@@ -19,12 +20,22 @@ def _ui(axis_id: str) -> HipUiInputs:
     )
 
 
+def _ready_estop_word() -> int:
+    bits = {k: True for k in ESTOP_OK_KEYS}
+    bits["taster"] = True
+    bits["schuetz"] = True
+    for k in ESTOP_CAUSE_KEYS:
+        bits[k] = False
+    return encode_estop_word(bits)
+
+
 def _snap(
     axis_id: str,
     *,
     joy: JoyState | None = None,
     claimed_by: str = "",
     vel_max: float = 1.0,
+    estop_word: int | None = None,
 ) -> TelemetrySnapshot:
     densis = {}
     if claimed_by is not None:
@@ -47,6 +58,7 @@ def _snap(
         axes={axis_id: AxisTelemetry(pos=0.0, vel=0.0, enabled=True, fault=False)},
         densis=densis,
         params={"VelMax": float(vel_max)},
+        estop_status_word=int(_ready_estop_word() if estop_word is None else estop_word),
         joy=joy if joy is not None else JoyState(),
     )
 
@@ -139,6 +151,78 @@ def test_soll_speed_emits_jog_winch_when_deadman_held() -> None:
     res = eng.step(inputs)
     assert any(isinstance(i, EnableAxis) and i.axis_id == "Anton" and i.enable for i in res.intents)
     assert any(isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate == 0.8 for i in res.intents)
+
+
+def test_soll_speed_negative_emits_jog_when_ready() -> None:
+    eng = HipEngine(hip_id="hip-test")
+    joy = JoyState(deadman=True, select_hip=True, soll_speed=-0.5)
+    snap = _snap("Anton", joy=joy, claimed_by="hip-test", vel_max=2.0)
+
+    inputs = HipStepInputs(
+        snap=snap,
+        hip_id="hip-test",
+        last_rx_ns=0,
+        now_ns=0,
+        stale_after_ms=500,
+        fixed_axis="",
+        lock_axis_combo=False,
+        last_mode="IDLE",
+        last_estate="IDLE",
+        ui=_ui("Anton"),
+        core_acks=[],
+        joy=joy,
+    )
+
+    res = eng.step(inputs)
+    assert any(isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate == -1.0 for i in res.intents)
+
+
+def test_not_owner_blocks_jog() -> None:
+    eng = HipEngine(hip_id="hip-test")
+    joy = JoyState(deadman=True, select_hip=True, soll_speed=0.5)
+    snap = _snap("Anton", joy=joy, claimed_by="", vel_max=2.0)
+
+    inputs = HipStepInputs(
+        snap=snap,
+        hip_id="hip-test",
+        last_rx_ns=0,
+        now_ns=0,
+        stale_after_ms=500,
+        fixed_axis="",
+        lock_axis_combo=False,
+        last_mode="IDLE",
+        last_estate="IDLE",
+        ui=_ui("Anton"),
+        core_acks=[],
+        joy=joy,
+    )
+
+    res = eng.step(inputs)
+    assert not any(isinstance(i, JogWinch) and abs(float(i.rate)) > 1e-6 for i in res.intents)
+
+
+def test_deadman_false_blocks_jog() -> None:
+    eng = HipEngine(hip_id="hip-test")
+    joy = JoyState(deadman=False, select_hip=True, soll_speed=0.5)
+    snap = _snap("Anton", joy=joy, claimed_by="hip-test", vel_max=2.0)
+
+    inputs = HipStepInputs(
+        snap=snap,
+        hip_id="hip-test",
+        last_rx_ns=0,
+        now_ns=0,
+        stale_after_ms=500,
+        fixed_axis="",
+        lock_axis_combo=False,
+        last_mode="IDLE",
+        last_estate="IDLE",
+        ui=_ui("Anton"),
+        core_acks=[],
+        joy=joy,
+    )
+
+    res = eng.step(inputs)
+    assert not any(isinstance(i, JogWinch) and abs(float(i.rate)) > 1e-6 for i in res.intents)
 
 
 def test_soll_speed_repeat_is_throttled() -> None:
