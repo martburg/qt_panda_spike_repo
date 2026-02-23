@@ -16,6 +16,7 @@ from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.command_frame import CommandFrame, coerce_param_ops
+from steuerung3d.core.executor import build_command_frame
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.core_mode import CoreMode, core_mode_value
 from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapshot
@@ -683,6 +684,8 @@ def main() -> int:
                 blocked_by = []
                 blocked_payload = []
                 try:
+                    cmd_frame = build_command_frame(st)
+                    cmd_axes = dict(getattr(cmd_frame, "axes", {}) or {})
                     core_blocked = list(getattr(st, "core_blocked_by", []) or [])
                     for item in core_blocked:
                         code = str(getattr(item, "code", item))
@@ -717,6 +720,15 @@ def main() -> int:
                         ready = bool(str(estate).upper() == "READY")
 
                         cmd = axis_cmd.get(axis_id)
+                        cmd_out = cmd_axes.get(axis_id)
+                        cmd_enable = None
+                        cmd_vel = None
+                        if cmd_out is not None:
+                            cmd_enable = bool(getattr(cmd_out, "enable", False))
+                            try:
+                                cmd_vel = float(getattr(cmd_out, "vel", 0.0) or 0.0)
+                            except Exception:
+                                cmd_vel = 0.0
                         started = bool(cmd and (bool(getattr(cmd, "enable", False)) or abs(float(getattr(cmd, "vel", 0.0) or 0.0)) > 0.0))
 
                         owner = str(st.axis_claims.get(axis_id, "") or "")
@@ -754,6 +766,8 @@ def main() -> int:
                                 "estop": bool(estop_axis),
                                 "fault": bool(fault_axis),
                                 "started": bool(started),
+                                "cmd_enable": cmd_enable,
+                                "cmd_vel": cmd_vel,
                                 "taster_enabled": gate_taster,
                                 "armed": bool(armed),
                                 "ready": bool(ready),
@@ -802,6 +816,8 @@ def main() -> int:
                         "fault": fault_v,
                         "intents_in_count": int(last_intents_meta.get("count", 0)),
                         "intents_in_types": intents_types_str,
+                        "cmd_estop_reset": bool(getattr(cmd_frame, "estop_reset", False)),
+                        "cmd_resync": bool(getattr(cmd_frame, "resync", False)),
                         "axes": axes_snapshot,
                         "reset_denied_total": int(reset_denied_total),
                         "reset_denied_by_axis": dict(reset_denied_by_axis),

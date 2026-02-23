@@ -84,6 +84,15 @@ def _age_ms(value: object) -> str:
         return "?"
 
 
+def _fmt_vel(value: object) -> str:
+    if value is None:
+        return "?"
+    try:
+        return f"{float(value):.3f}"
+    except Exception:
+        return "?"
+
+
 def build_frederik_panel_lines(fields: Dict[str, object], *, max_blocked: int = 3) -> list[str]:
     if not isinstance(fields, dict):
         return []
@@ -113,16 +122,19 @@ def build_frederik_panel_lines(fields: Dict[str, object], *, max_blocked: int = 
     reset_denied = int(fields.get("reset_denied_total", 0) or 0)
     live_denied = int(fields.get("live_denied_count", 0) or 0)
     live_denied_reason = str(fields.get("live_denied_reason", "") or "")
+    cmd_estop_reset = _flag(fields.get("cmd_estop_reset"))
+    cmd_resync = _flag(fields.get("cmd_resync"))
 
     lines = [
         f"Frederik: core_mode={core_mode} blocked_by=[{blocked_summary}]",
         f"Frederik: joy_dm={joy_dm} joy_sel={joy_sel} live_req_seen={live_req_seen}",
         f"Frederik: reset_denied={reset_denied} live_denied={live_denied} live_denied_reason={live_denied_reason}",
+        f"Frederik: cmd_estop_reset={cmd_estop_reset} cmd_resync={cmd_resync}",
     ]
 
     axes = fields.get("axes", [])
     if isinstance(axes, list) and axes:
-        lines.append("Frederik axes: axis in_scope estop fault started taster_enabled armed ready owner age_ms")
+        lines.append("Frederik axes: axis in_scope estop fault started cmd_en cmd_vel taster_enabled armed ready owner age_ms")
         axes_sorted = sorted(axes, key=lambda a: str(a.get("axis_id", "")) if isinstance(a, dict) else str(a))
         for ax in axes_sorted:
             if not isinstance(ax, dict):
@@ -132,6 +144,8 @@ def build_frederik_panel_lines(fields: Dict[str, object], *, max_blocked: int = 
             estop = _flag(ax.get("estop"))
             fault = _flag(ax.get("fault"))
             started = _flag(ax.get("started"))
+            cmd_enable = _flag(ax.get("cmd_enable"))
+            cmd_vel = _fmt_vel(ax.get("cmd_vel"))
             taster = _flag(ax.get("taster_enabled"))
             armed = _flag(ax.get("armed"))
             ready = _flag(ax.get("ready"))
@@ -140,7 +154,8 @@ def build_frederik_panel_lines(fields: Dict[str, object], *, max_blocked: int = 
             lines.append(
                 "Frederik "
                 f"axis={axis_id} in_scope={in_scope} estop={estop} fault={fault} "
-                f"started={started} taster_enabled={taster} armed={armed} ready={ready} "
+                f"started={started} cmd_en={cmd_enable} cmd_vel={cmd_vel} taster_enabled={taster} "
+                f"armed={armed} ready={ready} "
                 f"owner={owner} age_ms={age_ms}"
             )
 
