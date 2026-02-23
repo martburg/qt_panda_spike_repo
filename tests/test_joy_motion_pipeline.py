@@ -89,8 +89,8 @@ def test_joy_motion_end_to_end_gating_and_sign() -> None:
     assert any(isinstance(i, JogWinch) and i.rate == 0.0 for i in intents)
     assert any(isinstance(i, EnableAxis) and i.enable is False for i in intents)
 
-    # B) deadman true + owned => EnableAxis(True) + JogWinch with scaled sign
-    joy = JoyState(deadman=True, select_hip=False, soll_speed=-0.6)
+    # B) deadman true + selected + owned => EnableAxis(True) + JogWinch with scaled sign
+    joy = JoyState(deadman=True, select_hip=True, soll_speed=-0.6)
     intents = _step_engine(axis_id=axis_id, joy=joy, claimed_by=hip_id, hip_id=hip_id, vel_max=2.0)
     assert any(isinstance(i, EnableAxis) and i.enable is True for i in intents)
     assert any(isinstance(i, JogWinch) and i.rate == -1.2 for i in intents)

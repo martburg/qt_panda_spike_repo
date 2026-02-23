@@ -169,7 +169,7 @@ class HiPController:
 
         estop = bool(getattr(snap, "estop", False))
         fault = bool(getattr(snap, "fault", False))
-        mode = str(estate or "")
+        core_mode = str(getattr(snap, "core_mode", "") or "")
         armed = bool(str(estate or "").upper() in ("ARMED", "READY"))
         ready = bool(str(estate or "").upper() == "READY")
 
@@ -195,7 +195,7 @@ class HiPController:
         intents_out_count = int(len(intents or []))
 
         summary = (
-            f"hip axis={axis_selected or '-'} mode={mode or '-'} dm={int(dm)} sel={int(sel)} "
+            f"hip axis={axis_selected or '-'} mode={core_mode or '-'} dm={int(dm)} sel={int(sel)} "
             f"estop={int(estop)} v={joy_rate_mps:+.2f}m/s out=[{intents_out_types}]"
         )
 
@@ -211,7 +211,7 @@ class HiPController:
             "intents_out_count": int(intents_out_count),
             "estop": bool(estop),
             "fault": bool(fault),
-            "mode": str(mode),
+            "mode": str(core_mode),
             "estate": str(estate or ""),
             "armed": bool(armed),
             "ready": bool(ready),

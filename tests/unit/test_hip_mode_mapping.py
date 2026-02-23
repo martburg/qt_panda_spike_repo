@@ -73,7 +73,7 @@ def _runtime_with_status() -> tuple[HipRuntime, _StatusSink]:
     return rt, status
 
 
-def test_hip_status_mode_uses_estate() -> None:
+def test_hip_status_mode_uses_core_mode() -> None:
     rt, status = _runtime_with_status()
     rt._last_rx_ns = 0
     rt._last_mode = "IDLE"
@@ -85,7 +85,7 @@ def test_hip_status_mode_uses_estate() -> None:
 
     assert status.calls
     fields = status.calls[-1]["fields"]
-    assert fields.get("mode") == "READY"
+    assert fields.get("mode") == "IDLE"
     assert fields.get("estate") == "READY"
     assert fields.get("armed") is True
     assert fields.get("ready") is True

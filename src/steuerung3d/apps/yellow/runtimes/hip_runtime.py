@@ -209,7 +209,13 @@ class HipRuntime:
             sel = bool(getattr(joy, "select_hip", False))
             sp = float(getattr(joy, "soll_speed", 0.0) or 0.0)
 
-            motion_enabled = bool(motion_axis) and core_mode.upper() == "LIVE" and owner == self._hip_id and dm
+            motion_enabled = (
+                bool(motion_axis)
+                and core_mode.upper() == "LIVE"
+                and owner == self._hip_id
+                and dm
+                and sel
+            )
             self._log.info(
                 "hip_motion_dbg core_mode=%s legacy_mode=%s dm=%s sel=%s sp=%.3f motion_enabled=%s axis=%s owner=%s",
                 core_mode,
@@ -394,7 +400,7 @@ class HipRuntime:
         level = compute_status_level(self._last_estop, self._last_fault, stale)
         axis = str(getattr(self.engine.state, "selected_axis", "") or "") or (self._fixed_axis or "")
         estate = str(self._last_estate or "")
-        mode = estate or (self._last_mode or "")
+        mode = str(self._last_mode or "")
         armed = bool(str(estate or "").upper() in ("ARMED", "READY"))
         ready = bool(str(estate or "").upper() == "READY")
         age_disp = format_age_ms(age_ms)

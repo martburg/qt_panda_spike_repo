@@ -169,6 +169,12 @@ class HipEngine:
                     if vel_max_mps <= 0.0 and abs(float(self.state.joy.soll_speed)) > 0.0:
                         log.debug("HiP vel_max unavailable for axis %s", motion_axis_id)
 
+                    effective_speed = (
+                        float(self.state.joy.soll_speed)
+                        if self.state.joy.select_hip
+                        else 0.0
+                    )
+
                     if should_emit_enable(
                         self.state.last_sent_enable_by_axis,
                         motion_axis_id,
@@ -178,7 +184,7 @@ class HipEngine:
 
                     intent = map_soll_speed_to_jog_winch(
                         winch_id=motion_axis_id,
-                        soll_speed=float(self.state.joy.soll_speed),
+                        soll_speed=float(effective_speed),
                         vel_max=float(vel_max_mps),
                         hip_id=hip_id,
                     )

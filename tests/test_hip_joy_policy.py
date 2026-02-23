@@ -118,7 +118,7 @@ def test_soll_speed_negative_is_clamped_and_stored() -> None:
 
 def test_soll_speed_emits_jog_winch_when_deadman_held() -> None:
     eng = HipEngine(hip_id="hip-test")
-    joy = JoyState(deadman=True, select_hip=False, soll_speed=0.4)
+    joy = JoyState(deadman=True, select_hip=True, soll_speed=0.4)
     snap = _snap("Anton", joy=joy, claimed_by="hip-test", vel_max=2.0)
 
     inputs = HipStepInputs(
