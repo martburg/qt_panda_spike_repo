@@ -8,14 +8,7 @@ from steuerung3d.adapters.sim.device import SimDevice
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.intents import (
-    ArmLiveMode,
-    ClearFault,
-    DisarmToIdle,
-    EnableAxis,
-    JogAxis,
-    SetEstop,
-)
+from steuerung3d.core.intents import ClearFault, EnableAxis, JogAxis, SetEstop
 from steuerung3d.core.state import MachineState
 from steuerung3d.protocol.core_runner import CoreRunner
 from steuerung3d.protocol.transport import InMemTransport
@@ -23,8 +16,6 @@ from steuerung3d.protocol.transport import InMemTransport
 
 HELP = """commands:
   help
-  live                 -> ArmLiveMode
-  idle                 -> DisarmToIdle
   estop on|off         -> SetEstop(True/False)
   clearfault           -> ClearFault
   enable <AXIS> on|off -> EnableAxis
@@ -46,12 +37,6 @@ def parse_and_send(cmd: str, tr: InMemTransport) -> bool:
             return False
         if c == "help":
             print(HELP)
-            return True
-        if c == "live":
-            tr.publish_intent(ArmLiveMode())
-            return True
-        if c == "idle":
-            tr.publish_intent(DisarmToIdle())
             return True
         if c == "clearfault":
             tr.publish_intent(ClearFault())
@@ -121,11 +106,13 @@ def main() -> int:
                 x = latest.axes.get("X")
                 if x:
                     print(
-                        f"[tele] tick={latest.tick} t={latest.t_s:.2f}s mode={latest.mode} "
+                        f"[tele] tick={latest.tick} t={latest.t_s:.2f}s core_mode={latest.core_mode} "
                         f"estop={latest.estop} X(en={x.enabled}, vel={x.vel:.3f}, pos={x.pos:.3f})"
                     )
                 else:
-                    print(f"[tele] tick={latest.tick} t={latest.t_s:.2f}s mode={latest.mode} estop={latest.estop}")
+                    print(
+                        f"[tele] tick={latest.tick} t={latest.t_s:.2f}s core_mode={latest.core_mode} estop={latest.estop}"
+                    )
 
             # prompt
             sys.stdout.write("> ")

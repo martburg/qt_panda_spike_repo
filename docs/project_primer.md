@@ -54,7 +54,7 @@ Telemetry side:
 - `estop_status_word` is carried through untouched for UI bit decoding ([src/steuerung3d/core/telemetry.py](../src/steuerung3d/core/telemetry.py)) and decoded using the canonical map in [src/steuerung3d/protocol/estop_bits.py](../src/steuerung3d/protocol/estop_bits.py).
 
 Intents (examples):
-- Motion/control: `EnableAxis`, `JogAxis`, `SetEstop`, `ArmLiveMode`.
+- Motion/control: `EnableAxis`, `JogAxis`, `SetEstop`.
 - Parameter flow: `ParamEditBegin`, `ParamWrite`, `ParamCancel`.
 - LifeTick echo: `EchoLifeTick` mirrors device tick back to the device path ([src/steuerung3d/core/intents.py](../src/steuerung3d/core/intents.py)).
 

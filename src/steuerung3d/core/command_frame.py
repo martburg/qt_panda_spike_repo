@@ -99,7 +99,7 @@ class CommandFrame:
     t_s: float
     estop: bool          # legacy/unused for authority (keep for now)
     fault: bool
-    mode: str
+    core_mode: str
     axes: Dict[str, AxisSetpoint]
     # --- legacy downlink knobs (TwinCAT PLC protocol) ---
     # Keep defaults so existing callers/tests remain stable.

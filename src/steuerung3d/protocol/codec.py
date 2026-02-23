@@ -6,9 +6,7 @@ from typing import Any, Dict, Union
 from steuerung3d.protocol.raw_controls import RawControls
 
 from steuerung3d.core.intents import (
-    ArmLiveMode,
     ClearFault,
-    DisarmToIdle,
     EnableAxis,
     Intent,
     JogAxis,
@@ -59,8 +57,6 @@ _INTENT_TYPE_MAP = {
     "set_estop": SetEstop,
     "estop_reset": RequestEstopReset,   # NEW
     "resync": RequestResync,
-    "arm_live_mode": ArmLiveMode,
-    "disarm_to_idle": DisarmToIdle,
     "clear_fault": ClearFault,
     # parameters (axis-agnostic)
     "param_edit_begin": ParamEditBegin,
@@ -140,8 +136,7 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
     return TelemetrySnapshot(
         tick=int(payload.get("tick", 0)),
         t_s=float(payload.get("t_s", 0.0)),
-        mode=str(payload.get("mode", "IDLE")),
-        core_mode=str(payload.get("core_mode", payload.get("mode", "IDLE"))),
+        core_mode=str(payload.get("core_mode", "")),
         estop=bool(payload.get("estop", False)),
         fault=bool(payload.get("fault", False)),
         axes=axes_out,
@@ -223,7 +218,7 @@ def decode_command_frame(payload: Dict[str, Any]) -> CommandFrame:
         t_s=float(payload["t_s"]),
         estop=bool(payload["estop"]),
         fault=bool(payload["fault"]),
-        mode=str(payload["mode"]),
+        core_mode=str(payload.get("core_mode", "")),
         axes=axes_out,
         intent=bool(payload.get("intent", True)),
         resync=bool(payload.get("resync", False)),

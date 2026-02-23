@@ -13,7 +13,6 @@ def test_inmem_transport_roundtrip():
     snap = TelemetrySnapshot(
         tick=1,
         t_s=0.01,
-        mode="IDLE",
         core_mode="IDLE",
         estop=True,
         fault=False,

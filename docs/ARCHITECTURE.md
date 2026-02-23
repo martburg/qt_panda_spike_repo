@@ -18,7 +18,7 @@ Canonical architecture references:
 ## Key modules
 
 - `steuerung3d/core/state.py`
-  - `MachineState`: global tick/time, mode, safety flags
+  - `MachineState`: global tick/time, core_mode, safety flags
   - `AxisState`: measured state (pos/vel/enabled/fault)
   - `AxisCommandState`: commanded state (enable/vel) stored separately
 

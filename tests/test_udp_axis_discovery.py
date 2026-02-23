@@ -40,7 +40,7 @@ def test_udp_device_discovers_unknown_axis_from_telemetry():
             t_s=0.0,
             estop=False,
             fault=False,
-            mode='LIVE',
+            core_mode='LIVE',
             axes={'X': AxisSetpoint(enable=True, vel=0.0)},
         )
 

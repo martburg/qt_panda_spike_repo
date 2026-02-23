@@ -204,7 +204,7 @@ class UdpPlcCommandIn:
                     t_s=0.0,
                     estop=False,
                     fault=False,
-                    mode=str(f.get("Modus", "")) or "",
+                    core_mode=str(f.get("CoreMode", "")) or "",
                     axes={axis_id: AxisSetpoint(enable=enable, vel=vel)},
                     intent=bool(intent),
                     resync=bool(resync),

@@ -3,34 +3,23 @@
 Date: 2026-02-23
 Branch: coremode-cutover
 
-## Legacy mode concepts
+## Removed legacy mode concepts
 
-### Mode enum/state machine
-- [src/steuerung3d/core/mode.py](src/steuerung3d/core/mode.py): `Mode` enum (ESTOP/FAULT/IDLE/LIVE).
-- [src/steuerung3d/core/state.py](src/steuerung3d/core/state.py): `MachineState.mode`.
-- [src/steuerung3d/core/state_machine.py](src/steuerung3d/core/state_machine.py): `_coerce_mode()`, `normalize_mode()`, `enforce_mode_actions()`.
+### Deleted in cutover
+- [src/steuerung3d/core/mode.py](src/steuerung3d/core/mode.py): legacy `Mode` enum removed.
+- [src/steuerung3d/core/state_machine.py](src/steuerung3d/core/state_machine.py): legacy normalize/enforce helpers removed.
+- [src/steuerung3d/core/state.py](src/steuerung3d/core/state.py): `MachineState.mode` removed.
 
-### Mode propagation / usage
-- [src/steuerung3d/core/telemetry.py](src/steuerung3d/core/telemetry.py): `TelemetrySnapshot.mode`, `TelemetrySnapshot.from_state()` uses `state.mode`.
-- [src/steuerung3d/core/command_frame.py](src/steuerung3d/core/command_frame.py): `CommandFrame.mode` field.
-- [src/steuerung3d/core/executor.py](src/steuerung3d/core/executor.py): `CommandFrame(mode=state.mode.value)`.
-- [src/steuerung3d/apps/log_viewer/__main__.py](src/steuerung3d/apps/log_viewer/__main__.py): uses `snap.mode` or `cf.mode` when rendering.
-- [src/steuerung3d/apps/dev_stack/__main__.py](src/steuerung3d/apps/dev_stack/__main__.py): prints `snap.mode`.
-- [src/steuerung3d/apps/plc_stack/__main__.py](src/steuerung3d/apps/plc_stack/__main__.py): prints `snap.mode`.
+### CoreMode propagation / usage
+- [src/steuerung3d/core/core_mode.py](src/steuerung3d/core/core_mode.py): `CoreMode` enum + `core_mode_value()`.
+- [src/steuerung3d/core/state.py](src/steuerung3d/core/state.py): `MachineState.core_mode` (authoritative).
+- [src/steuerung3d/core/telemetry.py](src/steuerung3d/core/telemetry.py): `TelemetrySnapshot.core_mode`.
+- [src/steuerung3d/core/command_frame.py](src/steuerung3d/core/command_frame.py): `CommandFrame.core_mode` field.
+- [src/steuerung3d/core/executor.py](src/steuerung3d/core/executor.py): clamps motion when `core_mode != LIVE` or `joy.select_hip` is false.
 
-### Intent-based mode toggles
-- [src/steuerung3d/core/intents.py](src/steuerung3d/core/intents.py): `ArmLiveMode`, `DisarmToIdle`.
-- [src/steuerung3d/core/intent_handler.py](src/steuerung3d/core/intent_handler.py): handles `ArmLiveMode`/`DisarmToIdle` and motion gating.
-- [src/steuerung3d/protocol/codec.py](src/steuerung3d/protocol/codec.py): intent type map includes `arm_live_mode`, `disarm_to_idle`.
-- [src/steuerung3d/apps/cli_client/__main__.py](src/steuerung3d/apps/cli_client/__main__.py): publishes `ArmLiveMode`/`DisarmToIdle`.
-- [src/steuerung3d/apps/dev_stack/__main__.py](src/steuerung3d/apps/dev_stack/__main__.py): publishes `ArmLiveMode`.
-- [src/steuerung3d/apps/plc_stack/__main__.py](src/steuerung3d/apps/plc_stack/__main__.py): publishes `ArmLiveMode`.
-- [src/steuerung3d/apps/core_service/__main__.py](src/steuerung3d/apps/core_service/__main__.py): publishes `ArmLiveMode`.
-
-### live_request tracking
-- [src/steuerung3d/core/state.py](src/steuerung3d/core/state.py): `core_live_request`, `core_live_request_seen`.
-- [src/steuerung3d/core/intent_handler.py](src/steuerung3d/core/intent_handler.py): sets `core_live_request` on `ArmLiveMode` / clears on `DisarmToIdle`.
-- [src/steuerung3d/apps/core_udp_service/__main__.py](src/steuerung3d/apps/core_udp_service/__main__.py): consumes `core_live_request`, stores `core_live_request_seen`.
+### Intent-based mode toggles (removed)
+- `ArmLiveMode` / `DisarmToIdle` intents removed from core and protocol codec.
+- `core_live_request` / `core_live_request_seen` removed from state + core UDP service.
 
 ## Stage-2 CoreMode aggregation
 
@@ -67,21 +56,16 @@ Branch: coremode-cutover
 - [src/steuerung3d/apps/yellow/domain/ui_estop.py](src/steuerung3d/apps/yellow/domain/ui_estop.py):
   - profile inference uses `schluessel1`/`schluessel2` bits.
 
-## Grep hits to revisit during cutover
+## Grep hits to keep tidy
 
-- `Mode.` / `MachineState.mode` / `state.mode` usage.
-- `TelemetrySnapshot.mode` / `snap.mode` / `cf.mode` output formatting.
-- `ArmLiveMode` / `DisarmToIdle` call sites in apps and CLI.
 - `core_mode` / `core_blocked_by` / `core_axis_gate` consumers.
-- `core_live_request` / `core_live_request_seen`.
 - `AxisSafetyFacts` and `aggregate_core_mode()` usage.
 
 ## Risks / test touchpoints
 
 ### Risks
-- Mixed legacy `state.mode` vs new `core_mode` signals can diverge (telemetry vs birds-eye).
-- CLI/dev/plc demo flows still publish `ArmLiveMode`, which now maps to live request gating.
-- UI continues to show `snap.mode` (telemetry) in log viewers; potential confusion post-cutover.
+- `core_mode` is derived from safety facts; ensure any UI components still referencing mode strings read `core_mode`.
+- Select gating (`joy.select_hip`) is authoritative in core; tests that assume motion without select must set it explicitly.
 
 ### Tests to watch
 - [tests/test_core_mode_aggregate.py](tests/test_core_mode_aggregate.py)

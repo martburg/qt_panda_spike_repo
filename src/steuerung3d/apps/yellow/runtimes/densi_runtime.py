@@ -113,11 +113,11 @@ class DensiRuntime:
             self._seen_first_cmd = True
             self._hb.inc("cmd_rx", len(frames))
             self._log.debug(
-                "rx cmd: tick=%s estop_reset=%s fault=%s mode=%s",
+                "rx cmd: tick=%s estop_reset=%s fault=%s core_mode=%s",
                 getattr(self._last_cmd, "tick", None),
                 getattr(self._last_cmd, "estop_reset", None),
                 getattr(self._last_cmd, "fault", None),
-                getattr(self._last_cmd, "mode", None),
+                getattr(self._last_cmd, "core_mode", None),
             )
 
         res = self.engine.step(frames=frames, now_ns=int(now_ns))
@@ -163,7 +163,7 @@ class DensiRuntime:
             "last_cmd_tick": getattr(res.last_cmd, "tick", None),
             "seen_first_cmd": bool(res.seen_first_cmd),
             "tick": int(getattr(snap, "tick", 0) or 0),
-            "mode": str(getattr(snap, "mode", "") or ""),
+            "core_mode": str(getattr(snap, "core_mode", "") or ""),
             "estop": bool(getattr(snap, "estop", False)),
             "fault": bool(getattr(snap, "fault", False)),
             "estop_word": int(getattr(snap, "estop_status_word", 0) or 0),
@@ -171,8 +171,8 @@ class DensiRuntime:
 
     def _edge_log_cmd_changes(self, cmd: CommandFrame | None) -> None:
         try:
-            if self._ch.changed("cmd_mode", str(getattr(cmd, "mode", ""))):
-                self._log.info("cmd_mode=%s", getattr(cmd, "mode", ""))
+            if self._ch.changed("cmd_core_mode", str(getattr(cmd, "core_mode", ""))):
+                self._log.info("cmd_core_mode=%s", getattr(cmd, "core_mode", ""))
             if self._ch.changed("cmd_estop_reset", bool(getattr(cmd, "estop_reset", False))):
                 self._log.info("cmd_estop_reset=%s", bool(getattr(cmd, "estop_reset", False)))
         except Exception:
@@ -186,8 +186,8 @@ class DensiRuntime:
             pass
 
     def _publish_telemetry_and_heartbeat(self, snap: TelemetrySnapshot, now_ns: int) -> None:
-        if self._ch.changed("mode", str(getattr(snap, "mode", ""))):
-            self._log.info("mode=%s", getattr(snap, "mode", ""))
+        if self._ch.changed("core_mode", str(getattr(snap, "core_mode", ""))):
+            self._log.info("core_mode=%s", getattr(snap, "core_mode", ""))
         if self._ch.changed("estop", bool(getattr(snap, "estop", False))):
             self._log.info(
                 "estop=%s word=%s",
@@ -200,7 +200,7 @@ class DensiRuntime:
         # Heartbeat summary (1 Hz)
         self._hb.inc("telem_tx", 1)
         self._hb.set("tick", int(getattr(snap, "tick", 0)))
-        self._hb.set("mode", str(getattr(snap, "mode", "")))
+        self._hb.set("core_mode", str(getattr(snap, "core_mode", "")))
         self._hb.set("estop", bool(getattr(snap, "estop", False)))
         self._hb.set("fault", bool(getattr(snap, "fault", False)))
         if self._axis_ids:
@@ -208,7 +208,7 @@ class DensiRuntime:
         if self._last_cmd_ns is not None:
             self._hb.set("cmd_age_ms", int((int(now_ns) - int(self._last_cmd_ns)) / 1_000_000.0))
         self._hb.emit(self._log)
-        self._last_mode = str(getattr(self._last_cmd, "mode", "") or "")
+        self._last_mode = str(getattr(self._last_cmd, "core_mode", "") or "")
         self._last_estop = bool(getattr(self._last_cmd, "estop", False))
         self._last_fault = bool(getattr(self._last_cmd, "fault", False))
         self._emit_status(now_ns)
@@ -248,7 +248,7 @@ class DensiRuntime:
         online = bool(self._seen_first_cmd) and (not stale)
         age_disp = format_age_ms(age_ms)
         cmd = self._last_cmd
-        cmd_mode = str(getattr(cmd, "mode", "") or "") if cmd is not None else ""
+        cmd_mode = str(getattr(cmd, "core_mode", "") or "") if cmd is not None else ""
         cmd_intent = bool(getattr(cmd, "intent", False)) if cmd is not None else False
         cmd_enable = False
         cmd_vel = 0.0
@@ -293,7 +293,7 @@ class DensiRuntime:
             fields={
                 "component": "densi",
                 "axis": axis,
-                "mode": mode,
+                "core_mode": mode,
                 "online": bool(online),
                 "age_ms": (-1 if age_ms is None else float(age_ms)),
                 "stale": bool(stale),
@@ -301,7 +301,7 @@ class DensiRuntime:
                 "fault": bool(fault_now),
                 "tick": int(getattr(self.engine.state, "tick", 0) or 0),
                 "last_cmd_rx_age_ms": (-1 if age_ms is None else float(age_ms)),
-                "cmd_mode": str(cmd_mode),
+                "cmd_core_mode": str(cmd_mode),
                 "cmd_intent": bool(cmd_intent),
                 "cmd_enable": bool(cmd_enable),
                 "cmd_vel": float(cmd_vel),

@@ -5,7 +5,6 @@ from typing import Dict, Any
 
 from steuerung3d.core.command_frame import ParamOp
 
-from steuerung3d.core.mode import Mode
 from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.joy_state import JoyState
 
@@ -38,8 +37,6 @@ class MachineState:
     # Default is intentionally conservative to tolerate ~100-200ms RTT + jitter.
     # (Core tick is typically 10ms -> 200 ticks ~= 2.0s)
     densi_offline_after_ticks: int = 200
-
-    mode: Mode = Mode.IDLE
 
     axes: Dict[str, AxisState] = field(default_factory=dict)
     axis_cmd: Dict[str, AxisCommandState] = field(default_factory=dict)
@@ -117,12 +114,6 @@ class MachineState:
     core_mode: CoreMode = CoreMode.ESTOP
     core_blocked_by: list[object] = field(default_factory=list)
     core_axis_gate: Dict[str, Dict[str, object]] = field(default_factory=dict)
-    core_live_request: bool = False
-    core_live_request_seen: bool = False
-    core_live_denied_count: int = 0
-    core_live_denied_reason: str = ""
-    core_live_denied_codes: list[str] = field(default_factory=list)
-    core_live_denied_tick: int = -1
 
 
     def ensure_axis(self, axis_id: str) -> AxisState:

@@ -33,7 +33,7 @@ def _mk_cmd(*, vel: float, lifetick: int = 0) -> CommandFrame:
         t_s=0.0,
         estop=False,
         fault=False,
-        mode="IDLE",
+        core_mode="IDLE",
         axes={"Anton": AxisSetpoint(enable=True, vel=float(vel))},
         lifetick_echo={"Anton": int(lifetick)},
     )

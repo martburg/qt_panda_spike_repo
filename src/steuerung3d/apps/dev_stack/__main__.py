@@ -10,7 +10,7 @@ import tomllib
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, SetEstop
+from steuerung3d.core.intents import EnableAxis, JogAxis, SetEstop
 from steuerung3d.core.state import MachineState
 from steuerung3d.protocol.core_runner import CoreRunner
 from steuerung3d.protocol.recording import JsonlRecorder, LoggedTransport
@@ -126,8 +126,6 @@ def main() -> int:
     runner.start()
 
     # ---- Client behavior (v0.1): send some intents, print telemetry ----
-    transport.publish_intent(ArmLiveMode())
-
     # Enable + jog ALL axes (so you see Burt/Cecil/Debby too)
     for aid in axis_ids:
         transport.publish_intent(EnableAxis(axis_id=aid, enable=True))
@@ -150,7 +148,7 @@ def main() -> int:
                             parts.append(f"{aid}(en={a.enabled}, vel={a.vel:5.2f}, pos={a.pos:8.3f})")
 
                     print(
-                        f"tick={snap.tick:5d} t={snap.t_s:6.2f}s mode={snap.mode} estop={snap.estop} "
+                        f"tick={snap.tick:5d} t={snap.t_s:6.2f}s core_mode={snap.core_mode} estop={snap.estop} "
                         + " ".join(parts)
                     )
 

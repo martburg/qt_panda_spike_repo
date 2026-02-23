@@ -80,7 +80,6 @@ Suggested interaction:
 
 ```
 show
-live
 enable X on
 jog X 0.6
 show
@@ -88,14 +87,13 @@ estop on
 show
 estop off
 clearfault
-idle
 quit
 ```
 
 What to look for:
-- after `live` + `enable` + `jog`, X telemetry should show motion
+- after `enable` + `jog`, X telemetry should show motion (when core_mode is LIVE)
 - after `estop on`, commanded motion stops and state reflects ESTOP
-- `idle` leaves LIVE mode cleanly
+- select gating: motion requires select_hip in the core joystick state
 
 ## Test B — Dev stack end-to-end + JSONL log
 
@@ -106,7 +104,7 @@ python -m steuerung3d.apps.dev_stack --config configs\dev_plc.toml
 ```
 
 What to look for:
-- periodic status lines (tick/t/mode/estop)
+- periodic status lines (tick/t/core_mode/estop)
 - if not on the PLC network, a message about **UDP SIM fallback** is expected
 
 Then inspect the run:

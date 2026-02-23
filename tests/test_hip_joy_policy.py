@@ -41,7 +41,6 @@ def _snap(
     return TelemetrySnapshot(
         tick=1,
         t_s=0.0,
-        mode="LIVE",
         core_mode="LIVE",
         estop=False,
         fault=False,

@@ -53,7 +53,7 @@ def test_edge_roundtrip_with_udp_sim():
             t_s=1.0,
             estop=False,
             fault=False,
-            mode="LIVE",
+            core_mode="LIVE",
             axes={"Anton": AxisSetpoint(enable=True, vel=1.0)},
             lifetick_echo={"Anton": 4242},
         )

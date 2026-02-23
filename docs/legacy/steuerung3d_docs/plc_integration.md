@@ -102,9 +102,9 @@ estop = OR across latest snapshots received this tick (safe default)
 
 fault = OR across latest snapshots received this tick (safe default)
 
-Mode:
+Core mode:
 
-core-owned (we do not overwrite MachineState.mode from PLC telemetry in v0.1)
+core-owned (we do not overwrite MachineState.core_mode from PLC telemetry in v0.1)
 
 PLC-reported mode may still be logged for debugging
 

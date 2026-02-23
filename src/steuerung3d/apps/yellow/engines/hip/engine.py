@@ -150,7 +150,7 @@ class HipEngine:
 
         axis_id = str(selected_axis or fixed_axis or "").strip()
         attached = bool(selected_axis or fixed_axis)
-        mode_now = str(getattr(snap, "mode", "") or "")
+        mode_now = str(getattr(snap, "core_mode", "") or "")
 
         motion_axis_id = axis_id
         if not motion_axis_id and len(axis_ids) == 1:

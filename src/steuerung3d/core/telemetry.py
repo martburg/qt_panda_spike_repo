@@ -4,7 +4,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict
 
-from steuerung3d.core.mode import Mode
 from steuerung3d.core.core_mode import core_mode_value
 from steuerung3d.core.state import AxisState, MachineState
 from steuerung3d.core.param_registry import eps_for_param
@@ -48,7 +47,6 @@ class DensiTelemetry:
 class TelemetrySnapshot:
     tick: int
     t_s: float
-    mode: str
     core_mode: str
     estop: bool
     fault: bool
@@ -157,7 +155,6 @@ class TelemetrySnapshot:
         return cls(
             tick=int(state.tick),
             t_s=float(state.t_s),
-            mode=state.mode.value if hasattr(state.mode, "value") else str(state.mode),
             core_mode=core_mode_value(getattr(state, "core_mode", "")),
             estop=bool(state.estop),
             fault=bool(state.fault),
@@ -238,10 +235,10 @@ def apply_measured_snapshot(state: MachineState, snap: TelemetrySnapshot) -> Non
     """Apply a device/DenSi measured snapshot to MachineState.
 
     Important: measured snapshots must NOT override core-owned workflow state such as
-    the mode/state-machine, or parameter edit session flags. They should only update
+    core_mode, or parameter edit session flags. They should only update
     measured values (pos/vel, estop word, and measured params).
     """
-    # Core mode is driven by intents + state machine; ignore snap.mode from PLC telemetry.
+    # Core mode is driven by aggregated safety facts; ignore telemetry core_mode.
     state.estop = bool(getattr(snap, "estop", False))
     state.fault = bool(getattr(snap, "fault", False))
 

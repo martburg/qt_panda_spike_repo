@@ -174,7 +174,7 @@ class HipRuntime:
         legacy_vm = self._assemble_legacy_view_model(engine_result.presentation)
 
         self._hb.inc("rx_telem", len(snaps))
-        mode_v = str(getattr(snap, "mode", ""))
+        mode_v = str(getattr(snap, "core_mode", ""))
         estop_v = bool(getattr(snap, "estop", False))
         fault_v = bool(getattr(snap, "fault", False))
         self._last_mode = mode_v
@@ -218,15 +218,15 @@ class HipRuntime:
                 str(getattr(engine_result, "resync_block_reason", "") or ""),
             )
 
-        if self._ch.changed("mode", mode_v):
-            self._log.info("mode=%s", mode_v)
+        if self._ch.changed("core_mode", mode_v):
+            self._log.info("core_mode=%s", mode_v)
         if self._ch.changed("estop", estop_v):
             self._log.info("estop=%s", estop_v)
         if self._ch.changed("fault", fault_v):
             self._log.info("fault=%s", fault_v)
 
         self._hb.set("tick", int(getattr(snap, "tick", 0) or 0))
-        self._hb.set("mode", mode_v)
+        self._hb.set("core_mode", mode_v)
         self._hb.set("estop", estop_v)
         self._hb.set("fault", fault_v)
         axis = str(getattr(self.engine.state, "selected_axis", "") or "")

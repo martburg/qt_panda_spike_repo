@@ -4,9 +4,7 @@ import logging
 log = logging.getLogger("core")
 
 from steuerung3d.core.intents import (
-    ArmLiveMode,
     ClearFault,
-    DisarmToIdle,
     EnableAxis,
     ClaimAxis,
     ReleaseAxis,
@@ -30,11 +28,9 @@ from steuerung3d.core.intents import (
     Intent,
 )
 from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
-from steuerung3d.core.mode import Mode
 from steuerung3d.core.core_mode import CoreMode, core_mode_value
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.command_frame import ParamEditBeginOp, ParamWriteOp, ParamCancelOp
-from steuerung3d.core.state_machine import enforce_mode_actions, normalize_mode
 from steuerung3d.core.param_registry import normalize_group_values
 
 # PLC Modus 'w' expects the full parameter set on each write.
@@ -109,6 +105,19 @@ def _axis_reset_allowed(state: MachineState, axis_id: str, hip_id: str) -> tuple
     if claim_owner or holders:
         return False, "not_owner"
     return False, "no_owner"
+
+
+def enforce_core_mode_actions(state: MachineState) -> None:
+    core_mode = core_mode_value(getattr(state, "core_mode", "")).upper()
+    if core_mode == CoreMode.ESTOP.value:
+        for cmd in state.axis_cmd.values():
+            cmd.enable = False
+            cmd.vel = 0.0
+        return
+    if core_mode in (CoreMode.FAULT.value, CoreMode.IDLE.value, CoreMode.ARMED.value, CoreMode.READY.value):
+        for cmd in state.axis_cmd.values():
+            cmd.vel = 0.0
+        return
 
 
 def apply_intent(state: MachineState, intent: Intent) -> None:
@@ -269,8 +278,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
                     cmd.enable = False
                     cmd.vel = 0.0
 
-            normalize_mode(state)
-            enforce_mode_actions(state)
+            enforce_core_mode_actions(state)
             return
         case RequestEstopReset(axis_id=axis_id, hip_id=hip_id):
             # Historical name: RequestEstopReset. In v0.1 this acts as per-axis "clear fault / drive reset".
@@ -294,8 +302,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
                 ) + 1
                 return
 
-            normalize_mode(state)
-            enforce_mode_actions(state)
+            enforce_core_mode_actions(state)
             return
 
         case RequestResync(axis_id=axis_id, hip_id=hip_id):
@@ -396,32 +403,20 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             else:
                 state.pending_param_ops.append(op)
             return
-        case ArmLiveMode():
-            state.core_live_request = True
-            return
-
-        case DisarmToIdle():
-            state.core_live_request = False
-            return
-
         # fallthrough to mode-gated below
         case _:
             pass
 
     # --- MODE-GATED INTENTS (LIVE only) ---
-    normalize_mode(state)
-
     core_mode = core_mode_value(getattr(state, "core_mode", "")).upper()
     if core_mode:
         is_live = core_mode == CoreMode.LIVE.value
-    else:
-        is_live = state.mode == Mode.LIVE
 
     if not is_live:
-        enforce_mode_actions(state)
+        enforce_core_mode_actions(state)
         return
     if state.estop or state.fault:
-        enforce_mode_actions(state)
+        enforce_core_mode_actions(state)
         return
 
     match intent:

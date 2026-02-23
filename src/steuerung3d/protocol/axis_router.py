@@ -90,7 +90,7 @@ class AxisRouter:
                 t_s=cmd_frame.t_s,
                 estop=cmd_frame.estop,
                 fault=cmd_frame.fault,
-                mode=cmd_frame.mode,
+                core_mode=cmd_frame.core_mode,
                 axes={axis_id: sp},
                 intent=bool(getattr(cmd_frame, "intent", True)),
                 resync=bool(getattr(cmd_frame, "resync", False)),
@@ -155,8 +155,7 @@ class AxisRouter:
         return TelemetrySnapshot(
             tick=int(getattr(snap, "tick", 0)),
             t_s=float(getattr(snap, "t_s", 0.0)),
-            mode=str(getattr(snap, "mode", "")),
-            core_mode=str(getattr(snap, "core_mode", "")) or str(getattr(snap, "mode", "")),
+            core_mode=str(getattr(snap, "core_mode", "")),
             estop=bool(getattr(snap, "estop", False)),
             fault=bool(getattr(snap, "fault", False)),
             axes=axes,

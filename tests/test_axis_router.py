@@ -38,7 +38,7 @@ def test_router_reduces_multi_axis_command_frame_and_lifetick_echo():
         t_s=0.2,
         estop=False,
         fault=False,
-        mode="LIVE",
+        core_mode="LIVE",
         axes={
             "X": AxisSetpoint(enable=True, vel=2.0),
             "Y": AxisSetpoint(enable=False, vel=4.0),
@@ -87,7 +87,6 @@ def test_router_slices_ui_snapshot_and_pins_device_scoped_fields():
     dev_snap_x = TelemetrySnapshot(
         tick=1,
         t_s=0.02,
-        mode="LIVE",
         core_mode="LIVE",
         estop=False,
         fault=False,
@@ -111,7 +110,6 @@ def test_router_slices_ui_snapshot_and_pins_device_scoped_fields():
     core_snap = TelemetrySnapshot(
         tick=2,
         t_s=0.04,
-        mode="LIVE",
         core_mode="LIVE",
         estop=False,
         fault=False,

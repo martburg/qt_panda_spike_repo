@@ -841,9 +841,7 @@ EnableAxis: {"type":"enable_axis","axis_id":"X","enable":true}
 
 JogAxis: {"type":"jog_axis","axis_id":"X","vel":0.2}
 
-ArmLiveMode: {"type":"arm_live_mode"}
-
-DisarmToIdle: {"type":"disarm_to_idle"}
+CoreMode is derived from safety facts; there is no intent to set LIVE/IDLE.
 
 ClearFault: {"type":"clear_fault"}
 
@@ -868,7 +866,7 @@ Shape:
   "t_s": 12.3,
   "estop": false,
   "fault": false,
-  "mode": "live",
+  "core_mode": "LIVE",
   "axes": {
     "X": {"enable": true, "vel": 0.2}
   },
@@ -879,7 +877,7 @@ TelemetrySnapshot (Device → Core on 52002, and Core → UI on 51002)
 
 TelemetrySnapshot includes:
 
-tick, t_s, mode, estop, fault
+tick, t_s, core_mode, estop, fault
 
 per-axis: pos, vel, enabled, fault
 
@@ -890,7 +888,7 @@ Shape:
 {
   "tick": 123,
   "t_s": 12.3,
-  "mode": "idle",
+  "core_mode": "IDLE",
   "estop": false,
   "fault": false,
   "axes": {
@@ -905,7 +903,7 @@ Because the order is:
 
 apply intents
 
-enforce mode clamps
+enforce core_mode clamps
 
 advance tick
 

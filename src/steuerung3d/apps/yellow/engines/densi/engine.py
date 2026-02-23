@@ -275,7 +275,7 @@ class DenSiEngine:
                 t_s=float(self.state.t_s),
                 estop=False,
                 fault=False,
-                mode=self.state.mode,
+                core_mode=getattr(self.state, "core_mode", ""),
                 axes={},
                 estop_reset=False,
             )

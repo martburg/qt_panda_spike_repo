@@ -32,7 +32,6 @@ def test_encode_plc_uplink_has_eod_and_tail() -> None:
     snap = TelemetrySnapshot(
         tick=1,
         t_s=0.1,
-        mode="IDLE",
         core_mode="IDLE",
         estop=False,
         fault=False,
@@ -53,7 +52,7 @@ def test_encode_downlink_uses_true_false_tokens() -> None:
         t_s=0.0,
         estop=False,
         fault=False,
-        mode="IDLE",
+        core_mode="IDLE",
         axes={"Anton": AxisSetpoint(enable=True, vel=1.0)},
         intent=True,
         resync=False,

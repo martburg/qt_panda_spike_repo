@@ -35,13 +35,13 @@ except Exception as e:  # noqa: BLE001
 import math
 
 from steuerung3d.core.state import MachineState
-from steuerung3d.core.mode import Mode
+from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.intent_handler import apply_intent
 
 
 def test_arm_sync_and_enter_sync() -> None:
     st = MachineState()
-    st.mode = Mode.LIVE
+    st.core_mode = CoreMode.LIVE
 
     # Two densis online
     st.ensure_axis('A').pos = 1.0
@@ -59,4 +59,4 @@ def test_arm_sync_and_enter_sync() -> None:
     assert st.rig_mode == RigMode.ARMED_SYNC
 
     apply_intent(st, EnterSync())
-    assert st.rig_mode == RigMode.SYNC
+    assert st.rig_mode == RigMode.SYNC_ACTIVE

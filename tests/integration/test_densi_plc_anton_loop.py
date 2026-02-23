@@ -31,7 +31,7 @@ def _cmd(*, vel: float, tick: int) -> CommandFrame:
         t_s=0.0,
         estop=False,
         fault=False,
-        mode="IDLE",
+        core_mode="IDLE",
         axes={"Anton": AxisSetpoint(enable=True, vel=float(vel))},
         lifetick_echo={"Anton": int(tick) & 0xFFFF},
     )

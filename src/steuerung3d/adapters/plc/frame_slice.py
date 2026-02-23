@@ -23,7 +23,7 @@ def slice_command_frame(cmd: CommandFrame, axis_ids: Iterable[str]) -> CommandFr
         t_s=cmd.t_s,
         estop=cmd.estop,
         fault=cmd.fault,
-        mode=cmd.mode,
+        core_mode=cmd.core_mode,
         axes=sliced_axes,
         intent=getattr(cmd, "intent", True),
         resync=bool(getattr(cmd, "resync", False)),

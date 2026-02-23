@@ -25,7 +25,6 @@ def _snap_for_device_tick(axis_id: str, *, tick: int, t_s: float, device_tick: i
     return TelemetrySnapshot(
         tick=tick,
         t_s=t_s,
-        mode="LIVE",
         core_mode="LIVE",
         estop=False,
         fault=False,

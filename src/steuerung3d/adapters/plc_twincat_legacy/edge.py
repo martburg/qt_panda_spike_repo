@@ -191,8 +191,7 @@ class TwinCATLegacyWinchEdge:
         snap = TelemetrySnapshot(
             tick=int(cmd.tick),
             t_s=float(cmd.t_s),
-            mode=str(cmd.mode),
-            core_mode=str(cmd.mode),
+            core_mode=str(cmd.core_mode),
             estop=bool(cmd.estop),
             fault=bool(cmd.fault) or bool(fault),
             axes={

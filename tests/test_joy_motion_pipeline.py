@@ -27,7 +27,6 @@ def _snap(axis_id: str, *, joy: JoyState, claimed_by: str, vel_max: float = 1.0)
     return TelemetrySnapshot(
         tick=1,
         t_s=0.0,
-        mode="LIVE",
         core_mode="LIVE",
         estop=False,
         fault=False,
@@ -98,6 +97,7 @@ def test_joy_motion_end_to_end_gating_and_sign() -> None:
 
     st = MachineState()
     st.core_mode = CoreMode.LIVE
+    st.joy = JoyState(select_hip=True)
     apply_intent(st, RequestAxisLease(axis_id=axis_id, hip_id=hip_id, req_id="lease-anton"))
     apply_intent(st, EnableAxis(axis_id=axis_id, enable=True, hip_id=hip_id))
     _apply_intents(st, intents)
@@ -126,3 +126,35 @@ def test_joy_state_update_does_not_drive_motion() -> None:
 
     cmd = build_command_frame(st)
     assert cmd.axes[axis_id].vel == 0.0
+
+
+def test_core_select_gates_speed_when_unselected() -> None:
+    axis_id = "Anton"
+    hip_id = "hip-test"
+
+    st = MachineState()
+    st.ensure_axis(axis_id)
+    st.core_mode = CoreMode.LIVE
+    apply_intent(st, RequestAxisLease(axis_id=axis_id, hip_id=hip_id, req_id="lease-sel-0"))
+    apply_intent(st, EnableAxis(axis_id=axis_id, enable=True, hip_id=hip_id))
+    apply_intent(st, JogWinch(winch_id=axis_id, rate=0.7, hip_id=hip_id))
+    apply_intent(st, JoyStateUpdate(deadman=True, select_hip=False, soll_speed=0.7))
+
+    cmd = build_command_frame(st)
+    assert cmd.axes[axis_id].vel == 0.0
+
+
+def test_core_select_allows_speed_when_selected() -> None:
+    axis_id = "Anton"
+    hip_id = "hip-test"
+
+    st = MachineState()
+    st.ensure_axis(axis_id)
+    st.core_mode = CoreMode.LIVE
+    apply_intent(st, RequestAxisLease(axis_id=axis_id, hip_id=hip_id, req_id="lease-sel-1"))
+    apply_intent(st, EnableAxis(axis_id=axis_id, enable=True, hip_id=hip_id))
+    apply_intent(st, JogWinch(winch_id=axis_id, rate=-0.4, hip_id=hip_id))
+    apply_intent(st, JoyStateUpdate(deadman=True, select_hip=True, soll_speed=-0.4))
+
+    cmd = build_command_frame(st)
+    assert cmd.axes[axis_id].vel == -0.4

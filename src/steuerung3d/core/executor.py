@@ -12,6 +12,7 @@ _lt_last_cmd_log_by_axis: dict[str, float] = {}
 
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, coerce_param_ops
 from steuerung3d.core.state import MachineState
+from steuerung3d.core.core_mode import CoreMode, core_mode_value
 from steuerung3d.core.rig_logic import densi_online
 
 
@@ -67,12 +68,23 @@ def build_command_frame(state: MachineState) -> CommandFrame:
     except Exception:
         resync_any = bool(getattr(state, "resync_req", False))
 
+    core_mode = core_mode_value(getattr(state, "core_mode", ""))
+    joy = getattr(state, "joy", None)
+    joy_select = bool(getattr(joy, "select_hip", False)) if joy is not None else False
+    if core_mode != CoreMode.LIVE.value:
+        for axis_id, sp in axes.items():
+            axes[axis_id] = AxisSetpoint(enable=bool(sp.enable), vel=0.0)
+    elif not joy_select:
+        for axis_id, sp in axes.items():
+            if abs(float(sp.vel)) > 1e-6:
+                axes[axis_id] = AxisSetpoint(enable=bool(sp.enable), vel=0.0)
+
     return CommandFrame(
         tick=state.tick,
         t_s=state.t_s,
         estop=False,  # <-- important policy change
         fault=state.fault,
-        mode=state.mode.value,
+        core_mode=core_mode,
         axes=axes,
         estop_reset=state.estop_reset_req,  # pulse from HI-P intent
         resync=resync_any,  # legacy ReSync pulse

@@ -3,7 +3,8 @@ from __future__ import annotations
 import pytest
 
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.intents import ClaimAxis, ReleaseAxis, EnableAxis, JogAxis, ArmLiveMode
+from steuerung3d.core.intents import ClaimAxis, ReleaseAxis, EnableAxis, JogAxis
+from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.state import MachineState
 
 
@@ -43,8 +44,7 @@ def test_claim_enforces_enable_and_jog():
     st = MachineState()
 
     # LIVE-gated: enable/jog only apply in LIVE mode
-    apply_intent(st, ArmLiveMode())
-    assert st.mode.name == "LIVE"
+    st.core_mode = CoreMode.LIVE
 
     apply_intent(st, ClaimAxis(axis_id="Anton", hip_id="hipA", req_id="r1"))
 

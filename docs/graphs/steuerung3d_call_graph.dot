@@ -50,15 +50,12 @@ digraph G {
   "steuerung3d.apps.cli_client.__main__.main" -> "steuerung3d.core.state.MachineState";
   "steuerung3d.apps.cli_client.__main__.main" -> "steuerung3d.protocol.core_runner.CoreRunner";
   "steuerung3d.apps.cli_client.__main__.main" -> "steuerung3d.protocol.transport.InMemTransport";
-  "steuerung3d.apps.cli_client.__main__.parse_and_send" -> "steuerung3d.core.intents.ArmLiveMode";
   "steuerung3d.apps.cli_client.__main__.parse_and_send" -> "steuerung3d.core.intents.ClearFault";
-  "steuerung3d.apps.cli_client.__main__.parse_and_send" -> "steuerung3d.core.intents.DisarmToIdle";
   "steuerung3d.apps.cli_client.__main__.parse_and_send" -> "steuerung3d.core.intents.EnableAxis";
   "steuerung3d.apps.cli_client.__main__.parse_and_send" -> "steuerung3d.core.intents.JogAxis";
   "steuerung3d.apps.cli_client.__main__.parse_and_send" -> "steuerung3d.core.intents.SetEstop";
   "steuerung3d.apps.core_service.__main__.main" -> "steuerung3d.common.timebase.Timebase";
   "steuerung3d.apps.core_service.__main__.main" -> "steuerung3d.core.engine.CoreEngine";
-  "steuerung3d.apps.core_service.__main__.main" -> "steuerung3d.core.intents.ArmLiveMode";
   "steuerung3d.apps.core_service.__main__.main" -> "steuerung3d.core.intents.EnableAxis";
   "steuerung3d.apps.core_service.__main__.main" -> "steuerung3d.core.intents.JogAxis";
   "steuerung3d.apps.core_service.__main__.main" -> "steuerung3d.core.intents.SetEstop";
@@ -105,7 +102,6 @@ digraph G {
   "steuerung3d.apps.dev_stack.__main__.main" -> "steuerung3d.apps.dev_stack.__main__._load_device_from_config";
   "steuerung3d.apps.dev_stack.__main__.main" -> "steuerung3d.common.timebase.Timebase";
   "steuerung3d.apps.dev_stack.__main__.main" -> "steuerung3d.core.engine.CoreEngine";
-  "steuerung3d.apps.dev_stack.__main__.main" -> "steuerung3d.core.intents.ArmLiveMode";
   "steuerung3d.apps.dev_stack.__main__.main" -> "steuerung3d.core.intents.EnableAxis";
   "steuerung3d.apps.dev_stack.__main__.main" -> "steuerung3d.core.intents.JogAxis";
   "steuerung3d.apps.dev_stack.__main__.main" -> "steuerung3d.core.intents.SetEstop";
@@ -201,7 +197,6 @@ digraph G {
   "steuerung3d.apps.plc_stack.__main__.main" -> "steuerung3d.apps.plc_stack.builder.build_plc_device";
   "steuerung3d.apps.plc_stack.__main__.main" -> "steuerung3d.apps.plc_stack.builder.collect_axes";
   "steuerung3d.apps.plc_stack.__main__.main" -> "steuerung3d.config.plc_stack_config.load_plc_stack_config";
-  "steuerung3d.apps.plc_stack.__main__.main" -> "steuerung3d.core.intents.ArmLiveMode";
   "steuerung3d.apps.plc_stack.__main__.main" -> "steuerung3d.core.intents.EnableAxis";
   "steuerung3d.apps.plc_stack.__main__.main" -> "steuerung3d.core.intents.JogAxis";
   "steuerung3d.apps.plc_stack.__main__.main" -> "steuerung3d.core.intents.SetEstop";

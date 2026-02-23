@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 
 from steuerung3d.config.plc_stack_config import load_plc_stack_config
-from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, SetEstop
+from steuerung3d.core.intents import EnableAxis, JogAxis, SetEstop
 from steuerung3d.protocol.core_runner import CoreRunner
 
 from .builder import build_core, build_plc_device, collect_axes
@@ -39,7 +39,6 @@ def main() -> int:
     runner.start()
 
     # --- demo behavior (safe defaults; adjust for your rig) ---
-    tr.publish_intent(ArmLiveMode())
     for a in axes:
         tr.publish_intent(EnableAxis(axis_id=a, enable=True))
 
@@ -57,7 +56,7 @@ def main() -> int:
                     last_print = snap.tick
                     ax0 = snap.axes[axes[0]] if axes else None
                     print(
-                        f"tick={snap.tick:5d} t={snap.t_s:6.2f}s mode={snap.mode} "
+                        f"tick={snap.tick:5d} t={snap.t_s:6.2f}s core_mode={snap.core_mode} "
                         f"estop={snap.estop} fault={snap.fault} "
                         f"rx_ticks={device.last_rx_tick_by_endpoint} "
                         + (f"{axes[0]}(en={ax0.enabled}, vel={ax0.vel:5.2f}, pos={ax0.pos:8.3f})" if ax0 else "")

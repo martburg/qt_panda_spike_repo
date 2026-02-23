@@ -119,7 +119,7 @@ def _print_csv(
     show_pos: bool,
     show_intents: bool,
 ) -> None:
-    header = ["tick", "t_s", "mode", "estop", "fault"]
+    header = ["tick", "t_s", "core_mode", "estop", "fault"]
     if show_intents:
         header.append("intents")
     for a in axes:
@@ -136,7 +136,7 @@ def _print_csv(
 
         # Prefer telemetry for shared fields; fallback to command frame.
         t_s = snap.t_s if snap else (cf.t_s if cf else 0.0)
-        mode = snap.mode if snap else (cf.mode if cf else "")
+        mode = snap.core_mode if snap else (cf.core_mode if cf else "")
         estop = snap.estop if snap else (cf.estop if cf else False)
         fault = snap.fault if snap else (cf.fault if cf else False)
 
@@ -168,7 +168,7 @@ def _print_table(
     show_intents: bool,
 ) -> None:
     # Simple fixed-width table (no external deps).
-    cols = ["tick", "t_s", "mode", "E", "F"]
+    cols = ["tick", "t_s", "core_mode", "E", "F"]
     if show_intents:
         cols.append("I")
     for a in axes:
@@ -185,7 +185,7 @@ def _print_table(
         cf = cmd_by_tick.get(t)
 
         t_s = snap.t_s if snap else (cf.t_s if cf else 0.0)
-        mode = snap.mode if snap else (cf.mode if cf else "")
+        mode = snap.core_mode if snap else (cf.core_mode if cf else "")
         estop = snap.estop if snap else (cf.estop if cf else False)
         fault = snap.fault if snap else (cf.fault if cf else False)
 

@@ -7,7 +7,6 @@ from steuerung3d.core.intents import EnableAxis, JogAxis, SetEstop
 from steuerung3d.core.state import MachineState
 from steuerung3d.protocol.inmem_bus import InMemBus
 
-from steuerung3d.core.intents import EnableAxis, JogAxis, SetEstop, ArmLiveMode
 
 def main() -> int:
     tb = Timebase(dt_s=0.01)  # 100 Hz
@@ -31,7 +30,6 @@ def main() -> int:
             bus.publish_intent(SetEstop(estop=True))
         if state.tick == 350:
             bus.publish_intent(SetEstop(estop=False))
-            bus.publish_intent(ArmLiveMode())
             bus.publish_intent(EnableAxis(axis_id="X", enable=True))
             bus.publish_intent(JogAxis(axis_id="X", vel=0.5))
 

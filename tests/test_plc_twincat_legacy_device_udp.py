@@ -75,12 +75,12 @@ def test_device_sends_every_frame_and_echoes_last_uplink_lifetick():
     st.ensure_axis("Anton")
 
     # Frame 1: axis not present -> must still send lifetick (watchdog)
-    cmd1 = CommandFrame(tick=100, t_s=0.0, estop=False, fault=False, mode="X", axes={}, lifetick_echo={"Anton": 0})
+    cmd1 = CommandFrame(tick=100, t_s=0.0, estop=False, fault=False, core_mode="X", axes={}, lifetick_echo={"Anton": 0})
     dev.step(st, cmd1, dt=0.01)
 
     # Frame 2: axis present -> sends again
     cmd2 = CommandFrame(
-        tick=101, t_s=0.01, estop=False, fault=False, mode="X",
+        tick=101, t_s=0.01, estop=False, fault=False, core_mode="X",
         axes={"Anton": AxisSetpoint(enable=True, vel=3.0)},
         lifetick_echo={"Anton": 10},
     )
@@ -140,13 +140,13 @@ def test_device_rebases_possoll_to_posist_on_enable_edge():
     st.ensure_axis("Anton")
 
     # Step once with no command: still sends watchdog, and receives uplink -> caches ax.pos = 1.0
-    cmd0 = CommandFrame(tick=1, t_s=0.0, estop=False, fault=False, mode="X", axes={})
+    cmd0 = CommandFrame(tick=1, t_s=0.0, estop=False, fault=False, core_mode="X", axes={})
     dev.step(st, cmd0, dt=0.01)
 
     # Now enable with nonzero vel. On enable edge, PosSoll must equal cached PosIst exactly (1.0),
     # not 1.0 + vel*dt.
     cmd1 = CommandFrame(
-        tick=2, t_s=0.01, estop=False, fault=False, mode="X",
+        tick=2, t_s=0.01, estop=False, fault=False, core_mode="X",
         axes={"Anton": AxisSetpoint(enable=True, vel=3.0)},
     )
     dev.step(st, cmd1, dt=0.01)
@@ -206,7 +206,7 @@ def test_enabled_is_measured_not_commanded():
             t_s=0.01 * k,
             estop=False,
             fault=False,
-            mode="X",
+            core_mode="X",
             axes={"Anton": AxisSetpoint(enable=True, vel=1.0)},
         )
         dev.step(st, cmd, dt=0.01)

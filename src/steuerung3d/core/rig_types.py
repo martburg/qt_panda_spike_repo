@@ -8,9 +8,9 @@ from typing import Dict, Optional, Tuple
 class RigMode(str, Enum):
     """Rig-level workflow mode.
 
-    Separate from :class:`steuerung3d.core.mode.Mode`.
+    Separate from the global core_mode safety gate.
 
-    - Mode is the global safety/motion gate (ESTOP/FAULT/IDLE/LIVE)
+    - core_mode is the global safety/motion gate (ESTOP/FAULT/IDLE/LIVE)
     - RigMode is the operator workflow (discovery/setup/sync/recover)
 
     The config-freeze boundary is from ARMED_SYNC onwards.

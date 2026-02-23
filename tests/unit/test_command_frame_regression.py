@@ -9,10 +9,10 @@ from steuerung3d.adapters.sim.device import SimDevice
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogAxis, SetEstop, RequestAxisLease
+from steuerung3d.core.intents import EnableAxis, JogAxis, SetEstop, RequestAxisLease
 from steuerung3d.core.state import MachineState
-from steuerung3d.core.mode import Mode
 from steuerung3d.core.core_mode import CoreMode
+from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.command_frame import CommandFrame
 
 from steuerung3d.protocol.codec import encode_command_frame
@@ -51,7 +51,7 @@ def test_command_frame_sequence_regression_hash():
     for a in axis_ids:
         st.ensure_axis(a)
     st.core_mode = CoreMode.LIVE
-    st.mode = Mode.LIVE
+    st.joy = JoyState(select_hip=True)
 
     frames: List[CommandFrame] = []
 
@@ -71,7 +71,6 @@ def test_command_frame_sequence_regression_hash():
     hip_id = "hipA"
     for a in axis_ids:
         transport.publish_intent(RequestAxisLease(axis_id=a, hip_id=hip_id, req_id=f"lease-{a}"))
-    transport.publish_intent(ArmLiveMode())  # tick=0
     eng.step_once()  # tick=1
 
     for a in axis_ids:
@@ -89,5 +88,5 @@ def test_command_frame_sequence_regression_hash():
     got = _fingerprint(frames)
 
     # Baseline generated from current deterministic SIM behavior.
-    expected = "719740099e4b98177087c55fd85088fd590279a97d538975c0320e4e72a0c377"
+    expected = "89a8e72cf56a1500e3ace47212fb7a4b84000a46d1c58b393a4b48a62b5a5543"
     assert got == expected, f"command-frame regression hash changed: {got} != {expected}"

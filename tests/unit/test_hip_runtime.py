@@ -29,7 +29,6 @@ def _snap(axis_id: str = "A", device_tick: int = 10) -> TelemetrySnapshot:
     return TelemetrySnapshot(
         tick=1,
         t_s=0.0,
-        mode="IDLE",
         core_mode="IDLE",
         estop=False,
         fault=False,

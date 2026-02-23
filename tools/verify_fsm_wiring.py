@@ -6,7 +6,7 @@ from typing import Optional
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.state import MachineState
-from steuerung3d.core.mode import Mode
+from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.axis_types import AxisTelemetry as LegacyAxisTelemetry
 from steuerung3d.core.command_frame import CommandFrame
 
@@ -36,8 +36,8 @@ def main() -> None:
     tb = Timebase(dt_s=0.01)
     st = MachineState()
 
-    # Mode matters because enforce_mode_actions() runs every tick
-    st.mode = Mode.LIVE
+    # Core mode matters because enforce_core_mode_actions() runs every tick
+    st.core_mode = CoreMode.LIVE
 
     # Create axis once, then configure it
     ax = st.ensure_axis(axis_id)

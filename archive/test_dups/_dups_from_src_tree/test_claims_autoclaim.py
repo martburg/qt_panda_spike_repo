@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.intents import ClaimAxis, ReleaseAxis, EnableAxis, JogAxis, ArmLiveMode
+from steuerung3d.core.intents import ClaimAxis, ReleaseAxis, EnableAxis, JogAxis
 from steuerung3d.core.state import MachineState
 
 

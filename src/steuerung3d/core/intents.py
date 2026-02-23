@@ -102,16 +102,6 @@ class RequestResync:
 
 
 @dataclass(frozen=True)
-class ArmLiveMode:
-    type: Literal["arm_live_mode"] = "arm_live_mode"
-
-
-@dataclass(frozen=True)
-class DisarmToIdle:
-    type: Literal["disarm_to_idle"] = "disarm_to_idle"
-
-
-@dataclass(frozen=True)
 class ClearFault:
     type: Literal["clear_fault"] = "clear_fault"
 
@@ -260,8 +250,6 @@ Intent = Union[
     SetEstop,
     RequestEstopReset,  # NEW
     RequestResync,
-    ArmLiveMode,
-    DisarmToIdle,
     ClearFault,
     ParamEditBegin,
     ParamWrite,

@@ -39,7 +39,7 @@ def test_udp_telemetry_fanout_delivers_to_two_targets() -> None:
         ]
     )
 
-    snap = TelemetrySnapshot(tick=1, t_s=0.0, mode="IDLE", core_mode="IDLE", estop=False, fault=False, axes={})
+    snap = TelemetrySnapshot(tick=1, t_s=0.0, core_mode="IDLE", estop=False, fault=False, axes={})
     fanout.publish_telemetry(snap)
 
     got1 = _drain_until(rx1)
@@ -62,7 +62,7 @@ def test_udp_telemetry_fanout_continues_on_failure() -> None:
     outs.extend(_FailingOut() for _ in range(7))
 
     fanout = UdpTelemetryFanout(outs=outs)
-    snap = TelemetrySnapshot(tick=1, t_s=0.0, mode="IDLE", core_mode="IDLE", estop=False, fault=False, axes={})
+    snap = TelemetrySnapshot(tick=1, t_s=0.0, core_mode="IDLE", estop=False, fault=False, axes={})
 
     fanout.publish_telemetry(snap)
 

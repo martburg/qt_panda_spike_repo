@@ -562,13 +562,11 @@ def main() -> int:
                     joy_soll_speed=joy_soll_speed,
                 ),
             )
-            state.core_live_request_seen = bool(getattr(state, "core_live_request", False))
-            state.core_live_request = False
         except Exception:
             log.exception("core mode aggregation failed")
 
-        log.debug("tx cmd frame: tick=%s estop=%s fault=%s mode=%s",
-                  cmd_frame.tick, cmd_frame.estop, cmd_frame.fault, cmd_frame.mode)
+        log.debug("tx cmd frame: tick=%s estop=%s fault=%s core_mode=%s",
+                  cmd_frame.tick, cmd_frame.estop, cmd_frame.fault, cmd_frame.core_mode)
 
         now = time.monotonic()
         if now - t_last_report >= 1.0:
@@ -579,9 +577,9 @@ def main() -> int:
             age_c2  = None if last_seen["c2_telem_ts"] is None else now - last_seen["c2_telem_ts"]
 
             log.info(
-                "HB t=%.1fs mode=%s rig=%s estop=%s fault=%s claims=%d | intents=%d(age=%s) dev_telem=%d(age=%s) cmd_out=%d(age=%s) ui_telem_out=%d(age=%s) c2_telem_out=%d(age=%s)",
+                "HB t=%.1fs core_mode=%s rig=%s estop=%s fault=%s claims=%d | intents=%d(age=%s) dev_telem=%d(age=%s) cmd_out=%d(age=%s) ui_telem_out=%d(age=%s) c2_telem_out=%d(age=%s)",
                 now - t0,
-                getattr(getattr(state, "mode", ""), "value", getattr(state, "mode", "")),
+                core_mode_value(getattr(state, "core_mode", "")),
                 getattr(state, "rig_mode", "DISCOVERY"),
                 bool(getattr(state, "estop", False)),
                 bool(getattr(state, "fault", False)),
@@ -600,17 +598,17 @@ def main() -> int:
     def on_snapshot(snap: TelemetrySnapshot):
         # Log key state changes once (helps a lot during field debugging).
         try:
-            mode_v = str(getattr(snap, "mode", ""))
+            mode_v = str(getattr(snap, "core_mode", ""))
             estop_v = bool(getattr(snap, "estop", False))
             fault_v = bool(getattr(snap, "fault", False))
             rig_v = str(getattr(snap, "rig_mode", ""))
             if (
-                state_ch.changed("mode", mode_v)
+                state_ch.changed("core_mode", mode_v)
                 or state_ch.changed("estop", estop_v)
                 or state_ch.changed("fault", fault_v)
                 or state_ch.changed("rig_mode", rig_v)
             ):
-                log.info("state: mode=%s estop=%s fault=%s rig_mode=%s", mode_v, estop_v, fault_v, rig_v)
+                log.info("state: core_mode=%s estop=%s fault=%s rig_mode=%s", mode_v, estop_v, fault_v, rig_v)
 
             claims = tuple(sorted(dict(getattr(st, "axis_claims", {}) or {}).items()))
             if state_ch.changed("claims", claims):
@@ -663,11 +661,7 @@ def main() -> int:
 
                 estop_v = bool(getattr(snap, "estop", False))
                 fault_v = bool(getattr(snap, "fault", False))
-                mode_v = (
-                    core_mode_value(getattr(st, "core_mode", ""))
-                    or str(getattr(snap, "core_mode", ""))
-                    or str(getattr(getattr(snap, "mode", ""), "value", getattr(snap, "mode", "")))
-                )
+                mode_v = core_mode_value(getattr(st, "core_mode", "")) or str(getattr(snap, "core_mode", ""))
 
                 # Simple policy: ERR on estop/fault; WARN on stale inputs; else OK.
                 stale = False
@@ -779,11 +773,6 @@ def main() -> int:
                 joy = getattr(st, "joy", None)
                 joy_dm = bool(getattr(joy, "deadman", False))
                 joy_sel = bool(getattr(joy, "select_hip", False))
-                live_req_seen = bool(getattr(st, "core_live_request_seen", False))
-                live_denied_count = int(getattr(st, "core_live_denied_count", 0) or 0)
-                live_denied_reason = str(getattr(st, "core_live_denied_reason", "") or "")
-                live_denied_codes = list(getattr(st, "core_live_denied_codes", []) or [])
-
                 summary = (
                     f"core_mode={mode_v} blocked_by=[{blocked_summary}] "
                     f"in=[{intents_types_str}] n={int(last_intents_meta.get('count', 0))} "
@@ -807,10 +796,6 @@ def main() -> int:
                         "blocked_by": list(blocked_payload),
                         "joy_dm": bool(joy_dm),
                         "joy_sel": bool(joy_sel),
-                        "live_req_seen": bool(live_req_seen),
-                        "live_denied_count": int(live_denied_count),
-                        "live_denied_reason": str(live_denied_reason),
-                        "live_denied_codes": list(live_denied_codes),
                         "tick": int(getattr(snap, "tick", 0) or 0),
                         "mode": str(mode_v),
                         "estop": estop_v,

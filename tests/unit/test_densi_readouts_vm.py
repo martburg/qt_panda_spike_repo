@@ -30,7 +30,7 @@ def test_compute_densi_readouts_vm_formats_and_sliders() -> None:
         t_s=0.01,
         estop=False,
         fault=False,
-        mode="LIVE",
+        core_mode="LIVE",
         axes={"Anton": AxisSetpoint(enable=True, vel=0.5)},
     )
 

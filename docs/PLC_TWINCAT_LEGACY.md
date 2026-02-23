@@ -108,7 +108,7 @@ The downlink encoder in `codec.py` and the dataclass `TwinCATLegacyWinchDownlink
 The controller currently uses a minimal subset:
 
 - `lifetick` — required every frame (see invariants)
-- `modus` — legacy mode selector (default `"E"` in adapter)
+- `modus` — legacy PLC selector (default `"E"` in adapter; not core_mode)
 - `control_in` — minimal enable/control bit used by the UDP SIM to decide if the axis is enabled
 - `speed_soll` — commanded speed (UI units)
 - `pos_soll` — local integrated position setpoint

@@ -11,7 +11,7 @@ def _cmd() -> CommandFrame:
         t_s=0.0,
         estop=False,
         fault=False,
-        mode="TEST",
+        core_mode="TEST",
         axes={"A": AxisSetpoint(enable=True, vel=1.0)},
     )
 

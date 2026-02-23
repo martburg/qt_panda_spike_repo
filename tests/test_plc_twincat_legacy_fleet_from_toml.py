@@ -61,7 +61,7 @@ def test_fleet_from_repo_toml_steps_all_axes_and_updates_measured_state(tmp_path
                 t_s=0.01 * k,
                 estop=False,
                 fault=False,
-                mode="LIVE",
+                core_mode="LIVE",
                 axes={
                     "Anton": AxisSetpoint(enable=True, vel=0.6),
                     "Burt": AxisSetpoint(enable=True, vel=0.7),

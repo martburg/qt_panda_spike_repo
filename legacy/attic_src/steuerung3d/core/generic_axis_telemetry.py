@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Dict
 
 from steuerung3d.core.state import MachineState, AxisState
+from steuerung3d.core.core_mode import core_mode_value
 
 
 @dataclass(frozen=True)
@@ -18,7 +19,7 @@ class AxisTelemetryLight:
 class TelemetrySnapshot:
     tick: int
     t_s: float
-    mode: str
+    core_mode: str
     estop: bool
     fault: bool
     axes: Dict[str, AxisTelemetryLight]
@@ -37,7 +38,7 @@ class TelemetrySnapshot:
         return TelemetrySnapshot(
             tick=state.tick,
             t_s=state.t_s,
-            mode=state.mode.value,
+            core_mode=core_mode_value(getattr(state, "core_mode", "")),
             estop=state.estop,
             fault=state.fault,
             axes=axes,

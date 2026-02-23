@@ -4,6 +4,7 @@ from dataclasses import asdict
 from typing import Dict, Tuple
 
 from steuerung3d.core.state import MachineState
+from steuerung3d.core.core_mode import CoreMode, core_mode_value
 from steuerung3d.core.rig_types import RigMode, RigSyncConfig, RecoverPlan
 from steuerung3d.common.staleness import is_stale
 
@@ -182,10 +183,9 @@ def enforce_rig_invariants(state: MachineState) -> None:
     if bool(getattr(state, "estop", False)) or bool(getattr(state, "fault", False)):
         return
 
-    # ensure we can actually command motion; caller will still clamp by Mode
-    from steuerung3d.core.mode import Mode
-    if getattr(state, "mode", None) != Mode.LIVE:
-        # leave plan armed; UI can ArmLiveMode or we can auto-arm elsewhere
+    # ensure we can actually command motion; caller will still clamp by core_mode
+    if core_mode_value(getattr(state, "core_mode", "")) != CoreMode.LIVE.value:
+        # leave plan armed; UI can enable motion once core_mode is LIVE
         return
 
     # drive each participating axis toward its target length

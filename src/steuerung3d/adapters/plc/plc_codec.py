@@ -39,7 +39,7 @@ class PlcCodec:
             str(int(cmd.tick)),
             self.spec.true_token if cmd.estop else self.spec.false_token,
             self.spec.true_token if cmd.fault else self.spec.false_token,
-            str(cmd.mode),
+            str(cmd.core_mode),
         ]
 
         for axis_id in self.spec.axis_ids:
@@ -79,7 +79,7 @@ class PlcCodec:
 
             tick = int(parts[0])
             t_s = float(parts[1])
-            mode = str(parts[2])
+            _mode = str(parts[2])
             estop = (parts[3] == self.spec.true_token)
             fault = (parts[4] == self.spec.true_token)
 
@@ -105,8 +105,7 @@ class PlcCodec:
             return TelemetrySnapshot(
                 tick=tick,
                 t_s=t_s,
-                mode=mode,
-                core_mode=mode,
+                core_mode=str(_mode),
                 estop=estop,
                 fault=fault,
                 axes=axes_out,

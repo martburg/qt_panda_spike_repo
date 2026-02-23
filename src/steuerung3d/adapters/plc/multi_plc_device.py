@@ -24,7 +24,7 @@ class MultiPlcDevice:
     Policy (v0.1 default):
       - Global estop/fault = OR across latest received endpoint snapshots this tick.
         (Safe: any PLC estop trips global)
-      - Mode is core-owned: we do NOT overwrite state.mode from PLC telemetry.
+      - core_mode is core-owned: we do NOT overwrite state.core_mode from PLC telemetry.
     """
     endpoints: list[PlcEndpoint]
 
