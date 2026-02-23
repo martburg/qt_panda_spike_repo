@@ -13,10 +13,8 @@ def test_aggregate_and_store_updates_state() -> None:
                 AxisSafetyFacts(
                     axis_id="A",
                     in_scope=True,
-                    axis_estop=False,
-                    axis_started=True,
-                    axis_fault=False,
-                    axis_taster_enabled=True,
+                    estop_bits={},
+                    axis_taster=True,
                     axis_armed=True,
                     axis_ready=True,
                     axis_age_ms=0,
@@ -25,7 +23,7 @@ def test_aggregate_and_store_updates_state() -> None:
             stale_after_ms=100,
             joy_deadman=False,
             joy_select=False,
-            live_request=False,
+            joy_soll_speed=0.0,
         ),
     )
     assert st.core_mode == result.core_mode

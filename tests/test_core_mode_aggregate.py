@@ -8,14 +8,16 @@ from steuerung3d.core.mode_aggregate import (
 from steuerung3d.core.core_mode import CoreMode
 
 
+def _bits(**updates: bool) -> dict[str, bool]:
+    return dict(updates)
+
+
 def _axis(
     axis_id: str,
     *,
     in_scope: bool = True,
-    axis_estop: bool | None = False,
-    axis_started: bool | None = True,
-    axis_fault: bool | None = False,
-    axis_taster_enabled: bool | None = True,
+    estop_bits: dict[str, bool] | None = None,
+    axis_taster: bool | None = True,
     axis_armed: bool | None = True,
     axis_ready: bool | None = True,
     axis_age_ms: int | None = 0,
@@ -23,10 +25,8 @@ def _axis(
     return AxisSafetyFacts(
         axis_id=axis_id,
         in_scope=in_scope,
-        axis_estop=axis_estop,
-        axis_started=axis_started,
-        axis_fault=axis_fault,
-        axis_taster_enabled=axis_taster_enabled,
+        estop_bits=estop_bits,
+        axis_taster=axis_taster,
         axis_armed=axis_armed,
         axis_ready=axis_ready,
         axis_age_ms=axis_age_ms,
@@ -37,174 +37,133 @@ def _codes(result) -> set[str]:
     return {r.code for r in result.blocked_by}
 
 
-def test_out_of_scope_axis_does_not_block() -> None:
+def test_ready_to_live_on_deadman() -> None:
     res = aggregate_core_mode(
         AggregateInputs(
-            axes=[
-                _axis("A"),
-                _axis("B", in_scope=False, axis_estop=True, axis_age_ms=None),
-            ],
+            axes=[_axis("A", estop_bits=_bits())],
             stale_after_ms=100,
-            live_request=False,
-            joy_deadman=False,
-            joy_select=False,
-        )
-    )
-    assert res.core_mode == CoreMode.READY
-    assert "ESTOP" not in _codes(res)
-
-
-def test_all_axes_out_of_scope_goes_estop() -> None:
-    res = aggregate_core_mode(
-        AggregateInputs(
-            axes=[
-                _axis("A", in_scope=False, axis_age_ms=None),
-                _axis("B", in_scope=False, axis_age_ms=None),
-            ],
-            stale_after_ms=100,
-        )
-    )
-    assert res.core_mode == CoreMode.ESTOP
-    assert "MISSING" in _codes(res)
-
-
-def test_stale_blocks_estop() -> None:
-    res = aggregate_core_mode(
-        AggregateInputs(axes=[_axis("A", axis_age_ms=150)], stale_after_ms=100)
-    )
-    assert res.core_mode == CoreMode.ESTOP
-    assert "STALE" in _codes(res)
-
-
-def test_stale_overrides_estop_and_fault() -> None:
-    res = aggregate_core_mode(
-        AggregateInputs(
-            axes=[_axis("A", axis_age_ms=150, axis_estop=True, axis_fault=True)],
-            stale_after_ms=100,
-        )
-    )
-    assert res.core_mode == CoreMode.ESTOP
-    assert "STALE" in _codes(res)
-    assert "ESTOP" not in _codes(res)
-    assert "FAULT" not in _codes(res)
-
-
-def test_missing_blocks_estop() -> None:
-    res = aggregate_core_mode(
-        AggregateInputs(axes=[_axis("A", axis_started=None)], stale_after_ms=100)
-    )
-    assert res.core_mode == CoreMode.ESTOP
-    assert "MISSING" in _codes(res)
-
-
-def test_estop_blocks() -> None:
-    res = aggregate_core_mode(
-        AggregateInputs(axes=[_axis("A", axis_estop=True)], stale_after_ms=100)
-    )
-    assert res.core_mode == CoreMode.ESTOP
-    assert "ESTOP" in _codes(res)
-
-
-def test_estop_takes_precedence_over_fault() -> None:
-    res = aggregate_core_mode(
-        AggregateInputs(axes=[_axis("A", axis_estop=True, axis_fault=True)], stale_after_ms=100)
-    )
-    assert res.core_mode == CoreMode.ESTOP
-    assert "ESTOP" in _codes(res)
-    assert "FAULT" not in _codes(res)
-
-
-def test_fault_blocks() -> None:
-    res = aggregate_core_mode(
-        AggregateInputs(axes=[_axis("A", axis_fault=True)], stale_after_ms=100)
-    )
-    assert res.core_mode == CoreMode.ESTOP
-    assert "FAULT" in _codes(res)
-
-
-def test_not_started_goes_idle() -> None:
-    res = aggregate_core_mode(
-        AggregateInputs(axes=[_axis("A", axis_started=False)], stale_after_ms=100)
-    )
-    assert res.core_mode == CoreMode.IDLE
-    assert "NOT_STARTED" in _codes(res)
-
-
-def test_multi_axis_not_started_keeps_idle() -> None:
-    res = aggregate_core_mode(
-        AggregateInputs(
-            axes=[_axis("A", axis_started=True), _axis("B", axis_started=False)],
-            stale_after_ms=100,
-        )
-    )
-    assert res.core_mode == CoreMode.IDLE
-    assert "NOT_STARTED" in _codes(res)
-
-
-def test_taster_enabled_ready_gate() -> None:
-    res = aggregate_core_mode(
-        AggregateInputs(
-            axes=[_axis("A", axis_taster_enabled=True, axis_ready=False)],
-            stale_after_ms=100,
-        )
-    )
-    assert res.core_mode == CoreMode.ARMED
-    assert "NOT_READY" in _codes(res)
-
-
-def test_multi_axis_not_ready_stays_armed() -> None:
-    res = aggregate_core_mode(
-        AggregateInputs(
-            axes=[
-                _axis("A", axis_ready=True, axis_taster_enabled=True),
-                _axis("B", axis_ready=False, axis_taster_enabled=True),
-            ],
-            stale_after_ms=100,
-        )
-    )
-    assert res.core_mode == CoreMode.ARMED
-    assert "NOT_READY" in _codes(res)
-
-
-def test_taster_disabled_does_not_require_ready() -> None:
-    res = aggregate_core_mode(
-        AggregateInputs(
-            axes=[
-                _axis(
-                    "A",
-                    axis_taster_enabled=False,
-                    axis_ready=False,
-                    axis_armed=False,
-                )
-            ],
-            stale_after_ms=100,
-        )
-    )
-    assert res.core_mode == CoreMode.READY
-
-
-def test_live_requires_ready_request_deadman_select() -> None:
-    res = aggregate_core_mode(
-        AggregateInputs(
-            axes=[_axis("A")],
-            stale_after_ms=100,
-            live_request=True,
             joy_deadman=True,
-            joy_select=True,
         )
     )
     assert res.core_mode == CoreMode.LIVE
 
 
-def test_live_drops_to_ready_without_deadman() -> None:
+def test_live_to_ready_when_deadman_released() -> None:
     res = aggregate_core_mode(
         AggregateInputs(
-            axes=[_axis("A")],
+            axes=[_axis("A", estop_bits=_bits())],
             stale_after_ms=100,
-            live_request=True,
             joy_deadman=False,
-            joy_select=True,
         )
     )
     assert res.core_mode == CoreMode.READY
-    assert "NO_DEADMAN" in _codes(res)
+
+
+def test_key0_only_aggregation_ignores_key1_faults() -> None:
+    res = aggregate_core_mode(
+        AggregateInputs(
+            axes=[
+                _axis("A", estop_bits=_bits()),
+                _axis("B", estop_bits=_bits(schluessel1=True, network=True)),
+            ],
+            stale_after_ms=100,
+            joy_deadman=False,
+        )
+    )
+    assert res.core_mode == CoreMode.READY
+    assert res.axis_gate["B"]["hard_estop_active"] is False
+
+
+def test_no_key0_axes_is_fault() -> None:
+    res = aggregate_core_mode(
+        AggregateInputs(
+            axes=[
+                _axis("A", estop_bits=_bits(schluessel1=True)),
+                _axis("B", estop_bits=_bits(schluessel2=True)),
+            ],
+            stale_after_ms=100,
+        )
+    )
+    assert res.core_mode == CoreMode.FAULT
+    assert "NO_KEY0_AXES" in _codes(res)
+
+
+def test_key_policy_ignores_network_for_key1() -> None:
+    res = aggregate_core_mode(
+        AggregateInputs(
+            axes=[
+                _axis("A", estop_bits=_bits()),
+                _axis("B", estop_bits=_bits(schluessel1=True, network=True)),
+            ],
+            stale_after_ms=100,
+        )
+    )
+    assert res.axis_gate["B"]["hard_estop_active"] is False
+
+
+def test_key_policy_ignores_guider_and_enc_for_key2() -> None:
+    res = aggregate_core_mode(
+        AggregateInputs(
+            axes=[
+                _axis("A", estop_bits=_bits()),
+                _axis("B", estop_bits=_bits(schluessel2=True, guider=True, dcs_ok=False)),
+            ],
+            stale_after_ms=100,
+        )
+    )
+    assert res.axis_gate["B"]["hard_estop_active"] is False
+    assert res.axis_gate["B"]["fault_estop_active"] is False
+
+
+def test_estop_when_hard_source_active() -> None:
+    res = aggregate_core_mode(
+        AggregateInputs(
+            axes=[_axis("A", estop_bits=_bits(network=True))],
+            stale_after_ms=100,
+        )
+    )
+    assert res.core_mode == CoreMode.ESTOP
+
+
+def test_fault_when_ok_chain_breaks() -> None:
+    res = aggregate_core_mode(
+        AggregateInputs(
+            axes=[_axis("A", estop_bits=_bits(kw30_ok=False))],
+            stale_after_ms=100,
+        )
+    )
+    assert res.core_mode == CoreMode.FAULT
+
+
+def test_idle_when_not_all_armed() -> None:
+    res = aggregate_core_mode(
+        AggregateInputs(
+            axes=[_axis("A", estop_bits=_bits(), axis_armed=False)],
+            stale_after_ms=100,
+        )
+    )
+    assert res.core_mode == CoreMode.IDLE
+
+
+def test_armed_when_not_all_ready() -> None:
+    res = aggregate_core_mode(
+        AggregateInputs(
+            axes=[_axis("A", estop_bits=_bits(), axis_ready=False)],
+            stale_after_ms=100,
+        )
+    )
+    assert res.core_mode == CoreMode.ARMED
+
+
+def test_select_gates_nonzero_motion() -> None:
+    res = aggregate_core_mode(
+        AggregateInputs(
+            axes=[_axis("A", estop_bits=_bits())],
+            stale_after_ms=100,
+            joy_deadman=True,
+            joy_select=False,
+            joy_soll_speed=0.5,
+        )
+    )
+    assert res.core_mode == CoreMode.LIVE
+    assert "NO_SELECT" in _codes(res)

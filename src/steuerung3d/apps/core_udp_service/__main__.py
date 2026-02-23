@@ -501,11 +501,10 @@ def main() -> int:
             joy = getattr(state, "joy", None)
             joy_deadman = bool(getattr(joy, "deadman", False)) if joy is not None else False
             joy_select = bool(getattr(joy, "select_hip", False)) if joy is not None else False
+            joy_soll_speed = float(getattr(joy, "soll_speed", 0.0) or 0.0) if joy is not None else 0.0
 
             facts: list[AxisSafetyFacts] = []
             reg = dict(getattr(state, "densi_registry", {}) or {})
-            axis_cmd = dict(getattr(state, "axis_cmd", {}) or {})
-            axis_states = dict(getattr(state, "axes", {}) or {})
             for axis_id in axis_ids:
                 estop_word = router.last_dev_estop_word_by_axis.get(axis_id)
                 estate = None
@@ -515,16 +514,18 @@ def main() -> int:
                     except Exception:
                         estate = None
 
-                axis_estop = None if estate is None else (str(estate).upper() == "ESTOP")
                 axis_armed = None if estate is None else (str(estate).upper() in ("ARMED", "READY"))
                 axis_ready = None if estate is None else (str(estate).upper() == "READY")
-                axis_taster_enabled = None if estate is None else True
 
-                cmd = axis_cmd.get(axis_id)
-                axis_started = bool(cmd and (bool(getattr(cmd, "enable", False)) or abs(float(getattr(cmd, "vel", 0.0) or 0.0)) > 0.0))
-
-                ax_state = axis_states.get(axis_id)
-                axis_fault = bool(getattr(ax_state, "fault", False)) if ax_state is not None else bool(getattr(state, "fault", False))
+                bits = None
+                axis_taster = None
+                if estop_word is not None:
+                    try:
+                        bits = decode_estop_word(int(estop_word))
+                        axis_taster = bool(bits.get("taster", False))
+                    except Exception:
+                        bits = None
+                        axis_taster = None
 
                 owner = str(getattr(state, "axis_claims", {}).get(axis_id, "") or "")
                 if not owner:
@@ -543,18 +544,14 @@ def main() -> int:
                     AxisSafetyFacts(
                         axis_id=str(axis_id),
                         in_scope=True,
-                        axis_estop=axis_estop,
-                        axis_started=axis_started,
-                        axis_fault=axis_fault,
-                        axis_taster_enabled=axis_taster_enabled,
+                        estop_bits=bits,
+                        axis_taster=axis_taster,
                         axis_armed=axis_armed,
                         axis_ready=axis_ready,
                         axis_age_ms=age_ms,
                         axis_owner=owner,
                     )
                 )
-
-            live_request = bool(getattr(state, "core_live_request", False))
             result = aggregate_and_store(
                 state,
                 AggregateInputs(
@@ -562,24 +559,11 @@ def main() -> int:
                     stale_after_ms=stale_after_ms,
                     joy_deadman=joy_deadman,
                     joy_select=joy_select,
-                    live_request=live_request,
+                    joy_soll_speed=joy_soll_speed,
                 ),
             )
-            state.core_live_request_seen = live_request
+            state.core_live_request_seen = bool(getattr(state, "core_live_request", False))
             state.core_live_request = False
-            if live_request and result.core_mode != CoreMode.LIVE:
-                codes: list[str] = []
-                for item in list(result.blocked_by or []):
-                    code = str(getattr(item, "code", item))
-                    axis_id = getattr(item, "axis_id", None)
-                    if axis_id:
-                        codes.append(f"{code}:{axis_id}")
-                    else:
-                        codes.append(code)
-                state.core_live_denied_count = int(getattr(state, "core_live_denied_count", 0)) + 1
-                state.core_live_denied_tick = int(state.tick)
-                state.core_live_denied_codes = list(codes)
-                state.core_live_denied_reason = codes[0] if codes else "UNKNOWN"
         except Exception:
             log.exception("core mode aggregation failed")
 
@@ -751,20 +735,20 @@ def main() -> int:
                         fault_axis = bool(getattr(st, "fault", False))
 
                         gate = dict(axis_gate.get(axis_id, {}) or {})
-                        gate_estop = gate.get("estop")
-                        gate_fault = gate.get("fault")
-                        gate_started = gate.get("started")
-                        gate_taster = gate.get("taster_enabled")
+                        gate_estop = gate.get("hard_estop_active")
+                        gate_fault = gate.get("fault_estop_active")
+                        gate_taster = gate.get("taster")
                         gate_armed = gate.get("armed")
                         gate_ready = gate.get("ready")
                         gate_owner = gate.get("owner")
                         gate_age_ms = gate.get("age_ms")
+                        gate_key_mode = gate.get("key_mode")
                         if gate_owner:
                             owner = str(gate_owner)
 
                         estop_axis = bool(gate_estop) if gate_estop is not None else bool(str(estate).upper() == "ESTOP")
                         fault_axis = bool(gate_fault) if gate_fault is not None else bool(getattr(st, "fault", False))
-                        started = bool(gate_started) if gate_started is not None else bool(started)
+                        started = bool(started)
                         armed = bool(gate_armed) if gate_armed is not None else bool(armed)
                         ready = bool(gate_ready) if gate_ready is not None else bool(ready)
 
@@ -772,6 +756,7 @@ def main() -> int:
                             {
                                 "axis_id": str(axis_id),
                                 "in_scope": bool(gate.get("in_scope", True)),
+                                "key_mode": str(gate_key_mode or ""),
                                 "estop": bool(estop_axis),
                                 "fault": bool(fault_axis),
                                 "started": bool(started),

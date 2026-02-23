@@ -4,16 +4,40 @@ from dataclasses import dataclass, field
 from typing import Iterable
 
 from steuerung3d.core.core_mode import CoreMode
+from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS
+
+KEY0 = "Key0"
+KEY1 = "Key1"
+KEY2 = "Key2"
+
+TWINSAFE_KEYS = {
+    "g1_fb", "g1_com", "g1_out",
+    "g2_fb", "g2_com", "g2_out",
+    "g3_fb", "g3_com", "g3_out",
+}
+
+DYNAMIC_EXCLUDE = {
+    "ready",
+    "taster",
+    "schuetz",
+    "reset_able",
+    "steuerwort",
+    "key1_ok",
+    "key2_ok",
+    "schluessel1",
+    "schluessel2",
+}
+
+KEY1_IGNORES = {"network", *TWINSAFE_KEYS}
+KEY2_IGNORES = {"network", "guider", "dcs_ok", *TWINSAFE_KEYS}
 
 
 @dataclass(frozen=True)
 class AxisSafetyFacts:
     axis_id: str
     in_scope: bool
-    axis_estop: bool | None = None
-    axis_started: bool | None = None
-    axis_fault: bool | None = None
-    axis_taster_enabled: bool | None = None
+    estop_bits: dict[str, bool] | None = None
+    axis_taster: bool | None = None
     axis_armed: bool | None = None
     axis_ready: bool | None = None
     axis_age_ms: int | None = None
@@ -26,7 +50,7 @@ class AggregateInputs:
     stale_after_ms: int
     joy_deadman: bool = False
     joy_select: bool = False
-    live_request: bool = False
+    joy_soll_speed: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -45,14 +69,8 @@ class AggregateResult:
 
 def _missing_fields(axis: AxisSafetyFacts) -> list[str]:
     missing: list[str] = []
-    if axis.axis_estop is None:
-        missing.append("axis_estop")
-    if axis.axis_started is None:
-        missing.append("axis_started")
-    if axis.axis_fault is None:
-        missing.append("axis_fault")
-    if axis.axis_taster_enabled is None:
-        missing.append("axis_taster_enabled")
+    if axis.estop_bits is None:
+        missing.append("estop_bits")
     if axis.axis_armed is None:
         missing.append("axis_armed")
     if axis.axis_ready is None:
@@ -60,6 +78,56 @@ def _missing_fields(axis: AxisSafetyFacts) -> list[str]:
     if axis.axis_age_ms is None:
         missing.append("axis_age_ms")
     return missing
+
+
+def _key_mode(bits: dict[str, bool] | None) -> str | None:
+    if bits is None:
+        return None
+    if bool(bits.get("schluessel2", False)):
+        return KEY2
+    if bool(bits.get("schluessel1", False)):
+        return KEY1
+    return KEY0
+
+
+def _key_ignored_keys(key_mode: str | None) -> set[str]:
+    if key_mode == KEY2:
+        return set(KEY2_IGNORES)
+    if key_mode == KEY1:
+        return set(KEY1_IGNORES)
+    return set()
+
+
+def _effective_estops(
+    bits: dict[str, bool] | None,
+    *,
+    key_mode: str | None,
+) -> tuple[bool | None, bool | None]:
+    if bits is None:
+        return None, None
+
+    ignored = _key_ignored_keys(key_mode)
+    hard_keys = {k for k in ESTOP_CAUSE_KEYS if k not in ignored}
+    hard_active = any(bool(bits.get(k, False)) for k in hard_keys)
+
+    ok_keys = {
+        k
+        for k in ESTOP_OK_KEYS
+        if (k not in DYNAMIC_EXCLUDE) and (k not in ignored)
+    }
+    ok_fault = any(not bool(bits.get(k, True)) for k in ok_keys)
+
+    other_fault_keys = {
+        k
+        for k in bits.keys()
+        if k not in ESTOP_CAUSE_KEYS
+        and k not in ESTOP_OK_KEYS
+        and k not in DYNAMIC_EXCLUDE
+        and k not in ignored
+    }
+    other_fault = any(bool(bits.get(k, False)) for k in other_fault_keys)
+
+    return hard_active, (ok_fault or other_fault)
 
 
 def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
@@ -80,14 +148,20 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
             except Exception:
                 stale = True
 
+        key_mode = _key_mode(axis.estop_bits)
+        hard_estop_active, fault_estop_active = _effective_estops(
+            axis.estop_bits,
+            key_mode=key_mode,
+        )
+
         axis_gate[axis.axis_id] = {
             "in_scope": bool(axis.in_scope),
+            "key_mode": key_mode,
             "missing": bool(missing),
             "stale": bool(stale),
-            "estop": axis.axis_estop,
-            "fault": axis.axis_fault,
-            "started": axis.axis_started,
-            "taster_enabled": axis.axis_taster_enabled,
+            "hard_estop_active": hard_estop_active,
+            "fault_estop_active": fault_estop_active,
+            "taster": axis.axis_taster,
             "armed": axis.axis_armed,
             "ready": axis.axis_ready,
             "owner": axis.axis_owner,
@@ -97,61 +171,63 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
         if not axis.in_scope:
             continue
 
-        if missing:
+        eligible = (key_mode == KEY0) or (key_mode is None)
+        if missing and eligible:
             blocked_by.append(BlockedReason("MISSING", axis.axis_id, ",".join(missing)))
             has_missing_or_stale = True
             continue
-        if stale:
+        if stale and eligible:
             blocked_by.append(BlockedReason("STALE", axis.axis_id, None))
             has_missing_or_stale = True
 
-    if not in_scope:
-        blocked_by.append(BlockedReason("MISSING", None, "no_in_scope_axes"))
-        return AggregateResult(core_mode=CoreMode.ESTOP, blocked_by=blocked_by, axis_gate=axis_gate)
+    eligible_axes = [
+        axis
+        for axis in in_scope
+        if axis_gate.get(axis.axis_id, {}).get("key_mode") == KEY0
+    ]
+
+    if not eligible_axes:
+        blocked_by.append(BlockedReason("NO_KEY0_AXES", None, None))
+        return AggregateResult(core_mode=CoreMode.FAULT, blocked_by=blocked_by, axis_gate=axis_gate)
 
     if has_missing_or_stale:
-        return AggregateResult(core_mode=CoreMode.ESTOP, blocked_by=blocked_by, axis_gate=axis_gate)
+        return AggregateResult(core_mode=CoreMode.FAULT, blocked_by=blocked_by, axis_gate=axis_gate)
 
-    estop_axes = [axis for axis in in_scope if bool(axis.axis_estop)]
+    estop_axes = [
+        axis
+        for axis in eligible_axes
+        if bool(axis_gate.get(axis.axis_id, {}).get("hard_estop_active", False))
+    ]
     if estop_axes:
         blocked_by.extend([BlockedReason("ESTOP", axis.axis_id, None) for axis in estop_axes])
         return AggregateResult(core_mode=CoreMode.ESTOP, blocked_by=blocked_by, axis_gate=axis_gate)
 
-    fault_axes = [axis for axis in in_scope if bool(axis.axis_fault)]
+    fault_axes = [
+        axis
+        for axis in eligible_axes
+        if bool(axis_gate.get(axis.axis_id, {}).get("fault_estop_active", False))
+    ]
     if fault_axes:
         blocked_by.extend([BlockedReason("FAULT", axis.axis_id, None) for axis in fault_axes])
-        return AggregateResult(core_mode=CoreMode.ESTOP, blocked_by=blocked_by, axis_gate=axis_gate)
+        return AggregateResult(core_mode=CoreMode.FAULT, blocked_by=blocked_by, axis_gate=axis_gate)
 
-    not_started = [axis for axis in in_scope if not bool(axis.axis_started)]
-    if not_started:
-        blocked_by.extend([BlockedReason("NOT_STARTED", axis.axis_id, None) for axis in not_started])
+    not_armed = [axis for axis in eligible_axes if not bool(axis.axis_armed)]
+    if not_armed:
+        blocked_by.extend([BlockedReason("NOT_ARMED", axis.axis_id, None) for axis in not_armed])
         return AggregateResult(core_mode=CoreMode.IDLE, blocked_by=blocked_by, axis_gate=axis_gate)
 
-    not_ready: list[AxisSafetyFacts] = []
-    for axis in in_scope:
-        if bool(axis.axis_taster_enabled):
-            ready = bool(axis.axis_ready)
-        else:
-            ready = True
-        if not ready:
-            not_ready.append(axis)
-
+    not_ready = [axis for axis in eligible_axes if not bool(axis.axis_ready)]
     if not_ready:
         blocked_by.extend([BlockedReason("NOT_READY", axis.axis_id, None) for axis in not_ready])
         return AggregateResult(core_mode=CoreMode.ARMED, blocked_by=blocked_by, axis_gate=axis_gate)
 
-    if inputs.live_request and inputs.joy_deadman and inputs.joy_select:
-        return AggregateResult(core_mode=CoreMode.LIVE, blocked_by=blocked_by, axis_gate=axis_gate)
+    if not inputs.joy_deadman:
+        return AggregateResult(core_mode=CoreMode.READY, blocked_by=blocked_by, axis_gate=axis_gate)
 
-    if not inputs.live_request:
-        blocked_by.append(BlockedReason("NO_LIVE_REQUEST", None, None))
-    else:
-        if not inputs.joy_deadman:
-            blocked_by.append(BlockedReason("NO_DEADMAN", None, None))
-        if not inputs.joy_select:
-            blocked_by.append(BlockedReason("NO_SELECT", None, None))
-
-    return AggregateResult(core_mode=CoreMode.READY, blocked_by=blocked_by, axis_gate=axis_gate)
+    core_mode = CoreMode.LIVE
+    if (abs(float(inputs.joy_soll_speed)) > 1e-6) and (not inputs.joy_select):
+        blocked_by.append(BlockedReason("NO_SELECT", None, None))
+    return AggregateResult(core_mode=core_mode, blocked_by=blocked_by, axis_gate=axis_gate)
 
 
 def aggregate_and_store(state, inputs: AggregateInputs) -> AggregateResult:
