@@ -67,6 +67,86 @@ def format_birds_eye(
     return "\n".join(lines)
 
 
+def _flag(value: object) -> str:
+    if value is True:
+        return "1"
+    if value is False:
+        return "0"
+    return "?"
+
+
+def _age_ms(value: object) -> str:
+    if value is None:
+        return "?"
+    try:
+        return str(int(value))
+    except Exception:
+        return "?"
+
+
+def build_frederik_panel_lines(fields: Dict[str, object], *, max_blocked: int = 3) -> list[str]:
+    if not isinstance(fields, dict):
+        return []
+
+    core_mode = str(fields.get("core_mode", fields.get("mode", "")) or "")
+
+    blocked_in = fields.get("blocked_by", [])
+    blocked_codes: list[str] = []
+    if isinstance(blocked_in, list):
+        for item in blocked_in:
+            if isinstance(item, dict):
+                code = str(item.get("code", ""))
+                axis_id = str(item.get("axis_id", ""))
+                if axis_id:
+                    blocked_codes.append(f"{axis_id}:{code}" if code else axis_id)
+                else:
+                    blocked_codes.append(code)
+            else:
+                blocked_codes.append(str(item))
+    blocked_codes = [b for b in blocked_codes if b]
+    blocked_summary = ",".join(blocked_codes[: int(max_blocked)])
+
+    joy_dm = _flag(fields.get("joy_dm"))
+    joy_sel = _flag(fields.get("joy_sel"))
+    live_req_seen = _flag(fields.get("live_req_seen"))
+
+    reset_denied = int(fields.get("reset_denied_total", 0) or 0)
+    live_denied = int(fields.get("live_denied_count", 0) or 0)
+    live_denied_reason = str(fields.get("live_denied_reason", "") or "")
+
+    lines = [
+        f"Frederik: core_mode={core_mode} blocked_by=[{blocked_summary}]",
+        f"Frederik: joy_dm={joy_dm} joy_sel={joy_sel} live_req_seen={live_req_seen}",
+        f"Frederik: reset_denied={reset_denied} live_denied={live_denied} live_denied_reason={live_denied_reason}",
+    ]
+
+    axes = fields.get("axes", [])
+    if isinstance(axes, list) and axes:
+        lines.append("Frederik axes: axis in_scope estop fault started taster_enabled armed ready owner age_ms")
+        axes_sorted = sorted(axes, key=lambda a: str(a.get("axis_id", "")) if isinstance(a, dict) else str(a))
+        for ax in axes_sorted:
+            if not isinstance(ax, dict):
+                continue
+            axis_id = str(ax.get("axis_id", ""))
+            in_scope = _flag(ax.get("in_scope"))
+            estop = _flag(ax.get("estop"))
+            fault = _flag(ax.get("fault"))
+            started = _flag(ax.get("started"))
+            taster = _flag(ax.get("taster_enabled"))
+            armed = _flag(ax.get("armed"))
+            ready = _flag(ax.get("ready"))
+            owner = str(ax.get("owner_hip_id", "") or "-")
+            age_ms = _age_ms(ax.get("age_ms"))
+            lines.append(
+                "Frederik "
+                f"axis={axis_id} in_scope={in_scope} estop={estop} fault={fault} "
+                f"started={started} taster_enabled={taster} armed={armed} ready={ready} "
+                f"owner={owner} age_ms={age_ms}"
+            )
+
+    return lines
+
+
 def _now_ts() -> str:
     return time.strftime("%Y%m%d_%H%M%S")
 
@@ -410,10 +490,14 @@ class StackRuntime:
                     if isinstance(sm, dict):
                         level = str(sm.get("level", ""))
                         summary = str(sm.get("summary", ""))
+                        fields = sm.get("fields", {}) if isinstance(sm.get("fields", {}), dict) else {}
                     else:
                         level = str(getattr(sm, "level", ""))
                         summary = str(getattr(sm, "summary", ""))
+                        fields = {}
                     parts.append(f"{rp.spec.name}: {level} {summary} ({age_ms}ms)")
+                    if isinstance(fields, dict) and str(fields.get("component", "")) == "core":
+                        parts.extend(build_frederik_panel_lines(fields))
                 else:
                     t = self.tailers.get(rp.spec.name)
                     if t:
@@ -425,8 +509,9 @@ class StackRuntime:
                 t.poll()
                 if t.last_line:
                     parts.append(f"{name}: {t.last_line[:120]}")
-
-        return format_birds_eye(parts, multiline=_birdseye_multiline_default())
+        has_frederik = any(str(p).startswith("Frederik") for p in parts)
+        max_entries = max(6, len(parts)) if has_frederik else 6
+        return format_birds_eye(parts, multiline=_birdseye_multiline_default(), max_entries=max_entries)
 
     def _report_crash(self, rp: RunningProcess, rc: int):
         print(f"\n[stack] process exited: {rp.spec.name} pid={rp.popen.pid} rc={rc}")

@@ -5,12 +5,13 @@ from steuerung3d.core.state import MachineState
 from steuerung3d.core.state_machine import enforce_mode_actions
 
 
-def test_idle_to_live_and_back():
+def test_live_request_does_not_override_mode():
     st = MachineState()
     assert st.mode == Mode.IDLE
 
     apply_intent(st, ArmLiveMode())
-    assert st.mode == Mode.LIVE
+    assert st.core_live_request is True
+    assert st.mode == Mode.IDLE
 
     apply_intent(st, SetEstop(estop=True))
     assert st.mode == Mode.ESTOP
@@ -33,12 +34,11 @@ def test_motion_intents_blocked_outside_live():
     assert st.mode == Mode.IDLE
     assert st.axis_cmd.get("X") is None
 
-    # Arm LIVE: now they take effect (in command state)
-    apply_intent(st, ArmLiveMode())
+    # Mark core LIVE: now they take effect (in command state)
+    st.core_mode = "LIVE"
     apply_intent(st, EnableAxis(axis_id="X", enable=True, hip_id=hip_id))
     apply_intent(st, JogAxis(axis_id="X", vel=1.0, hip_id=hip_id))
 
-    assert st.mode == Mode.LIVE
     cmd = st.axis_cmd["X"]
     assert cmd.enable is True
     assert cmd.vel == 1.0

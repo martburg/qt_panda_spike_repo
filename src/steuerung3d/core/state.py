@@ -112,6 +112,17 @@ class MachineState:
     # --- joystick state (UI telemetry only; used in Stage 2) ---
     joy: JoyState = field(default_factory=JoyState)
 
+    # --- core mode aggregation (Stage 2) ---
+    core_mode: str = "ESTOP"
+    core_blocked_by: list[object] = field(default_factory=list)
+    core_axis_gate: Dict[str, Dict[str, object]] = field(default_factory=dict)
+    core_live_request: bool = False
+    core_live_request_seen: bool = False
+    core_live_denied_count: int = 0
+    core_live_denied_reason: str = ""
+    core_live_denied_codes: list[str] = field(default_factory=list)
+    core_live_denied_tick: int = -1
+
 
     def ensure_axis(self, axis_id: str) -> AxisState:
         if axis_id not in self.axes:

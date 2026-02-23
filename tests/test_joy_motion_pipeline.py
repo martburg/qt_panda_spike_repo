@@ -5,7 +5,7 @@ from typing import Iterable
 from steuerung3d.apps.yellow.engines.hip.engine import HipEngine, HipStepInputs, HipUiInputs
 from steuerung3d.core.executor import build_command_frame
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.intents import ArmLiveMode, EnableAxis, JogWinch, JoyStateUpdate, RequestAxisLease
+from steuerung3d.core.intents import EnableAxis, JogWinch, JoyStateUpdate, RequestAxisLease
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
@@ -95,7 +95,7 @@ def test_joy_motion_end_to_end_gating_and_sign() -> None:
     assert any(isinstance(i, JogWinch) and i.rate == -1.2 for i in intents)
 
     st = MachineState()
-    apply_intent(st, ArmLiveMode())
+    st.core_mode = "LIVE"
     apply_intent(st, RequestAxisLease(axis_id=axis_id, hip_id=hip_id, req_id="lease-anton"))
     apply_intent(st, EnableAxis(axis_id=axis_id, enable=True, hip_id=hip_id))
     _apply_intents(st, intents)
@@ -116,7 +116,7 @@ def test_joy_state_update_does_not_drive_motion() -> None:
 
     st = MachineState()
     st.ensure_axis(axis_id)
-    apply_intent(st, ArmLiveMode())
+    st.core_mode = "LIVE"
     apply_intent(st, RequestAxisLease(axis_id=axis_id, hip_id=hip_id, req_id="lease-joy"))
     apply_intent(st, EnableAxis(axis_id=axis_id, enable=True, hip_id=hip_id))
 

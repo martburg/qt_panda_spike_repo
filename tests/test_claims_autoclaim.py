@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.intents import ClaimAxis, ReleaseAxis, EnableAxis, JogAxis, ArmLiveMode, RequestAxisLease
+from steuerung3d.core.intents import ClaimAxis, ReleaseAxis, EnableAxis, JogAxis, RequestAxisLease
 from steuerung3d.core.state import MachineState
 
 def test_claim_axis_idempotent_and_exclusive():
@@ -41,9 +41,8 @@ def test_release_axis_only_by_owner():
 def test_claim_enforces_enable_and_jog():
     st = MachineState()
 
-    # Enable/Jog are LIVE-gated: arm LIVE first
-    apply_intent(st, ArmLiveMode())
-    assert getattr(st, "mode", None) is not None
+    # Enable/Jog are LIVE-gated: mark core LIVE first
+    st.core_mode = "LIVE"
 
     apply_intent(st, ClaimAxis(axis_id="Anton", hip_id="hipA", req_id="r1"))
     apply_intent(st, RequestAxisLease(axis_id="Anton", hip_id="hipA", req_id="lease-1"))

@@ -145,3 +145,45 @@ Draft design (phase 1+) notes:
 Proposed birds-eye field list (Core line):
 - core_mode, blocked_by, last_reset_request{axis_id, hip_id, allowed, reason}
 - per-axis list: axis_id, in_scope, estop/fault/ready/armed, owner_hip_id, reset_allowed, reset_denied_count
+
+## CoreModeAggregatorFromScratch Phase 0 (discovery)
+
+Baseline tests:
+- pytest -q fails during collection: missing dependency "transitions" (tests/test_axis_fsm.py imports core/axis_fsm.py).
+
+Telemetry facts (estop/fault/started/taster/armed/ready/age) and where they come from:
+- Estop + fault are exported in TelemetrySnapshot from MachineState: [src/steuerung3d/core/telemetry.py](src/steuerung3d/core/telemetry.py#L37-L151). PLC uplink decode sets estop based on EStopStatus cause bits: [src/steuerung3d/protocol/plc_codec.py](src/steuerung3d/protocol/plc_codec.py#L246-L341).
+- EStopStatus word is carried through as estop_status_word in TelemetrySnapshot and used to decode logical bits (taster/ready/etc.): [src/steuerung3d/core/telemetry.py](src/steuerung3d/core/telemetry.py#L60-L151), [src/steuerung3d/protocol/estop_bits.py](src/steuerung3d/protocol/estop_bits.py#L6-L121).
+- READY bit is the logical "ready" bit in EStopStatus (bit 29) and is set by the DenSi ladder when the estate reaches READY: [src/steuerung3d/apps/yellow/engines/densi/estop_fsm.py](src/steuerung3d/apps/yellow/engines/densi/estop_fsm.py#L130-L159).
+- Ladder estate (ESTOP/IDLE/ARMED/READY) is derived from the estop word using taster/schuetz/brake bits: [src/steuerung3d/apps/yellow/domain/banner_facts.py](src/steuerung3d/apps/yellow/domain/banner_facts.py#L35-L96).
+- Taster state is the estop bit "taster" (bit 27). DenSi view model uses it directly for dots and banner grace handling: [src/steuerung3d/apps/yellow/runtimes/densi_runtime.py](src/steuerung3d/apps/yellow/runtimes/densi_runtime.py#L454-L496).
+- Started (post-ESStart) is not a first-class telemetry field; in core birds-eye it is inferred from axis_cmd enable/velocity in core state: [src/steuerung3d/apps/core_udp_service/__main__.py](src/steuerung3d/apps/core_udp_service/__main__.py#L623-L655).
+- Armed/ready in birds-eye are derived from banner estate decoded from the estop word: [src/steuerung3d/apps/core_udp_service/__main__.py](src/steuerung3d/apps/core_udp_service/__main__.py#L612-L655).
+- Age/staleness is tracked per runtime: hip/densi use stale_after_ms with compute_age_ms/compute_stale; core uses densi_offline_after_ticks for device registry aging. See [src/steuerung3d/apps/yellow/runtimes/hip_runtime.py](src/steuerung3d/apps/yellow/runtimes/hip_runtime.py#L58-L189), [src/steuerung3d/apps/yellow/runtimes/densi_runtime.py](src/steuerung3d/apps/yellow/runtimes/densi_runtime.py#L68-L120), [src/steuerung3d/core/state.py](src/steuerung3d/core/state.py#L16-L64), [src/steuerung3d/core/telemetry.py](src/steuerung3d/core/telemetry.py#L92-L138).
+
+Keyswitch scope (key1/key2) findings:
+- Keyswitch bits are defined only as EStopStatus bits schluessel1/schluessel2 (bit 30/31) with UI profile helpers; no explicit axis in_scope policy was found in core. See [src/steuerung3d/protocol/estop_bits.py](src/steuerung3d/protocol/estop_bits.py#L58-L66) and [src/steuerung3d/apps/yellow/domain/ui_estop.py](src/steuerung3d/apps/yellow/domain/ui_estop.py#L162-L214).
+
+DenSi READY meaning (for birds-eye):
+- The READY bit is driven by the DenSi ladder: when no trip and schuetz=1, taster=1, and brake OK, estate becomes READY and inj_bits["ready"] is set. See [src/steuerung3d/apps/yellow/engines/densi/estop_fsm.py](src/steuerung3d/apps/yellow/engines/densi/estop_fsm.py#L130-L159).
+
+Birds-eye panels/emitters (status heartbeats):
+- Core "Frederik" panel: status.emit_every with core_mode, blocked_by, per-axis fields in [src/steuerung3d/apps/core_udp_service/__main__.py](src/steuerung3d/apps/core_udp_service/__main__.py#L580-L709).
+- HiP runtime status: [src/steuerung3d/apps/yellow/runtimes/hip_runtime.py](src/steuerung3d/apps/yellow/runtimes/hip_runtime.py#L350-L392) and controller emission hook for motion intents in [src/steuerung3d/apps/yellow/controllers/hip_controller.py](src/steuerung3d/apps/yellow/controllers/hip_controller.py#L108-L190).
+- DenSi runtime status: [src/steuerung3d/apps/yellow/runtimes/densi_runtime.py](src/steuerung3d/apps/yellow/runtimes/densi_runtime.py#L239-L309).
+
+Staleness thresholds found:
+- HiP/Densi controllers default stale_after_ms=500. See [src/steuerung3d/apps/yellow/controllers/hip_controller.py](src/steuerung3d/apps/yellow/controllers/hip_controller.py#L35-L76) and [src/steuerung3d/apps/yellow/controllers/densi_controller.py](src/steuerung3d/apps/yellow/controllers/densi_controller.py#L35-L75).
+- Core device offline: densi_offline_after_ticks=200 (approx 2s at 10ms ticks). See [src/steuerung3d/core/state.py](src/steuerung3d/core/state.py#L19-L28) and [src/steuerung3d/core/telemetry.py](src/steuerung3d/core/telemetry.py#L92-L138).
+- DenSi lifetick stale thresholds: active=50 ticks, idle=500 ticks. See [src/steuerung3d/apps/yellow/engines/densi/engine.py](src/steuerung3d/apps/yellow/engines/densi/engine.py#L136-L176) and [src/steuerung3d/apps/yellow/engines/densi/plc_anton_vel_cmd.py](src/steuerung3d/apps/yellow/engines/densi/plc_anton_vel_cmd.py#L19-L146).
+- joy2intent stale_after_ms default 200 in config. See [src/steuerung3d/apps/joy2intent/config.py](src/steuerung3d/apps/joy2intent/config.py#L54-L66).
+
+## CoreModeAggregatorFromScratch Phase 5 (tests)
+
+Edge-case policy clarifications:
+- If all axes are out-of-scope, core_mode is ESTOP and blocked_by includes MISSING (detail: no_in_scope_axes).
+- Precedence order: stale/missing overrides estop/fault; estop overrides fault.
+- Mixed scope is stable: out-of-scope axes do not block in-scope aggregates.
+
+Tests added:
+- tests/test_core_mode_aggregate.py: all out-of-scope ESTOP, stale overrides, estop precedence, multi-axis idle/armed.

@@ -396,17 +396,11 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
                 state.pending_param_ops.append(op)
             return
         case ArmLiveMode():
-            normalize_mode(state)
-            if state.mode == Mode.IDLE and (not state.estop) and (not state.fault):
-                state.mode = Mode.LIVE
-            enforce_mode_actions(state)
+            state.core_live_request = True
             return
 
         case DisarmToIdle():
-            normalize_mode(state)
-            if state.mode == Mode.LIVE:
-                state.mode = Mode.IDLE
-            enforce_mode_actions(state)
+            state.core_live_request = False
             return
 
         # fallthrough to mode-gated below
@@ -416,7 +410,16 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
     # --- MODE-GATED INTENTS (LIVE only) ---
     normalize_mode(state)
 
-    if state.mode != Mode.LIVE:
+    core_mode = str(getattr(state, "core_mode", "") or "").upper()
+    if core_mode:
+        is_live = core_mode == "LIVE"
+    else:
+        is_live = state.mode == Mode.LIVE
+
+    if not is_live:
+        enforce_mode_actions(state)
+        return
+    if state.estop or state.fault:
         enforce_mode_actions(state)
         return
 
