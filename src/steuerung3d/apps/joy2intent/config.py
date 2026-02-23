@@ -43,11 +43,15 @@ class Joy2IntentConfig:
     # Sync/cartesian limits (currently not used by joy2intent mapping, kept for config completeness).
     sync_max_v: Dict[str, float] = field(default_factory=dict)
 
+    # Identity stamped into motion intents. Must match the claim owner (HiP).
+    hip_id: str = "hip"
+
 
 def load_joy2intent_config(path: Path) -> Joy2IntentConfig:
     raw = load_toml(path)
 
     io = raw.get("io", {}) or {}
+    ident = raw.get("identity", {}) or {}
     rig = raw.get("rig", {}) or {}
     mode = raw.get("mode", {}) or {}
     limits = raw.get("limits", {}) or {}
@@ -78,4 +82,6 @@ def load_joy2intent_config(path: Path) -> Joy2IntentConfig:
         deadzone=float(f.get("deadzone", 0.08)),
         expo=float(f.get("expo", 0.25)),
         invert=dict(f.get("invert", {}) or {}),
+
+        hip_id=str(ident.get("hip_id", "hip")),
     )

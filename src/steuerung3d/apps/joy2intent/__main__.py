@@ -118,7 +118,7 @@ def main() -> int:
                 last_axes = [float(x) for x in list(rc.axes)[:6]]
             except Exception:
                 last_axes = []
-            intents = synthesize_intents(st, rc, bind, rig, lim)
+            intents = synthesize_intents(st, rc, bind, rig, lim, hip_id=cfg.hip_id)
 
             # Minimal "what changed" logs (no spam)
             try:

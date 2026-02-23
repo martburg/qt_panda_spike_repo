@@ -17,13 +17,29 @@ from steuerung3d.core.rig_logic import densi_online
 
 
 def _axis_lease_allows(state: MachineState, axis_id: str) -> bool:
+    """Return whether the command frame should carry non-zero setpoints for *axis_id*.
+
+    Today, some profiles establish an **axis claim** (legacy ownership) but do
+    not yet populate the **lease holder** list (multi-HiP arbitration). If we
+    require lease holders strictly, the command frame will disable all axes and
+    DenSi will never see control words / velocities.
+
+    Policy:
+      - If lease holders exist for an axis -> allow.
+      - Else if an axis claim exists -> allow (legacy behaviour).
+    """
+
     holders = getattr(state, "lease_axis_holders", {}) or {}
-    if not isinstance(holders, dict):
-        return False
-    vals = holders.get(axis_id, [])
-    if not isinstance(vals, (list, tuple)):
-        return False
-    return len([v for v in list(vals) if str(v)]) > 0
+    if isinstance(holders, dict):
+        vals = holders.get(axis_id, [])
+        if isinstance(vals, (list, tuple)) and any(str(v) for v in list(vals)):
+            return True
+
+    claims = getattr(state, "axis_claims", {}) or {}
+    if isinstance(claims, dict) and axis_id in claims and claims.get(axis_id) is not None:
+        return True
+
+    return False
 
 
 def build_command_frame(state: MachineState) -> CommandFrame:

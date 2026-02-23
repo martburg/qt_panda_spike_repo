@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Sequence, Set
 
-from steuerung3d.core.intents import EnableAxis, JogWinch, JoyStateUpdate
+from steuerung3d.core.intents import ClaimAxis, EnableAxis, JogWinch, JoyStateUpdate
 from steuerung3d.core.joy_state import clamp_soll_speed
 
 
@@ -144,6 +144,8 @@ def synthesize_intents(
     bind: JoyBindings,
     rig: JoyRig,
     lim: JoyLimits,
+    # Must match the claim owner (HiP) to avoid the core treating motion intents as stale.
+    hip_id: str = "hip",
 ) -> List[object]:
     """Convert a joystick report into a list of core intents.
 
@@ -187,6 +189,12 @@ def synthesize_intents(
         if b in pressed and i < len(rig_ids):
             selected.append(rig_ids[i])
 
+    # Legacy arbitration: even if multiple select buttons are held, only one
+    # winch is targeted (lowest index wins). This mirrors the original
+    # "one active hip" behavior and avoids accidental multi-winch jogging.
+    if len(selected) > 1:
+        selected = [selected[0]]
+
     selected_set = set(selected)
 
     if deadman and select_hip and (not selected_set) and len(rig_ids) == 1:
@@ -206,7 +214,7 @@ def synthesize_intents(
 
         if prev_deadman and active_ids:
             for wid in sorted(active_ids):
-                intents.append(EnableAxis(axis_id=wid, enable=False))
+                intents.append(EnableAxis(axis_id=wid, enable=False, hip_id=hip_id))
         if hasattr(st, "prev_active_winch_idxs"):
             st.prev_active_winch_idxs.clear()
         elif hasattr(st, "enabled_winch_ids"):
@@ -225,7 +233,8 @@ def synthesize_intents(
         current_active = {str(x) for x in current_active_raw}
     for wid in sorted(selected_set):
         if wid not in current_active:
-            intents.append(EnableAxis(axis_id=wid, enable=True))
+            intents.append(ClaimAxis(axis_id=wid, hip_id=hip_id))
+            intents.append(EnableAxis(axis_id=wid, enable=True, hip_id=hip_id))
 
     # Compute jog rate
     axis_idx = bind.axes.get("manual_jog")
@@ -243,7 +252,7 @@ def synthesize_intents(
 
     if rate != 0.0:
         for wid in sorted(selected_set):
-            intents.append(JogWinch(winch_id=wid, rate=rate))
+            intents.append(JogWinch(winch_id=wid, rate=rate, hip_id=hip_id))
     if hasattr(st, 'prev_active_winch_idxs'):
         # tests expect indices; derive from rig order
         st.prev_active_winch_idxs = {rig_ids.index(w) for w in selected_set if w in rig_ids}

@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import logging
 import time
+import os
 import uuid
 
 from PySide6.QtCore import QTimer
@@ -101,7 +102,15 @@ class HiPController:
         self._last_estate: str = "ESTOP"
 
         # HiP identity (used for ClaimAxis/ReleaseAxis, etc.)
-        self._hip_id: str = f"hip-{uuid.uuid4().hex[:8]}"
+        # Stable controller identity.
+        #
+        # The core enforces axis-claim ownership for motion intents.
+        # If this id changes every run (random UUID), other components (e.g.
+        # joy2intent) cannot reliably stamp matching hip_id into EnableAxis/
+        # JogWinch intents, and the core will ignore them as stale.
+        #
+        # In the future, we can make this per-instance/per-axis via config.
+        self._hip_id: str = os.environ.get("STEUERUNG3D_HIP_ID", "hip")
 
     def set_fixed_axis(self, axis_id: str, *, lock_combo: bool = True) -> None:
         self._fixed_axis = (axis_id or "").strip()

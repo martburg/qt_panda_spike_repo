@@ -56,7 +56,7 @@ def test_single_winch_select_hip_fallback_emits_enable_and_jog() -> None:
     assert any(isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate > 0.0 for i in intents)
 
 
-def test_setup_manual_multi_select_emits_enable_and_jog_for_all_selected() -> None:
+def test_setup_manual_multi_select_targets_single_lowest_index() -> None:
     st = JoyState()
     bind = _bind()
     rig = _rig()
@@ -66,12 +66,13 @@ def test_setup_manual_multi_select_emits_enable_and_jog_for_all_selected() -> No
     rc = _rc(axes=[0.0, 0.6], pressed=(5, 0, 2))
     intents = synthesize_intents(st, rc, bind, rig, lim)
 
-    # Expect EnableAxis(True) for Anton and Cecil, and JogWinch for both
+    # Legacy arbitration: even if multiple select buttons are held, only one
+    # winch is targeted (lowest index wins).
     enables = [i for i in intents if isinstance(i, EnableAxis) and i.enable]
     jugs = [i for i in intents if isinstance(i, JogWinch)]
 
-    assert {e.axis_id for e in enables} == {"Anton", "Cecil"}
-    assert {j.winch_id for j in jugs} == {"Anton", "Cecil"}
+    assert {e.axis_id for e in enables} == {"Anton"}
+    assert {j.winch_id for j in jugs} == {"Anton"}
 
     # Rate should be scaled by max_winch_mps
     for j in jugs:
