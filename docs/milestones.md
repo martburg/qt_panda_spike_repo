@@ -35,7 +35,7 @@ Completed:
 
 - `inputd` gamepad listener (pygame) with compact console output
 - `joy2intent_gamepad.toml` mapping for **setup jogging** (deadman, select winch buttons, fine, left-y)
-- `setup_stack` launches 4× DenSi + 4× HiP + Core (+ inputd/joy2intent)
+- Profile-driven `up --profile ...` launches the stack (Core + DenSi + HiP + optional inputd/joy2intent).
 - Strict per-axis device command routing (no broadcast) + port overlap guards
 - Per-axis UI telemetry slicing (HiPs no longer “pick up” other DenSis)
 - HiP txn ack robustness (process `core_acks` across drained snapshots to avoid false timeouts)

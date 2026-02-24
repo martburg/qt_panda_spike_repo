@@ -27,7 +27,7 @@ python -m steuerung3d logs <service> --profile <profile> --follow
 python -m steuerung3d down   --profile <profile>
 ```
 
-`setup_stack` still exists, but it is now a **thin wrapper** over the same runtime (so we only maintain one supervisor implementation).
+`setup_stack` has been **removed**. Use the profile-driven supervisor (`python -m steuerung3d up --profile ...`) for all stack launches.
 
 ---
 

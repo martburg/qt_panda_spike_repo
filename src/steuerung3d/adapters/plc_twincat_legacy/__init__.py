@@ -1,9 +1,15 @@
-"""PLC-facing adapters (real PLC or PLC simulator).
+"""Legacy TwinCAT PLC-facing adapters (real PLC or PLC simulator).
 
-In v0.1 this package focuses on a small, schema-driven line codec and a UDP
-PLC simulator app.
+The TwinCAT legacy protocol uses semicolon-separated fields and has multiple
+install-specific variants.
 
-The real Beckhoff/TwinCAT code sends semicolon-separated fields. The exact
-field order varies between installations, so we keep the codec configurable.
+Status:
+- **Obsolete** for new development.
+- Kept to support older rigs and as a reference implementation.
+
+Prefer:
+- ``steuerung3d.adapters.plc`` (schema-driven codec + early UDP device)
 """
 
+OBSOLETE = True
+OBSOLETE_REASON = "Legacy TwinCAT adapter; prefer schema-driven PLC adapter (steuerung3d.adapters.plc)."

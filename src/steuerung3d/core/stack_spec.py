@@ -3,7 +3,7 @@
 This module defines a small, versionable representation of the *boot stack*.
 
 Design goals:
-- Keep the current setup_stack behavior (logs per process, birds-eye, crash tail),
+- Keep the current supervisor behavior (logs per process, birds-eye, crash tail),
   but make *what we start* configurable.
 - Make profiles portable (TOML), with per-axis fanout.
 - Keep the runtime safe and deterministic: validate ports, expand templates, then run.

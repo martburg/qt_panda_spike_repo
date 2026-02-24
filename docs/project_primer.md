@@ -95,7 +95,7 @@ Operational expectations:
 - Structured birds-eye status via a UDP JSON heartbeat channel (see [docs/STACK_BOOT_STATUS.md](STACK_BOOT_STATUS.md)).
 
 Legacy compatibility:
-- `setup_stack` still exists as a thin wrapper over the same runtime (see [docs/STACK_BOOT_STATUS.md](STACK_BOOT_STATUS.md)).
+- `setup_stack` has been removed; stacks are launched via the profile-driven supervisor (see [docs/STACK_BOOT_STATUS.md](STACK_BOOT_STATUS.md)).
 
 ## 8) Regression tests that freeze semantics
 
@@ -127,5 +127,5 @@ Glossary (internal terms):
 Refactor direction (current intent):
 - Converge transports on `InMemTransport` and keep the "shim" for older bus APIs until removed ([docs/transport.md](transport.md)).
 - Keep CommandFrame as the stable seam to minimize churn across adapters and tests ([docs/ARCHITECTURE.md](ARCHITECTURE.md)).
-- Continue migrating boot flows toward the profile-driven supervisor; `setup_stack` remains a compatibility wrapper until fully retired ([docs/STACK_BOOT_STATUS.md](STACK_BOOT_STATUS.md)).
+- Continue migrating boot flows toward the profile-driven supervisor; `setup_stack` has been retired (removed) ([docs/STACK_BOOT_STATUS.md](STACK_BOOT_STATUS.md)).
 - Treat the PLC wire format as frozen; evolve the stack by improving adapters and tests, not by mutating on-wire order or semantics without synchronized updates ([docs/PLC_TWINCAT_LEGACY.md](PLC_TWINCAT_LEGACY.md)).

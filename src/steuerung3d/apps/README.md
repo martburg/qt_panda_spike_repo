@@ -2,26 +2,36 @@
 
 ## Purpose
 
-Runnable entrypoints (`python -m ...`) for CLI client, core service, dev stack, PLC sim, PLC stack builder, replay player, and log viewer.
+Runnable entrypoints (`python -m ...`) for stack services and developer tooling.
+
+The canonical way to boot a stack is the profile-driven supervisor:
+
+- `python -m steuerung3d up --profile <name>`
+
+For a single source of truth on which apps are supported vs obsolete, see:
+
+- `steuerung3d.core.app_catalog`
 
 ## Subdirectories
 
-- `cli_client/` — Minimal CLI that can send intents/commands and display telemetry against a running core service or stack.
-- `core_service/` — Main long-running core service process: ticks the engine, talks to devices, emits telemetry, and records logs.
-- `dev_stack/` — Convenience app that wires a full dev stack (core + device) based on TOML and runs it end-to-end.
-- `log_viewer/` — CLI log viewer for comparing commanded vs measured signals over time from JSONL recordings.
-- `plc_sim/` — Legacy PLC simulator UI/process: emulates the TwinCAT PLC side to exercise the main app without hardware.
-- `plc_stack/` — PLC stack builder app: loads PLC endpoints from TOML and constructs the wiring (and optionally runs it).
-- `replay_player/` — Replays recorded JSONL sessions through the core engine for regression tests and debugging.
+- `core_udp_service/` — **Canonical** core process used by stack profiles.
+- `hi_p/` — Human Intent Parser (UI/controller).
+- `den_si/` — Device endpoint simulator.
+- `joy2intent/` — Joystick input -> intents bridge.
+- `inputd/` — Input daemon (keyboard/misc sources).
 
-## Files
+Developer tools:
 
-- `__init__.py`
+- `cli_client/` — Minimal CLI that can send intents/commands and display telemetry.
+- `dev_stack/` — Convenience app that wires a local dev stack based on TOML and runs it end-to-end.
+- `log_viewer/` — CLI log viewer for comparing commanded vs measured signals from JSONL recordings.
+- `replay_player/` — Replays recorded JSONL sessions through the core engine.
 
-## Key entry points
+Legacy / obsolete:
 
-- `__init__.py`
+- `core_service/` — **obsolete** (superseded by `core_udp_service` + StackSpec profiles).
+- `plc_twincat_legacy_edge/` — **obsolete** TwinCAT legacy UDP edge adapter.
 
 ## Notes
 
-- This README was auto-generated to help orient the repo. If something is inaccurate, update it to match reality.
+- If something here is inaccurate, update it to match reality.

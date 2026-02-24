@@ -62,7 +62,7 @@ LifeTick can generate a lot of traffic, so **LifeTick trace logging is DEBUG-onl
 If you need to debug the LifeTick path, run the stack with debug logging, e.g.:
 
 ```bash
-python -m steuerung3d.apps.setup_stack --log-level debug ...
+python -m steuerung3d up --profile 1dev_sim  # (or another profile) --log-level debug ...
 ```
 
 Normal `INFO` output should stay readable and focus on:

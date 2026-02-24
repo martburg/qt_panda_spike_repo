@@ -100,7 +100,7 @@ Some signals can be very chatty (multiple axes, multiple processes, many times p
 When you need them, start the stack (or the specific app) with:
 
 ```bash
-python -m steuerung3d.apps.setup_stack --log-level debug ...
+python -m steuerung3d up --profile 1dev_sim  # (or another profile) --log-level debug ...
 ```
 
 Tip: if you only care about one component, set that process to DEBUG and leave the rest at INFO.

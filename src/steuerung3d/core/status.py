@@ -22,14 +22,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
-
-def parse_hostport(s: str) -> Tuple[str, int]:
-    if not isinstance(s, str) or ":" not in s:
-        raise ValueError(f"Invalid host:port: {s!r}")
-    host, port_s = s.rsplit(":", 1)
-    host = host.strip()
-    port = int(port_s.strip())
-    return host, port
+from steuerung3d.core.net import parse_hostport
 
 
 def env_for_process(

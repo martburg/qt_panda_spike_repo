@@ -17,16 +17,6 @@ def _is_windows() -> bool:
     return os.name == "nt"
 
 
-def _parse_hostport(s: str, default_host: str = "127.0.0.1") -> Tuple[str, int]:
-    s = (s or "").strip()
-    if not s:
-        raise ValueError("empty host:port")
-    if s.count(":") == 0:
-        return (default_host, int(s))
-    host, port_s = s.rsplit(":", 1)
-    host = host.strip() or default_host
-    return (host, int(port_s))
-
 
 def _axes_from_joy2intent(path: Path) -> List[str]:
     cfg = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -140,7 +130,7 @@ def main() -> int:
     if not axes:
         axes = ["X"]
 
-    telem_out = _parse_hostport(args.telem_out)
+    telem_out = parse_hostport(args.telem_out)
 
     children: List[Child] = []
     try:

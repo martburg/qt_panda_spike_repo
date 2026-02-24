@@ -55,12 +55,8 @@ Canonical architecture references:
   - early minimal UDP adapter (toy protocol)
 
 - `steuerung3d/adapters/plc_twincat_legacy/*`
-  - real TwinCAT legacy UDP protocol:
-    - codec (`codec.py`)
-    - single-axis UDP device (`device.py`)
-    - fleet device (`fleet.py`)
-    - TOML loader (`config.py`)
-    - loopback UDP simulators for off-network development (`udp_sim.py`)
+  - **obsolete** TwinCAT legacy UDP protocol adapter (kept for reference/field rigs).
+  - See: `docs/OBSOLETE.md` and `docs/PLC_TWINCAT_LEGACY.md`.
 
 ## Why the command frame seam matters
 

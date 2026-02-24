@@ -230,14 +230,6 @@ digraph G {
   "steuerung3d.apps.replay_player.__main__.main" -> "steuerung3d.core.state.MachineState";
   "steuerung3d.apps.replay_player.__main__.main" -> "steuerung3d.protocol.recording.JsonlReader";
   "steuerung3d.apps.replay_player.__main__.main" -> "steuerung3d.protocol.transport.InMemTransport";
-  "steuerung3d.apps.setup_stack.__main__.build_stack_spec_from_args" -> "steuerung3d.apps.setup_stack.__main__._axes_from_joy2intent";
-  "steuerung3d.apps.setup_stack.__main__.build_stack_spec_from_args" -> "steuerung3d.apps.setup_stack.__main__._parse_axes_arg";
-  "steuerung3d.apps.setup_stack.__main__.build_stack_spec_from_args" -> "steuerung3d.apps.setup_stack.__main__._parse_hostport";
-  "steuerung3d.apps.setup_stack.__main__.build_stack_spec_from_args" -> "steuerung3d.core.stack_spec.ServiceSpec";
-  "steuerung3d.apps.setup_stack.__main__.build_stack_spec_from_args" -> "steuerung3d.core.stack_spec.StackSpec";
-  "steuerung3d.apps.setup_stack.__main__.main" -> "steuerung3d.apps.setup_stack.__main__._is_windows";
-  "steuerung3d.apps.setup_stack.__main__.main" -> "steuerung3d.apps.setup_stack.__main__.build_stack_spec_from_args";
-  "steuerung3d.apps.setup_stack.__main__.main" -> "steuerung3d.core.stack_runtime.StackRuntime";
   "steuerung3d.apps.yellow.__main__.main" -> "steuerung3d.apps.yellow.ui_shell.build_yellow_window";
   "steuerung3d.apps.yellow.controllers.densi_controller.DenSiController.__post_init__" -> "steuerung3d.adapters.sim.axis_plant.SimAxisPlant";
   "steuerung3d.apps.yellow.controllers.densi_controller.DenSiController.__post_init__" -> "steuerung3d.adapters.sim.device.SimDevice";

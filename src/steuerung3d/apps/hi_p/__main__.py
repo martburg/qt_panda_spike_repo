@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+
+from steuerung3d.core.net import parse_hostport
 import sys
 
 import logging
@@ -58,16 +60,8 @@ def main() -> int:
     shadow_mode = str(engine_cfg.get("shadow_mode", "old") or "old").strip().lower()
     if shadow_mode not in ("old", "shadow", "new"):
         shadow_mode = "old"
-    def _parse_hostport(s: str, default_host: str = "127.0.0.1"):
-        s = (s or "").strip()
-        if s.count(":") == 0:
-            return (default_host, int(s))
-        h, p = s.rsplit(":", 1)
-        h = h.strip() or default_host
-        return (h, int(p))
-
-    intent_out_addr = _parse_hostport(args.intent_out)
-    telem_in_addr = _parse_hostport(args.telem_in)
+    intent_out_addr = parse_hostport(args.intent_out)
+    telem_in_addr = parse_hostport(args.telem_in)
 
     log.info("HI-P target IntentOut=%s  bind TelemetryIn=%s", intent_out_addr, telem_in_addr)
 

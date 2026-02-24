@@ -1,7 +1,7 @@
 """Run/session directory helpers.
 
 This module centralizes the "session run dir" policy used by launchers such as
-`steuerung3d.apps.setup_stack` and future unified stack supervisors.
+Profile-driven stack supervisors (historically also `setup_stack`, now removed).
 
 Policy
   - Each run gets a fresh session directory under `<base>/sessions/<timestamp>/`.
@@ -47,7 +47,7 @@ def make_session_dir(
     Parameters
     ----------
     base_dir:
-        Base directory for the launcher/run (e.g. `.run/setup_stack`).
+        Base directory for the launcher/run (e.g. `.run/<profile>`).
     keep_last:
         Number of most recent sessions to keep.
     sessions_subdir:

@@ -45,14 +45,14 @@ Workflow:
 
 ## 1) Discovery (mandatory)
 Use repo search/read tools to gather:
-- Entry points / apps (core service, HiP, DenSi, setup_stack, joy2intent, inputd, SIM)
+- Entry points / apps (core service, HiP, DenSi, setup_stack (removed), joy2intent, inputd, SIM)
 - Protocol and state machine definitions
 - Docs / README / architecture notes
 - Tests that freeze semantics (especially livetick echo roundtrip, protocol alignment tests)
 - Canonical PLC protocol docs (MUST locate legacy_plc_anton.md or equivalents)
 
 Suggested searches:
-- "apps/core" "core_udp_service" "setup_stack"
+- "apps/core" "core_udp_service" "setup_stack" (removed)
 - "HiP" "hip_controller" "DenSi" "densi_controller"
 - "TelemetrySnapshot" "Intent" "CommandFrame" "MachineState" "ESTOP" "l漫" (ignore if irrelevant)
 - "legacy_plc_anton" "Beckhoff" "TwinCAT" "KommAnton__MAIN"

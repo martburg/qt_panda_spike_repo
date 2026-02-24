@@ -149,8 +149,6 @@ digraph G {
   "steuerung3d.apps.replay_player.__main__" -> "steuerung3d.core.telemetry";
   "steuerung3d.apps.replay_player.__main__" -> "steuerung3d.protocol.recording";
   "steuerung3d.apps.replay_player.__main__" -> "steuerung3d.protocol.transport";
-  "steuerung3d.apps.setup_stack.__main__" -> "steuerung3d.core.stack_runtime";
-  "steuerung3d.apps.setup_stack.__main__" -> "steuerung3d.core.stack_spec";
   "steuerung3d.apps.yellow.__main__" -> "steuerung3d.apps.yellow.ui_shell";
   "steuerung3d.apps.yellow.controllers" -> "steuerung3d.apps.yellow.bindings";
   "steuerung3d.apps.yellow.controllers" -> "steuerung3d.apps.yellow.ports";

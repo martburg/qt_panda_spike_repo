@@ -1,6 +1,6 @@
 """Run a stack profile as supervised subprocesses.
 
-This is a generalized version of the existing `setup_stack` runner:
+This is a generalized stack supervisor/runtime used by the profile-driven boot:
 - per-process logs in a session directory (with rollover)
 - birds-eye view (log tail)
 - crash tail of last N lines

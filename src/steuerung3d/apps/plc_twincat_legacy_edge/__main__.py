@@ -5,6 +5,8 @@ import logging
 import time
 from typing import Tuple
 
+from steuerung3d.core.net import parse_hostport
+
 from steuerung3d.util.log_context import install_log_context
 
 from steuerung3d.protocol.udp_channels import UdpCommandIn, UdpTelemetryOut
@@ -14,16 +16,6 @@ from steuerung3d.adapters.plc_twincat_legacy.edge import TwinCATLegacyWinchEdge
 
 log = logging.getLogger("plc_twincat_legacy_edge")
 
-
-def _parse_hostport(s: str, default_host: str = "127.0.0.1") -> Tuple[str, int]:
-    s = (s or "").strip()
-    if not s:
-        raise ValueError("empty host:port")
-    if s.count(":") == 0:
-        return (default_host, int(s))
-    host, port_s = s.rsplit(":", 1)
-    host = host.strip() or default_host
-    return (host, int(port_s))
 
 
 def main() -> int:
@@ -54,10 +46,10 @@ def main() -> int:
     install_log_context(role="plc_edge", axis=str(args.axis))
 
     axis_id = str(args.axis).strip()
-    cmd_in = _parse_hostport(args.cmd_in)
-    telem_out = _parse_hostport(args.telem_out)
-    plc_remote = _parse_hostport(args.plc_remote)
-    local_bind = _parse_hostport(args.local_bind)
+    cmd_in = parse_hostport(args.cmd_in)
+    telem_out = parse_hostport(args.telem_out)
+    plc_remote = parse_hostport(args.plc_remote)
+    local_bind = parse_hostport(args.local_bind)
 
     log.info(
         "starting axis=%s cmd_in=%s telem_out=%s plc_remote=%s local_bind=%s dt=%.4fs",

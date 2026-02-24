@@ -11,7 +11,7 @@ Supported `kind` values:
 
 - `sim` (default)
 - `udp_plc_toy`
-- `plc_twincat_legacy_fleet`
+- `plc_twincat_legacy_fleet` (**obsolete**, see `docs/OBSOLETE.md`)
 
 ---
 
@@ -42,6 +42,9 @@ remote_port = 55001
 ---
 
 ## `plc_twincat_legacy_fleet`
+
+> Status: **obsolete**. Kept for older field rigs and reference. Prefer `sim` or the schema-driven PLC adapter (`steuerung3d.adapters.plc`).
+
 
 Legacy TwinCAT/Beckhoff UDP protocol used by the winches (Anton/Burt/Cecil/Debby…).
 

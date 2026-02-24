@@ -125,7 +125,7 @@ The device adapter is selected by `device.kind` in TOML:
 
 - `sim` (default): local plant simulation
 - `udp_plc_toy`: early semicolon UDP adapter (`adapters/plc/udp_device.py`)
-- `plc_twincat_legacy_fleet`: legacy TwinCAT UDP adapter (Anton/Burt/Cecil/Debby…)
+- `plc_twincat_legacy_fleet`: legacy TwinCAT UDP adapter (**obsolete**, see `docs/OBSOLETE.md`) (Anton/Burt/Cecil/Debby…)
 
 See `docs/CONFIG_TOML.md` for the schema and examples.
 
@@ -149,34 +149,23 @@ This allows you to test:
 
 ---
 
-## Running the full multi-axis demo with `setup_stack`
+## Running the full multi-axis demo (profile-driven)
 
-`setup_stack` predates the profile-driven boot CLI. It is now a **thin compatibility wrapper**
-over the same runtime (so we only have one supervisor implementation).
+The legacy `setup_stack` wrapper has been **removed**. All local demo wiring is now done via
+the profile-driven supervisor:
 
-It launches the typical local demo stack:
+```powershell
+python -m steuerung3d up --profile 1dev_sim
+```
+
+This launches the typical local demo stack:
 
 - `core_udp_service`
 - `den_si` (one per axis)
-- `hi_p` (one per axis)
+- `hi_p` (single in `1dev_sim`)
 - optional joystick helpers (`inputd`, `joy2intent`)
 
-Example (legacy style):
-
-```powershell
-python -m steuerung3d.apps.setup_stack --joy2intent configs\joy2intent_gamepad.toml --inputd configs\inputd_gamepad.toml --cmd-base 52001 --dev-telem-in 127.0.0.1:52020
-```
-
-### Debugging early exits
-
-- Each child gets a stable name (e.g. `core_udp_service`, `densi-Anton`, `hip-Debby`, …).
-- Each child writes combined stdout/stderr to `.run/setup_stack/<name>.log`.
-- If a child exits, `setup_stack` prints the *name*, PID, return code, and a short tail of its log.
-
-### Logging noise
-
-- LifeTick trace logs are throttled and emitted at **DEBUG** level.
-  (The default `INFO` level stays readable during normal operation.)
+Logs and per-process status output are written under `.run/<profile>/...`.
 
 ---
 
@@ -206,17 +195,6 @@ Logs are written to `logs/session.jsonl` (JSON Lines) via the recorder.
 
 
 
-### Setup stack (legacy convenience)
-
-`setup_stack` remains useful for quick local runs (especially when you like its flags), but new work should
-prefer `python -m steuerung3d up --profile ...` so the wiring lives in one place.
-
-It launches the same components as the profiles:
-
-- **Core** (`core_udp_service`)
-- **DenSi** (one per axis; device-side sim UI)
-- **HiP** (one per axis; operator UI)
-- optionally **inputd** (gamepad reader) and **joy2intent** (maps joystick → intents)
 
 ### Recommended port plan (Windows-safe)
 
@@ -239,16 +217,11 @@ UI intents (HiPs → Core) use `127.0.0.1:51001` by default.
 From repo root:
 
 ```powershell
-python -m steuerung3d.apps.setup_stack `
-  --joy2intent configs\joy2intent_gamepad.toml `
-  --inputd    configs\inputd_gamepad.toml `
-  --cmd-base  52001 `
-  --ui-telem-base 51002 `
-  --dev-telem-in  127.0.0.1:52020 `
-  --log-level info
+python -m steuerung3d up --profile 1dev_sim
 ```
 
-If you omit `--dev-telem-in`, the launcher will choose a non-overlapping port automatically (currently `cmd_base + 100`, e.g. `52101`).
+To run multi-axis demos, use a stack profile under `configs/stacks/` (or create one) and point it at the desired axes and ports.
+
 
 ### How to verify wiring quickly
 

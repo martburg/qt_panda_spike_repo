@@ -5,6 +5,8 @@ import sys
 import logging
 from typing import Tuple
 
+from steuerung3d.core.net import parse_hostport
+
 from steuerung3d.util.log_context import install_log_context
 
 from PySide6.QtWidgets import QApplication
@@ -17,18 +19,6 @@ from steuerung3d.protocol.udp_channels import UdpCommandIn, UdpTelemetryOut
 
 log = logging.getLogger("den_si")
 
-
-def _parse_hostport(s: str) -> Tuple[str, int]:
-    """Parse 'host:port' (host may be omitted -> 127.0.0.1)."""
-    s = (s or "").strip()
-    if not s:
-        raise ValueError("empty host:port")
-    if s.count(":") == 0:
-        # only port provided
-        return ("127.0.0.1", int(s))
-    host, port_s = s.rsplit(":", 1)
-    host = host.strip() or "127.0.0.1"
-    return (host, int(port_s))
 
 
 def main() -> int:
@@ -70,8 +60,8 @@ def main() -> int:
     install_log_context(role="den_si", axis=axis_ids[0])
     log.info("log level = %s", args.log_level.upper())
 
-    cmd_in_addr = _parse_hostport(args.cmd_in)
-    telem_out_addr = _parse_hostport(args.telem_out)
+    cmd_in_addr = parse_hostport(args.cmd_in)
+    telem_out_addr = parse_hostport(args.telem_out)
 
     log.info(
         "Den-Si bind CommandIn=%s  target TelemetryOut=%s  wire_proto=%s",

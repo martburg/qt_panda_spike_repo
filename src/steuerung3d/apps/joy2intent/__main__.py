@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+
+from steuerung3d.core.net import parse_hostport
 import logging
 import time
 from pathlib import Path
@@ -46,14 +48,10 @@ def main() -> int:
     cfg = load_joy2intent_config(Path(args.config))
 
     # Stack profiles may own infrastructure wiring (ports / axis list). Allow explicit overrides.
-    def _parse_hostport(s: str) -> tuple[str, int]:
-        host, port = s.rsplit(":", 1)
-        return host.strip(), int(port)
-
     if args.raw_in:
-        cfg = replace(cfg, raw_in=_parse_hostport(str(args.raw_in)))
+        cfg = replace(cfg, raw_in=parse_hostport(str(args.raw_in)))
     if args.intent_out:
-        cfg = replace(cfg, intent_out=_parse_hostport(str(args.intent_out)))
+        cfg = replace(cfg, intent_out=parse_hostport(str(args.intent_out)))
     if args.winches:
         winches = [w.strip() for w in str(args.winches).split(",") if w.strip()]
         if winches:

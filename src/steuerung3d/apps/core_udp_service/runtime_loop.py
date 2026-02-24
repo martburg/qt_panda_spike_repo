@@ -11,6 +11,7 @@ from steuerung3d.core.command_frame import CommandFrame, coerce_param_ops
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.mode_aggregate import aggregate_and_store
 from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapshot
+from steuerung3d.core.net import parse_hostport, normalize_host
 from steuerung3d.protocol.core_runner import CoreRunner
 from steuerung3d.protocol.axis_router import AxisRouter
 from steuerung3d.protocol.udp_channels import UdpIntentIn, UdpTelemetryOut, UdpTelemetryFanout
@@ -51,20 +52,6 @@ def _fatal(msg: str) -> int:
     return 2
 
 
-def _parse_hostport(s: str, default_host: str = "127.0.0.1") -> Tuple[str, int]:
-    s = (s or "").strip()
-    if not s:
-        raise ValueError("empty host:port")
-    if s.count(":") == 0:
-        return (default_host, int(s))
-    host, port_s = s.rsplit(":", 1)
-    host = host.strip() or default_host
-    return (host, int(port_s))
-
-
-def _normalize_host(host: str, *, default_host: str = "127.0.0.1") -> str:
-    return (host or "").strip() or default_host
-
 
 # Export helpers for CLI tests
 __all__ = [
@@ -83,10 +70,10 @@ def _expand_targets(
 ) -> List[Tuple[str, int]]:
     targets: List[Tuple[str, int]] = []
     for s in explicit_targets:
-        targets.append(_parse_hostport(s))
+        targets.append(parse_hostport(s))
     if base is not None and int(count) > 0:
         base_port = int(str(base).strip())
-        host = _normalize_host(base_host)
+        host = normalize_host(base_host)
         for i in range(int(count)):
             targets.append((host, base_port + i))
     if not targets and default_target is not None:
@@ -97,7 +84,7 @@ def _expand_targets(
 def _expand_dev_cmd_targets(base: str, count: int, host: str) -> List[Tuple[str, int]]:
     base_port = int(str(base).strip())
     out: List[Tuple[str, int]] = []
-    cmd_host = _normalize_host(host)
+    cmd_host = normalize_host(host)
     for i in range(int(count)):
         out.append((cmd_host, base_port + i))
     return out
@@ -105,7 +92,7 @@ def _expand_dev_cmd_targets(base: str, count: int, host: str) -> List[Tuple[str,
 
 def run_core_udp_service(*, args, status) -> int:
     # --- UDP endpoints ---
-    intent_in_bind = _parse_hostport(args.intent_in)
+    intent_in_bind = parse_hostport(args.intent_in)
 
     op_intent_in = UdpIntentIn.bind(intent_in_bind)
 
@@ -137,13 +124,13 @@ def run_core_udp_service(*, args, status) -> int:
     c2_telem_outs = [UdpTelemetryOut.connect(t) for t in c2_telem_targets]
     c2_fanout = UdpTelemetryFanout(outs=c2_telem_outs) if c2_telem_outs else None
 
-    dev_telem_bind = _parse_hostport(args.dev_telem_in)
+    dev_telem_bind = parse_hostport(args.dev_telem_in)
     dev_telem_in = UdpPlcTelemetryIn.bind(dev_telem_bind)
 
     # Device command broadcast targets (N DenSi apps each binding a unique command port)
     dev_cmd_targets: List[Tuple[str, int]] = []
     for s in args.dev_cmd_target:
-        dev_cmd_targets.append(_parse_hostport(s))
+        dev_cmd_targets.append(parse_hostport(s))
 
     if args.dev_cmd_base is not None and int(args.dev_cmd_count) > 0:
         base = int(str(args.dev_cmd_base).strip())
