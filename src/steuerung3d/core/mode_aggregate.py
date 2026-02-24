@@ -65,6 +65,7 @@ class AggregateResult:
     core_mode: CoreMode
     blocked_by: list[BlockedReason] = field(default_factory=list)
     axis_gate: dict[str, dict[str, object]] = field(default_factory=dict)
+    motion_allowed: bool = False
 
 
 def _missing_fields(axis: AxisSafetyFacts) -> list[str]:
@@ -219,15 +220,18 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
     not_ready = [axis for axis in eligible_axes if not bool(axis.axis_ready)]
     if not_ready:
         blocked_by.extend([BlockedReason("NOT_READY", axis.axis_id, None) for axis in not_ready])
-        return AggregateResult(core_mode=CoreMode.ARMED, blocked_by=blocked_by, axis_gate=axis_gate)
+        return AggregateResult(core_mode=CoreMode.ARMED, blocked_by=blocked_by, axis_gate=axis_gate, motion_allowed=False)
 
     if not inputs.joy_deadman:
-        return AggregateResult(core_mode=CoreMode.READY, blocked_by=blocked_by, axis_gate=axis_gate)
+        return AggregateResult(core_mode=CoreMode.READY, blocked_by=blocked_by, axis_gate=axis_gate, motion_allowed=False)
 
     core_mode = CoreMode.LIVE
+    motion_allowed = True
     if (abs(float(inputs.joy_soll_speed)) > 1e-6) and (not inputs.joy_select):
         blocked_by.append(BlockedReason("NO_SELECT", None, None))
-    return AggregateResult(core_mode=core_mode, blocked_by=blocked_by, axis_gate=axis_gate)
+        # In current system, NO_SELECT blocks motion even if core_mode is LIVE
+        motion_allowed = False
+    return AggregateResult(core_mode=core_mode, blocked_by=blocked_by, axis_gate=axis_gate, motion_allowed=motion_allowed)
 
 
 def aggregate_and_store(state, inputs: AggregateInputs) -> AggregateResult:

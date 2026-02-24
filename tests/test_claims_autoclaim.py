@@ -50,7 +50,8 @@ def test_claim_enforces_enable_and_jog():
 
     # Wrong HIP cannot enable (claim exists)
     apply_intent(st, EnableAxis(axis_id="Anton", enable=True, hip_id="hipB"))
-    assert "Anton" not in st.axis_cmd  # should not create/set command
+    assert st.axis_cmd["Anton"].enable is False
+    assert st.axis_cmd["Anton"].vel == pytest.approx(0.0)
 
     # Owner can enable
     apply_intent(st, EnableAxis(axis_id="Anton", enable=True, hip_id="hipA"))

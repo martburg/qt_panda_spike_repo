@@ -10,11 +10,13 @@ def test_enable_and_jog_writes_command_state_only_in_live():
     st = MachineState()
     hip_id = "hipA"
     apply_intent(st, RequestAxisLease(axis_id="X", hip_id=hip_id, req_id="lease-1"))
+    st.ensure_axis("X")
 
     # Not LIVE -> ignored
     apply_intent(st, EnableAxis(axis_id="X", enable=True, hip_id=hip_id))
     apply_intent(st, JogAxis(axis_id="X", vel=1.25, hip_id=hip_id))
-    assert st.axis_cmd.get("X") is None
+    assert st.axis_cmd["X"].enable is False
+    assert st.axis_cmd["X"].vel == 0.0
 
     # LIVE -> commands are accepted
     st.core_mode = CoreMode.LIVE
@@ -44,7 +46,8 @@ def test_estop_disables_axes_and_blocks_motion():
     apply_intent(st, JogAxis(axis_id="X", vel=2.0, hip_id=hip_id))
 
     # command state should still be absent
-    assert st.axis_cmd.get("X") is None
+    assert st.axis_cmd["X"].enable is False
+    assert st.axis_cmd["X"].vel == 0.0
     # measured remains clamped
     assert st.axes["X"].enabled is False
     assert st.axes["X"].vel == 0.0

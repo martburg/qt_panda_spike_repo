@@ -119,6 +119,8 @@ class MachineState:
     def ensure_axis(self, axis_id: str) -> AxisState:
         if axis_id not in self.axes:
             self.axes[axis_id] = AxisState()
+        if axis_id not in self.axis_cmd:
+            self.axis_cmd[axis_id] = AxisCommandState()
         return self.axes[axis_id]
 
     def ensure_axis_cmd(self, axis_id: str) -> AxisCommandState:

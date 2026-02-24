@@ -16,7 +16,8 @@ def test_motion_intents_blocked_outside_live():
     apply_intent(st, JogAxis(axis_id="X", vel=1.0, hip_id=hip_id))
     enforce_core_mode_actions(st)
 
-    assert st.axis_cmd.get("X") is None
+    assert st.axis_cmd["X"].enable is False
+    assert st.axis_cmd["X"].vel == 0.0
 
     # Mark core LIVE: now they take effect (in command state)
     st.core_mode = CoreMode.LIVE

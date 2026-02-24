@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from steuerung3d.apps.core_udp_service.__main__ import _expand_targets, _expand_dev_cmd_targets
+from steuerung3d.apps.core_udp_service.runtime_loop import _expand_targets, _expand_dev_cmd_targets
 
 
 def test_expand_targets_uses_base_host() -> None:

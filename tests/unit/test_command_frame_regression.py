@@ -88,5 +88,5 @@ def test_command_frame_sequence_regression_hash():
     got = _fingerprint(frames)
 
     # Baseline generated from current deterministic SIM behavior.
-    expected = "89a8e72cf56a1500e3ace47212fb7a4b84000a46d1c58b393a4b48a62b5a5543"
+    expected = "4075eb972757e7312e6f7d3a0523d750ec3b4d0717c89b3d6f7db05d1684af2f"
     assert got == expected, f"command-frame regression hash changed: {got} != {expected}"
