@@ -19,9 +19,8 @@ class FakeUdpLink:
 
 
 class FakeCodec:
-    def __init__(self, *, spec, axis_id: str):
+    def __init__(self, *, spec):
         self.spec = spec
-        self.axis_id = axis_id
 
 
 def test_build_plc_device_constructs_endpoints_without_opening_sockets(tmp_path: Path) -> None:
@@ -46,7 +45,7 @@ bind_host = "0.0.0.0"
 bind_port = 51002
 target_host = "172.16.17.2"
 target_port = 50001
-axis_ids = ["Y", "Z"]
+axis_ids = ["Y"]
 """,
         encoding="utf-8",
     )
@@ -56,20 +55,21 @@ axis_ids = ["Y", "Z"]
     device, endpoints = build_plc_device(
         cfg,
         link_factory=lambda *, bind, target: FakeUdpLink(bind=bind, target=target),
-        codec_factory=lambda *, spec, axis_id: FakeCodec(spec=spec, axis_id=axis_id),    )
+        codec_factory=lambda *, spec: FakeCodec(spec=spec),
+    )
 
     assert len(endpoints) == 2
     assert endpoints[0].name == "Anton"
     assert endpoints[0].axis_ids == ["X"]
     assert endpoints[0].link.bind == ("0.0.0.0", 51001)
     assert endpoints[0].link.target == ("172.16.17.1", 50001)
-    assert endpoints[0].codec.axis_id == "Anton"
+    assert endpoints[0].codec.spec.axis_ids == ["X"]
 
     assert endpoints[1].name == "Burt"
-    assert endpoints[1].axis_ids == ["Y", "Z"]
+    assert endpoints[1].axis_ids == ["Y"]
     assert endpoints[1].link.bind == ("0.0.0.0", 51002)
     assert endpoints[1].link.target == ("172.16.17.2", 50001)
-    assert endpoints[1].codec.axis_id == "Burt"
+    assert endpoints[1].codec.spec.axis_ids == ["Y"]
 
     # MultiPlcDevice should expose endpoint names (smoke check)
     assert hasattr(device, "endpoints")

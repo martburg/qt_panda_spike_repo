@@ -20,7 +20,7 @@ def validate_endpoints(endpoints: List[PlcEndpoint]) -> None:
 
     Rules:
       - endpoint names must be unique
-      - each endpoint must own at least one axis_id
+      - each endpoint must own exactly one axis_id (canonical PLC telegrams are per axis)
       - an axis_id may be owned by at most one endpoint
       - endpoint axis_ids must match codec.spec.axis_ids (strongly recommended)
 
@@ -38,6 +38,11 @@ def validate_endpoints(endpoints: List[PlcEndpoint]) -> None:
     for e in endpoints:
         if not e.axis_ids:
             raise PlcValidationError(f"Endpoint '{e.name}' has empty axis_ids")
+        if len(e.axis_ids) != 1:
+            raise PlcValidationError(
+                f"Endpoint '{e.name}' must have exactly one axis_id for the canonical PLC codec; "
+                f"got axis_ids={e.axis_ids}"
+            )
 
         # axis ownership uniqueness
         for ax in e.axis_ids:

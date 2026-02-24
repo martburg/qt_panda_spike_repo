@@ -2,19 +2,19 @@
 
 ## Purpose
 
-Quick-start TOML configs used during development (legacy location). Prefer `configs/` unless a script explicitly points here.
+This package contains the Python loaders / schema for TOML configuration.
+
+**Runtime config files live in the repo root `configs/` directory.**
 
 ## Files
 
-- `dev_plc.toml`
-- `dev_sim.toml`
-- `dev_udp_toy.toml`
+- `plc_stack_config.py` (loader + schema)
+- `log_viewer_config.py` (loader + schema)
+- `toml_loader.py` (shared helpers)
 
 ## Key entry points
 
-- `dev_plc.toml`
-- `dev_sim.toml`
-- `dev_udp_toy.toml`
+- `load_plc_stack_config()`
 
 ## Notes
 

@@ -1,114 +1,68 @@
 from __future__ import annotations
 
+"""PLC codec adapter (canonical).
+
+This module provides the *adapter* interface used by the PLC edge layer:
+
+  - encode_command_frame(CommandFrame) -> bytes
+  - try_decode_telemetry(bytes) -> Optional[TelemetrySnapshot]
+
+The previous implementation was a scaffold with a placeholder token layout.
+As a declared Lane-2 change (RefOS), this now delegates to the canonical
+implementation in :mod:`steuerung3d.protocol.plc_codec`, which mirrors
+KommAnton__MAIN.st.
+
+Important semantic note:
+  The canonical PLC telegrams are *per axis endpoint* (e.g. Anton/Burt/...).
+  Therefore, this adapter currently supports exactly one axis_id per endpoint.
+"""
+
 from dataclasses import dataclass
-from typing import Optional, Dict, List
+from typing import Optional
 
 from steuerung3d.core.command_frame import CommandFrame
-from steuerung3d.core.telemetry import TelemetrySnapshot, AxisTelemetry
+from steuerung3d.core.telemetry import TelemetrySnapshot
+
+from steuerung3d.protocol.plc_codec import decode_uplink_to_snapshot, encode_downlink
 
 from .plc_config import PlcWireSpec
 
 
 @dataclass
 class PlcCodec:
-    """
-    PLC codec: bytes <-> typed objects.
+    """Codec used by PlcEndpoint.
 
-    This is where "what the PLC strings mean" lives.
-    Transport (UDP sockets etc.) is handled elsewhere.
-
-    Command TX placeholder format (semicolon-delimited, newline-terminated):
-      tick;estop;fault;mode;X_enable;X_vel;Y_enable;Y_vel;...
-
-    Telemetry RX placeholder format (semicolon-delimited, newline optional):
-      tick;t_s;mode;estop;fault;X_pos;X_vel;X_enabled;X_fault;Y_pos;Y_vel;Y_enabled;Y_fault;...
-
-    IMPORTANT:
-      The telemetry layout above is a *scaffold*. Replace/extend try_decode_telemetry()
-      to match the real PLC stream once we finalize the field map.
+    Args:
+        spec: Wire/format parameters and endpoint axis assignment.
+              For the canonical PLC protocol, spec.axis_ids must contain exactly one axis.
     """
 
     spec: PlcWireSpec
+
+    def _axis_name(self) -> str:
+        axis_ids = list(getattr(self.spec, "axis_ids", []) or [])
+        if len(axis_ids) != 1:
+            raise ValueError(
+                "Canonical PLC codec supports exactly one axis_id per endpoint; "
+                f"got axis_ids={axis_ids}"
+            )
+        return str(axis_ids[0])
 
     # -----------------------
     # TX: core -> PLC
     # -----------------------
     def encode_command_frame(self, cmd: CommandFrame) -> bytes:
-        d = self.spec.delimiter
-        parts: List[str] = [
-            str(int(cmd.tick)),
-            self.spec.true_token if cmd.estop else self.spec.false_token,
-            self.spec.true_token if cmd.fault else self.spec.false_token,
-            str(cmd.core_mode),
-        ]
-
-        for axis_id in self.spec.axis_ids:
-            sp = cmd.axes.get(axis_id)
-            if sp is None:
-                en = False
-                vel = 0.0
-            else:
-                en = bool(sp.enable)
-                vel = float(sp.vel)
-
-            parts.append(self.spec.true_token if en else self.spec.false_token)
-            parts.append(self.spec.float_fmt.format(vel))
-
-        line = d.join(parts) + "\n"
-        return line.encode(self.spec.encoding, errors="strict")
+        axis_name = self._axis_name()
+        return encode_downlink(
+            axis_id=axis_name,
+            frame=cmd,
+            true_token=self.spec.true_token,
+            false_token=self.spec.false_token,
+        )
 
     # -----------------------
     # RX: PLC -> core
     # -----------------------
     def try_decode_telemetry(self, payload: bytes) -> Optional[TelemetrySnapshot]:
-        """
-        Best-effort parse.
-        Returns None on parse errors so the caller can ignore bad packets.
-        """
-        try:
-            text = payload.decode(self.spec.encoding, errors="strict").strip()
-            if not text:
-                return None
-
-            parts = text.split(self.spec.delimiter)
-
-            # Header fields
-            # tick;t_s;mode;estop;fault;...
-            if len(parts) < 5:
-                return None
-
-            tick = int(parts[0])
-            t_s = float(parts[1])
-            _mode = str(parts[2])
-            estop = (parts[3] == self.spec.true_token)
-            fault = (parts[4] == self.spec.true_token)
-
-            # Per-axis fields:
-            # X_pos;X_vel;X_enabled;X_fault; repeated
-            idx = 5
-            axes_out: Dict[str, AxisTelemetry] = {}
-            for axis_id in self.spec.axis_ids:
-                if idx + 4 > len(parts):
-                    return None
-                pos = float(parts[idx + 0])
-                vel = float(parts[idx + 1])
-                enabled = (parts[idx + 2] == self.spec.true_token)
-                ax_fault = (parts[idx + 3] == self.spec.true_token)
-                axes_out[axis_id] = AxisTelemetry(
-                    pos=pos,
-                    vel=vel,
-                    enabled=enabled,
-                    fault=ax_fault,
-                )
-                idx += 4
-
-            return TelemetrySnapshot(
-                tick=tick,
-                t_s=t_s,
-                core_mode=str(_mode),
-                estop=estop,
-                fault=fault,
-                axes=axes_out,
-            )
-        except Exception:
-            return None
+        # Canonical decoder is already best-effort and returns None on parse errors.
+        return decode_uplink_to_snapshot(payload)

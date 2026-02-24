@@ -1,3 +1,12 @@
+import pytest
+
+
+pytest.importorskip("transitions")
+
+
+pytestmark = pytest.mark.requires_transitions
+
+
 from steuerung3d.core.axis_fsm import AxisFSM, AxisFsmConfig, ST_IDLE, ST_ESTOP, ST_RECOVER
 from steuerung3d.core.axis_types import AxisTelemetry, AxisRequest
 
