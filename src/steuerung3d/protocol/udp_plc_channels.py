@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""UDP channels for legacy TwinCAT semicolon-delimited PLC frames.
+r"""UDP channels for legacy TwinCAT semicolon-delimited PLC frames.
 
 These are intentionally *not* JSON. They carry plain ASCII lines like:
 

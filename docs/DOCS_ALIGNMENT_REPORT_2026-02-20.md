@@ -18,8 +18,7 @@ This pass focused on **eliminating stale entry points and file references** intr
 
 ### 2) Marked obsolete docs (prefixed `obs_`)
 
-- `docs/Transport Layer.md` → `docs/obs_transport_layer.md`
-- `src/steuerung3d/docs/Transport Layer.md` → `src/steuerung3d/docs/obs_transport_layer.md`
+- `docs/transport_layer.md` → `docs/obs_transport_layer.md`
 - `docs/graphs/steuerung3d_dead_code_candidates.md` → `docs/graphs/obs_steuerung3d_dead_code_candidates.md`
 
 Each now contains a short header explaining why it is obsolete and where to look instead.
