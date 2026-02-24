@@ -100,9 +100,17 @@ def _axis_lease_allows(state: MachineState, axis_id: str, hip_id: str) -> bool:
         return True
 
     # Fallback to legacy claim owner if present.
+    #
+    # NOTE: MachineState.axis_claims is a Dict[str, str] (axis_id -> hip_id).
+    # Some earlier prototypes briefly used a richer claim object; keep a
+    # defensive branch so we don't regress if that ever returns.
     claims = getattr(state, "axis_claims", {}) or {}
     claim = claims.get(str(axis_id or "")) if isinstance(claims, dict) else None
-    return bool(claim) and str(getattr(claim, "hip_id", "")) == hip_id
+    if not claim:
+        return False
+    if isinstance(claim, str):
+        return claim == hip_id
+    return str(getattr(claim, "hip_id", "")) == hip_id
 
 
 def _axis_reset_allowed(state: MachineState, axis_id: str, hip_id: str) -> tuple[bool, str]:

@@ -231,10 +231,20 @@ def synthesize_intents(
         current_active = {rig_ids[i] for i in current_active_raw if 0 <= i < len(rig_ids)}
     else:
         current_active = {str(x) for x in current_active_raw}
+    # Important:
+    # - ClaimAxis is only needed on the transition (avoid spam).
+    # - EnableAxis(True) is safe/idempotent, and we intentionally *repeat it*
+    #   while deadman is held.
+    #
+    # Rationale: the core may temporarily be in FAULT/IDLE while deadman+select
+    # are already pressed (e.g. fault/ESTOP clearing and legacy READY coming in).
+    # If EnableAxis(True) is only emitted on the first transition, it can be
+    # dropped by core safety gating and never re-sent, leaving cmd_en=0 even
+    # though JogWinch continues to stream.
     for wid in sorted(selected_set):
         if wid not in current_active:
             intents.append(ClaimAxis(axis_id=wid, hip_id=hip_id))
-            intents.append(EnableAxis(axis_id=wid, enable=True, hip_id=hip_id))
+        intents.append(EnableAxis(axis_id=wid, enable=True, hip_id=hip_id))
 
     # Compute jog rate
     axis_idx = bind.axes.get("manual_jog")

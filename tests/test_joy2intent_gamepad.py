@@ -99,6 +99,28 @@ def test_deadman_release_disables_previously_enabled_winches() -> None:
     assert {d.axis_id for d in disables} == {"Anton"}
 
 
+def test_deadman_hold_repeats_enable_keepalive() -> None:
+    """EnableAxis(True) must be re-emitted while deadman is held.
+
+    This acts as a keepalive so that if the first EnableAxis was dropped by
+    core safety gating (e.g. core still FAULT/IDLE during bring-up), the axis
+    will still become enabled once the core transitions to LIVE.
+    """
+
+    st = JoyState()
+    bind = _bind()
+    rig = _rig()
+    lim = _lim()
+
+    rc = _rc(axes=[0.0, 0.3], pressed=(5, 0))
+    intents1 = synthesize_intents(st, rc, bind, rig, lim)
+    assert any(isinstance(i, EnableAxis) and i.axis_id == "Anton" and i.enable for i in intents1)
+
+    # Same inputs, next tick: keepalive enable should still be present.
+    intents2 = synthesize_intents(st, rc, bind, rig, lim)
+    assert any(isinstance(i, EnableAxis) and i.axis_id == "Anton" and i.enable for i in intents2)
+
+
 def test_fine_button_scales_rate() -> None:
     st = JoyState()
     bind = _bind()
