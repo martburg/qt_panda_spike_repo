@@ -161,9 +161,9 @@ def test_select_gates_nonzero_motion() -> None:
             axes=[_axis("A", estop_bits=_bits())],
             stale_after_ms=100,
             joy_deadman=True,
-            joy_select=False,
+            joy_select_hip=False,
             joy_soll_speed=0.5,
         )
     )
     assert res.core_mode == CoreMode.LIVE
-    assert "NO_SELECT" in _codes(res)
+    assert "NO_SELECT_FOR_MOTION" in _codes(res)

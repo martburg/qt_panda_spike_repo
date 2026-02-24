@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..qtutil.ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
+from ..ui.joy_style import JOY_DEADMAN_PROP, JOY_SELECT_HIP_PROP
 from ..qtutil.param_widget_binder import ParamWidgetBinder
 from ..qtutil.modal_lock import ModalLock
 from ..qtutil.param_ui_apply import ParamUiBindings, apply_param_ui
@@ -360,18 +361,18 @@ class HipQtBinder:
         self._set_dot("dotHdrOnline", state)
 
     def _set_joy_properties(self, deadman: bool, select_hip: bool) -> None:
-        # Joy UI reflection: QSS uses joy_deadman/joy_select dynamic properties.
+        # Joy UI reflection: QSS uses joy_deadman/joy_select_hip dynamic properties.
         if self._frame_footer is not None:
             set_state_property(
                 self._frame_footer,
-                "true" if bool(deadman) else "false",
-                prop="joy_deadman",
+                bool(deadman),
+                prop=JOY_DEADMAN_PROP,
             )
         if self._frame_header is not None:
             set_state_property(
                 self._frame_header,
-                "true" if bool(select_hip) else "false",
-                prop="joy_select",
+                bool(select_hip),
+                prop=JOY_SELECT_HIP_PROP,
             )
 
     def _apply_joy_speed(self, soll_speed: float) -> None:

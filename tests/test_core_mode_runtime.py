@@ -22,7 +22,7 @@ def test_aggregate_and_store_updates_state() -> None:
             ],
             stale_after_ms=100,
             joy_deadman=False,
-            joy_select=False,
+            joy_select_hip=False,
             joy_soll_speed=0.0,
         ),
     )

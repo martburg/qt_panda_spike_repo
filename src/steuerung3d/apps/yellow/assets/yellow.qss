@@ -12,7 +12,7 @@ QFrame#frameFooter[joy_deadman="true"] {
     background-color: #00a000;
 }
 
-QFrame#frameHeader[joy_select="true"] {
+QFrame#frameHeader[joy_select_hip="true"] {
     background-color: #00a000;
 }
 

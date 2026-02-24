@@ -49,7 +49,7 @@ class AggregateInputs:
     axes: Iterable[AxisSafetyFacts]
     stale_after_ms: int
     joy_deadman: bool = False
-    joy_select: bool = False
+    joy_select_hip: bool = False
     joy_soll_speed: float = 0.0
 
 
@@ -227,9 +227,9 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
 
     core_mode = CoreMode.LIVE
     motion_allowed = True
-    if (abs(float(inputs.joy_soll_speed)) > 1e-6) and (not inputs.joy_select):
-        blocked_by.append(BlockedReason("NO_SELECT", None, None))
-        # In current system, NO_SELECT blocks motion even if core_mode is LIVE
+    if (abs(float(inputs.joy_soll_speed)) > 1e-6) and (not inputs.joy_select_hip):
+        blocked_by.append(BlockedReason("NO_SELECT_FOR_MOTION", None, None))
+        # In current system, NO_SELECT_FOR_MOTION blocks motion even if core_mode is LIVE
         motion_allowed = False
     return AggregateResult(core_mode=core_mode, blocked_by=blocked_by, axis_gate=axis_gate, motion_allowed=motion_allowed)
 
@@ -239,4 +239,5 @@ def aggregate_and_store(state, inputs: AggregateInputs) -> AggregateResult:
     state.core_mode = result.core_mode
     state.core_blocked_by = list(result.blocked_by)
     state.core_axis_gate = dict(result.axis_gate)
+    state.core_motion_allowed = bool(result.motion_allowed)
     return result

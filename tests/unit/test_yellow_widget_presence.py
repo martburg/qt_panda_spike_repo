@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
+pytest.importorskip('PySide6')
+
 import os
 from pathlib import Path
 
@@ -15,6 +19,7 @@ def _ensure_app() -> None:
     QApplication([])
 
 
+@pytest.mark.ui
 def test_yellow_ui_widget_presence() -> None:
     _ensure_app()
     root = Path(__file__).resolve().parents[2]

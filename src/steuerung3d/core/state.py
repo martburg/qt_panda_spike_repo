@@ -114,6 +114,7 @@ class MachineState:
     core_mode: CoreMode = CoreMode.ESTOP
     core_blocked_by: list[object] = field(default_factory=list)
     core_axis_gate: Dict[str, Dict[str, object]] = field(default_factory=dict)
+    core_motion_allowed: bool = False
 
 
     def ensure_axis(self, axis_id: str) -> AxisState:

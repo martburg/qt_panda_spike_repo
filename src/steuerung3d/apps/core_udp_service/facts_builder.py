@@ -4,15 +4,14 @@ from typing import List
 
 from steuerung3d.apps.yellow.domain.banner_facts import derive_banner_estate_from_word
 from steuerung3d.core.mode_aggregate import AggregateInputs, AxisSafetyFacts
+from steuerung3d.core.joy_facts import extract_joy_facts
 from steuerung3d.protocol.estop_bits import decode_estop_word
 
 
 def build_aggregate_inputs(*, state, router, axis_ids: List[str], dt: float) -> AggregateInputs:
     stale_after_ms = int(float(getattr(state, "densi_offline_after_ticks", 200)) * float(dt) * 1000.0)
     joy = getattr(state, "joy", None)
-    joy_deadman = bool(getattr(joy, "deadman", False)) if joy is not None else False
-    joy_select = bool(getattr(joy, "select_hip", False)) if joy is not None else False
-    joy_soll_speed = float(getattr(joy, "soll_speed", 0.0) or 0.0) if joy is not None else 0.0
+    jf = extract_joy_facts(joy)
 
     facts: list[AxisSafetyFacts] = []
     reg = dict(getattr(state, "densi_registry", {}) or {})
@@ -67,7 +66,7 @@ def build_aggregate_inputs(*, state, router, axis_ids: List[str], dt: float) -> 
     return AggregateInputs(
         axes=facts,
         stale_after_ms=stale_after_ms,
-        joy_deadman=joy_deadman,
-        joy_select=joy_select,
-        joy_soll_speed=joy_soll_speed,
+        joy_deadman=jf.deadman,
+        joy_select_hip=jf.select_hip,
+        joy_soll_speed=jf.soll_speed,
     )

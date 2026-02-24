@@ -14,3 +14,15 @@ from pathlib import Path
 SRC = Path(__file__).resolve().parent / "src"
 if SRC.exists():
     sys.path.insert(0, str(SRC))
+import importlib.util
+
+import pytest
+
+
+def _has_pyside6() -> bool:
+    return importlib.util.find_spec("PySide6") is not None
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    if "ui" in item.keywords and not _has_pyside6():
+        pytest.skip("PySide6 not installed; skipping UI test")

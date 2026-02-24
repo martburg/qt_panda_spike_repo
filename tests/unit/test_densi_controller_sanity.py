@@ -4,6 +4,8 @@ import pytest
 
 pytest.importorskip("PySide6")
 
+pytestmark = pytest.mark.ui
+
 from steuerung3d.apps.yellow.controllers.densi_controller import DenSiController
 
 

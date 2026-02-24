@@ -5,6 +5,7 @@ from typing import Dict, List
 
 from steuerung3d.apps.yellow.domain.banner_facts import derive_banner_estate_from_word
 from steuerung3d.core.core_mode import core_mode_value
+from steuerung3d.core.joy_facts import extract_joy_facts
 from steuerung3d.core.executor import build_command_frame
 from steuerung3d.protocol.estop_bits import decode_estop_word
 
@@ -179,10 +180,12 @@ def emit_birds_eye_status(
         blocked_summary = ",".join(blocked_by)
 
         joy = getattr(state, "joy", None)
-        joy_dm = bool(getattr(joy, "deadman", False))
-        joy_sel = bool(getattr(joy, "select_hip", False))
+        jf = extract_joy_facts(joy)
+        joy_dm = bool(jf.deadman)
+        joy_sel = bool(jf.select_hip)
+        motion_allowed_i = int(bool(getattr(state, "core_motion_allowed", False)))
         summary = (
-            f"core_mode={mode_v} blocked_by=[{blocked_summary}] "
+            f"core_mode={mode_v} motion_allowed={motion_allowed_i} blocked_by=[{blocked_summary}] "
             f"in=[{intents_types_str}] n={int(last_intents_meta.get('count', 0))} "
             f"reset_denied={int(reset_denied_total)}"
         )
@@ -204,6 +207,7 @@ def emit_birds_eye_status(
                 "blocked_by": list(blocked_payload),
                 "joy_dm": bool(joy_dm),
                 "joy_sel": bool(joy_sel),
+                "motion_allowed": bool(getattr(state, "core_motion_allowed", False)),
                 "tick": int(getattr(snap, "tick", 0) or 0),
                 "mode": str(mode_v),
                 "estop": estop_v,

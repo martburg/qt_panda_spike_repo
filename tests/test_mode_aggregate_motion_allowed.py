@@ -34,12 +34,12 @@ def test_motion_allowed_with_live_and_no_select() -> None:
             axes=[_axis("A", estop_bits=_bits())],
             stale_after_ms=100,
             joy_deadman=True,
-            joy_select=False,
+            joy_select_hip=False,
             joy_soll_speed=0.5,
         )
     )
     assert res.core_mode == CoreMode.LIVE
-    assert any(r.code == "NO_SELECT" for r in res.blocked_by)
+    assert any(r.code == "NO_SELECT_FOR_MOTION" for r in res.blocked_by)
     assert res.motion_allowed is False
 
 def test_motion_allowed_false_when_estop() -> None:
@@ -48,7 +48,7 @@ def test_motion_allowed_false_when_estop() -> None:
             axes=[_axis("A", estop_bits=_bits(network=True))],
             stale_after_ms=100,
             joy_deadman=True,
-            joy_select=True,
+            joy_select_hip=True,
             joy_soll_speed=0.5,
         )
     )
@@ -61,7 +61,7 @@ def test_motion_allowed_false_when_not_ready() -> None:
             axes=[_axis("A", estop_bits=_bits(), axis_ready=False)],
             stale_after_ms=100,
             joy_deadman=True,
-            joy_select=True,
+            joy_select_hip=True,
             joy_soll_speed=0.5,
         )
     )
@@ -74,7 +74,7 @@ def test_motion_allowed_false_when_deadman_released() -> None:
             axes=[_axis("A", estop_bits=_bits())],
             stale_after_ms=100,
             joy_deadman=False,
-            joy_select=True,
+            joy_select_hip=True,
             joy_soll_speed=0.5,
         )
     )
