@@ -20,8 +20,8 @@ class FakeUdpLink:
 
 class FakeCodec:
     def __init__(self, *, spec, axis_id: str):
-         self.spec = spec
-    self.axis_id = axis_id
+        self.spec = spec
+        self.axis_id = axis_id
 
 
 def test_build_plc_device_constructs_endpoints_without_opening_sockets(tmp_path: Path) -> None:
