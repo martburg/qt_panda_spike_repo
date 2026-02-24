@@ -165,6 +165,20 @@ Notes:
 
 ---
 
+## Single boundary policy (production)
+
+TwinCAT legacy integration uses `TwinCATLegacyWinchEdge` as the single boundary implementation
+for production runs. The `device.py` adapter is legacy harness only and should not be wired
+into production stacks.
+
+Manual verification checklist:
+
+- Start stack profile `dev_real` or your PLC profile.
+- Move joystick and verify the winch responds.
+- Confirm logs show the edge adapter starting and telemetry flowing.
+
+---
+
 ## Testing contract (regression guards)
 Tests must enforce:
 

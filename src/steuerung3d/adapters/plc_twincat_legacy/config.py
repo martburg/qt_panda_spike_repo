@@ -6,8 +6,10 @@ from typing import Any, Dict, List, Mapping, Optional
 
 import tomllib
 
-from steuerung3d.adapters.plc_twincat_legacy.device import TwinCATLegacyWinchUdpDevice
-from steuerung3d.adapters.plc_twincat_legacy.fleet import TwinCATLegacyWinchFleetDevice
+from steuerung3d.adapters.plc_twincat_legacy.edge_fleet import (
+    TwinCATLegacyWinchEdgeDevice,
+    TwinCATLegacyWinchFleetEdge,
+)
 
 
 def _get(d: Mapping[str, Any], key: str, default: Any = None) -> Any:
@@ -29,7 +31,7 @@ class PlcTwincatLegacyFleetConfig:
     intent: bool = True
 
 
-def load_plc_twincat_legacy_fleet_from_toml(path: str | Path) -> TwinCATLegacyWinchFleetDevice:
+def load_plc_twincat_legacy_fleet_from_toml(path: str | Path) -> TwinCATLegacyWinchFleetEdge:
     cfg = tomllib.loads(Path(path).read_text(encoding="utf-8"))
 
     device = _require(cfg, "device")
@@ -52,7 +54,7 @@ def load_plc_twincat_legacy_fleet_from_toml(path: str | Path) -> TwinCATLegacyWi
     if not isinstance(axes, list) or not axes:
         raise ValueError("device.plc_twincat_legacy_fleet.axes must be a non-empty list")
 
-    devices: List[TwinCATLegacyWinchUdpDevice] = []
+    devices: List[TwinCATLegacyWinchEdgeDevice] = []
     for a in axes:
         axis_id = str(_require(a, "axis_id"))
         remote_ip = str(_require(a, "remote_ip"))
@@ -66,14 +68,14 @@ def load_plc_twincat_legacy_fleet_from_toml(path: str | Path) -> TwinCATLegacyWi
         intent = bool(_get(a, "intent", defaults.intent))
 
         devices.append(
-            TwinCATLegacyWinchUdpDevice(
+            TwinCATLegacyWinchEdgeDevice(
                 axis_id=axis_id,
-                remote=(remote_ip, remote_port),
-                local=(controller_ip, local_port),
+                plc_remote=(remote_ip, remote_port),
+                local_bind=(controller_ip, local_port),
                 timeout_s=timeout_s,
                 modus=modus,
                 intent=intent,
             )
         )
 
-    return TwinCATLegacyWinchFleetDevice(devices=devices)
+    return TwinCATLegacyWinchFleetEdge(devices=devices)

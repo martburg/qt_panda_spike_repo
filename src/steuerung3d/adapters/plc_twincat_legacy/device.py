@@ -1,4 +1,5 @@
 # src/steuerung3d/adapters/plc_legacy_winch/device.py
+# LEGACY HARNESS ONLY: not used by production stack wiring.
 from __future__ import annotations
 
 import os
