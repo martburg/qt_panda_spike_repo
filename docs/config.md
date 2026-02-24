@@ -109,11 +109,7 @@ If/when those runners return, reintroduce the config docs alongside the actual f
 
 ---
 
-## Note about `src/steuerung3d/docs/`
+## Docs location
 
-This repo keeps a *package-coupled* copy of selected docs under:
-
-- `src/steuerung3d/docs/…`
-
-Those files are meant for distribution alongside the Python package.
-When updating docs in `docs/`, mirror the same changes into `src/steuerung3d/docs/` (or regenerate the copies).
+Project documentation lives in `docs/` at the repository root.
+The previous `src/steuerung3d/docs/` package mirror has been removed to avoid drift.

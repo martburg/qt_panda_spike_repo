@@ -6,7 +6,7 @@ Archived/previous documentation snapshots (kept for reference while docs are reo
 
 ## Subdirectories
 
-- `steuerung3d_docs/` — Older docs set that mirrors `src/steuerung3d/docs/` (useful for diffing changes).
+- `steuerung3d_docs/` — Older docs set that used to mirror `src/steuerung3d/docs/` (this mirror has been removed) (useful for diffing changes).
 
 ## Files
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Older docs set that mirrors `src/steuerung3d/docs/` (useful for diffing changes).
+Older docs set that used to mirror `src/steuerung3d/docs/` (this mirror has been removed) (useful for diffing changes).
 
 ## Subdirectories
 

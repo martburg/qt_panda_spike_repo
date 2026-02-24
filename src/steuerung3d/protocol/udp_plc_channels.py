@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 r"""UDP channels for legacy TwinCAT semicolon-delimited PLC frames.
 
 These are intentionally *not* JSON. They carry plain ASCII lines like:
@@ -14,6 +12,8 @@ and expose methods that match the rest of the stack (``publish_command_frame`` /
 We keep everything best-effort and defensive: these channels are used for debugging and bring-up, so
 we prefer “don’t crash” over “strict schema enforcement”.
 """
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 import os

@@ -26,7 +26,6 @@ Each now contains a short header explaining why it is obsolete and where to look
 ### 3) Generated doc indexes refreshed
 
 - `docs/README.generated.md`
-- `src/steuerung3d/docs/README.generated.md`
 
 These now list current files and note that obsolete docs are prefixed with `obs_`.
 
@@ -37,6 +36,6 @@ These now list current files and note that obsolete docs are prefixed with `obs_
 ## Conventions going forward
 
 - **Authoritative docs** live under `docs/`.
-- `src/steuerung3d/docs/` is a *package-coupled mirror*; keep it in sync when docs change.
+- `docs/` is the single canonical docs tree. (The old `src/steuerung3d/docs/` mirror has been removed.)
 - When a doc becomes misleading after refactors, rename it with `obs_` rather than silently deleting it.
 
