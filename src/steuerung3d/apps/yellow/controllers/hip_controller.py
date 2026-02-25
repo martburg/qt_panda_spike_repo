@@ -50,6 +50,8 @@ class HiPController:
     # If we stop receiving telemetry for this long, we go back to UNKNOWN
     stale_after_ms: int = 500
 
+    _dbg_next_s = 0.0
+
     def __post_init__(self) -> None:
         self.ui = YellowBindings.from_window(self.win)
 
@@ -266,6 +268,39 @@ class HiPController:
 
                 rt_inputs = self._hip_runtime.collect_inputs(snaps=snaps, now_ns=now_ns, ui=ui_inputs)
                 rt_result = self._hip_runtime.tick(inputs=rt_inputs)
+
+                log.info(
+                    "hi_p: ui axis=%r changed=%s attached=%s intents=%d",
+                    ui_inputs.axis_selected,
+                    ui_inputs.axis_selection_changed,
+                    getattr(rt_result.view_model.attach_state, "attached", None) if rt_result.view_model else None,
+                    len(rt_result.intents) if hasattr(rt_result, "intents") else -1,
+                )
+
+                vm = rt_result.view_model
+                if vm is not None and not getattr(self, "_dbg_vm_keys_once", False):
+                    self._dbg_vm_keys_once = True
+                    log.info("hi_p: dbg vm_type=%s keys=%s", type(vm).__name__, sorted(vars(vm).keys()))
+
+                now_s = time.time()
+                if now_s >= getattr(self, "_dbg_next_s", 0.0):
+                    self._dbg_next_s = now_s + 1.0
+
+                    vm = rt_result.view_model
+                    ast = getattr(vm, "attach_state", None)
+
+                    log.info(
+                        "hi_p: dbg axis=%r attached=%s modal_locked=%s tabs_enabled=%s "
+                        "lifetick_age=%r drive_main=%r pos=%r vel=%r",
+                        ui_inputs.axis_selected,
+                        getattr(ast, "attached", None),
+                        getattr(ui_inputs, "modal_locked", None),
+                        getattr(ast, "tabs_enabled", None),
+                        getattr(vm, "lifetick_age", None),
+                        getattr(vm, "main_drive_status_text", None),
+                        getattr(vm, "pos_text", None),
+                        getattr(vm, "vel_text", None),
+                    )
 
                 if rt_result.apply_startup_state:
                     if getattr(self, "_binder", None) is not None:

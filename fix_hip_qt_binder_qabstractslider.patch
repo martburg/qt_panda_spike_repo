@@ -1,0 +1,17 @@
+diff --git a/src/steuerung3d/apps/yellow/binders/hip_qt_binder_init_impl.py b/src/steuerung3d/apps/yellow/binders/hip_qt_binder_init_impl.py
+index 3c8c3a1..b7b2d5e 100644
+--- a/src/steuerung3d/apps/yellow/binders/hip_qt_binder_init_impl.py
++++ b/src/steuerung3d/apps/yellow/binders/hip_qt_binder_init_impl.py
+@@ -4,11 +4,12 @@ from __future__ import annotations
+
+ from typing import TYPE_CHECKING
+
+ from PySide6.QtWidgets import (
++    QAbstractSlider,
+     QCheckBox,
+     QComboBox,
+     QLineEdit,
+     QPushButton,
+     QTabWidget,
+     QWidget,
+ )

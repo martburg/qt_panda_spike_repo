@@ -1,0 +1,68 @@
+--- /mnt/data/tmp_orig/hip_qt_binder.py	2026-02-25 08:27:24.705534734 +0000
++++ src/steuerung3d/apps/yellow/binders/hip_qt_binder.py	2026-02-25 08:26:18.416041328 +0000
+@@ -204,17 +204,17 @@
+         _init_impl.init_param_inputs(self)
+ 
+     def _find_button(self, object_name: str) -> QPushButton | None:
+-        _init_impl.find_button(self, object_name)
++        return _init_impl.find_button(self, object_name)
+ 
+     def _find_line_edit(self, object_name: str) -> QLineEdit | None:
+-        _init_impl.find_line_edit(self, object_name)
++        return _init_impl.find_line_edit(self, object_name)
+ 
+     def _build_bindings(self) -> None:
+         _init_impl.build_bindings(self)
+ 
+     @staticmethod
+     def _require_widget(widget: QWidget | None, object_name: str) -> QWidget:
+-        _init_impl.require_widget(widget, object_name)
++        return _init_impl.require_widget(widget, object_name)
+ 
+     def _set_dot(self, object_name: str, state) -> None:
+         _init_impl.set_dot(self, object_name, state)
+
+--- /mnt/data/tmp_orig/hip_qt_binder_init_impl.py	2026-02-25 08:27:24.719248726 +0000
++++ src/steuerung3d/apps/yellow/binders/hip_qt_binder_init_impl.py	2026-02-25 08:26:29.341632721 +0000
+@@ -3,6 +3,7 @@
+ from typing import TYPE_CHECKING
+ 
+ from PySide6.QtWidgets import (
++    QAbstractSlider,
+     QCheckBox,
+     QComboBox,
+     QLineEdit,
+@@ -191,6 +192,33 @@
+         ],
+         context="hi_p:bindings_required",
+     )
++
++    # If binding discovery silently failed, the UI will "work" but appear empty/uninitialized.
++    # Emit a one-shot error with a concrete list of missing required widgets.
++    missing_required: list[str] = []
++    required_vars = {
++        "cmbAxis": self._cmbAxis,
++        "txtTick": self._txtTick,
++        "txtPos": self._txtPos,
++        "txtVel": self._txtVel,
++        "txtAmp": self._txtAmp,
++        "txtTemp": self._txtTemp,
++        "txtGuiderRangeMin": self._txt_guider_range_min,
++        "txtGuiderRangeMax": self._txt_guider_range_max,
++        "txtGuiderRangeValue": self._txt_guider_range_val,
++        "txtGuiderSpeed": self._txt_guider_speed,
++        "sldVelCmd": self._sld_vel_cmd,
++        "sldLimitRange": self._sld_limit_range,
++        "sldGuiderRange": self._sld_guider_range,
++        "sldGuiderSpeed": self._sld_guider_speed,
++        "btnEStopReset": self._btn_estop_reset,
++        "btnDiagResync": self._btn_diag_resync,
++    }
++    for name, obj in required_vars.items():
++        if obj is None:
++            missing_required.append(name)
++    if missing_required:
++        self.log.error("hi_p: binder missing required widgets: %s", ", ".join(sorted(missing_required)))
+     log_missing_optional_once(
+         self.log,
+         self._wcache,
