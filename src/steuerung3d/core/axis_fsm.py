@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from transitions import Machine
 
 from .axis_types import AxisTelemetry, AxisRequest, AxisCommand
+from .control_in import compute_control_in
 
 
 # States: keep them controller-side and semantic
@@ -144,13 +145,22 @@ class AxisFSM:
         return self._cmd_safe(req, intent=False, resync=False)
 
     # ---------- command builders ----------
-    def _base(self, req: AxisRequest, *, modus: str, intent: bool, resync: bool) -> AxisCommand:
+    def _base(
+        self,
+        req: AxisRequest,
+        *,
+        modus: str,
+        intent: bool,
+        resync: bool,
+        enable: bool = False,
+        motion: bool = False,
+    ) -> AxisCommand:
         return AxisCommand(
             modus=modus,
             own_pid_tx=self.cfg.controller_pid,
             control_pid_tx=self.cfg.default_control_pid_tx,
             intent_str="True" if intent else "False",
-            control_in=0,                    # TODO: map bits for enable/motion if needed
+            control_in=compute_control_in(enable=bool(enable), motion=bool(motion)),
             guide_control_ui=0,
             speed_soll=req.cmd_speed,
             guide_speed_soll=0.0,
@@ -174,7 +184,7 @@ class AxisFSM:
             cmd_pos=0.0,
             write_params=False,
         )
-        return self._base(safe_req, modus=self.cfg.safe_modus, intent=intent, resync=resync)
+        return self._base(safe_req, modus=self.cfg.safe_modus, intent=intent, resync=resync, enable=False, motion=False)
 
     def _cmd_estop(self, req: AxisRequest) -> AxisCommand:
         # During estop, don't try to own/enable; only pass reset/resync signals.
@@ -189,16 +199,19 @@ class AxisFSM:
 
     def _cmd_enable(self, req: AxisRequest, intent: bool) -> AxisCommand:
         # Enabling = same setpoints, but you may set enable bit in control_in once mapped
-        cmd = self._base(req, modus=self.cfg.idle_modus, intent=intent, resync=False)
-        # TODO: set enable bit in cmd.control_in when known
-        return cmd
+        return self._base(req, modus=self.cfg.idle_modus, intent=intent, resync=False, enable=True, motion=False)
 
     def _cmd_active(self, req: AxisRequest, intent: bool) -> AxisCommand:
         # Active = allow motion setpoints through (already ramped/clamped elsewhere)
-        cmd = self._base(req, modus=self.cfg.idle_modus, intent=intent, resync=False)
-        # TODO: set motion/enable bits in cmd.control_in when known
-        return cmd
+        return self._base(
+            req,
+            modus=self.cfg.idle_modus,
+            intent=intent,
+            resync=False,
+            enable=True,
+            motion=bool(req.want_motion),
+        )
 
     def _cmd_recover(self, req: AxisRequest) -> AxisCommand:
         # Recover = claim + resync asserted (legacy uses ReSync==1 to clear EStoped)
-        return self._base(req, modus=self.cfg.idle_modus, intent=True, resync=True)
+        return self._base(req, modus=self.cfg.idle_modus, intent=True, resync=True, enable=False, motion=False)

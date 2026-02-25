@@ -1,4 +1,9 @@
-# src/steuerung3d/protocol/codec.pyfrom __future__ import annotations
+"""Protocol codec.
+
+Encodes/decodes JSON-ish frames between components.
+"""
+
+from __future__ import annotations
 
 from dataclasses import asdict
 from typing import Any, Dict, Union
@@ -65,6 +70,21 @@ _INTENT_TYPE_MAP = {
     "echo_lifetick": EchoLifeTick,
     "joy_state_update": JoyStateUpdate,
 }
+
+
+def register_intent_type(type_name: str, cls: type[Intent]) -> None:
+    """Register an intent type for decoding.
+
+    This keeps the existing explicit map (stable + audit-friendly) while
+    providing a single extension point for new intents.
+    """
+
+    t = str(type_name or "").strip()
+    if not t:
+        raise ValueError("type_name must be non-empty")
+    if t in _INTENT_TYPE_MAP and _INTENT_TYPE_MAP[t] is not cls:
+        raise ValueError(f"intent type already registered: {t}")
+    _INTENT_TYPE_MAP[t] = cls
 
 
 def encode_intent(intent: Intent) -> Dict[str, Any]:
