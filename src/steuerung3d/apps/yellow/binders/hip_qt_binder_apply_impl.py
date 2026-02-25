@@ -10,6 +10,7 @@ from ..qtutil.ui_update import (
     set_enabled_repolish,
     set_state_by_object_name,
     set_state_property,
+    update_slider
 )
 from ..qtutil.binder_helpers import block_signals, safe_set_text
 from ..qtutil.ui_format import fmt_f_unit_de
@@ -30,19 +31,31 @@ if TYPE_CHECKING:
     from ..engines.hip.engine import HipViewModel
 
 def apply(b, vm: HipViewModel) -> None:
+    # Always-visible UI
     b.apply_tick_text(vm.tick_text)
     b._set_joy_properties(vm.joy_deadman, vm.joy_select_hip)
     b._apply_attach_state(vm)
-    if vm.attach_state is not None and not bool(vm.attach_state.attached):
-        b._apply_joy_speed(float(vm.joy_soll_speed))
-        return
-    b._apply_drive_status(vm)
+
+    # Always keep axis picker in sync (if you moved it into _apply_attach_combo)
+    b._apply_attach_combo(vm)
+
     b._apply_banner(vm)
     b._apply_header_dots(vm)
     b._apply_estop_state(vm)
+
+    # Joy speed is display-only; safe to apply always
+    b._apply_joy_speed(float(vm.joy_soll_speed))
+
+    # Axis-dependent sections: only show/update when attached
+    attached = bool(getattr(vm.attach_state, "attached", False)) if vm.attach_state is not None else False
+    if not attached:
+        # Optionally clear/hide axis-specific fields here (drive/readouts/params),
+        # but do NOT return early before rendering global widgets.
+        return
+
+    b._apply_drive_status(vm)
     b._apply_readouts(vm)
     b._apply_sliders(vm)
-    b._apply_joy_speed(float(vm.joy_soll_speed))
     b._apply_cut_markers(vm)
     b._apply_params(vm)
 
@@ -122,43 +135,46 @@ def _apply_joy_speed(b, soll_speed: float) -> None:
 # Apply helpers
 # ------------------------------------------------------------------
 
+def _apply_attach_combo(b, vm: HipViewModel) -> None:
+    if vm.attach_combo is None or b._cmbAxis is None:
+        return
 
-    if vm.attach_combo is not None and b._cmbAxis is not None:
-        base_items = [str(x) for x in (vm.attach_combo.items or [])]
-        items = [NOT_ATTACHED] + base_items
+    base_items = [str(x) for x in (vm.attach_combo.items or [])]
+    items = [NOT_ATTACHED] + base_items
 
-        # VM's preferred selection
-        vm_cur = (vm.attach_combo.current or "").strip() or NOT_ATTACHED
-        if vm_cur not in items:
-            vm_cur = NOT_ATTACHED
+    # VM's preferred selection
+    vm_cur = (vm.attach_combo.current or "").strip() or NOT_ATTACHED
+    if vm_cur not in items:
+        vm_cur = NOT_ATTACHED
 
-        # UI's current selection (what the user sees right now)
-        ui_cur = b._cmbAxis.currentText().strip() or NOT_ATTACHED
-        if ui_cur not in items:
-            ui_cur = NOT_ATTACHED
+    # UI's current selection (what the user sees right now)
+    ui_cur = b._cmbAxis.currentText().strip() or NOT_ATTACHED
+    if ui_cur not in items:
+        ui_cur = NOT_ATTACHED
 
-        # Critical rule:
-        # - While NOT attached, prefer the UI selection (so we don't fight the user).
-        # - Once attached, follow VM (the controller is the source of truth).
-        desired = vm_cur
-        if vm.attach_state is not None and (not bool(getattr(vm.attach_state, "attached", False))):
-            desired = ui_cur
+    # Critical rule:
+    # - While NOT attached, prefer the UI selection (so we don't fight the user).
+    # - Once attached, follow VM (the controller is the source of truth).
+    desired = vm_cur
+    if vm.attach_state is not None and (not bool(getattr(vm.attach_state, "attached", False))):
+        desired = ui_cur
 
-        existing = [b._cmbAxis.itemText(i) for i in range(b._cmbAxis.count())]
-        need_rebuild = (existing != items) or (b._cmbAxis.currentText().strip() != desired)
+    existing = [b._cmbAxis.itemText(i) for i in range(b._cmbAxis.count())]
+    need_rebuild = (existing != items) or (b._cmbAxis.currentText().strip() != desired)
 
-        if need_rebuild:
-            b._suppress_axis_signal = True
-            try:
-                with block_signals(b._cmbAxis):
-                    b._cmbAxis.clear()
-                    b._cmbAxis.addItems(items)
-                    b._cmbAxis.setCurrentText(desired)
-            finally:
-                b._suppress_axis_signal = False
+    if need_rebuild:
+        b._suppress_axis_signal = True
+        try:
+            with block_signals(b._cmbAxis):
+                b._cmbAxis.clear()
+                b._cmbAxis.addItems(items)
+                b._cmbAxis.setCurrentText(desired)
+        finally:
+            b._suppress_axis_signal = False
 
-        set_enabled(b._cmbAxis, bool(vm.attach_combo.enabled))
+    set_enabled(b._cmbAxis, bool(vm.attach_combo.enabled))
 
+def _apply_attach_state(b, vm: HipViewModel) -> None:
     if vm.attach_state is None:
         return
 

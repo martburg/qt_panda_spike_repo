@@ -20,6 +20,7 @@ import uuid
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QWidget
 
+from more_itertools import last
 from steuerung3d.util.ratelimit import rl_log_exc
 
 # Optional structured status heartbeat (used by stack supervisor birds-eye)
@@ -317,7 +318,12 @@ class HiPController:
                     try:
                         self._binder.apply(rt_result.view_model)
                     except Exception:
-                        pass
+                        now_s = time.time()
+                        last = getattr(self, "_binder_apply_err_last_s", 0.0)
+                        if now_s - last > 1.0:  # rate-limit so logs don't explode
+                            self._binder_apply_err_last_s = now_s
+                            log.exception("hi_p: binder.apply crashed (continuing).")
+
                 self._wd.mark("render")
 
                 if rt_result.snap is not None:

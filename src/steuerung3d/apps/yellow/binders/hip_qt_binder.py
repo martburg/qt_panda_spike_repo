@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QAbstractSlider,
     QCheckBox,
     QComboBox,
+    QFrame,
     QLineEdit,
     QPushButton,
     QTabWidget,
@@ -79,6 +80,8 @@ class HipQtBinder:
     _sliders_bindings: HipSlidersBindings | None = None
     _modal_lock: ModalLock | None = None
     _param_ui_bindings: ParamUiBindings | None = None
+    _frame_footer: QFrame | None = None
+    _frame_header: QFrame | None = None
 
     def __post_init__(self) -> None:
         _init_impl.post_init(self)

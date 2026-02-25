@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QAbstractSlider,
     QCheckBox,
     QComboBox,
+    QFrame,
     QLineEdit,
     QPushButton,
     QTabWidget,
@@ -55,6 +56,9 @@ def post_init(self: "HipQtBinder") -> None:
     # --- Core widgets
     self._tabs_main: QTabWidget | None = self._wcache.get(QTabWidget, "tabsMain")
     self._cmbAxis: QComboBox | None = self._wcache.combo_box("cmbAxis")
+    # Footer frame (exists in yellow3_merged.ui as name="frameFooter")
+    self._frame_footer: QFrame | None = self._wcache.get(QFrame, "frameFooter")
+    self._frame_header: QFrame | None = self._wcache.get(QFrame, "frameHeader")
 
     # Header + tick
     self._txtTick: QLineEdit | None = self._wcache.line_edit("txtTick")
