@@ -161,6 +161,9 @@ class HipQtBinder:
     def apply_online_state(self, state: str | None) -> None:
         _apply_impl.apply_online_state(self, state)
 
+    def _apply_attach_combo(self, vm) -> None:
+        _apply_impl._apply_attach_combo(self, vm)
+
     def _set_joy_properties(self, deadman: bool, select_hip: bool) -> None:
         _apply_impl._set_joy_properties(self, deadman, select_hip)
 
