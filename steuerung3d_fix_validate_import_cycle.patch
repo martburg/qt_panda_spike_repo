@@ -1,0 +1,45 @@
+diff --git a/src/steuerung3d/adapters/plc/validate.py b/src/steuerung3d/adapters/plc/validate.py
+index 1111111..2222222 100644
+--- a/src/steuerung3d/adapters/plc/validate.py
++++ b/src/steuerung3d/adapters/plc/validate.py
+@@ -1,15 +1,26 @@
+-from __future__ import annotations
+-
+-from dataclasses import dataclass
+-
+-from .plc_endpoint import PlcEndpoint
++from __future__ import annotations
++
++from dataclasses import dataclass
++from typing import TYPE_CHECKING, Any
++
++# NOTE: Do NOT import PlcEndpoint at runtime here.
++# validate.py is imported by plc_codec.py, and plc_endpoint.py imports plc_codec.py.
++# Importing PlcEndpoint here would create a circular import during module init.
++if TYPE_CHECKING:  # pragma: no cover
++    from .plc_endpoint import PlcEndpoint
+
+
+ @dataclass(frozen=True)
+ class ValidationError(Exception):
+     message: str
+
+     def __str__(self) -> str:  # pragma: no cover
+         return self.message
+
+
+-def require_single_axis_id(endpoint: PlcEndpoint, *, where: str) -> str:
++def require_single_axis_id(endpoint: Any, *, where: str) -> str:
+     \"\"\"Enforce the current single-axis endpoint contract.
+
+     We still model endpoints as \"one axis per UDP endpoint\" in the refactor scope.
+     \"\"\"
+-    axis_id = endpoint.name
++    axis_id = getattr(endpoint, "name", None)
++    if not isinstance(axis_id, str) or not axis_id:
++        raise ValidationError(f\"{where}: endpoint must expose a non-empty .name (axis_id)\")
+     if \",\" in axis_id or \";\" in axis_id or \" \" in axis_id:
+         raise ValidationError(
+             f\"{where}: endpoint.name must be a single axis id, got {axis_id!r}\"
+         )
+     return axis_id

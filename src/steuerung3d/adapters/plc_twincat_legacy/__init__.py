@@ -13,3 +13,11 @@ Prefer:
 
 OBSOLETE = True
 OBSOLETE_REASON = "Legacy TwinCAT adapter; prefer schema-driven PLC adapter (steuerung3d.adapters.plc)."
+
+import warnings
+
+warnings.warn(
+    f"{__name__} is obsolete: {OBSOLETE_REASON}",
+    category=UserWarning,
+    stacklevel=2,
+)

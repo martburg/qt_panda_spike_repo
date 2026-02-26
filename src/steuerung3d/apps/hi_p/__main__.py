@@ -8,7 +8,7 @@ import sys
 import logging
 from pathlib import Path
 
-from steuerung3d.util.log_context import install_log_context
+from steuerung3d.util.app_bootstrap import bootstrap_logging
 from steuerung3d.config.toml_loader import load_toml
 
 from PySide6.QtWidgets import QApplication
@@ -49,12 +49,8 @@ def main() -> int:
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
     args = ap.parse_args()
 
-    logging.basicConfig(
-        level=getattr(logging, args.log_level.upper()),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
-    install_log_context(role="hi_p", axis=(args.axis or ""))
-    log.info("log level = %s", args.log_level.upper())
+    bootstrap_logging(role="hi_p", axis=(args.axis or ""), log_level=args.log_level)
+    log.info("log level = %s", str(args.log_level).upper())
     cfg = _load_config(args.config or None)
     engine_cfg = cfg.get("engine", {}) or {}
     shadow_mode = str(engine_cfg.get("shadow_mode", "old") or "old").strip().lower()

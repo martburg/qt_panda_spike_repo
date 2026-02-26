@@ -26,6 +26,7 @@ from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.plc_codec import decode_uplink_to_snapshot, encode_downlink
 
 from .plc_config import PlcWireSpec
+from .validate import require_single_axis_id
 
 
 @dataclass
@@ -40,13 +41,7 @@ class PlcCodec:
     spec: PlcWireSpec
 
     def _axis_name(self) -> str:
-        axis_ids = list(getattr(self.spec, "axis_ids", []) or [])
-        if len(axis_ids) != 1:
-            raise ValueError(
-                "Canonical PLC codec supports exactly one axis_id per endpoint; "
-                f"got axis_ids={axis_ids}"
-            )
-        return str(axis_ids[0])
+        return require_single_axis_id(self.spec.axis_ids, context=f"Endpoint '{self.spec}'", exc_type=PlcValidationError)
 
     # -----------------------
     # TX: core -> PLC

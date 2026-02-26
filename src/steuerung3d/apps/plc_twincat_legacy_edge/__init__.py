@@ -6,3 +6,11 @@ schema-driven PLC adapter under ``steuerung3d.adapters.plc``.
 
 OBSOLETE = True
 OBSOLETE_REASON = "Legacy TwinCAT UDP edge adapter; prefer schema-driven PLC adapter + StackSpec profiles."
+
+import warnings
+
+warnings.warn(
+    f"{__name__} is obsolete: {OBSOLETE_REASON}",
+    category=UserWarning,
+    stacklevel=2,
+)

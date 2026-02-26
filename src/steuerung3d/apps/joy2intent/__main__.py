@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from dataclasses import replace
 
-from steuerung3d.util.log_context import install_log_context
+from steuerung3d.util.app_bootstrap import bootstrap_logging
 from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
 
 from steuerung3d.core.status import StatusEmitter
@@ -37,11 +37,7 @@ def main() -> int:
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
     args = ap.parse_args()
 
-    logging.basicConfig(
-        level=getattr(logging, args.log_level.upper()),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
-    install_log_context(role="joy2intent")
+    bootstrap_logging(role="joy2intent", log_level=args.log_level)
 
     status = StatusEmitter.from_env(default_service="joy2intent")
 

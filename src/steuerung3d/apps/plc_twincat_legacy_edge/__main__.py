@@ -7,7 +7,7 @@ from typing import Tuple
 
 from steuerung3d.core.net import parse_hostport
 
-from steuerung3d.util.log_context import install_log_context
+from steuerung3d.util.app_bootstrap import bootstrap_logging
 
 from steuerung3d.protocol.udp_channels import UdpCommandIn, UdpTelemetryOut
 from steuerung3d.protocol.udp_transport_v2 import UdpTransportV2
@@ -39,11 +39,7 @@ def main() -> int:
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
     args = ap.parse_args()
 
-    logging.basicConfig(
-        level=getattr(logging, args.log_level.upper()),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
-    install_log_context(role="plc_edge", axis=str(args.axis))
+    bootstrap_logging(role="plc_edge", axis=str(args.axis), log_level=args.log_level)
 
     axis_id = str(args.axis).strip()
     cmd_in = parse_hostport(args.cmd_in)

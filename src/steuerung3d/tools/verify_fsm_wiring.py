@@ -39,12 +39,12 @@ def main() -> None:
     # Core mode matters because enforce_core_mode_actions() runs every tick
     st.core_mode = CoreMode.LIVE
 
-    # Create axis once, then configure it
+    # Create axis once (also ensures axis_cmd), then configure it
     ax = st.ensure_axis(axis_id)
     ax.kind = "legacy_twincat"                  # <-- critical
     ax.meta["own_pid_tx"] = pid
 
-    st.ensure_axis_cmd(axis_id)                 # creates axis_cmd["X"]
+
 
     # Make sure the FSM config will use the same pid (optional but cleaner)
     st.controller_pid = pid                     # <-- recommended (if MachineState allows it)

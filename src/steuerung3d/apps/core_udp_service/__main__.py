@@ -4,7 +4,7 @@ import logging
 
 import argparse
 
-from steuerung3d.util.log_context import install_log_context
+from steuerung3d.util.app_bootstrap import bootstrap_logging
 from steuerung3d.core.status import StatusEmitter
 
 from .runtime_loop import run_core_udp_service
@@ -131,12 +131,8 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    logging.basicConfig(
-        level=getattr(logging, args.log_level.upper()),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
-    install_log_context(role="core")
-    log.info("log level = %s", args.log_level.upper())
+    bootstrap_logging(role="core", log_level=args.log_level)
+    log.info("log level = %s", str(args.log_level).upper())
 
     # Optional structured heartbeat (supervisor birds-eye). Controlled by env:
     #   ST3D_STATUS_OUT, ST3D_STACK_NAME, ST3D_SERVICE_NAME, ST3D_INSTANCE

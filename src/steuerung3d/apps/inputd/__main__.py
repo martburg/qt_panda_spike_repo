@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import List, Optional
 
-from steuerung3d.util.log_context import install_log_context
+from steuerung3d.util.app_bootstrap import bootstrap_logging
 from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
 from steuerung3d.core.status import StatusEmitter
 
@@ -166,11 +166,7 @@ def main() -> int:
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
     args = ap.parse_args()
 
-    logging.basicConfig(
-        level=getattr(logging, args.log_level.upper()),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
-    install_log_context(role="inputd")
+    bootstrap_logging(role="inputd", log_level=args.log_level)
 
     if args.list:
         return _list_devices()

@@ -44,3 +44,6 @@ src/logs/
 # local patch files kept outside repo (root only)
  /*.patch
  /*.rej
+# Qt Designer autosave
+*.autosave
+*.ui.autosave

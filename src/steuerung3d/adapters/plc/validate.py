@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Set
+from typing import Dict, List, Type, TYPE_CHECKING, Any
 
-from .plc_endpoint import PlcEndpoint
+if TYPE_CHECKING:
+    from .plc_endpoint import PlcEndpoint
 
 
 @dataclass(frozen=True)
@@ -14,9 +15,35 @@ class PlcValidationError(Exception):
         return self.message
 
 
-def validate_endpoints(endpoints: List[PlcEndpoint]) -> None:
+def require_single_axis_id(
+    axis_ids: List[str] | None,
+    *,
+    context: str,
+    exc_type: Type[Exception] = ValueError,
+) -> str:
+    """Return the single required axis_id or raise.
+
+    Canonical PLC telegrams are per-axis endpoint, so we currently require
+    exactly one axis_id.
+
+    Args:
+        axis_ids: Axis id list (may be None/empty).
+        context: Human-readable context for error messages.
+        exc_type: Exception type to raise (ValueError by default).
+
     """
-    Validate mixed PLC axis assignment.
+    ids = [str(x) for x in (axis_ids or [])]
+    if len(ids) != 1:
+        msg = f"{context} must have exactly one axis_id; got axis_ids={ids}"
+        # PlcValidationError is a dataclass exception that expects message=...
+        if exc_type is PlcValidationError:
+            raise PlcValidationError(msg)
+        raise exc_type(msg)
+    return ids[0]
+
+
+def validate_endpoints(endpoints: List[PlcEndpoint]) -> None:
+    """Validate PLC endpoint configuration.
 
     Rules:
       - endpoint names must be unique
@@ -36,21 +63,18 @@ def validate_endpoints(endpoints: List[PlcEndpoint]) -> None:
 
     owned_by: Dict[str, str] = {}
     for e in endpoints:
-        if not e.axis_ids:
-            raise PlcValidationError(f"Endpoint '{e.name}' has empty axis_ids")
-        if len(e.axis_ids) != 1:
-            raise PlcValidationError(
-                f"Endpoint '{e.name}' must have exactly one axis_id for the canonical PLC codec; "
-                f"got axis_ids={e.axis_ids}"
-            )
+        axis_id = require_single_axis_id(
+            e.axis_ids,
+            context=f"Endpoint '{e.name}'",
+            exc_type=PlcValidationError,
+        )
 
         # axis ownership uniqueness
-        for ax in e.axis_ids:
-            if ax in owned_by:
-                raise PlcValidationError(
-                    f"Axis '{ax}' is owned by both '{owned_by[ax]}' and '{e.name}'"
-                )
-            owned_by[ax] = e.name
+        if axis_id in owned_by:
+            raise PlcValidationError(
+                f"Axis '{axis_id}' is owned by both '{owned_by[axis_id]}' and '{e.name}'"
+            )
+        owned_by[axis_id] = e.name
 
         # codec/spec should match endpoint assignment
         spec_axes = list(getattr(e.codec, "spec").axis_ids)  # PlcCodec.spec.axis_ids

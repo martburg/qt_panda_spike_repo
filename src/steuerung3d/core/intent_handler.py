@@ -455,7 +455,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             if claim and not hip_id:
                 # Backward-compat: if a claim exists and the intent lacks hip_id, ignore.
                 return
-            cmd = state.ensure_axis_cmd(axis_id)
+            cmd = state.axis_cmd[axis_id]  # ensured by ensure_axis() above
             cmd.enable = bool(enable)
             if not cmd.enable:
                 cmd.vel = 0.0
@@ -471,7 +471,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
                 return
             if claim and not hip_id:
                 return
-            cmd = state.ensure_axis_cmd(axis_id)
+            cmd = state.axis_cmd[axis_id]  # ensured by ensure_axis() above
             if cmd.enable:
                 cmd.vel = float(vel)
             return
@@ -488,7 +488,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
                 return
             if claim and not hip_id:
                 return
-            cmd = state.ensure_axis_cmd(axis_id)
+            cmd = state.axis_cmd[axis_id]  # ensured by ensure_axis() above
             if cmd.enable:
                 cmd.vel = float(rate)
             return

@@ -7,7 +7,7 @@ from typing import Tuple
 
 from steuerung3d.core.net import parse_hostport
 
-from steuerung3d.util.log_context import install_log_context
+from steuerung3d.util.app_bootstrap import bootstrap_logging
 
 from PySide6.QtWidgets import QApplication
 
@@ -48,17 +48,12 @@ def main() -> int:
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
     args = ap.parse_args()
 
-    logging.basicConfig(
-        level=getattr(logging, args.log_level.upper()),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
-
     axis_ids = [a.strip() for a in args.axis if a and a.strip()]
     if not axis_ids:
         axis_ids = ["X"]
 
-    install_log_context(role="den_si", axis=axis_ids[0])
-    log.info("log level = %s", args.log_level.upper())
+    bootstrap_logging(role="den_si", axis=(axis_ids[0] if axis_ids else ""), log_level=args.log_level)
+    log.info("log level = %s", str(args.log_level).upper())
 
     cmd_in_addr = parse_hostport(args.cmd_in)
     telem_out_addr = parse_hostport(args.telem_out)

@@ -70,7 +70,6 @@ def main() -> int:
     tb = Timebase(dt_s=0.01)
     st = MachineState()
     st.ensure_axis("X")
-    st.ensure_axis_cmd("X")
 
     device = SimDevice(SimAxisPlant())
 
