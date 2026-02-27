@@ -42,3 +42,33 @@ def axis_lease_allows(state: MachineState, axis_id: str, hip_id: str) -> bool:
     if isinstance(claim, str):
         return claim == hip_id
     return str(getattr(claim, "hip_id", "")) == hip_id
+
+
+def axis_lease_allows_any(state: MachineState, axis_id: str) -> bool:
+    """Return whether *axis_id* is controlled by *someone*.
+
+    This is used when building the outbound CommandFrame for devices/DenSi.
+
+    Rationale: Some profiles establish an axis claim (legacy ownership) but do
+    not yet populate lease holders (multi-HiP arbitration). If we require lease
+    holders strictly, the CommandFrame will disable all axes and DenSi will
+    never see control words / velocities.
+
+    Policy (device-facing):
+      - If lease holders exist for an axis -> allow.
+      - Else if an axis claim exists -> allow (legacy behaviour).
+    """
+
+    axis_id = str(axis_id or "")
+    if not axis_id:
+        return False
+
+    holders = axis_lease_holders(state, axis_id)
+    if holders:
+        return True
+
+    claims = getattr(state, "axis_claims", {}) or {}
+    if isinstance(claims, dict) and axis_id in claims and claims.get(axis_id) is not None:
+        return True
+
+    return False

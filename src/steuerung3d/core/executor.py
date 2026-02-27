@@ -1,44 +1,85 @@
 from __future__ import annotations
 
-from typing import Dict
 import logging
 import time
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+from typing import Dict, Optional
 
-log = logging.getLogger("core") 
+from steuerung3d.config.lifrtick_config import LifrtickTraceConfig, load_lifrtick_config
+from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, coerce_param_ops
+from steuerung3d.core.core_mode import CoreMode, core_mode_value
+from steuerung3d.core.intent_handlers.lease import axis_lease_allows_any
+from steuerung3d.core.rig_logic import densi_online
+from steuerung3d.core.state import MachineState
 
-# Lifetick tracing: avoid per-tick spam. Log at most every 0.5s per axis.
-_LT_LOG_EVERY_S = 0.5
+log = logging.getLogger("core")
+
+# Lifetick tracing: avoid per-tick spam in the *core* logger.
 _lt_last_cmd_log_by_axis: dict[str, float] = {}
 
-from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, coerce_param_ops
-from steuerung3d.core.state import MachineState
-from steuerung3d.core.core_mode import CoreMode, core_mode_value
-from steuerung3d.core.rig_logic import densi_online
+_lifrtick_cfg: Optional[LifrtickTraceConfig] = None
+_lifrtick_logger: Optional[logging.Logger] = None
 
 
-def _axis_lease_allows(state: MachineState, axis_id: str) -> bool:
-    """Return whether the command frame should carry non-zero setpoints for *axis_id*.
+def _get_lifrtick_cfg() -> LifrtickTraceConfig:
+    global _lifrtick_cfg
+    if _lifrtick_cfg is None:
+        # Config lives in-repo, but is intentionally optional.
+        _lifrtick_cfg = load_lifrtick_config(Path("configs/debug/lifrtick.toml"))
+    return _lifrtick_cfg
 
-    Today, some profiles establish an **axis claim** (legacy ownership) but do
-    not yet populate the **lease holder** list (multi-HiP arbitration). If we
-    require lease holders strictly, the command frame will disable all axes and
-    DenSi will never see control words / velocities.
 
-    Policy:
-      - If lease holders exist for an axis -> allow.
-      - Else if an axis claim exists -> allow (legacy behaviour).
+def _get_lifrtick_logger() -> Optional[logging.Logger]:
+    """Return a dedicated lifetick logger when enabled.
+
+    This keeps main core logs readable while allowing high-frequency tracing
+    into a rotating file ("oscilloscope" style).
     """
 
-    holders = getattr(state, "lease_axis_holders", {}) or {}
-    if isinstance(holders, dict):
-        vals = holders.get(axis_id, [])
-        if isinstance(vals, (list, tuple)) and any(str(v) for v in list(vals)):
-            return True
+    global _lifrtick_logger
+    if _lifrtick_logger is not None:
+        return _lifrtick_logger
 
-    claims = getattr(state, "axis_claims", {}) or {}
-    if isinstance(claims, dict) and axis_id in claims and claims.get(axis_id) is not None:
+    cfg = _get_lifrtick_cfg()
+    if not cfg.enable:
+        return None
+
+    logger = logging.getLogger("lifrtick")
+    logger.propagate = False
+    logger.setLevel(logging.INFO)
+
+    log_path = Path(cfg.path)
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        # If we cannot create dirs, fall back to no special handler.
+        return None
+
+    handler = RotatingFileHandler(
+        log_path,
+        maxBytes=int(cfg.max_bytes),
+        backupCount=int(cfg.backup_count),
+        encoding="utf-8",
+    )
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+    logger.addHandler(handler)
+
+    _lifrtick_logger = logger
+    return _lifrtick_logger
+
+
+def _compute_resync_any(state: MachineState) -> bool:
+    resync_any = bool(getattr(state, "resync_req", False))
+    if resync_any:
         return True
-
+    m = getattr(state, "resync_req_by_axis", {})
+    if isinstance(m, dict):
+        try:
+            return any(bool(v) for v in m.values())
+        except Exception:
+            return bool(getattr(state, "resync_req", False))
     return False
 
 
@@ -49,22 +90,22 @@ def build_command_frame(state: MachineState) -> CommandFrame:
             if not densi_online(state, axis_id):
                 axes[axis_id] = AxisSetpoint(enable=False, vel=0.0)
                 continue
-        if not _axis_lease_allows(state, axis_id):
+        if not axis_lease_allows_any(state, axis_id):
             axes[axis_id] = AxisSetpoint(enable=False, vel=0.0)
             continue
         axes[axis_id] = AxisSetpoint(enable=cmd.enable, vel=cmd.vel)
     lifetick_echo = dict(getattr(state, "lifetick_echo_by_axis", {}))
 
-    # LifeTick echo map is updated frequently; keep at DEBUG to avoid log spam.
-    log.debug("core cmd lifetick_echo=%s", state.lifetick_echo_by_axis)
-
     # LIFETICK trace: Core -> devices (via CommandFrame.lifetick_echo)
     now_s = time.monotonic()
+    cfg = _get_lifrtick_cfg()
+    lifrtick = _get_lifrtick_logger()
+    every_s = float(cfg.every_s) if cfg.every_s is not None else 0.5
     axis_ids = sorted(set(axes.keys()) | set(lifetick_echo.keys()))
     for axis_id in axis_ids:
         v = lifetick_echo.get(axis_id, None)
         last_s = float(_lt_last_cmd_log_by_axis.get(axis_id, 0.0))
-        if (now_s - last_s) >= _LT_LOG_EVERY_S:
+        if (now_s - last_s) >= every_s:
             _lt_last_cmd_log_by_axis[axis_id] = now_s
             # LifeTick is useful while debugging connectivity, but too chatty
             # for everyday use. Keep it at DEBUG and throttled.
@@ -74,15 +115,15 @@ def build_command_frame(state: MachineState) -> CommandFrame:
                 state.tick,
                 int(v) & 0xFFFF if isinstance(v, int) else v,
             )
+            if lifrtick is not None:
+                lifrtick.info(
+                    "axis=%s cmd_tick=%s echo=%s",
+                    axis_id,
+                    state.tick,
+                    int(v) & 0xFFFF if isinstance(v, int) else v,
+                )
 
-    resync_any = bool(getattr(state, "resync_req", False))
-    try:
-        if not resync_any:
-            m = getattr(state, "resync_req_by_axis", {})
-            if isinstance(m, dict):
-                resync_any = any(bool(v) for v in m.values())
-    except Exception:
-        resync_any = bool(getattr(state, "resync_req", False))
+    resync_any = _compute_resync_any(state)
 
     core_mode = core_mode_value(getattr(state, "core_mode", ""))
     joy = getattr(state, "joy", None)

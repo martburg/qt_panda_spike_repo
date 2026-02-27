@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-log = logging.getLogger("core")
 
 from steuerung3d.core.intents import (
     ClearFault,
@@ -38,6 +37,11 @@ from steuerung3d.core.intent_handlers.lease import (
     axis_lease_holders as _axis_lease_holders,
     set_lease_denial as _set_lease_denial,
 )
+from steuerung3d.core.intent_handlers.claims import claim_axis as _claim_axis
+from steuerung3d.core.intent_handlers.claims import release_axis as _release_axis
+
+
+log = logging.getLogger("core")
 
 # PLC Modus 'w' expects the full parameter set on each write.
 # We merge partial UI writes with last-known params to avoid zeroing untouched fields.
@@ -54,6 +58,7 @@ def _txn_ack(state: MachineState, req_id: str) -> None:
     """Record a one-shot ack for HIP (emitted in telemetry)."""
     if req_id:
         state.core_acks.append(req_id)
+
 
 def _txn_seen_or_mark(state: MachineState, req_id: str, *, max_keep: int = 512) -> bool:
     """Return True if req_id was seen before; else mark it as seen.
@@ -133,28 +138,11 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
 
         # --- CLAIMS (exclusive control) ---
         case ClaimAxis(axis_id=axis_id, hip_id=hip_id, req_id=req_id):
-            if not axis_id or not hip_id:
-                return
-            cur = state.axis_claims.get(axis_id, "")
-            if cur in ("", hip_id):
-                state.axis_claims[axis_id] = hip_id
-                _txn_ack(state, req_id)
-            else:
-                # Deny claim; emit a one-shot ack that the HIP can interpret
-                if req_id:
-                    state.core_acks.append(f"{req_id}:deny:{cur}")
+            _claim_axis(state, axis_id, hip_id, req_id)
             return
 
         case ReleaseAxis(axis_id=axis_id, hip_id=hip_id, req_id=req_id):
-            if not axis_id or not hip_id:
-                return
-            cur = state.axis_claims.get(axis_id, "")
-            if cur == hip_id:
-                state.axis_claims.pop(axis_id, None)
-                _txn_ack(state, req_id)
-            else:
-                if req_id:
-                    state.core_acks.append(f"{req_id}:noop")
+            _release_axis(state, axis_id, hip_id, req_id)
             return
 
         # --- LEASES (rig + axis) ---
