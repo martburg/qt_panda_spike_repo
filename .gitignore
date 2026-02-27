@@ -47,3 +47,6 @@ src/logs/
 # Qt Designer autosave
 *.autosave
 *.ui.autosave
+
+# accidental snapshot mount
+mnt/

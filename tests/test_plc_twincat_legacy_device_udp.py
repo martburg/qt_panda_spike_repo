@@ -4,6 +4,15 @@ import socket
 import threading
 import time
 
+import os
+import pytest
+
+if os.getenv("RUN_LEGACY_TWINCAT_TESTS", "0") != "1":
+    pytest.skip(
+        "Legacy TwinCAT adapter tests are opt-in; set RUN_LEGACY_TWINCAT_TESTS=1",
+        allow_module_level=True,
+    )
+
 from steuerung3d.adapters.plc_twincat_legacy.device import TwinCATLegacyWinchUdpDevice
 from steuerung3d.core.command_frame import CommandFrame, AxisSetpoint
 from steuerung3d.core.state import MachineState

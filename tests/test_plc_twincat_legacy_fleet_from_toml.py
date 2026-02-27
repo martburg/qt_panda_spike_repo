@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import os
 import pytest
+
+if os.getenv("RUN_LEGACY_TWINCAT_TESTS", "0") != "1":
+    pytest.skip(
+        "Legacy TwinCAT adapter tests are opt-in; set RUN_LEGACY_TWINCAT_TESTS=1",
+        allow_module_level=True,
+    )
+
 
 from steuerung3d.adapters.plc_twincat_legacy.udp_sim import build_udp_sim_fleet_from_toml
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame

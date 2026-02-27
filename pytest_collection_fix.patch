@@ -1,0 +1,27 @@
+diff --git a/pytest.ini b/pytest.ini
+new file mode 100644
+index 0000000..1d8f6c4
+--- /dev/null
++++ b/pytest.ini
+@@ -0,0 +1,22 @@
++[pytest]
++# Keep test collection deterministic: only collect from ./tests
++testpaths = tests
++
++# Never recurse into archived, generated, vendored, or accidental nested trees.
++norecursedirs =
++    archive
++    mnt
++    .run
++    .venv
++    vault
++    build
++    dist
++
++# Keep output useful in CI/local runs
++addopts = -ra
++
++# Register custom marks used in the suite
++markers =
++    ui: UI-related tests (typically require PySide6)
++
