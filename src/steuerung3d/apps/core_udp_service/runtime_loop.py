@@ -11,48 +11,25 @@ from steuerung3d.core.command_frame import CommandFrame, coerce_param_ops
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.mode_aggregate import aggregate_and_store
 from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapshot
-from steuerung3d.core.net import parse_hostport, normalize_host
+from steuerung3d.core.net import parse_hostport
 from steuerung3d.protocol.core_runner import CoreRunner
 from steuerung3d.protocol.axis_router import AxisRouter
 from steuerung3d.protocol.udp_channels import UdpIntentIn, UdpTelemetryOut, UdpTelemetryFanout
 from steuerung3d.protocol.udp_plc_channels import UdpPlcTelemetryIn, UdpPlcCommandOut
 from steuerung3d.util.heartbeat import ChangeTracker
 
+from .cli_validation import (
+    uniq_axes_or_error,
+    validate_dev_cmd_targets,
+    validate_ui_telem_targets,
+)
 from .facts_builder import build_aggregate_inputs
+from .fatal_ui import fatal as _fatal
 from .reporter import emit_birds_eye_status, log_periodic_heartbeat
+from .targets import expand_dev_cmd_targets as _expand_dev_cmd_targets
+from .targets import expand_targets as _expand_targets
 
 log = logging.getLogger("core_udp_service")
-
-
-def _show_fatal_modal(msg: str, *, title: str = "Steuerung3D – Core") -> None:
-    """Best-effort modal error dialog (Windows-friendly). Falls back to stderr."""
-    try:
-        import tkinter as _tk
-        from tkinter import messagebox as _mb
-        r = _tk.Tk()
-        r.withdraw()
-        _mb.showerror(title, msg)
-        try:
-            r.destroy()
-        except Exception:
-            pass
-    except Exception:
-        # Headless or tkinter unavailable
-        pass
-    try:
-        import sys as _sys
-        print(msg, file=_sys.stderr)
-    except Exception:
-        pass
-
-
-def _fatal(msg: str) -> int:
-    _show_fatal_modal(msg)
-    log.error(msg)
-    return 2
-
-
-
 # Export helpers for CLI tests
 __all__ = [
     "run_core_udp_service",
@@ -60,34 +37,6 @@ __all__ = [
     "_expand_dev_cmd_targets",
 ]
 
-def _expand_targets(
-    explicit_targets: List[str],
-    *,
-    base: Optional[str],
-    count: int,
-    base_host: str,
-    default_target: Optional[Tuple[str, int]],
-) -> List[Tuple[str, int]]:
-    targets: List[Tuple[str, int]] = []
-    for s in explicit_targets:
-        targets.append(parse_hostport(s))
-    if base is not None and int(count) > 0:
-        base_port = int(str(base).strip())
-        host = normalize_host(base_host)
-        for i in range(int(count)):
-            targets.append((host, base_port + i))
-    if not targets and default_target is not None:
-        targets = [default_target]
-    return targets
-
-
-def _expand_dev_cmd_targets(base: str, count: int, host: str) -> List[Tuple[str, int]]:
-    base_port = int(str(base).strip())
-    out: List[Tuple[str, int]] = []
-    cmd_host = normalize_host(host)
-    for i in range(int(count)):
-        out.append((cmd_host, base_port + i))
-    return out
 
 
 def run_core_udp_service(*, args, status) -> int:
@@ -209,75 +158,27 @@ def run_core_udp_service(*, args, status) -> int:
     # Router centralizes strict per-axis shaping (commands + UI snapshots)
     # and holds device-scoped caches used for axis-pinned UI values.
 
-    # Enforce uniqueness while preserving order; duplicates are almost always
-    # a configuration mistake (and are disastrous with strict per-axis routing).
-    seen = set()
-    dupes = []
-    uniq: List[str] = []
-    for a in axis_ids:
-        k = a
-        if k in seen:
-            dupes.append(k)
-            continue
-        seen.add(k)
-        uniq.append(k)
-    if dupes:
-        return _fatal(
-            "Duplicate --axis entries are not allowed (strict per-axis routing).\n\n"
-            f"Axes provided: {axis_ids}\n"
-            f"Duplicates: {sorted(set(dupes))}"
-        )
-    axis_ids = uniq
+    axis_ids, err = uniq_axes_or_error(axis_ids)
+    if err:
+        return _fatal(err)
+
     # --- strict per-axis device command routing ---
     # We do NOT support broadcast device commands, because PLC code is frozen.
-    if len(axis_ids) > 1:
-        if len(dev_cmd_targets) != len(axis_ids):
-            msg = (
-                "Multi-axis run requires one --dev-cmd-target per axis (no broadcast).\n\n"
-                f"Axes ({len(axis_ids)}): {', '.join(axis_ids)}\n"
-                f"Targets provided ({len(dev_cmd_targets)}): {dev_cmd_targets}\n\n"
-                "Fix: provide N targets, e.g.\n"
-                "  --dev-cmd-target 172.16.17.1:50010 --dev-cmd-target 172.16.17.2:50010 ...\n"
-                "or use a local sim range, e.g.\n"
-                f"  --dev-cmd-base 52001 --dev-cmd-count {len(axis_ids)}\n\n"
-                "Note: --dev-telem-in must NOT overlap the dev-cmd port range."
-            )
-            return _fatal(msg)
-    else:
-        # single-axis: ensure exactly one target
-        if len(dev_cmd_targets) != 1:
-            msg = (
-                "Single-axis run requires exactly one --dev-cmd-target.\n\n"
-                f"Axis: {axis_ids[0] if axis_ids else 'X'}\n"
-                f"Targets provided ({len(dev_cmd_targets)}): {dev_cmd_targets}"
-            )
-            return _fatal(msg)
+    err = validate_dev_cmd_targets(axis_ids=axis_ids, dev_cmd_targets=dev_cmd_targets)
+    if err:
+        return _fatal(err)
 
     # Map axis_id -> CommandOut transport (order matters).
     axis_cmd_outs = {axis_id: dev_cmd_outs[i] for i, axis_id in enumerate(axis_ids)}
 
     # --- strict per-axis UI telemetry routing ---
-    if not args.ui_telem_disable:
-        if len(axis_ids) > 1:
-            if len(ui_telem_targets) != len(axis_ids):
-                msg = (
-                    "Multi-axis run requires one UI telemetry target per axis (no broadcast).\n\n"
-                    f"Axes ({len(axis_ids)}): {', '.join(axis_ids)}\n"
-                    f"UI Telemetry targets provided ({len(ui_telem_targets)}): {ui_telem_targets}\n\n"
-                    "Fix: provide N targets, e.g.\n"
-                    "  --ui-telem-target 127.0.0.1:51002 --ui-telem-target 127.0.0.1:51003 ...\n"
-                    "or use a local range, e.g.\n"
-                    f"  --ui-telem-base 51002 --ui-telem-count {len(axis_ids)}\n"
-                )
-                return _fatal(msg)
-        else:
-            if len(ui_telem_targets) != 1:
-                msg = (
-                    "Single-axis run requires exactly one UI telemetry target.\n\n"
-                    f"Axis: {axis_ids[0] if axis_ids else 'X'}\n"
-                    f"Targets provided ({len(ui_telem_targets)}): {ui_telem_targets}"
-                )
-                return _fatal(msg)
+    err = validate_ui_telem_targets(
+        ui_telem_disable=bool(args.ui_telem_disable),
+        axis_ids=axis_ids,
+        ui_telem_targets=ui_telem_targets,
+    )
+    if err:
+        return _fatal(err)
 
     axis_ui_outs = {axis_id: op_telem_outs[i] for i, axis_id in enumerate(axis_ids)} if op_telem_outs else {}
     for a in axis_ids:

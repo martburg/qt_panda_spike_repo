@@ -26,6 +26,20 @@ class AxisCommandState:
 
 
 @dataclass
+class AxisControl:
+    """Convenience bundle for per-axis state.
+
+    This is a structural refactor to "concentrate the model" without changing
+    existing public fields. The legacy ``axes`` and ``axis_cmd`` dicts remain the
+    canonical access paths for most code, but they are now backed by the same
+    per-axis objects stored in ``axis_ctl``.
+    """
+
+    measured: AxisState = field(default_factory=AxisState)
+    cmd: AxisCommandState = field(default_factory=AxisCommandState)
+
+
+@dataclass
 class MachineState:
     """
     Single source of truth.
@@ -40,6 +54,9 @@ class MachineState:
 
     axes: Dict[str, AxisState] = field(default_factory=dict)
     axis_cmd: Dict[str, AxisCommandState] = field(default_factory=dict)
+
+    # Bundled per-axis view (structural): axis_id -> AxisControl
+    axis_ctl: Dict[str, AxisControl] = field(default_factory=dict)
 
     # Exclusive control claims: axis_id -> hip_id (set by ClaimAxis/ReleaseAxis)
     axis_claims: Dict[str, str] = field(default_factory=dict)
@@ -118,13 +135,30 @@ class MachineState:
 
 
     def ensure_axis(self, axis_id: str) -> AxisState:
-        if axis_id not in self.axes:
-            self.axes[axis_id] = AxisState()
-        if axis_id not in self.axis_cmd:
-            self.axis_cmd[axis_id] = AxisCommandState()
-        return self.axes[axis_id]
+        axis_id = str(axis_id)
+        if axis_id not in self.axis_ctl:
+            self.axis_ctl[axis_id] = AxisControl()
+        ctl = self.axis_ctl[axis_id]
+        # Keep legacy dicts backed by the same objects.
+        self.axes[axis_id] = ctl.measured
+        self.axis_cmd[axis_id] = ctl.cmd
+        return ctl.measured
 
     def ensure_axis_cmd(self, axis_id: str) -> AxisCommandState:
-        if axis_id not in self.axis_cmd:
-            self.axis_cmd[axis_id] = AxisCommandState()
+        axis_id = str(axis_id)
+        self.ensure_axis(axis_id)
         return self.axis_cmd[axis_id]
+
+    def axis_owner(self, axis_id: str) -> str:
+        """Best-effort owner resolution (claim first, then lease)."""
+
+        axis_id = str(axis_id or "")
+        if not axis_id:
+            return ""
+
+        owner = str((self.axis_claims or {}).get(axis_id, "") or "")
+        if owner:
+            return owner
+
+        holders = list((self.lease_axis_holders or {}).get(axis_id, []) or [])
+        return str(holders[0]) if holders else ""

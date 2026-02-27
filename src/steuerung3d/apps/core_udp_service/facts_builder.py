@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List
 
-from steuerung3d.apps.yellow.domain.banner_facts import derive_banner_estate_from_word
+from steuerung3d.protocol.banner_estate import derive_banner_estate_from_word
 from steuerung3d.core.mode_aggregate import AggregateInputs, AxisSafetyFacts
 from steuerung3d.core.joy_facts import extract_joy_facts
 from steuerung3d.protocol.estop_bits import decode_estop_word
@@ -37,10 +37,11 @@ def build_aggregate_inputs(*, state, router, axis_ids: List[str], dt: float) -> 
                 bits = None
                 axis_taster = None
 
-        owner = str(getattr(state, "axis_claims", {}).get(axis_id, "") or "")
-        if not owner:
-            holders = list(getattr(state, "lease_axis_holders", {}).get(axis_id, []) or [])
-            owner = str(holders[0]) if holders else ""
+        # Prefer a single helper for claim/lease resolution.
+        try:
+            owner = str(state.axis_owner(axis_id))
+        except Exception:
+            owner = ""
 
         age_ms = None
         d = reg.get(axis_id)
