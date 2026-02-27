@@ -1,0 +1,557 @@
+diff --git a/docs/refactor/OBSOLETE_SURFACE_AREA.md b/docs/refactor/OBSOLETE_SURFACE_AREA.md
+new file mode 100644
+index 0000000..8ab5e6c
+--- /dev/null
++++ b/docs/refactor/OBSOLETE_SURFACE_AREA.md
+@@ -0,0 +1,62 @@
++# Obsolete surface area — deletion plan
++
++This repo intentionally keeps some **obsolete** code paths for compatibility or
++reference. RefOS v2 says we may **rename / dedupe / remove dead code** in Lane 1
++as long as we do not introduce silent semantic drift.
++
++This document is a staging area for reaching the point where we can **delete**
++these modules with confidence.
++
++## Canonical supported stack
++
++The supported stack (used by profiles like `1dev_sim`) is:
++
++- `steuerung3d.apps.core_udp_service`
++- `steuerung3d.apps.hi_p`
++- `steuerung3d.apps.den_si`
++- `steuerung3d.apps.joy2intent`
++
++Everything else must either be:
++
++- explicitly marked **obsolete**, and
++- isolated from supported imports.
++
++## Current obsolete modules
++
++### Apps
++
++- `steuerung3d.apps.core_service` (obsolete)
++- `steuerung3d.apps.plc_twincat_legacy_edge` (obsolete)
++
++The `core/app_catalog.py` keeps these entries for discoverability and
++compatibility.
++
++### Adapters
++
++- `steuerung3d.adapters.plc_twincat_legacy` (legacy TwinCAT semicolon protocol)
++
++## “Ready to delete” checklist
++
++Before deleting a module tree, ensure all of the following are true:
++
++1. **No supported app imports it**
++   - `core_udp_service`, `hi_p`, `den_si`, `joy2intent` must not import it.
++2. **No supported profile depends on it**
++   - `configs/stacks/*.toml` used in CI / daily work must not reference it.
++3. **Tests cover the supported alternative**
++   - any behavior the obsolete module provided has a test for the replacement.
++4. **Docs updated**
++   - remove or relocate references to obsolete entrypoints.
++5. **Lane 2 declaration if CLI/API surface changes**
++   - removing entrypoints or public modules is semantic for operators.
++
++## How to measure progress
++
++Use grep to find imports / references:
++
++- `grep -RIn "plc_twincat_legacy" src/steuerung3d`
++- `grep -RIn "plc_twincat_legacy_edge" src/steuerung3d`
++
++When the only remaining references live under `apps/dev_stack/` or `tools/` and
++no supported stack imports them, we are close to being able to delete the
++surface area (Lane 2: declared + ledger + tests).
+diff --git a/src/steuerung3d/apps/core_udp_service/netplan.py b/src/steuerung3d/apps/core_udp_service/netplan.py
+new file mode 100644
+index 0000000..1f245c6
+--- /dev/null
++++ b/src/steuerung3d/apps/core_udp_service/netplan.py
+@@ -0,0 +1,116 @@
++from __future__ import annotations
++
++from dataclasses import dataclass
++from typing import List, Tuple
++
++from steuerung3d.core.net import parse_hostport
++from steuerung3d.protocol.udp_channels import UdpIntentIn, UdpTelemetryOut, UdpTelemetryFanout
++from steuerung3d.protocol.udp_plc_channels import UdpPlcTelemetryIn, UdpPlcCommandOut
++
++from .fatal_ui import fatal as _fatal
++from .targets import expand_dev_cmd_targets as _expand_dev_cmd_targets
++from .targets import expand_targets as _expand_targets
++
++
++@dataclass(frozen=True)
++class UdpPlan:
++    # Operator intents
++    intent_in_bind: Tuple[str, int]
++    op_intent_in: UdpIntentIn
++
++    # Operator telemetry (one target per axis, validated later)
++    ui_telem_targets: List[Tuple[str, int]]
++    op_telem_outs: List[UdpTelemetryOut]
++
++    # Optional secondary telemetry fanout
++    c2_telem_targets: List[Tuple[str, int]]
++    c2_fanout: UdpTelemetryFanout | None
++
++    # Device telemetry in
++    dev_telem_bind: Tuple[str, int]
++    dev_telem_in: UdpPlcTelemetryIn
++
++    # Device command outs
++    dev_cmd_targets: List[Tuple[str, int]]
++    dev_cmd_outs: List[UdpPlcCommandOut]
++
++
++def build_udp_plan(*, args) -> UdpPlan | int:
++    """Build UDP binds/connects from CLI args.
++
++    Structural helper: extracted from runtime_loop to keep the main loop readable.
++    Validation of axis<->target counts happens in runtime_loop.
++    """
++
++    intent_in_bind = parse_hostport(args.intent_in)
++    op_intent_in = UdpIntentIn.bind(intent_in_bind)
++
++    # UI telemetry targets
++    if args.ui_telem_disable and (
++        args.ui_telem_target
++        or args.ui_telem_base is not None
++        or int(args.ui_telem_count) > 0
++    ):
++        return _fatal("UI telemetry disabled but UI targets were provided.")
++
++    ui_telem_targets = _expand_targets(
++        args.ui_telem_target,
++        base=args.ui_telem_base,
++        count=int(args.ui_telem_count),
++        base_host=args.ui_telem_host,
++        default_target=None if args.ui_telem_disable else ("127.0.0.1", 51002),
++    )
++    op_telem_outs = [UdpTelemetryOut.connect(t) for t in ui_telem_targets]
++
++    c2_telem_targets: List[Tuple[str, int]] = _expand_targets(
++        args.c2_telem_target,
++        base=args.c2_telem_base,
++        count=int(args.c2_telem_count),
++        base_host=args.c2_telem_host,
++        default_target=None,
++    )
++    c2_telem_outs = [UdpTelemetryOut.connect(t) for t in c2_telem_targets]
++    c2_fanout = UdpTelemetryFanout(outs=c2_telem_outs) if c2_telem_outs else None
++
++    dev_telem_bind = parse_hostport(args.dev_telem_in)
++    dev_telem_in = UdpPlcTelemetryIn.bind(dev_telem_bind)
++
++    # Device command broadcast targets (N DenSi apps each binding a unique command port)
++    dev_cmd_targets: List[Tuple[str, int]] = []
++    for s in args.dev_cmd_target:
++        dev_cmd_targets.append(parse_hostport(s))
++
++    if args.dev_cmd_base is not None and int(args.dev_cmd_count) > 0:
++        base = int(str(args.dev_cmd_base).strip())
++        dev_cmd_targets.extend(
++            _expand_dev_cmd_targets(str(args.dev_cmd_base), int(args.dev_cmd_count), args.dev_cmd_host)
++        )
++
++        # Guard against accidental port overlap (common on Windows).
++        if dev_telem_bind[0] == "127.0.0.1" and dev_telem_bind[1] in range(base, base + int(args.dev_cmd_count)):
++            return _fatal(
++                f"dev telemetry bind port {dev_telem_bind[1]} overlaps dev-cmd ports {base}..{base + int(args.dev_cmd_count) - 1}. "
++                f"Pick a different --dev-telem-in (e.g. 127.0.0.1:{base + 100}) or shift --dev-cmd-base."
++            )
++
++    if not dev_cmd_targets:
++        # Default only for single-axis convenience. Multi-axis requires explicit per-axis targets.
++        if len([a for a in args.axis if a and str(a).strip()]) <= 1:
++            dev_cmd_targets = [("127.0.0.1", 52001)]
++        else:
++            dev_cmd_targets = []
++
++    dev_cmd_outs = [UdpPlcCommandOut.connect(t) for t in dev_cmd_targets]
++
++    return UdpPlan(
++        intent_in_bind=intent_in_bind,
++        op_intent_in=op_intent_in,
++        ui_telem_targets=ui_telem_targets,
++        op_telem_outs=op_telem_outs,
++        c2_telem_targets=c2_telem_targets,
++        c2_fanout=c2_fanout,
++        dev_telem_bind=dev_telem_bind,
++        dev_telem_in=dev_telem_in,
++        dev_cmd_targets=dev_cmd_targets,
++        dev_cmd_outs=dev_cmd_outs,
++    )
+diff --git a/src/steuerung3d/apps/core_udp_service/runtime_loop.py b/src/steuerung3d/apps/core_udp_service/runtime_loop.py
+index 8c189c9..54c0845 100644
+--- a/src/steuerung3d/apps/core_udp_service/runtime_loop.py
++++ b/src/steuerung3d/apps/core_udp_service/runtime_loop.py
+@@ -2,7 +2,7 @@ from __future__ import annotations
+ 
+ import logging
+ import time
+-from typing import List, Optional, Tuple
++from typing import Optional
+ 
+ from steuerung3d.common.timebase import Timebase
+ from steuerung3d.core.engine import CoreEngine
+@@ -11,11 +11,8 @@ from steuerung3d.core.command_frame import CommandFrame, coerce_param_ops
+ from steuerung3d.core.state import MachineState
+ from steuerung3d.core.mode_aggregate import aggregate_and_store
+ from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapshot
+-from steuerung3d.core.net import parse_hostport
+ from steuerung3d.protocol.core_runner import CoreRunner
+ from steuerung3d.protocol.axis_router import AxisRouter
+-from steuerung3d.protocol.udp_channels import UdpIntentIn, UdpTelemetryOut, UdpTelemetryFanout
+-from steuerung3d.protocol.udp_plc_channels import UdpPlcTelemetryIn, UdpPlcCommandOut
+ from steuerung3d.util.heartbeat import ChangeTracker
+ 
+ from .cli_validation import (
+@@ -28,6 +25,7 @@ from .fatal_ui import fatal as _fatal
+ from .reporter import emit_birds_eye_status, log_periodic_heartbeat
+ from .targets import expand_dev_cmd_targets as _expand_dev_cmd_targets
+ from .targets import expand_targets as _expand_targets
++from .netplan import build_udp_plan
+ 
+ log = logging.getLogger("core_udp_service")
+ # Export helpers for CLI tests
+@@ -41,67 +39,20 @@ __all__ = [
+ 
+ def run_core_udp_service(*, args, status) -> int:
+     # --- UDP endpoints ---
+-    intent_in_bind = parse_hostport(args.intent_in)
+-
+-    op_intent_in = UdpIntentIn.bind(intent_in_bind)
+-
+-    # UI telemetry targets
+-    if args.ui_telem_disable and (
+-        args.ui_telem_target
+-        or args.ui_telem_base is not None
+-        or int(args.ui_telem_count) > 0
+-    ):
+-        return _fatal("UI telemetry disabled but UI targets were provided.")
+-
+-    ui_telem_targets = _expand_targets(
+-        args.ui_telem_target,
+-        base=args.ui_telem_base,
+-        count=int(args.ui_telem_count),
+-        base_host=args.ui_telem_host,
+-        default_target=None if args.ui_telem_disable else ("127.0.0.1", 51002),
+-    )
+-    op_telem_outs = [UdpTelemetryOut.connect(t) for t in ui_telem_targets]
+-
+-    c2_telem_targets: List[Tuple[str, int]] = []
+-    c2_telem_targets = _expand_targets(
+-        args.c2_telem_target,
+-        base=args.c2_telem_base,
+-        count=int(args.c2_telem_count),
+-        base_host=args.c2_telem_host,
+-        default_target=None,
+-    )
+-    c2_telem_outs = [UdpTelemetryOut.connect(t) for t in c2_telem_targets]
+-    c2_fanout = UdpTelemetryFanout(outs=c2_telem_outs) if c2_telem_outs else None
+-
+-    dev_telem_bind = parse_hostport(args.dev_telem_in)
+-    dev_telem_in = UdpPlcTelemetryIn.bind(dev_telem_bind)
+-
+-    # Device command broadcast targets (N DenSi apps each binding a unique command port)
+-    dev_cmd_targets: List[Tuple[str, int]] = []
+-    for s in args.dev_cmd_target:
+-        dev_cmd_targets.append(parse_hostport(s))
+-
+-    if args.dev_cmd_base is not None and int(args.dev_cmd_count) > 0:
+-        base = int(str(args.dev_cmd_base).strip())
+-        dev_cmd_targets.extend(
+-            _expand_dev_cmd_targets(str(args.dev_cmd_base), int(args.dev_cmd_count), args.dev_cmd_host)
+-        )
+-
+-        # Guard against accidental port overlap (common on Windows).
+-        if dev_telem_bind[0] == "127.0.0.1" and dev_telem_bind[1] in range(base, base + int(args.dev_cmd_count)):
+-            return _fatal(
+-                f"dev telemetry bind port {dev_telem_bind[1]} overlaps dev-cmd ports {base}..{base + int(args.dev_cmd_count) - 1}. "
+-                f"Pick a different --dev-telem-in (e.g. 127.0.0.1:{base + 100}) or shift --dev-cmd-base."
+-            )
+-
+-    if not dev_cmd_targets:
+-        # Default only for single-axis convenience. Multi-axis requires explicit per-axis targets.
+-        if len([a for a in args.axis if a and str(a).strip()]) <= 1:
+-            dev_cmd_targets = [("127.0.0.1", 52001)]
+-        else:
+-            dev_cmd_targets = []
+-
+-    dev_cmd_outs = [UdpPlcCommandOut.connect(t) for t in dev_cmd_targets]
++    plan = build_udp_plan(args=args)
++    if isinstance(plan, int):
++        return plan
++
++    intent_in_bind = plan.intent_in_bind
++    op_intent_in = plan.op_intent_in
++    ui_telem_targets = plan.ui_telem_targets
++    op_telem_outs = plan.op_telem_outs
++    c2_telem_targets = plan.c2_telem_targets
++    c2_fanout = plan.c2_fanout
++    dev_telem_bind = plan.dev_telem_bind
++    dev_telem_in = plan.dev_telem_in
++    dev_cmd_targets = plan.dev_cmd_targets
++    dev_cmd_outs = plan.dev_cmd_outs
+ 
+     stats = {
+         "intents_in": 0,
+diff --git a/src/steuerung3d/core/intent_handler.py b/src/steuerung3d/core/intent_handler.py
+index c3564eb..c6189f5 100644
+--- a/src/steuerung3d/core/intent_handler.py
++++ b/src/steuerung3d/core/intent_handler.py
+@@ -39,63 +39,14 @@ from steuerung3d.core.intent_handlers.lease import (
+ )
+ from steuerung3d.core.intent_handlers.claims import claim_axis as _claim_axis
+ from steuerung3d.core.intent_handlers.claims import release_axis as _release_axis
++from steuerung3d.core.intent_handlers.txn import txn_ack as _txn_ack
++from steuerung3d.core.intent_handlers.txn import txn_seen_or_mark as _txn_seen_or_mark
++from steuerung3d.core.intent_handlers.reset_resync import axis_reset_allowed as _axis_reset_allowed
++from steuerung3d.core.intent_handlers.params import merge_plc_write_values as _merge_plc_write_values
+ 
+ 
+ log = logging.getLogger("core")
+ 
+-# PLC Modus 'w' expects the full parameter set on each write.
+-# We merge partial UI writes with last-known params to avoid zeroing untouched fields.
+-_PLC_WRITE_KEYS = {
+-    'HardMax','UserMax','UserMin','HardMin',
+-    'VelMax','AccMax','DccMax','MaxAmp',
+-    'P','I','D','IL','RampForm',
+-    'Pitch','PosMax','PosMin',
+-    'PosWin','VelWin','AccMove','VelMaxMot',
+-}
+-
+-
+-def _txn_ack(state: MachineState, req_id: str) -> None:
+-    """Record a one-shot ack for HIP (emitted in telemetry)."""
+-    if req_id:
+-        state.core_acks.append(req_id)
+-
+-
+-def _txn_seen_or_mark(state: MachineState, req_id: str, *, max_keep: int = 512) -> bool:
+-    """Return True if req_id was seen before; else mark it as seen.
+-
+-    We keep a bounded map (req_id -> last_seen_tick) to prevent unbounded growth.
+-    """
+-    if not req_id:
+-        return False
+-    if req_id in state.seen_req_ids:
+-        state.seen_req_ids[req_id] = int(state.tick)
+-        return True
+-    state.seen_req_ids[req_id] = int(state.tick)
+-    if len(state.seen_req_ids) > max_keep:
+-        # drop oldest entries
+-        items = sorted(state.seen_req_ids.items(), key=lambda kv: kv[1])
+-        for k, _t in items[: len(items) - max_keep]:
+-            state.seen_req_ids.pop(k, None)
+-    return False
+-
+-
+-def _axis_reset_allowed(state: MachineState, axis_id: str, hip_id: str) -> tuple[bool, str]:
+-    axis_id = str(axis_id or "")
+-    hip_id = str(hip_id or "")
+-    if not axis_id:
+-        return False, "missing_axis"
+-    if not hip_id:
+-        return False, "missing_hip"
+-    claim_owner = str(state.axis_claims.get(axis_id, "") or "")
+-    if claim_owner and hip_id == claim_owner:
+-        return True, "claim_owner"
+-    holders = _axis_lease_holders(state, axis_id)
+-    if hip_id in holders:
+-        return True, "lease_holder"
+-    if claim_owner or holders:
+-        return False, "not_owner"
+-    return False, "no_owner"
+-
+ 
+ def enforce_core_mode_actions(state: MachineState) -> None:
+     core_mode = core_mode_value(getattr(state, "core_mode", "")).upper()
+@@ -338,9 +289,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
+             state.param_commit_match_streak = 0
+ 
+             # Merge with last-known params so PLC 'w' writes are full-snapshot.
+-            wire_vals = {k: float(v) for k, v in (state.params or {}).items() if k in _PLC_WRITE_KEYS}
+-            wire_vals.update({k: float(v) for k, v in cleaned.items()})
+-            op = ParamWriteOp(group=grp, values=wire_vals)
++            op = ParamWriteOp(group=grp, values=_merge_plc_write_values(state, cleaned=cleaned))
+ 
+             if axis_id and hasattr(state, "pending_param_ops_by_axis"):
+                 owner = state.axis_claims.get(axis_id, "")
+@@ -404,7 +353,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
+             if claim and not hip_id:
+                 # Backward-compat: if a claim exists and the intent lacks hip_id, ignore.
+                 return
+-            cmd = state.axis_cmd[axis_id]  # ensured by ensure_axis() above
++            cmd = state.axis_ctl[str(axis_id)].cmd  # ensured by ensure_axis() above
+             cmd.enable = bool(enable)
+             if not cmd.enable:
+                 cmd.vel = 0.0
+@@ -420,7 +369,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
+                 return
+             if claim and not hip_id:
+                 return
+-            cmd = state.axis_cmd[axis_id]  # ensured by ensure_axis() above
++            cmd = state.axis_ctl[str(axis_id)].cmd  # ensured by ensure_axis() above
+             if cmd.enable:
+                 cmd.vel = float(vel)
+             return
+@@ -437,7 +386,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
+                 return
+             if claim and not hip_id:
+                 return
+-            cmd = state.axis_cmd[axis_id]  # ensured by ensure_axis() above
++            cmd = state.axis_ctl[str(axis_id)].cmd  # ensured by ensure_axis() above
+             if cmd.enable:
+                 cmd.vel = float(rate)
+             return
+diff --git a/src/steuerung3d/core/intent_handlers/params.py b/src/steuerung3d/core/intent_handlers/params.py
+new file mode 100644
+index 0000000..c16793a
+--- /dev/null
++++ b/src/steuerung3d/core/intent_handlers/params.py
+@@ -0,0 +1,42 @@
++from __future__ import annotations
++
++from typing import Dict
++
++from steuerung3d.core.state import MachineState
++
++
++# PLC Modus 'w' expects the full parameter set on each write.
++# We merge partial UI writes with last-known params to avoid zeroing untouched fields.
++PLC_WRITE_KEYS = {
++    "HardMax",
++    "UserMax",
++    "UserMin",
++    "HardMin",
++    "VelMax",
++    "AccMax",
++    "DccMax",
++    "MaxAmp",
++    "P",
++    "I",
++    "D",
++    "IL",
++    "RampForm",
++    "Pitch",
++    "PosMax",
++    "PosMin",
++    "PosWin",
++    "VelWin",
++    "AccMove",
++    "VelMaxMot",
++}
++
++
++def merge_plc_write_values(state: MachineState, *, cleaned: Dict[str, float]) -> Dict[str, float]:
++    """Merge partial UI param writes with last-known device params.
++
++    Structural extraction; behavior stays identical to the previous inline logic.
++    """
++
++    wire_vals = {k: float(v) for k, v in (state.params or {}).items() if k in PLC_WRITE_KEYS}
++    wire_vals.update({k: float(v) for k, v in cleaned.items()})
++    return wire_vals
+diff --git a/src/steuerung3d/core/intent_handlers/reset_resync.py b/src/steuerung3d/core/intent_handlers/reset_resync.py
+new file mode 100644
+index 0000000..8eaaa40
+--- /dev/null
++++ b/src/steuerung3d/core/intent_handlers/reset_resync.py
+@@ -0,0 +1,31 @@
++from __future__ import annotations
++
++from steuerung3d.core.state import MachineState
++from steuerung3d.core.intent_handlers.lease import axis_lease_holders
++
++
++def axis_reset_allowed(state: MachineState, axis_id: str, hip_id: str) -> tuple[bool, str]:
++    """Policy: who is allowed to request an ESTOP reset pulse for an axis.
++
++    Structural extraction: behavior stays identical to the previous inline
++    helper in intent_handler.py.
++    """
++
++    axis_id = str(axis_id or "")
++    hip_id = str(hip_id or "")
++    if not axis_id:
++        return False, "missing_axis"
++    if not hip_id:
++        return False, "missing_hip"
++
++    claim_owner = str(state.axis_claims.get(axis_id, "") or "")
++    if claim_owner and hip_id == claim_owner:
++        return True, "claim_owner"
++
++    holders = axis_lease_holders(state, axis_id)
++    if hip_id in holders:
++        return True, "lease_holder"
++
++    if claim_owner or holders:
++        return False, "not_owner"
++    return False, "no_owner"
+diff --git a/src/steuerung3d/core/intent_handlers/txn.py b/src/steuerung3d/core/intent_handlers/txn.py
+new file mode 100644
+index 0000000..52d4722
+--- /dev/null
++++ b/src/steuerung3d/core/intent_handlers/txn.py
+@@ -0,0 +1,30 @@
++from __future__ import annotations
++
++from steuerung3d.core.state import MachineState
++
++
++def txn_ack(state: MachineState, req_id: str) -> None:
++    """Record a one-shot ack for HIP (emitted in telemetry)."""
++
++    if req_id:
++        state.core_acks.append(req_id)
++
++
++def txn_seen_or_mark(state: MachineState, req_id: str, *, max_keep: int = 512) -> bool:
++    """Return True if req_id was seen before; else mark it as seen.
++
++    We keep a bounded map (req_id -> last_seen_tick) to prevent unbounded growth.
++    """
++
++    if not req_id:
++        return False
++    if req_id in state.seen_req_ids:
++        state.seen_req_ids[req_id] = int(state.tick)
++        return True
++    state.seen_req_ids[req_id] = int(state.tick)
++    if len(state.seen_req_ids) > max_keep:
++        # Drop oldest entries.
++        items = sorted(state.seen_req_ids.items(), key=lambda kv: kv[1])
++        for k, _t in items[: len(items) - max_keep]:
++            state.seen_req_ids.pop(k, None)
++    return False
+diff --git a/src/steuerung3d/core/state.py b/src/steuerung3d/core/state.py
+index 1876045..731d0aa 100644
+--- a/src/steuerung3d/core/state.py
++++ b/src/steuerung3d/core/state.py
+@@ -7,6 +7,7 @@ from steuerung3d.core.command_frame import ParamOp
+ 
+ from steuerung3d.core.core_mode import CoreMode
+ from steuerung3d.core.joy_state import JoyState
++from steuerung3d.core.mode_aggregate import BlockedReason
+ 
+ 
+ @dataclass
+@@ -129,7 +130,7 @@ class MachineState:
+ 
+     # --- core mode aggregation (Stage 2) ---
+     core_mode: CoreMode = CoreMode.ESTOP
+-    core_blocked_by: list[object] = field(default_factory=list)
++    core_blocked_by: list[BlockedReason] = field(default_factory=list)
+     core_axis_gate: Dict[str, Dict[str, object]] = field(default_factory=dict)
+     core_motion_allowed: bool = False
+ 
