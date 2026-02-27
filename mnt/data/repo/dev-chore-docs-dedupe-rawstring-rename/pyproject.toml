@@ -20,5 +20,9 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.pytest.ini_options]
+markers = [
+    "ui: tests requiring PySide6/Qt",
+]
+addopts = "-ra"
 # Tests live at repo root.
 testpaths = ["tests"]

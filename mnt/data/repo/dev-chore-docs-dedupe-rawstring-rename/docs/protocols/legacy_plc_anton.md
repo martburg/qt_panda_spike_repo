@@ -1,4 +1,6 @@
-# Legacy PLC UDP Protocol — Anton (172.16.17.2)
+# Legacy PLC UDP Protocol — Anton
+
+Shared guarantees: `legacy_plc_common.md` (172.16.17.2)
 
 Canonical source: Beckhoff ST program `KommAnton__MAIN.st`.
 

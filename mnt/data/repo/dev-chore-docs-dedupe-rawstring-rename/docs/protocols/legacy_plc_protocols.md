@@ -10,9 +10,13 @@ All payloads are ASCII `;`-delimited and order-sensitive.
 | Axis / PLC | PLC IP | PLC bind | Controller bind | Doc |
 |---|---:|---|---|---|
 | Anton | 172.16.17.2 | 172.16.17.2:15001 | 172.16.17.5:15002 | `legacy_plc_anton.md` |
-| Debby | 172.16.17.3 | 172.16.17.3:15001 | 172.16.17.5:15002 | `legacy_plc_debby.md` (TODO) |
-| Burt  | 172.16.17.4 | 172.16.17.4:15001 | 172.16.17.5:15002 | `legacy_plc_burt.md` (TODO) |
-| Cecil | 172.16.17.1 | 172.16.17.1:15001 | 172.16.17.5:15002 | `legacy_plc_cecil.md` (TODO) |
+| Debby | 172.16.17.3 | 172.16.17.3:15001 | 172.16.17.5:15002 | `legacy_plc_debby.md` |
+| Burt  | 172.16.17.4 | 172.16.17.4:15001 | 172.16.17.5:15002 | `legacy_plc_burt.md` |
+| Cecil | 172.16.17.1 | 172.16.17.1:15001 | 172.16.17.5:15002 | `legacy_plc_cecil.md` |
+
+## Shared contract
+
+See: `legacy_plc_common.md`
 
 ## Contract guarantees (shared)
 
