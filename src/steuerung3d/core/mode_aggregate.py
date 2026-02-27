@@ -233,11 +233,3 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
         motion_allowed = False
     return AggregateResult(core_mode=core_mode, blocked_by=blocked_by, axis_gate=axis_gate, motion_allowed=motion_allowed)
 
-
-def aggregate_and_store(state, inputs: AggregateInputs) -> AggregateResult:
-    result = aggregate_core_mode(inputs)
-    state.core_mode = result.core_mode
-    state.core_blocked_by = list(result.blocked_by)
-    state.core_axis_gate = dict(result.axis_gate)
-    state.core_motion_allowed = bool(result.motion_allowed)
-    return result

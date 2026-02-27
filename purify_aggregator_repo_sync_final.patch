@@ -1,0 +1,82 @@
+diff --git a/src/steuerung3d/apps/core_udp_service/runtime_loop.py b/src/steuerung3d/apps/core_udp_service/runtime_loop.py
+index 8c189c9..a3741b1 100644
+--- a/src/steuerung3d/apps/core_udp_service/runtime_loop.py
++++ b/src/steuerung3d/apps/core_udp_service/runtime_loop.py
+@@ -9,7 +9,7 @@ from steuerung3d.core.engine import CoreEngine
+ from steuerung3d.core.intent_handler import apply_intent
+ from steuerung3d.core.command_frame import CommandFrame, coerce_param_ops
+ from steuerung3d.core.state import MachineState
+-from steuerung3d.core.mode_aggregate import aggregate_and_store
++from steuerung3d.core.mode_aggregate import aggregate_core_mode
+ from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapshot
+ from steuerung3d.core.net import parse_hostport
+ from steuerung3d.protocol.core_runner import CoreRunner
+@@ -254,7 +254,12 @@ def run_core_udp_service(*, args, status) -> int:
+         # Aggregate core mode (single source of truth for birds-eye).
+         try:
+             inputs = build_aggregate_inputs(state=state, router=router, axis_ids=axis_ids, dt=dt)
+-            result = aggregate_and_store(state, inputs)
++            result = aggregate_core_mode(inputs)
++            # Apply aggregation result explicitly (aggregator remains pure)
++            state.core_mode = result.core_mode
++            state.core_blocked_by = list(result.blocked_by)
++            state.core_axis_gate = dict(result.axis_gate)
++            state.core_motion_allowed = bool(result.motion_allowed)
+         except Exception:
+             log.exception("core mode aggregation failed")
+ 
+diff --git a/src/steuerung3d/core/mode_aggregate.py b/src/steuerung3d/core/mode_aggregate.py
+index 265bd52..1e1bc74 100644
+--- a/src/steuerung3d/core/mode_aggregate.py
++++ b/src/steuerung3d/core/mode_aggregate.py
+@@ -233,11 +233,3 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
+         motion_allowed = False
+     return AggregateResult(core_mode=core_mode, blocked_by=blocked_by, axis_gate=axis_gate, motion_allowed=motion_allowed)
+ 
+-
+-def aggregate_and_store(state, inputs: AggregateInputs) -> AggregateResult:
+-    result = aggregate_core_mode(inputs)
+-    state.core_mode = result.core_mode
+-    state.core_blocked_by = list(result.blocked_by)
+-    state.core_axis_gate = dict(result.axis_gate)
+-    state.core_motion_allowed = bool(result.motion_allowed)
+-    return result
+diff --git a/tests/test_core_mode_runtime.py b/tests/test_core_mode_runtime.py
+index cd1bea0..0132bd3 100644
+--- a/tests/test_core_mode_runtime.py
++++ b/tests/test_core_mode_runtime.py
+@@ -1,13 +1,15 @@
+ from __future__ import annotations
+ 
+-from steuerung3d.core.mode_aggregate import AggregateInputs, AxisSafetyFacts, aggregate_and_store
++from steuerung3d.core.mode_aggregate import AggregateInputs, AxisSafetyFacts, aggregate_core_mode
+ from steuerung3d.core.state import MachineState
+ 
+ 
+-def test_aggregate_and_store_updates_state() -> None:
++def test_aggregate_core_mode_is_pure_and_state_application_is_explicit() -> None:
+     st = MachineState()
+-    result = aggregate_and_store(
+-        st,
++    default_mode = st.core_mode
++
++    # Aggregation is pure: it must not mutate MachineState.
++    result = aggregate_core_mode(
+         AggregateInputs(
+             axes=[
+                 AxisSafetyFacts(
+@@ -26,6 +28,14 @@ def test_aggregate_and_store_updates_state() -> None:
+             joy_soll_speed=0.0,
+         ),
+     )
++    assert st.core_mode == default_mode
++
++    # Application is explicit (the runtime loop / engine owns state mutation).
++    st.core_mode = result.core_mode
++    st.core_blocked_by = list(result.blocked_by)
++    st.core_axis_gate = dict(result.axis_gate)
++    st.core_motion_allowed = bool(result.motion_allowed)
++
+     assert st.core_mode == result.core_mode
+     assert st.core_blocked_by == list(result.blocked_by)
+     assert st.core_axis_gate == dict(result.axis_gate)

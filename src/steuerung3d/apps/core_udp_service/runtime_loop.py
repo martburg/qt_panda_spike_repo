@@ -9,7 +9,7 @@ from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.command_frame import CommandFrame, coerce_param_ops
 from steuerung3d.core.state import MachineState
-from steuerung3d.core.mode_aggregate import aggregate_and_store
+from steuerung3d.core.mode_aggregate import aggregate_core_mode
 from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapshot
 from steuerung3d.core.net import parse_hostport
 from steuerung3d.protocol.core_runner import CoreRunner
@@ -254,7 +254,12 @@ def run_core_udp_service(*, args, status) -> int:
         # Aggregate core mode (single source of truth for birds-eye).
         try:
             inputs = build_aggregate_inputs(state=state, router=router, axis_ids=axis_ids, dt=dt)
-            result = aggregate_and_store(state, inputs)
+            result = aggregate_core_mode(inputs)
+            # Apply aggregation result explicitly (aggregator remains pure)
+            state.core_mode = result.core_mode
+            state.core_blocked_by = list(result.blocked_by)
+            state.core_axis_gate = dict(result.axis_gate)
+            state.core_motion_allowed = bool(result.motion_allowed)
         except Exception:
             log.exception("core mode aggregation failed")
 
