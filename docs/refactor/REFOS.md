@@ -8,7 +8,6 @@ Semantic Policy: Small declared changes allowed
 ## 1. Mission
 
 Stabilize and streamline Steuerung3D while:
-- Sticking to 1 densi (`1dev_sim`)
 - Preventing silent semantic drift
 - Improving clarity, ownership handling, mode aggregation, and IO contracts
 - Keeping tests green and runtime stable
@@ -43,8 +42,6 @@ Allowed:
 - Documentation alignment.
 
 Operational constraint:
-- Only 1 densi active.
-- No multi-densi scaling work.
 - No PLC protocol changes without explicit declaration.
 
 ---
@@ -93,7 +90,7 @@ Gate:
 After each batch:
 
 1. `pytest -q`
-2. `python -m steuerung3d up --profile 1dev_sim`
+2. manual smoke test
 3. If Lane 2 → ledger updated + tests added
 
 No exceptions.
