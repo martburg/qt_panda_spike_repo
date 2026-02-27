@@ -5,14 +5,14 @@
 #
 # Enable intentionally defaults to false.
 
-[livetick]
+[lifetick]
 enable = false
 
 # Throttle: log at most every N seconds per axis.
 every_s = 0.05
 
 # Output log path (relative to CWD). A good default is the session folder.
-path = ".run/livetick.log"
+path = ".run/lifetick.log"
 
 # Rotation settings:
 #   max_bytes   - max file size before rollover

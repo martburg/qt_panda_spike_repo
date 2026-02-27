@@ -6,7 +6,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Dict, Optional
 
-from steuerung3d.config.lifrtick_config import LifrtickTraceConfig, load_lifrtick_config
+from steuerung3d.config.lifetick_config import LifetickTraceConfig, load_lifetick_config
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, coerce_param_ops
 from steuerung3d.core.core_mode import CoreMode, core_mode_value
 from steuerung3d.core.intent_handlers.lease import axis_lease_allows_any
@@ -18,34 +18,34 @@ log = logging.getLogger("core")
 # Lifetick tracing: avoid per-tick spam in the *core* logger.
 _lt_last_cmd_log_by_axis: dict[str, float] = {}
 
-_lifrtick_cfg: Optional[LifrtickTraceConfig] = None
-_lifrtick_logger: Optional[logging.Logger] = None
+_lifetick_cfg: Optional[LifetickTraceConfig] = None
+_lifetick_logger: Optional[logging.Logger] = None
 
 
-def _get_lifrtick_cfg() -> LifrtickTraceConfig:
-    global _lifrtick_cfg
-    if _lifrtick_cfg is None:
+def _get_lifetick_cfg() -> LifetickTraceConfig:
+    global _lifetick_cfg
+    if _lifetick_cfg is None:
         # Config lives in-repo, but is intentionally optional.
-        _lifrtick_cfg = load_lifrtick_config(Path("configs/debug/lifrtick.toml"))
-    return _lifrtick_cfg
+        _lifetick_cfg = load_lifetick_config(Path("configs/debug/lifetick.toml"))
+    return _lifetick_cfg
 
 
-def _get_lifrtick_logger() -> Optional[logging.Logger]:
+def _get_lifetick_logger() -> Optional[logging.Logger]:
     """Return a dedicated lifetick logger when enabled.
 
     This keeps main core logs readable while allowing high-frequency tracing
     into a rotating file ("oscilloscope" style).
     """
 
-    global _lifrtick_logger
-    if _lifrtick_logger is not None:
-        return _lifrtick_logger
+    global _lifetick_logger
+    if _lifetick_logger is not None:
+        return _lifetick_logger
 
-    cfg = _get_lifrtick_cfg()
+    cfg = _get_lifetick_cfg()
     if not cfg.enable:
         return None
 
-    logger = logging.getLogger("lifrtick")
+    logger = logging.getLogger("lifetick")
     logger.propagate = False
     logger.setLevel(logging.INFO)
 
@@ -66,8 +66,8 @@ def _get_lifrtick_logger() -> Optional[logging.Logger]:
     handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
     logger.addHandler(handler)
 
-    _lifrtick_logger = logger
-    return _lifrtick_logger
+    _lifetick_logger = logger
+    return _lifetick_logger
 
 
 def _compute_resync_any(state: MachineState) -> bool:
@@ -98,8 +98,8 @@ def build_command_frame(state: MachineState) -> CommandFrame:
 
     # LIFETICK trace: Core -> devices (via CommandFrame.lifetick_echo)
     now_s = time.monotonic()
-    cfg = _get_lifrtick_cfg()
-    lifrtick = _get_lifrtick_logger()
+    cfg = _get_lifetick_cfg()
+    lifetick = _get_lifetick_logger()
     every_s = float(cfg.every_s) if cfg.every_s is not None else 0.5
     axis_ids = sorted(set(axes.keys()) | set(lifetick_echo.keys()))
     for axis_id in axis_ids:
@@ -115,8 +115,8 @@ def build_command_frame(state: MachineState) -> CommandFrame:
                 state.tick,
                 int(v) & 0xFFFF if isinstance(v, int) else v,
             )
-            if lifrtick is not None:
-                lifrtick.info(
+            if lifetick is not None:
+                lifetick.info(
                     "axis=%s cmd_tick=%s echo=%s",
                     axis_id,
                     state.tick,

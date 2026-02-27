@@ -19,7 +19,7 @@ class LifetickTraceConfig:
     every_s: float = 0.5
 
     # File output. If *path* is relative, it is interpreted relative to CWD.
-    path: str = ".run/lifrtick.log"
+    path: str = ".run/lifetick.log"
 
     # Rotation settings.
     max_bytes: int = 2_000_000
