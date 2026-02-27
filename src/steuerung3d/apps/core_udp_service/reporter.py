@@ -126,7 +126,7 @@ def emit_birds_eye_status(
                         cmd_vel = 0.0
                 started = bool(cmd and (bool(getattr(cmd, "enable", False)) or abs(float(getattr(cmd, "vel", 0.0) or 0.0)) > 0.0))
 
-                owner = str(state.axis_claims.get(axis_id, "") or "")
+                owner = str(state.claim_owner(axis_id) or "")
                 if not owner:
                     holders = list(getattr(state, "lease_axis_holders", {}).get(axis_id, []) or [])
                     owner = str(holders[0]) if holders else ""

@@ -7,7 +7,7 @@ def claim_axis(state: MachineState, axis_id: str, hip_id: str, req_id: str) -> N
     """Handle ClaimAxis intent (legacy exclusive control)."""
     if not axis_id or not hip_id:
         return
-    cur = state.axis_claims.get(axis_id, "")
+    cur = state.claim_owner(axis_id)
     if cur in ("", hip_id):
         state.axis_claims[axis_id] = hip_id
         if req_id:
@@ -22,7 +22,7 @@ def release_axis(state: MachineState, axis_id: str, hip_id: str, req_id: str) ->
     """Handle ReleaseAxis intent."""
     if not axis_id or not hip_id:
         return
-    cur = state.axis_claims.get(axis_id, "")
+    cur = state.claim_owner(axis_id)
     if cur == hip_id:
         state.axis_claims.pop(axis_id, None)
         if req_id:

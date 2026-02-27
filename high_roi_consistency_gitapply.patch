@@ -1,0 +1,31 @@
+--- a/src/steuerung3d/core/intent_handlers/claims.py
++++ b/src/steuerung3d/core/intent_handlers/claims.py
+@@ -7,7 +7,7 @@
+     """Handle ClaimAxis intent (legacy exclusive control)."""
+     if not axis_id or not hip_id:
+         return
+-    cur = state.axis_claims.get(axis_id, "")
++    cur = state.claim_owner(axis_id)
+     if cur in ("", hip_id):
+         state.axis_claims[axis_id] = hip_id
+         if req_id:
+@@ -22,7 +22,7 @@
+     """Handle ReleaseAxis intent."""
+     if not axis_id or not hip_id:
+         return
+-    cur = state.axis_claims.get(axis_id, "")
++    cur = state.claim_owner(axis_id)
+     if cur == hip_id:
+         state.axis_claims.pop(axis_id, None)
+         if req_id:
+--- a/src/steuerung3d/apps/core_udp_service/reporter.py
++++ b/src/steuerung3d/apps/core_udp_service/reporter.py
+@@ -126,7 +126,7 @@
+                         cmd_vel = 0.0
+                 started = bool(cmd and (bool(getattr(cmd, "enable", False)) or abs(float(getattr(cmd, "vel", 0.0) or 0.0)) > 0.0))
+ 
+-                owner = str(state.axis_claims.get(axis_id, "") or "")
++                owner = str(state.claim_owner(axis_id) or "")
+                 if not owner:
+                     holders = list(getattr(state, "lease_axis_holders", {}).get(axis_id, []) or [])
+                     owner = str(holders[0]) if holders else ""
