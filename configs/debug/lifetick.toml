@@ -1,0 +1,21 @@
+# Lifetick tracing ("oscilloscope" style) for debugging connectivity.
+#
+# This creates a dedicated rotating log file for high-frequency lifetick
+# information without flooding the main core logger.
+#
+# Enable intentionally defaults to false.
+
+[lifetick]
+enable = false
+
+# Throttle: log at most every N seconds per axis.
+every_s = 0.05
+
+# Output log path (relative to CWD). A good default is the session folder.
+path = ".run/lifetick.log"
+
+# Rotation settings:
+#   max_bytes   - max file size before rollover
+#   backup_count - number of rollover files to keep
+max_bytes = 5_000_000
+backup_count = 10

@@ -162,3 +162,24 @@ class MachineState:
 
         holders = list((self.lease_axis_holders or {}).get(axis_id, []) or [])
         return str(holders[0]) if holders else ""
+
+    def claim_owner(self, axis_id: str) -> str:
+        """Return current claim owner for *axis_id* (empty if none)."""
+
+        axis_id = str(axis_id or "")
+        if not axis_id:
+            return ""
+        claims = getattr(self, "axis_claims", {}) or {}
+        if not isinstance(claims, dict):
+            return ""
+        return str(claims.get(axis_id, "") or "")
+
+    def is_claim_owner(self, axis_id: str, hip_id: str) -> bool:
+        """Return whether *hip_id* matches the claim owner for *axis_id*."""
+
+        axis_id = str(axis_id or "")
+        hip_id = str(hip_id or "")
+        if not axis_id or not hip_id:
+            return False
+        owner = self.claim_owner(axis_id)
+        return bool(owner) and (owner == hip_id)

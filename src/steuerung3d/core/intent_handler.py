@@ -39,6 +39,7 @@ from steuerung3d.core.intent_handlers.lease import (
 )
 from steuerung3d.core.intent_handlers.claims import claim_axis as _claim_axis
 from steuerung3d.core.intent_handlers.claims import release_axis as _release_axis
+from steuerung3d.core.intent_handlers.reset_resync import axis_reset_allowed
 
 
 log = logging.getLogger("core")
@@ -77,24 +78,6 @@ def _txn_seen_or_mark(state: MachineState, req_id: str, *, max_keep: int = 512) 
         for k, _t in items[: len(items) - max_keep]:
             state.seen_req_ids.pop(k, None)
     return False
-
-
-def _axis_reset_allowed(state: MachineState, axis_id: str, hip_id: str) -> tuple[bool, str]:
-    axis_id = str(axis_id or "")
-    hip_id = str(hip_id or "")
-    if not axis_id:
-        return False, "missing_axis"
-    if not hip_id:
-        return False, "missing_hip"
-    claim_owner = str(state.axis_claims.get(axis_id, "") or "")
-    if claim_owner and hip_id == claim_owner:
-        return True, "claim_owner"
-    holders = _axis_lease_holders(state, axis_id)
-    if hip_id in holders:
-        return True, "lease_holder"
-    if claim_owner or holders:
-        return False, "not_owner"
-    return False, "no_owner"
 
 
 def enforce_core_mode_actions(state: MachineState) -> None:
@@ -258,7 +241,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             axis_id = str(axis_id or "")
             hip_id = str(hip_id or "")
 
-            allowed, _reason = _axis_reset_allowed(state, axis_id, hip_id)
+            allowed, _reason = axis_reset_allowed(state, axis_id, hip_id)
             if not allowed:
                 key = axis_id or "<none>"
                 state.estop_reset_denied_count_by_axis[key] = int(
@@ -284,7 +267,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             hip_id = str(hip_id or "")
 
             if axis_id:
-                owner = state.axis_claims.get(axis_id, "")
+                owner = state.claim_owner(axis_id)
                 if owner and hip_id and owner != hip_id:
                     return
                 if hasattr(state, "resync_req_by_axis"):
@@ -306,7 +289,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             op = ParamEditBeginOp(group=grp)
 
             if axis_id and hasattr(state, "pending_param_ops_by_axis"):
-                owner = state.axis_claims.get(axis_id, "")
+                owner = state.claim_owner(axis_id)
                 if owner and hip_id and owner != hip_id:
                     return
                 state.pending_param_ops_by_axis.setdefault(axis_id, []).append(op)
@@ -343,7 +326,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             op = ParamWriteOp(group=grp, values=wire_vals)
 
             if axis_id and hasattr(state, "pending_param_ops_by_axis"):
-                owner = state.axis_claims.get(axis_id, "")
+                owner = state.claim_owner(axis_id)
                 if owner and hip_id and owner != hip_id:
                     return
                 state.pending_param_ops_by_axis.setdefault(axis_id, []).append(op)
@@ -369,7 +352,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             op = ParamCancelOp(group=grp)
 
             if axis_id and hasattr(state, "pending_param_ops_by_axis"):
-                owner = state.axis_claims.get(axis_id, "")
+                owner = state.claim_owner(axis_id)
                 if owner and hip_id and owner != hip_id:
                     return
                 state.pending_param_ops_by_axis.setdefault(axis_id, []).append(op)
@@ -398,7 +381,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             if not _axis_lease_allows(state, axis_id, hip_id):
                 state.lease_last_denial_reason = f"axis_lease_required:{axis_id}"
                 return
-            claim = state.axis_claims.get(axis_id, "")
+            claim = state.claim_owner(axis_id)
             if claim and hip_id and claim != hip_id:
                 return
             if claim and not hip_id:
@@ -415,7 +398,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             if not _axis_lease_allows(state, axis_id, hip_id):
                 state.lease_last_denial_reason = f"axis_lease_required:{axis_id}"
                 return
-            claim = state.axis_claims.get(axis_id, "")
+            claim = state.claim_owner(axis_id)
             if claim and hip_id and claim != hip_id:
                 return
             if claim and not hip_id:
@@ -432,7 +415,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             if not _axis_lease_allows(state, axis_id, hip_id):
                 state.lease_last_denial_reason = f"axis_lease_required:{axis_id}"
                 return
-            claim = state.axis_claims.get(axis_id, "")
+            claim = state.claim_owner(axis_id)
             if claim and hip_id and claim != hip_id:
                 return
             if claim and not hip_id:
@@ -454,7 +437,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
                     if not _axis_lease_allows(state, axis_id, hip_id):
                         state.lease_last_denial_reason = f"axis_lease_required:{axis_id}"
                         continue
-                    claim = state.axis_claims.get(axis_id, "")
+                    claim = state.claim_owner(axis_id)
                     if claim and hip_id and claim != hip_id:
                         continue
                     if claim and not hip_id:

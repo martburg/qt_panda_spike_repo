@@ -37,7 +37,8 @@ def load_lifetick_config(path: Path) -> LifetickTraceConfig:
         return LifetickTraceConfig()
 
     data = load_toml(path)
-    root = data.get("lifetick", {}) if isinstance(data, dict) else {}
+    # Historical/legacy spelling: [lifrtick]
+    root = data.get("lifrtick", {}) if isinstance(data, dict) else {}
     if not isinstance(root, dict):
         return LifetickTraceConfig()
 
@@ -63,9 +64,9 @@ def load_lifetick_config(path: Path) -> LifetickTraceConfig:
         v: Any = root.get(key, default)
         return str(v) if v is not None else str(default)
 
-    every_s = max(0.0, _get_float("every_s", LifrtickTraceConfig.every_s))
-    max_bytes = max(1, _get_int("max_bytes", LifrtickTraceConfig.max_bytes))
-    backup_count = max(0, _get_int("backup_count", LifrtickTraceConfig.backup_count))
+    every_s = max(0.0, _get_float("every_s", LifetickTraceConfig.every_s))
+    max_bytes = max(1, _get_int("max_bytes", LifetickTraceConfig.max_bytes))
+    backup_count = max(0, _get_int("backup_count", LifetickTraceConfig.backup_count))
 
     return LifetickTraceConfig(
         enable=_get_bool("enable", LifetickTraceConfig.enable),

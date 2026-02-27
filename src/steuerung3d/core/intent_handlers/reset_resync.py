@@ -18,7 +18,7 @@ def axis_reset_allowed(state: MachineState, axis_id: str, hip_id: str) -> tuple[
     if not hip_id:
         return False, "missing_hip"
 
-    claim_owner = str(state.axis_claims.get(axis_id, "") or "")
+    claim_owner = state.claim_owner(axis_id)
     if claim_owner and hip_id == claim_owner:
         return True, "claim_owner"
 
