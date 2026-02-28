@@ -133,6 +133,35 @@ class MachineState:
     core_axis_gate: Dict[str, Dict[str, object]] = field(default_factory=dict)
     core_motion_allowed: bool = False
 
+    def clear_one_shots(self) -> None:
+        """Clear one-shot request fields after they have been emitted once.
+
+        Semantic policy (2026-02-28):
+        - The per-axis maps (``*_by_axis``) are the canonical source of truth.
+        - The legacy global fields (``estop_reset_req``, ``resync_req``, ``pending_param_ops``)
+          are maintained only for backward compatibility and are cleared here as well.
+        """
+
+        # Reset / resync pulses (one-shot)
+        self.estop_reset_req = False
+        self.estop_reset_req_by_axis.clear()
+
+        self.resync_req = False
+        self.resync_req_by_axis.clear()
+
+        # Parameter ops are one-shot as well (UI can re-issue if needed)
+        self.pending_param_ops.clear()
+        self.pending_param_ops_by_axis.clear()
+
+    def clear_transients(self) -> None:
+        """Clear transient/one-shot state after a full engine tick.
+
+        This consolidates the end-of-tick cleanup into a single supported write-path.
+        """
+
+        self.clear_one_shots()
+        self.core_acks.clear()
+
 
     def ensure_axis(self, axis_id: str) -> AxisState:
         axis_id = str(axis_id)
@@ -215,23 +244,3 @@ class MachineState:
             if hip_id and self.claim_owner(axis_id) != hip_id:
                 return
         self.axis_claims.pop(axis_id, None)
-
-def clear_one_shots(self) -> None:
-    """Clear one-shot request fields after they have been emitted once.
-
-    Semantic policy (2026-02-28):
-    - The per-axis maps (``*_by_axis``) are the canonical source of truth.
-    - The legacy global fields (``estop_reset_req``, ``resync_req``, ``pending_param_ops``)
-      are maintained only for backward compatibility and are cleared here as well.
-    """
-
-    # Reset / resync pulses (one-shot)
-    self.estop_reset_req = False
-    self.estop_reset_req_by_axis.clear()
-
-    self.resync_req = False
-    self.resync_req_by_axis.clear()
-
-    # Parameter ops are one-shot as well (UI can re-issue if needed)
-    self.pending_param_ops.clear()
-    self.pending_param_ops_by_axis.clear()

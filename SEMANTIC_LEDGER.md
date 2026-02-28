@@ -52,3 +52,4 @@ This file records *declared* semantic changes (RefOS Lane 2) made during stabili
 ### Notes
 - Multi-axis routing in core_udp_service continues to route per-axis param ops and reset pulses strictly.
 - `MachineState.clear_one_shots()` centralizes one-shot clearing to keep the tick loop clean.
+- Bugfix/tightening: `clear_one_shots` is now a real `MachineState` method (was accidentally module-level in one snapshot), and the engine uses `state.clear_transients()` for end-of-tick cleanup.

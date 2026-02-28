@@ -2,20 +2,17 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.state import MachineState
-from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapshot
 from steuerung3d.core.net import parse_hostport
 from steuerung3d.protocol.core_runner import CoreRunner
 from steuerung3d.protocol.axis_router import AxisRouter
 from steuerung3d.protocol.udp_channels import UdpIntentIn, UdpTelemetryOut, UdpTelemetryFanout
 from steuerung3d.protocol.udp_plc_channels import UdpPlcTelemetryIn, UdpPlcCommandOut
-from steuerung3d.util.heartbeat import ChangeTracker
 
 from .cli_validation import (
     uniq_axes_or_error,
@@ -25,7 +22,7 @@ from .cli_validation import (
 from .runtime_helpers import apply_mode_aggregation as _apply_mode_aggregation
 from .runtime_helpers import compute_one_shots_by_axis as _compute_one_shots_by_axis
 from .fatal_ui import fatal as _fatal
-from .reporter import emit_birds_eye_status, log_periodic_heartbeat
+from .runtime_handlers import DeviceStepper, SnapshotHandler, build_intent_drain
 from .targets import expand_dev_cmd_targets as _expand_dev_cmd_targets
 from .targets import expand_targets as _expand_targets
 
@@ -119,10 +116,6 @@ def run_core_udp_service(*, args, status) -> int:
         "cmd_ts": None,
     }
     t0 = time.monotonic()
-    t_last_report = t0
-
-    # Track key state transitions (avoid log spam while still giving operators context).
-    state_ch = ChangeTracker()
 
     log.info("=== core_udp_service starting ===")
     log.info("Operator: IntentIn  bind=%s", intent_in_bind)
@@ -187,144 +180,39 @@ def run_core_udp_service(*, args, status) -> int:
         ui_telem_out_by_axis=axis_ui_outs,
     )
 
-    def drain_intents():
-        ints = op_intent_in.drain_intents(limit=200)
-        if ints:
-            stats["intents_in"] += len(ints)
-            last_seen["intent_ts"] = time.monotonic()
-            try:
-                last_intents_meta["count"] = int(len(ints))
-                last_intents_meta["types"] = sorted({type(i).__name__ for i in ints})
-            except Exception:
-                last_intents_meta["count"] = int(len(ints))
-                last_intents_meta["types"] = []
-            log.debug("rx intents: %d (last=%s)", len(ints), type(ints[-1]).__name__)
-        return ints
+    drain_intents = build_intent_drain(
+        op_intent_in=op_intent_in,
+        stats=stats,
+        last_seen=last_seen,
+        last_intents_meta=last_intents_meta,
+        log=log,
+    )
 
-    def device_step(state, cmd_frame, dt):
-        nonlocal t_last_report
+    device_step = DeviceStepper(
+        router=router,
+        axis_ids=axis_ids,
+        dev_telem_in=dev_telem_in,
+        stats=stats,
+        last_seen=last_seen,
+        t0=t0,
+        apply_mode_aggregation=_apply_mode_aggregation,
+        compute_one_shots_by_axis=_compute_one_shots_by_axis,
+        log=log,
+    )
 
-        # Per-axis command routing (no broadcast).
-        estop_reset_by_axis, param_ops_by_axis = _compute_one_shots_by_axis(state, axis_ids)
-
-        sent = router.publish_command_frames(
-            cmd_frame,
-            estop_reset_by_axis=estop_reset_by_axis,
-            param_ops_by_axis=param_ops_by_axis,
-        )
-        stats["cmd_out"] += max(1, sent)
-        last_seen["cmd_ts"] = time.monotonic()
-
-        snaps = dev_telem_in.drain_telemetry(limit=50)
-        if snaps:
-            stats["dev_telem_in"] += len(snaps)
-            last_seen["dev_telem_ts"] = time.monotonic()
-            # Update axis-scoped caches from all received device snapshots.
-            router.ingest_device_telemetry(snaps)
-            # Device-side measured telemetry can arrive from multiple sources
-            # (e.g. one DenSi process per axis). Apply *all* snapshots so each
-            # axis' measured/meta fields get updated, instead of only the most
-            # recent datagram.
-            for snap in snaps:
-                apply_measured_snapshot(state, snap)
-            log.debug(
-                "rx dev telem: %d (last estop=%s fault=%s tick=%s)",
-                len(snaps),
-                snaps[-1].estop,
-                snaps[-1].fault,
-                snaps[-1].tick,
-            )
-        else:
-            log.debug("rx dev telem: 0")
-
-        # Aggregate core mode (single source of truth for birds-eye).
-        try:
-            _apply_mode_aggregation(state, router=router, axis_ids=axis_ids, dt=dt)
-        except Exception:
-            log.exception("core mode aggregation failed")
-
-        log.debug("tx cmd frame: tick=%s estop=%s fault=%s core_mode=%s",
-                  cmd_frame.tick, cmd_frame.estop, cmd_frame.fault, cmd_frame.core_mode)
-
-        now = time.monotonic()
-        if now - t_last_report >= 1.0:
-            log_periodic_heartbeat(
-                log=log,
-                now=now,
-                t0=t0,
-                state=state,
-                stats=stats,
-                last_seen=last_seen,
-            )
-            t_last_report = now
-
-    # Lifetick tracing: log Core->UI device tick at most every 0.5s per axis.
-    _lt_last_ui_log_s_by_axis: dict[str, float] = {}
-
-    def on_snapshot(snap: TelemetrySnapshot):
-        # Log key state changes once (helps a lot during field debugging).
-        try:
-            mode_v = str(getattr(snap, "core_mode", ""))
-            estop_v = bool(getattr(snap, "estop", False))
-            fault_v = bool(getattr(snap, "fault", False))
-            rig_v = str(getattr(snap, "rig_mode", ""))
-            if (
-                state_ch.changed("core_mode", mode_v)
-                or state_ch.changed("estop", estop_v)
-                or state_ch.changed("fault", fault_v)
-                or state_ch.changed("rig_mode", rig_v)
-            ):
-                log.info("state: core_mode=%s estop=%s fault=%s rig_mode=%s", mode_v, estop_v, fault_v, rig_v)
-
-            claims = tuple(sorted(dict(getattr(st, "axis_claims", {}) or {}).items()))
-            if state_ch.changed("claims", claims):
-                log.info("claims: %s", dict(claims))
-
-            pe = bool(getattr(st, "param_edit_active", False))
-            pg = str(getattr(st, "param_edit_group", ""))
-            if state_ch.changed("param_edit", (pe, pg)):
-                log.info("param_edit: active=%s group=%s", pe, pg)
-        except Exception:
-            pass
-
-        if not args.ui_telem_disable:
-            # One HiP per axis: send a *sliced* snapshot to each UI target.
-            router.publish_ui_snapshot(snap)
-
-        if c2_fanout is not None:
-            c2_fanout.publish_telemetry(snap)
-            stats["c2_telem_out"] += max(1, len(c2_telem_outs))
-            last_seen["c2_telem_ts"] = time.monotonic()
-
-        # LIFETICK trace: Core -> HiP (TelemetrySnapshot.axes[axis].device_tick)
-        for axis_id in axis_ids:
-            try:
-                ax = dict(getattr(snap, "axes", {}) or {}).get(axis_id)
-                dev_tick = getattr(ax, "device_tick", None)
-                now_s = time.monotonic()
-                last_s = float(_lt_last_ui_log_s_by_axis.get(axis_id, 0.0))
-                if dev_tick is not None and (now_s - last_s) >= 0.5:
-                    _lt_last_ui_log_s_by_axis[axis_id] = now_s
-                    log.debug("LIFETICK Core tx UI telem: axis=%s device_tick=%s", axis_id, int(dev_tick))
-            except Exception:
-                pass
-
-        if not args.ui_telem_disable:
-            stats["ui_telem_out"] += max(1, len(axis_ids))
-            last_seen["ui_telem_ts"] = time.monotonic()
-
-            log.debug("tx ui telem: tick=%s estop=%s fault=%s", snap.tick, snap.estop, snap.fault)
-
-        # Structured heartbeat for supervisor birds-eye (PLC telemetry remains unchanged).
-        emit_birds_eye_status(
-            status=status,
-            snap=snap,
-            state=st,
-            router=router,
-            axis_ids=axis_ids,
-            last_intents_meta=last_intents_meta,
-            last_seen=last_seen,
-        )
+    on_snapshot = SnapshotHandler(
+        router=router,
+        axis_ids=axis_ids,
+        args=args,
+        c2_fanout=c2_fanout,
+        c2_telem_outs=c2_telem_outs,
+        stats=stats,
+        last_seen=last_seen,
+        status=status,
+        state=st,
+        last_intents_meta=last_intents_meta,
+        log=log,
+    )
 
     eng = CoreEngine(
         timebase=tb,

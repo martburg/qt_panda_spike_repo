@@ -1,0 +1,38 @@
+# stacks/joy_local_to_remote_core.toml
+# Local machine: inputd + joy2intent
+# Remote machine: core (+ densi/hip) is already running and listening on 100.80.182.128:51001
+
+[app]
+dt_s = 0.02
+realtime = false
+
+[net]
+raw_controls = "127.0.0.1:50100"
+remote_intent = "100.80.182.128:51001"
+
+[services.inputd]
+enabled = true
+argv = [
+  "python", "-m", "steuerung3d.apps.inputd",
+  "--config", "configs/inputd_gamepad.toml",
+]
+
+[services.joy2intent]
+enabled = true
+argv = [
+  "python", "-m", "steuerung3d.apps.joy2intent",
+  "--config", "configs/joy2intent_bindings_gamepad.toml",
+  "--raw-in", "{net.raw_controls}",
+  "--intent-out", "{net.remote_intent}",
+  "--winches", "Anton",
+]
+
+# Explicitly keep the rest OFF on the local box
+[services.core]
+enabled = false
+
+[services.densi]
+enabled = false
+
+[services.hip]
+enabled = false

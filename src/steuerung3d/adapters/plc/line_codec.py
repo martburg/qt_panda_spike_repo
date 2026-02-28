@@ -96,6 +96,49 @@ class PlcLineCodec:
         return self.encode(values, schema=self.tx)
 
 
+@dataclass(frozen=True)
+class PlcTelemetryLine:
+    """Typed view of a decoded TX (PLC->core) line."""
+
+    tick: int
+    axis: str
+    enabled: bool
+    vel: float
+    pos: float
+    fault: bool
+    extra: str = ""
+
+
+def decode_tx_line(codec: PlcLineCodec, line: str) -> Optional[PlcTelemetryLine]:
+    """Best-effort parse of a PLC telemetry line.
+
+    Returns None if required fields are missing or malformed.
+    """
+
+    m = codec.decode_tx(line)
+    axis = str(m.get("axis", "") or "").strip()
+    if not axis:
+        return None
+    try:
+        tick = parse_int(str(m.get("tick", "0")), default=0)
+        enabled = bool(parse_bool(str(m.get("enabled", "0")), default=False))
+        vel = float(parse_float(str(m.get("vel", "0")), default=0.0))
+        pos = float(parse_float(str(m.get("pos", "0")), default=0.0))
+        fault_i = parse_int(str(m.get("fault", "0")), default=0)
+        extra = str(m.get("_extra", "") or "")
+        return PlcTelemetryLine(
+            tick=int(tick),
+            axis=axis,
+            enabled=enabled,
+            vel=vel,
+            pos=pos,
+            fault=bool(fault_i != 0),
+            extra=extra,
+        )
+    except Exception:
+        return None
+
+
 def parse_int(v: str, default: int = 0) -> int:
     return _parse_int(v, default=default)
 

@@ -4,7 +4,7 @@ import socket
 from dataclasses import dataclass, field
 from typing import Optional, Tuple
 
-from steuerung3d.adapters.plc.line_codec import PlcLineCodec, parse_bool, parse_float, parse_int
+from steuerung3d.adapters.plc.line_codec import PlcLineCodec, decode_tx_line
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.state import MachineState
 
@@ -85,17 +85,14 @@ class UdpPlcDevice:
             ln = ln.strip()
             if not ln:
                 continue
-            tx = self.codec.decode_tx(ln)
-            axis = tx.get("axis")
-            if not axis:
+            frame = decode_tx_line(self.codec, ln)
+            if frame is None:
                 continue
             # Discovery: create axes on first sight so HiPs can select them.
-            ax = state.ensure_axis(str(axis))
+            ax = state.ensure_axis(str(frame.axis))
             # Record last-seen (core tick) for UI/health decisions.
             ax.meta["last_seen_tick"] = int(state.tick)
-            ax.enabled = bool(parse_bool(tx.get("enabled", "0")))
-            ax.vel = float(parse_float(tx.get("vel", "0")))
-            ax.pos = float(parse_float(tx.get("pos", "0")))
-            # fault is optional
-            fault = parse_int(tx.get("fault", "0"), default=0)
-            ax.fault = fault != 0
+            ax.enabled = bool(frame.enabled)
+            ax.vel = float(frame.vel)
+            ax.pos = float(frame.pos)
+            ax.fault = bool(frame.fault)

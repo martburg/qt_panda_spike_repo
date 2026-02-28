@@ -31,7 +31,7 @@ def _profile_arg(value: str) -> str:
     """argparse type for --profile.
 
     Accepts either:
-      - a known profile name (resolved via configs/stacks/<name>.toml)
+      - a known profile name (resolved via configs/profiles/<name>.toml; legacy: configs/stacks)
       - an explicit TOML path
 
     Raises a helpful error listing known profile names.
@@ -54,7 +54,7 @@ def _profile_arg(value: str) -> str:
         )
     raise argparse.ArgumentTypeError(
         f"unknown profile '{v}' and no profiles discovered. "
-        "(Tip: expected configs/stacks/*.toml or a direct .toml path)"
+        "(Tip: expected configs/profiles/*.toml (or legacy configs/stacks) or a direct .toml path)"
     )
 
 
@@ -66,14 +66,14 @@ class St3DArgumentParser(argparse.ArgumentParser):
         if "--profile" in message:
             names = discover_stack_profiles()
             if names:
-                extra_lines = ["", "Available profiles (configs/stacks/*.toml):"]
+                extra_lines = ["", "Available profiles (configs/profiles/*.toml; legacy configs/stacks):"]
                 extra_lines += [f"  - {n}" for n in names]
                 extra_lines += ["", "Tip: python -m steuerung3d profiles"]
                 extra = "\n".join(extra_lines) + "\n"
             else:
                 extra = (
-                    "\nNo profiles found under configs/stacks/. "
-                    "Provide a direct .toml path, or add configs/stacks/<name>.toml.\n"
+                    "\nNo profiles found under configs/profiles/ (or legacy configs/stacks/). "
+                    "Provide a direct .toml path, or add configs/profiles/<name>.toml.\n"
                 )
 
         self.print_usage(sys.stderr)
@@ -85,7 +85,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sp = sub.add_parser("profiles", help="list available stack profiles")
-    sp.add_argument("--dir", default=None, help="override stacks dir (default: configs/stacks)")
+    sp.add_argument("--dir", default=None, help="override profiles dir (default: configs/profiles)")
     sp.add_argument("--paths", action="store_true", help="print full paths")
     sp.set_defaults(_fn=cmd_profiles)
 

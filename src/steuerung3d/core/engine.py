@@ -71,28 +71,13 @@ class CoreEngine:
             self.state.update_param_commit_timeout(max_age_ticks=max_age_ticks)
 
         # ---- clear one-shot requests after emitting once ----
-        if hasattr(self.state, "clear_one_shots"):
-            self.state.clear_one_shots()
-        else:
-            # Fallback for older snapshots
-            self.state.estop_reset_req = False
-            if hasattr(self.state, "estop_reset_req_by_axis"):
-                self.state.estop_reset_req_by_axis.clear()
-
-            self.state.resync_req = False
-            if hasattr(self.state, "resync_req_by_axis"):
-                self.state.resync_req_by_axis.clear()
-
-            self.state.pending_param_ops.clear()
-            if hasattr(self.state, "pending_param_ops_by_axis"):
-                self.state.pending_param_ops_by_axis.clear()
+        self.state.clear_transients()
 
         # 5) emit telemetry snapshot
         if self.on_snapshot is not None:
             self.on_snapshot(TelemetrySnapshot.from_state(self.state))
 
-        # one-shot transactional acks (HIP<->Core)
-        self.state.core_acks.clear()
+
 
     def run_for_ticks(self, n: int) -> None:
         if n < 0:

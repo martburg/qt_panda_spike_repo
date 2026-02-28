@@ -1,0 +1,2841 @@
+diff --git a/SEMANTIC_LEDGER.md b/SEMANTIC_LEDGER.md
+index 0a69a23..12916bf 100644
+--- a/SEMANTIC_LEDGER.md
++++ b/SEMANTIC_LEDGER.md
+@@ -52,3 +52,4 @@ This file records *declared* semantic changes (RefOS Lane 2) made during stabili
+ ### Notes
+ - Multi-axis routing in core_udp_service continues to route per-axis param ops and reset pulses strictly.
+ - `MachineState.clear_one_shots()` centralizes one-shot clearing to keep the tick loop clean.
++- Bugfix/tightening: `clear_one_shots` is now a real `MachineState` method (was accidentally module-level in one snapshot), and the engine uses `state.clear_transients()` for end-of-tick cleanup.
+diff --git a/configs/README.md b/configs/README.md
+index 2fc521c..e35673a 100644
+--- a/configs/README.md
++++ b/configs/README.md
+@@ -21,4 +21,5 @@ Package-level defaults / embedded example configs shipped with the library.
+ ## Notes
+ 
+ - This README was auto-generated to help orient the repo. If something is inaccurate, update it to match reality.
+-- Stack profiles (e.g. `configs/stacks/1dev_sim.toml`) currently point joy2intent to `configs/joy2intent_bindings_gamepad.toml`.
++- Stack profiles live in `configs/profiles/*.toml` (canonical).
++  `configs/stacks/` remains supported for backward compatibility.
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/configs/profiles/1dev_sim.toml b/configs/profiles/1dev_sim.toml
+new file mode 100644
+index 0000000..8946a8e
+--- /dev/null
++++ b/configs/profiles/1dev_sim.toml
+@@ -0,0 +1,69 @@
++[stack]
++name = "1dev_sim"
++
++[rig]
++# Minimal SIM stack: one simulated device, one HiP, all the trimmings.
++axes = ["Anton"]
++device_source = "sim"
++
++[net]
++bind_host = "127.0.0.1"
++cmd_base = 52001
++ui_telem_base = 51002
++dev_telem_in = "127.0.0.1:52020"
++status_in = "127.0.0.1:51200"
++raw_in = "127.0.0.1:50100"
++intent = "127.0.0.1:51001"
++
++[services.core]
++enabled = true
++module = "steuerung3d.apps.core_udp_service"
++mode = "single"
++args = [
++  "--intent-in", "{net.intent}",
++  "--dev-telem-in", "{net.dev_telem_in}",
++  "--dev-cmd-base", "{net.cmd_base}",
++  "--dev-cmd-count", "{len(rig.axes)}",
++  "--ui-telem-base", "{net.ui_telem_base}",
++  "--ui-telem-count", "{len(rig.axes)}",
++  "{repeat('--axis', rig.axes)}",
++]
++
++[services.densi]
++enabled = true
++module = "steuerung3d.apps.den_si"
++mode = "per_axis"
++config = "configs/services/densi.toml"
++args = [
++  "--axis", "{axis}",
++  "--cmd-in", "{net.bind_host}:{net.cmd_base + axis_index}",
++  "--telem-out", "{net.dev_telem_in}",
++]
++
++[services.hip]
++enabled = true
++module = "steuerung3d.apps.hi_p"
++mode = "single"
++count = 1  # count must be int; 'auto' removed to avoid confusion
++config = "configs/services/hip.toml"
++args = [
++  "--telem-in", "{net.bind_host}:{net.ui_telem_base}",
++  "--intent-out", "{net.intent}",
++]
++
++[services.inputd]
++enabled = true
++module = "steuerung3d.apps.inputd"
++mode = "single"
++config = "configs/inputd_gamepad.toml"
++
++[services.joy2intent]
++enabled = true
++module = "steuerung3d.apps.joy2intent"
++mode = "single"
++config = "configs/joy2intent_bindings_gamepad.toml"
++args = [
++  "--raw-in", "{net.raw_in}",
++  "--intent-out", "{net.intent}",
++  "--winches", "{csv(rig.axes)}",
++]
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/configs/profiles/1dev_sim_remote.toml b/configs/profiles/1dev_sim_remote.toml
+new file mode 100644
+index 0000000..a5b47af
+--- /dev/null
++++ b/configs/profiles/1dev_sim_remote.toml
+@@ -0,0 +1,69 @@
++[stack]
++name = "1dev_sim"
++
++[rig]
++# Minimal SIM stack: one simulated device, one HiP, all the trimmings.
++axes = ["Anton"]
++device_source = "sim"
++
++[net]
++bind_host = "0.0.0.0"
++cmd_base = 52001
++ui_telem_base = 51002
++dev_telem_in = "127.0.0.1:52020"
++status_in = "127.0.0.1:51200"
++raw_in = "127.0.0.1:50100"
++intent = "0.0.0.0:51001"
++
++[services.core]
++enabled = true
++module = "steuerung3d.apps.core_udp_service"
++mode = "single"
++args = [
++  "--intent-in", "{net.intent}",
++  "--dev-telem-in", "{net.dev_telem_in}",
++  "--dev-cmd-base", "{net.cmd_base}",
++  "--dev-cmd-count", "{len(rig.axes)}",
++  "--ui-telem-base", "{net.ui_telem_base}",
++  "--ui-telem-count", "{len(rig.axes)}",
++  "{repeat('--axis', rig.axes)}",
++]
++
++[services.densi]
++enabled = true
++module = "steuerung3d.apps.den_si"
++mode = "per_axis"
++config = "configs/services/densi.toml"
++args = [
++  "--axis", "{axis}",
++  "--cmd-in", "{net.bind_host}:{net.cmd_base + axis_index}",
++  "--telem-out", "{net.dev_telem_in}",
++]
++
++[services.hip]
++enabled = true
++module = "steuerung3d.apps.hi_p"
++mode = "single"
++count = 1  # count must be int; 'auto' removed to avoid confusion
++config = "configs/services/hip.toml"
++args = [
++  "--telem-in", "{net.bind_host}:{net.ui_telem_base}",
++  "--intent-out", "{net.intent}",
++]
++
++[services.inputd]
++enabled = false
++module = "steuerung3d.apps.inputd"
++mode = "single"
++config = "configs/inputd_gamepad.toml"
++
++[services.joy2intent]
++enabled = false
++module = "steuerung3d.apps.joy2intent"
++mode = "single"
++config = "configs/joy2intent_bindings_gamepad.toml"
++args = [
++  "--raw-in", "{net.raw_in}",
++  "--intent-out", "{net.intent}",
++  "--winches", "{csv(rig.axes)}",
++]
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/configs/profiles/1dev_sim_remote_joy.toml b/configs/profiles/1dev_sim_remote_joy.toml
+new file mode 100644
+index 0000000..741d245
+--- /dev/null
++++ b/configs/profiles/1dev_sim_remote_joy.toml
+@@ -0,0 +1,73 @@
++[stack]
++name = "1dev_sim_remote_joy"
++
++[rig]
++# Minimal SIM stack: one simulated device, one HiP, all the trimmings.
++axes = ["Anton"]
++device_source = "sim"
++
++[net]
++bind_host = "0.0.0.0"
++cmd_base = 52001
++ui_telem_base = 51002
++dev_telem_in = "127.0.0.1:52020"
++status_in = "127.0.0.1:51200"
++raw_in = "127.0.0.1:50100"
++
++# split intent bind vs send
++intent_in  = "0.0.0.0:51001"      # Core listens here (remote + localhost)
++intent_out = "127.0.0.1:51001"    # HiP sends here (local to Core)
++
++
++[services.core]
++enabled = true
++module = "steuerung3d.apps.core_udp_service"
++mode = "single"
++args = [
++  "--intent-in", "{net.intent_in}",
++  "--dev-telem-in", "{net.dev_telem_in}",
++  "--dev-cmd-base", "{net.cmd_base}",
++  "--dev-cmd-count", "{len(rig.axes)}",
++  "--ui-telem-base", "{net.ui_telem_base}",
++  "--ui-telem-count", "{len(rig.axes)}",
++  "{repeat('--axis', rig.axes)}",
++]
++
++[services.densi]
++enabled = true
++module = "steuerung3d.apps.den_si"
++mode = "per_axis"
++config = "configs/services/densi.toml"
++args = [
++  "--axis", "{axis}",
++  "--cmd-in", "{net.bind_host}:{net.cmd_base + axis_index}",
++  "--telem-out", "{net.dev_telem_in}",
++]
++
++[services.hip]
++enabled = true
++module = "steuerung3d.apps.hi_p"
++mode = "single"
++count = 1  # count must be int; 'auto' removed to avoid confusion
++config = "configs/services/hip.toml"
++args = [
++  "--telem-in", "{net.bind_host}:{net.ui_telem_base}",
++  "--intent-out", "{net.intent_out}",
++]
++
++[services.inputd]
++enabled = false
++module = "steuerung3d.apps.inputd"
++mode = "single"
++config = "configs/inputd_gamepad.toml"
++
++[services.joy2intent]
++enabled = false
++module = "steuerung3d.apps.joy2intent"
++mode = "single"
++config = "configs/joy2intent_bindings_gamepad.toml"
++args = [
++  "--raw-in", "{net.raw_in}",
++  "--intent-out", "{net.intent}",
++  "--winches", "{csv(rig.axes)}",
++]
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/configs/profiles/README.md b/configs/profiles/README.md
+new file mode 100644
+index 0000000..bd66767
+--- /dev/null
++++ b/configs/profiles/README.md
+@@ -0,0 +1,14 @@
++## Stack profiles
++
++Canonical stack profile location: `configs/profiles/*.toml`.
++
++These TOML files are consumed by:
++
++```bash
++python -m steuerung3d up --profile 1dev_sim
++python -m steuerung3d profiles
++```
++
++Notes:
++- `configs/stacks/` remains supported for backward compatibility, but new profiles
++  should be added here.
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/configs/profiles/anton_core_densi.toml b/configs/profiles/anton_core_densi.toml
+new file mode 100644
+index 0000000..cd26c76
+--- /dev/null
++++ b/configs/profiles/anton_core_densi.toml
+@@ -0,0 +1,53 @@
++# Core + DenSi for a single Anton axis, all local.
++# Use:
++#   python -m steuerung3d up --profile anton_core_densi
++#
++# Notes:
++# - core_udp_service currently binds IntentIn fixed at 127.0.0.1:51001 (no CLI flag).
++# - UI telemetry out uses --ui-telem-target / --ui-telem-base flags (not --telem-out).
++
++[stack]
++name = "anton_core_densi"
++description = "Core + DenSi (Anton) using PLC semicolon UDP"
++
++[rig]
++axes = ["Anton"]
++
++[net]
++bind_host = "127.0.0.1"
++intent = "127.0.0.1:51001"
++ui_telem_out = 51002
++
++# Device-side (PLC wire)
++dev_cmd_base = 52001
++# DenSi telem-out should target this; core binds it
++# (keep it distinct from dev_cmd ports).
++dev_telem_in = "127.0.0.1:52020"
++
++[services.core]
++enabled = true
++module = "steuerung3d.apps.core_udp_service"
++args = [
++  "--intent-in", "{net.intent}",
++  "--axis", "Anton",
++  "--ui-telem-target", "127.0.0.1:51002",
++  "--dev-cmd-base", "52001",
++  "--dev-cmd-count", "1",
++  "--dev-telem-in", "127.0.0.1:52020",
++  "--dt", "0.02",
++  "--log-level", "info",
++]
++
++[services.densi]
++enabled = true
++module = "steuerung3d.apps.den_si"
++mode = "per_axis"
++config = "configs/services/densi.toml"
++args = [
++  "--axis", "Anton",
++  "--cmd-in", "127.0.0.1:52001",
++  "--telem-out", "127.0.0.1:52020",
++  "--wire-proto", "plc",
++  "--dt", "0.01",
++  "--log-level", "info",
++]
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/configs/profiles/dev_real.toml b/configs/profiles/dev_real.toml
+new file mode 100644
+index 0000000..dc7b9e9
+--- /dev/null
++++ b/configs/profiles/dev_real.toml
+@@ -0,0 +1,70 @@
++[stack]
++name = "dev_real"
++
++[rig]
++# REAL stack: PLCs/DenSis are already running and emitting telemetry.
++# The supervisor starts core+tooling first, discovers live devices from telemetry,
++# then starts a HiP pool sized to the discovered devices.
++device_source = "real"
++# How long to listen for telemetry before provisioning the HiP pool.
++discovery_ms = 2000
++# Optional: expected axes list (documentation only, not used for spawning in REAL).
++axes = []
++
++[net]
++bind_host = "127.0.0.1"
++cmd_base = 52001
++ui_telem_base = 51002
++dev_telem_in = "172.16.17.5:52020"  # example: device telemetry coming into the core
++status_in = "127.0.0.1:51200"
++raw_in = "127.0.0.1:50100"
++intent = "127.0.0.1:51001"
++
++[services.core]
++enabled = true
++module = "steuerung3d.apps.core_udp_service"
++mode = "single"
++args = [
++  "--intent-in", "{net.intent}",
++  "--dev-telem-in", "{net.dev_telem_in}",
++  "--dev-cmd-base", "{net.cmd_base}",
++  "--dev-cmd-count", "4",  # adjust to your rig / or use explicit --dev-cmd-target
++  "--ui-telem-base", "{net.ui_telem_base}",
++  "--ui-telem-count", "4",
++]
++
++# NOTE: in REAL mode we do NOT spawn DenSi sims.
++[services.densi]
++enabled = true
++module = "steuerung3d.apps.den_si"
++mode = "per_axis"
++config = "configs/services/densi.toml"
++args = []
++
++[services.hip]
++enabled = true
++module = "steuerung3d.apps.hi_p"
++mode = "single"
++count = 1  # count must be int; 'auto' removed to avoid confusion
++config = "configs/services/hip.toml"
++args = [
++  "--telem-in", "{net.bind_host}:{net.ui_telem_base}",
++  "--intent-out", "{net.intent}",
++]
++
++[services.inputd]
++enabled = true
++module = "steuerung3d.apps.inputd"
++mode = "single"
++config = "configs/inputd_gamepad.toml"
++
++[services.joy2intent]
++enabled = true
++module = "steuerung3d.apps.joy2intent"
++mode = "single"
++config = "configs/joy2intent_bindings_gamepad.toml"
++args = [
++  "--raw-in", "{net.raw_in}",
++  "--intent-out", "{net.intent}",
++  # winches will be assigned in the UI once HiPs are attached.
++]
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/configs/profiles/dev_sim.toml b/configs/profiles/dev_sim.toml
+new file mode 100644
+index 0000000..48ae3ac
+--- /dev/null
++++ b/configs/profiles/dev_sim.toml
+@@ -0,0 +1,69 @@
++[stack]
++name = "dev_sim"
++
++[rig]
++# Axis IDs to boot. Keep this explicit; do not derive implicitly from joy2intent.
++axes = ["Anton", "Debby", "Cecil", "Burt"]
++device_source = "sim"  # sim | real
++
++[net]
++bind_host = "127.0.0.1"
++cmd_base = 52001
++ui_telem_base = 51002
++dev_telem_in = "127.0.0.1:52020"
++status_in = "127.0.0.1:51200"  # supervisor birds-eye heartbeat
++raw_in = "127.0.0.1:50100"      # inputd -> joy2intent
++intent = "127.0.0.1:51001"  # joy2intent -> core
++
++[services.core]
++enabled = true
++module = "steuerung3d.apps.core_udp_service"
++mode = "single"
++args = [
++  "--intent-in", "{net.intent}",
++  "--dev-telem-in", "{net.dev_telem_in}",
++  "--dev-cmd-base", "{net.cmd_base}",
++  "--dev-cmd-count", "{len(rig.axes)}",
++  "--ui-telem-base", "{net.ui_telem_base}",
++  "--ui-telem-count", "{len(rig.axes)}",
++  "{repeat('--axis', rig.axes)}",
++]
++
++[services.densi]
++enabled = true
++module = "steuerung3d.apps.den_si"
++mode = "per_axis"
++config = "configs/services/densi.toml"
++args = [
++  "--axis", "{axis}",
++  "--cmd-in", "{net.bind_host}:{net.cmd_base + axis_index}",
++  "--telem-out", "{net.dev_telem_in}",
++]
++
++[services.hip]
++enabled = true
++module = "steuerung3d.apps.hi_p"
++mode = "single"
++count = 1  # count must be int; 'auto' removed to avoid confusion
++config = "configs/services/hip.toml"
++args = [
++  "--telem-in", "{net.bind_host}:{net.ui_telem_base}",
++  "--intent-out", "{net.intent}",
++]
++
++[services.inputd]
++enabled = true
++module = "steuerung3d.apps.inputd"
++mode = "single"
++config = "configs/inputd_gamepad.toml"
++
++[services.joy2intent]
++enabled = true
++module = "steuerung3d.apps.joy2intent"
++mode = "single"
++config = "configs/joy2intent_bindings_gamepad.toml"
++args = [
++  "--raw-in", "{net.raw_in}",
++  "--intent-out", "{net.intent}",
++  "--winches", "{csv(rig.axes)}",
++]
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/configs/profiles/dev_sim_c2.toml b/configs/profiles/dev_sim_c2.toml
+new file mode 100644
+index 0000000..2f973d5
+--- /dev/null
++++ b/configs/profiles/dev_sim_c2.toml
+@@ -0,0 +1,86 @@
++[stack]
++name = "dev_sim_c2"
++
++[rig]
++# SIM stack: 4 simulated devices, 2 operator stations consuming C2.
++axes = ["Anton", "Debby", "Cecil", "Burt"]
++device_source = "sim"
++
++[net]
++bind_host = "127.0.0.1"
++cmd_base = 52001
++ui_telem_base = 51002
++# C2 rig telemetry (unicast fanout)
++c2_telem_pilot = "127.0.0.1:51100"
++c2_telem_ft = "127.0.0.1:51101"
++
++dev_telem_in = "127.0.0.1:52020"
++status_in = "127.0.0.1:51200"
++raw_in = "127.0.0.1:50100"
++intent = "127.0.0.1:51001"
++
++[services.core]
++enabled = true
++module = "steuerung3d.apps.core_udp_service"
++mode = "single"
++args = [
++  "--intent-in", "{net.intent}",
++  "--dev-telem-in", "{net.dev_telem_in}",
++  "--dev-cmd-base", "{net.cmd_base}",
++  "--dev-cmd-count", "{len(rig.axes)}",
++  "--ui-telem-base", "{net.ui_telem_base}",
++  "--ui-telem-count", "{len(rig.axes)}",
++  "--c2-telem-target", "{net.c2_telem_pilot}",
++  "--c2-telem-target", "{net.c2_telem_ft}",
++  "{repeat('--axis', rig.axes)}",
++]
++
++[services.densi]
++enabled = true
++module = "steuerung3d.apps.den_si"
++mode = "per_axis"
++config = "configs/services/densi.toml"
++args = [
++  "--axis", "{axis}",
++  "--cmd-in", "{net.bind_host}:{net.cmd_base + axis_index}",
++  "--telem-out", "{net.dev_telem_in}",
++]
++
++[services.hip_pilot]
++enabled = true
++module = "steuerung3d.apps.hi_p"
++mode = "single"
++config = "configs/services/hip.toml"
++args = [
++  "--role", "pilot",
++  "--telem-in", "{net.c2_telem_pilot}",
++  "--intent-out", "{net.intent}",
++]
++
++[services.hip_ft]
++enabled = true
++module = "steuerung3d.apps.hi_p"
++mode = "single"
++config = "configs/services/hip.toml"
++args = [
++  "--role", "ft",
++  "--telem-in", "{net.c2_telem_ft}",
++  "--intent-out", "{net.intent}",
++]
++
++[services.inputd]
++enabled = true
++module = "steuerung3d.apps.inputd"
++mode = "single"
++config = "configs/inputd_gamepad.toml"
++
++[services.joy2intent]
++enabled = true
++module = "steuerung3d.apps.joy2intent"
++mode = "single"
++config = "configs/joy2intent_bindings_gamepad.toml"
++args = [
++  "--raw-in", "{net.raw_in}",
++  "--intent-out", "{net.intent}",
++  "--winches", "{csv(rig.axes)}",
++]
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/configs/profiles/dev_sim_c2_only.toml b/configs/profiles/dev_sim_c2_only.toml
+new file mode 100644
+index 0000000..f5906ab
+--- /dev/null
++++ b/configs/profiles/dev_sim_c2_only.toml
+@@ -0,0 +1,84 @@
++[stack]
++name = "dev_sim_c2_only"
++
++[rig]
++# SIM stack: 4 simulated devices, 2 operator stations consuming C2 only.
++axes = ["Anton", "Debby", "Cecil", "Burt"]
++device_source = "sim"
++
++[net]
++bind_host = "127.0.0.1"
++cmd_base = 52001
++# C2 rig telemetry (unicast fanout)
++c2_telem_pilot = "127.0.0.1:51100"
++c2_telem_ft = "127.0.0.1:51101"
++
++dev_telem_in = "127.0.0.1:52020"
++status_in = "127.0.0.1:51200"
++raw_in = "127.0.0.1:50100"
++intent = "127.0.0.1:51001"
++
++[services.core]
++enabled = true
++module = "steuerung3d.apps.core_udp_service"
++mode = "single"
++args = [
++  "--intent-in", "{net.intent}",
++  "--dev-telem-in", "{net.dev_telem_in}",
++  "--dev-cmd-base", "{net.cmd_base}",
++  "--dev-cmd-count", "{len(rig.axes)}",
++  "--ui-telem-disable",
++  "--c2-telem-target", "{net.c2_telem_pilot}",
++  "--c2-telem-target", "{net.c2_telem_ft}",
++  "{repeat('--axis', rig.axes)}",
++]
++
++[services.densi]
++enabled = true
++module = "steuerung3d.apps.den_si"
++mode = "per_axis"
++config = "configs/services/densi.toml"
++args = [
++  "--axis", "{axis}",
++  "--cmd-in", "{net.bind_host}:{net.cmd_base + axis_index}",
++  "--telem-out", "{net.dev_telem_in}",
++]
++
++[services.hip_pilot]
++enabled = true
++module = "steuerung3d.apps.hi_p"
++mode = "single"
++config = "configs/services/hip.toml"
++args = [
++  "--role", "pilot",
++  "--telem-in", "{net.c2_telem_pilot}",
++  "--intent-out", "{net.intent}",
++]
++
++[services.hip_ft]
++enabled = true
++module = "steuerung3d.apps.hi_p"
++mode = "single"
++config = "configs/services/hip.toml"
++args = [
++  "--role", "ft",
++  "--telem-in", "{net.c2_telem_ft}",
++  "--intent-out", "{net.intent}",
++]
++
++[services.inputd]
++enabled = true
++module = "steuerung3d.apps.inputd"
++mode = "single"
++config = "configs/inputd_gamepad.toml"
++
++[services.joy2intent]
++enabled = true
++module = "steuerung3d.apps.joy2intent"
++mode = "single"
++config = "configs/joy2intent_bindings_gamepad.toml"
++args = [
++  "--raw-in", "{net.raw_in}",
++  "--intent-out", "{net.intent}",
++  "--winches", "{csv(rig.axes)}",
++]
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/configs/profiles/joy_local_to_remote_core.toml b/configs/profiles/joy_local_to_remote_core.toml
+new file mode 100644
+index 0000000..e7f3dd6
+--- /dev/null
++++ b/configs/profiles/joy_local_to_remote_core.toml
+@@ -0,0 +1,38 @@
++# stacks/joy_local_to_remote_core.toml
++# Local machine: inputd + joy2intent
++# Remote machine: core (+ densi/hip) is already running and listening on 100.80.182.128:51001
++
++[app]
++dt_s = 0.02
++realtime = false
++
++[net]
++raw_controls = "127.0.0.1:50100"
++remote_intent = "100.80.182.128:51001"
++
++[services.inputd]
++enabled = true
++argv = [
++  "python", "-m", "steuerung3d.apps.inputd",
++  "--config", "configs/inputd_gamepad.toml",
++]
++
++[services.joy2intent]
++enabled = true
++argv = [
++  "python", "-m", "steuerung3d.apps.joy2intent",
++  "--config", "configs/joy2intent_bindings_gamepad.toml",
++  "--raw-in", "{net.raw_controls}",
++  "--intent-out", "{net.remote_intent}",
++  "--winches", "Anton",
++]
++
++# Explicitly keep the rest OFF on the local box
++[services.core]
++enabled = false
++
++[services.densi]
++enabled = false
++
++[services.hip]
++enabled = false
+\ No newline at end of file
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/configs/profiles/only_densi_anton.toml b/configs/profiles/only_densi_anton.toml
+new file mode 100644
+index 0000000..8bce9fa
+--- /dev/null
++++ b/configs/profiles/only_densi_anton.toml
+@@ -0,0 +1,19 @@
++[stack]
++name = "only_densi_anton"
++
++[rig]
++axes = ["Anton"]
++
++[net]
++status_in = "127.0.0.1:51200"
++
++[services.densi]
++# REQUIRED by stack_runtime.expand_processes()
++module = "steuerung3d.apps.den_si"
++config = "configs/services/densi.toml"
++
++# Service-specific config
++axis = "Anton"
++cmd_in = "127.0.0.1:52001"
++telem_out = "127.0.0.1:52020"
++wire_proto = "plc" 
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/__pycache__/test_param_ops_coerce.cpython-311.pyc b/src/__pycache__/test_param_ops_coerce.cpython-311.pyc
+new file mode 100644
+index 0000000..3f850fa
+Binary files /dev/null and b/src/__pycache__/test_param_ops_coerce.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..d84cad2
+Binary files /dev/null and b/src/steuerung3d/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/__pycache__/__main__.cpython-311.pyc b/src/steuerung3d/__pycache__/__main__.cpython-311.pyc
+new file mode 100644
+index 0000000..4b80cb9
+Binary files /dev/null and b/src/steuerung3d/__pycache__/__main__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/__pycache__/run_stack_2win.cpython-311.pyc b/src/steuerung3d/__pycache__/run_stack_2win.cpython-311.pyc
+new file mode 100644
+index 0000000..ebcca8b
+Binary files /dev/null and b/src/steuerung3d/__pycache__/run_stack_2win.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/adapters/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/adapters/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..367be59
+Binary files /dev/null and b/src/steuerung3d/adapters/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/adapters/links/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/adapters/links/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..cf0316b
+Binary files /dev/null and b/src/steuerung3d/adapters/links/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/adapters/links/__pycache__/base.cpython-311.pyc b/src/steuerung3d/adapters/links/__pycache__/base.cpython-311.pyc
+new file mode 100644
+index 0000000..bfd0f64
+Binary files /dev/null and b/src/steuerung3d/adapters/links/__pycache__/base.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/adapters/links/__pycache__/udp_link.cpython-311.pyc b/src/steuerung3d/adapters/links/__pycache__/udp_link.cpython-311.pyc
+new file mode 100644
+index 0000000..1d093c7
+Binary files /dev/null and b/src/steuerung3d/adapters/links/__pycache__/udp_link.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/adapters/plc/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/adapters/plc/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..152b1d0
+Binary files /dev/null and b/src/steuerung3d/adapters/plc/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/adapters/plc/__pycache__/frame_slice.cpython-311.pyc b/src/steuerung3d/adapters/plc/__pycache__/frame_slice.cpython-311.pyc
+new file mode 100644
+index 0000000..48a8c0f
+Binary files /dev/null and b/src/steuerung3d/adapters/plc/__pycache__/frame_slice.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/adapters/plc/__pycache__/line_codec.cpython-311.pyc b/src/steuerung3d/adapters/plc/__pycache__/line_codec.cpython-311.pyc
+new file mode 100644
+index 0000000..1f115a9
+Binary files /dev/null and b/src/steuerung3d/adapters/plc/__pycache__/line_codec.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/adapters/plc/__pycache__/multi_plc_device.cpython-311.pyc b/src/steuerung3d/adapters/plc/__pycache__/multi_plc_device.cpython-311.pyc
+new file mode 100644
+index 0000000..4f528ba
+Binary files /dev/null and b/src/steuerung3d/adapters/plc/__pycache__/multi_plc_device.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/adapters/plc/__pycache__/plc_codec.cpython-311.pyc b/src/steuerung3d/adapters/plc/__pycache__/plc_codec.cpython-311.pyc
+new file mode 100644
+index 0000000..3021b21
+Binary files /dev/null and b/src/steuerung3d/adapters/plc/__pycache__/plc_codec.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/adapters/plc/__pycache__/plc_config.cpython-311.pyc b/src/steuerung3d/adapters/plc/__pycache__/plc_config.cpython-311.pyc
+new file mode 100644
+index 0000000..3c0fb81
+Binary files /dev/null and b/src/steuerung3d/adapters/plc/__pycache__/plc_config.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/adapters/plc/__pycache__/plc_endpoint.cpython-311.pyc b/src/steuerung3d/adapters/plc/__pycache__/plc_endpoint.cpython-311.pyc
+new file mode 100644
+index 0000000..1014a59
+Binary files /dev/null and b/src/steuerung3d/adapters/plc/__pycache__/plc_endpoint.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/adapters/plc/__pycache__/udp_device.cpython-311.pyc b/src/steuerung3d/adapters/plc/__pycache__/udp_device.cpython-311.pyc
+new file mode 100644
+index 0000000..23673c3
+Binary files /dev/null and b/src/steuerung3d/adapters/plc/__pycache__/udp_device.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/adapters/plc/__pycache__/validate.cpython-311.pyc b/src/steuerung3d/adapters/plc/__pycache__/validate.cpython-311.pyc
+new file mode 100644
+index 0000000..086b71e
+Binary files /dev/null and b/src/steuerung3d/adapters/plc/__pycache__/validate.cpython-311.pyc differ
+diff --git a/src/steuerung3d/adapters/plc/line_codec.py b/src/steuerung3d/adapters/plc/line_codec.py
+index 9e114f9..dd17539 100644
+--- a/src/steuerung3d/adapters/plc/line_codec.py
++++ b/src/steuerung3d/adapters/plc/line_codec.py
+@@ -96,6 +96,49 @@ class PlcLineCodec:
+         return self.encode(values, schema=self.tx)
+ 
+ 
++@dataclass(frozen=True)
++class PlcTelemetryLine:
++    """Typed view of a decoded TX (PLC->core) line."""
++
++    tick: int
++    axis: str
++    enabled: bool
++    vel: float
++    pos: float
++    fault: bool
++    extra: str = ""
++
++
++def decode_tx_line(codec: PlcLineCodec, line: str) -> Optional[PlcTelemetryLine]:
++    """Best-effort parse of a PLC telemetry line.
++
++    Returns None if required fields are missing or malformed.
++    """
++
++    m = codec.decode_tx(line)
++    axis = str(m.get("axis", "") or "").strip()
++    if not axis:
++        return None
++    try:
++        tick = parse_int(str(m.get("tick", "0")), default=0)
++        enabled = bool(parse_bool(str(m.get("enabled", "0")), default=False))
++        vel = float(parse_float(str(m.get("vel", "0")), default=0.0))
++        pos = float(parse_float(str(m.get("pos", "0")), default=0.0))
++        fault_i = parse_int(str(m.get("fault", "0")), default=0)
++        extra = str(m.get("_extra", "") or "")
++        return PlcTelemetryLine(
++            tick=int(tick),
++            axis=axis,
++            enabled=enabled,
++            vel=vel,
++            pos=pos,
++            fault=bool(fault_i != 0),
++            extra=extra,
++        )
++    except Exception:
++        return None
++
++
+ def parse_int(v: str, default: int = 0) -> int:
+     return _parse_int(v, default=default)
+ 
+diff --git a/src/steuerung3d/adapters/plc/udp_device.py b/src/steuerung3d/adapters/plc/udp_device.py
+index 1af517a..ee361bc 100644
+--- a/src/steuerung3d/adapters/plc/udp_device.py
++++ b/src/steuerung3d/adapters/plc/udp_device.py
+@@ -4,7 +4,7 @@ import socket
+ from dataclasses import dataclass, field
+ from typing import Optional, Tuple
+ 
+-from steuerung3d.adapters.plc.line_codec import PlcLineCodec, parse_bool, parse_float, parse_int
++from steuerung3d.adapters.plc.line_codec import PlcLineCodec, decode_tx_line
+ from steuerung3d.core.command_frame import CommandFrame
+ from steuerung3d.core.state import MachineState
+ 
+@@ -85,17 +85,14 @@ class UdpPlcDevice:
+             ln = ln.strip()
+             if not ln:
+                 continue
+-            tx = self.codec.decode_tx(ln)
+-            axis = tx.get("axis")
+-            if not axis:
++            frame = decode_tx_line(self.codec, ln)
++            if frame is None:
+                 continue
+             # Discovery: create axes on first sight so HiPs can select them.
+-            ax = state.ensure_axis(str(axis))
++            ax = state.ensure_axis(str(frame.axis))
+             # Record last-seen (core tick) for UI/health decisions.
+             ax.meta["last_seen_tick"] = int(state.tick)
+-            ax.enabled = bool(parse_bool(tx.get("enabled", "0")))
+-            ax.vel = float(parse_float(tx.get("vel", "0")))
+-            ax.pos = float(parse_float(tx.get("pos", "0")))
+-            # fault is optional
+-            fault = parse_int(tx.get("fault", "0"), default=0)
+-            ax.fault = fault != 0
++            ax.enabled = bool(frame.enabled)
++            ax.vel = float(frame.vel)
++            ax.pos = float(frame.pos)
++            ax.fault = bool(frame.fault)
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/adapters/sim/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/adapters/sim/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..5ddb727
+Binary files /dev/null and b/src/steuerung3d/adapters/sim/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/adapters/sim/__pycache__/axis_plant.cpython-311.pyc b/src/steuerung3d/adapters/sim/__pycache__/axis_plant.cpython-311.pyc
+new file mode 100644
+index 0000000..afeef14
+Binary files /dev/null and b/src/steuerung3d/adapters/sim/__pycache__/axis_plant.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/adapters/sim/__pycache__/device.cpython-311.pyc b/src/steuerung3d/adapters/sim/__pycache__/device.cpython-311.pyc
+new file mode 100644
+index 0000000..f24931f
+Binary files /dev/null and b/src/steuerung3d/adapters/sim/__pycache__/device.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..0409ae5
+Binary files /dev/null and b/src/steuerung3d/apps/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/cli_client/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/cli_client/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..f3a95d7
+Binary files /dev/null and b/src/steuerung3d/apps/cli_client/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/cli_client/__pycache__/__main__.cpython-311.pyc b/src/steuerung3d/apps/cli_client/__pycache__/__main__.cpython-311.pyc
+new file mode 100644
+index 0000000..4c1ac06
+Binary files /dev/null and b/src/steuerung3d/apps/cli_client/__pycache__/__main__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/core_udp_service/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/core_udp_service/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..416681c
+Binary files /dev/null and b/src/steuerung3d/apps/core_udp_service/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/core_udp_service/__pycache__/__main__.cpython-311.pyc b/src/steuerung3d/apps/core_udp_service/__pycache__/__main__.cpython-311.pyc
+new file mode 100644
+index 0000000..5d9ce1c
+Binary files /dev/null and b/src/steuerung3d/apps/core_udp_service/__pycache__/__main__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/core_udp_service/__pycache__/cli_validation.cpython-311.pyc b/src/steuerung3d/apps/core_udp_service/__pycache__/cli_validation.cpython-311.pyc
+new file mode 100644
+index 0000000..5dd3ffd
+Binary files /dev/null and b/src/steuerung3d/apps/core_udp_service/__pycache__/cli_validation.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/core_udp_service/__pycache__/facts_builder.cpython-311.pyc b/src/steuerung3d/apps/core_udp_service/__pycache__/facts_builder.cpython-311.pyc
+new file mode 100644
+index 0000000..0b416c1
+Binary files /dev/null and b/src/steuerung3d/apps/core_udp_service/__pycache__/facts_builder.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/core_udp_service/__pycache__/fatal_ui.cpython-311.pyc b/src/steuerung3d/apps/core_udp_service/__pycache__/fatal_ui.cpython-311.pyc
+new file mode 100644
+index 0000000..e2508b7
+Binary files /dev/null and b/src/steuerung3d/apps/core_udp_service/__pycache__/fatal_ui.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/core_udp_service/__pycache__/netplan.cpython-311.pyc b/src/steuerung3d/apps/core_udp_service/__pycache__/netplan.cpython-311.pyc
+new file mode 100644
+index 0000000..16f02a3
+Binary files /dev/null and b/src/steuerung3d/apps/core_udp_service/__pycache__/netplan.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/core_udp_service/__pycache__/reporter.cpython-311.pyc b/src/steuerung3d/apps/core_udp_service/__pycache__/reporter.cpython-311.pyc
+new file mode 100644
+index 0000000..75cd1c0
+Binary files /dev/null and b/src/steuerung3d/apps/core_udp_service/__pycache__/reporter.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/core_udp_service/__pycache__/runtime_handlers.cpython-311.pyc b/src/steuerung3d/apps/core_udp_service/__pycache__/runtime_handlers.cpython-311.pyc
+new file mode 100644
+index 0000000..50cd92a
+Binary files /dev/null and b/src/steuerung3d/apps/core_udp_service/__pycache__/runtime_handlers.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/core_udp_service/__pycache__/runtime_helpers.cpython-311.pyc b/src/steuerung3d/apps/core_udp_service/__pycache__/runtime_helpers.cpython-311.pyc
+new file mode 100644
+index 0000000..0586d2d
+Binary files /dev/null and b/src/steuerung3d/apps/core_udp_service/__pycache__/runtime_helpers.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/core_udp_service/__pycache__/runtime_loop.cpython-311.pyc b/src/steuerung3d/apps/core_udp_service/__pycache__/runtime_loop.cpython-311.pyc
+new file mode 100644
+index 0000000..5eab6da
+Binary files /dev/null and b/src/steuerung3d/apps/core_udp_service/__pycache__/runtime_loop.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/core_udp_service/__pycache__/runtime_loop_impl.cpython-311.pyc b/src/steuerung3d/apps/core_udp_service/__pycache__/runtime_loop_impl.cpython-311.pyc
+new file mode 100644
+index 0000000..f6eb816
+Binary files /dev/null and b/src/steuerung3d/apps/core_udp_service/__pycache__/runtime_loop_impl.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/core_udp_service/__pycache__/targets.cpython-311.pyc b/src/steuerung3d/apps/core_udp_service/__pycache__/targets.cpython-311.pyc
+new file mode 100644
+index 0000000..1a8fa45
+Binary files /dev/null and b/src/steuerung3d/apps/core_udp_service/__pycache__/targets.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/core_udp_service/runtime_handlers.py b/src/steuerung3d/apps/core_udp_service/runtime_handlers.py
+new file mode 100644
+index 0000000..8ed694f
+--- /dev/null
++++ b/src/steuerung3d/apps/core_udp_service/runtime_handlers.py
+@@ -0,0 +1,195 @@
++from __future__ import annotations
++
++import logging
++import time
++from dataclasses import dataclass, field
++from typing import Any, Callable, Dict, List, Tuple
++
++from steuerung3d.core.state import MachineState
++from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapshot
++
++from steuerung3d.protocol.axis_router import AxisRouter
++from steuerung3d.protocol.udp_channels import UdpIntentIn
++from steuerung3d.protocol.udp_plc_channels import UdpPlcTelemetryIn
++
++from .reporter import emit_birds_eye_status, log_periodic_heartbeat
++from steuerung3d.util.heartbeat import ChangeTracker
++
++
++def build_intent_drain(
++    *,
++    op_intent_in: UdpIntentIn,
++    stats: Dict[str, int],
++    last_seen: Dict[str, Any],
++    last_intents_meta: Dict[str, Any],
++    log: logging.Logger,
++) -> Callable[[], list[Any]]:
++    def drain_intents() -> list[Any]:
++        ints = op_intent_in.drain_intents(limit=200)
++        if ints:
++            stats["intents_in"] += len(ints)
++            last_seen["intent_ts"] = time.monotonic()
++            try:
++                last_intents_meta["count"] = int(len(ints))
++                last_intents_meta["types"] = sorted({type(i).__name__ for i in ints})
++            except Exception:
++                last_intents_meta["count"] = int(len(ints))
++                last_intents_meta["types"] = []
++            log.debug("rx intents: %d (last=%s)", len(ints), type(ints[-1]).__name__)
++        return list(ints)
++
++    return drain_intents
++
++
++@dataclass
++class DeviceStepper:
++    router: AxisRouter
++    axis_ids: list[str]
++    dev_telem_in: UdpPlcTelemetryIn
++    stats: Dict[str, int]
++    last_seen: Dict[str, Any]
++    t0: float
++    apply_mode_aggregation: Callable[..., None]
++    compute_one_shots_by_axis: Callable[..., Any]
++    log: logging.Logger
++
++    t_last_report: float = field(default_factory=time.monotonic)
++
++    def __call__(self, state: MachineState, cmd_frame: Any, dt: float) -> None:
++        # Per-axis command routing (no broadcast).
++        estop_reset_by_axis, param_ops_by_axis = self.compute_one_shots_by_axis(state, self.axis_ids)
++
++        sent = self.router.publish_command_frames(
++            cmd_frame,
++            estop_reset_by_axis=estop_reset_by_axis,
++            param_ops_by_axis=param_ops_by_axis,
++        )
++        self.stats["cmd_out"] += max(1, sent)
++        self.last_seen["cmd_ts"] = time.monotonic()
++
++        snaps = self.dev_telem_in.drain_telemetry(limit=50)
++        if snaps:
++            self.stats["dev_telem_in"] += len(snaps)
++            self.last_seen["dev_telem_ts"] = time.monotonic()
++            # Update axis-scoped caches from all received device snapshots.
++            self.router.ingest_device_telemetry(snaps)
++            # Apply *all* snapshots so each axis gets updated.
++            for snap in snaps:
++                apply_measured_snapshot(state, snap)
++            self.log.debug(
++                "rx dev telem: %d (last estop=%s fault=%s tick=%s)",
++                len(snaps),
++                snaps[-1].estop,
++                snaps[-1].fault,
++                snaps[-1].tick,
++            )
++        else:
++            self.log.debug("rx dev telem: 0")
++
++        # Aggregate core mode (single source of truth for birds-eye).
++        try:
++            self.apply_mode_aggregation(state, router=self.router, axis_ids=self.axis_ids, dt=dt)
++        except Exception:
++            self.log.exception("core mode aggregation failed")
++
++        self.log.debug(
++            "tx cmd frame: tick=%s estop=%s fault=%s core_mode=%s",
++            cmd_frame.tick,
++            cmd_frame.estop,
++            cmd_frame.fault,
++            cmd_frame.core_mode,
++        )
++
++        now = time.monotonic()
++        if now - self.t_last_report >= 1.0:
++            log_periodic_heartbeat(
++                log=self.log,
++                now=now,
++                t0=self.t0,
++                state=state,
++                stats=self.stats,
++                last_seen=self.last_seen,
++            )
++            self.t_last_report = now
++
++
++@dataclass
++class SnapshotHandler:
++    router: AxisRouter
++    axis_ids: list[str]
++    args: Any
++    c2_fanout: Any
++    c2_telem_outs: list[Any]
++    stats: Dict[str, int]
++    last_seen: Dict[str, Any]
++    status: Any
++    state: MachineState
++    last_intents_meta: Dict[str, Any]
++    log: logging.Logger
++
++    state_ch: ChangeTracker = field(default_factory=ChangeTracker)
++    lt_last_ui_log_s_by_axis: dict[str, float] = field(default_factory=dict)
++
++    def __call__(self, snap: TelemetrySnapshot) -> None:
++        # Log key state changes once (helps a lot during field debugging).
++        try:
++            mode_v = str(getattr(snap, "core_mode", ""))
++            estop_v = bool(getattr(snap, "estop", False))
++            fault_v = bool(getattr(snap, "fault", False))
++            rig_v = str(getattr(snap, "rig_mode", ""))
++            if (
++                self.state_ch.changed("core_mode", mode_v)
++                or self.state_ch.changed("estop", estop_v)
++                or self.state_ch.changed("fault", fault_v)
++                or self.state_ch.changed("rig_mode", rig_v)
++            ):
++                self.log.info("state: core_mode=%s estop=%s fault=%s rig_mode=%s", mode_v, estop_v, fault_v, rig_v)
++
++            claims = tuple(sorted(dict(getattr(self.state, "axis_claims", {}) or {}).items()))
++            if self.state_ch.changed("claims", claims):
++                self.log.info("claims: %s", dict(claims))
++
++            pe = bool(getattr(self.state, "param_edit_active", False))
++            pg = str(getattr(self.state, "param_edit_group", ""))
++            if self.state_ch.changed("param_edit", (pe, pg)):
++                self.log.info("param_edit: active=%s group=%s", pe, pg)
++        except Exception:
++            pass
++
++        if not self.args.ui_telem_disable:
++            # One HiP per axis: send a *sliced* snapshot to each UI target.
++            self.router.publish_ui_snapshot(snap)
++
++        if self.c2_fanout is not None:
++            self.c2_fanout.publish_telemetry(snap)
++            self.stats["c2_telem_out"] += max(1, len(self.c2_telem_outs))
++            self.last_seen["c2_telem_ts"] = time.monotonic()
++
++        # LIFETICK trace: Core -> HiP (TelemetrySnapshot.axes[axis].device_tick)
++        for axis_id in self.axis_ids:
++            try:
++                ax = dict(getattr(snap, "axes", {}) or {}).get(axis_id)
++                dev_tick = getattr(ax, "device_tick", None)
++                now_s = time.monotonic()
++                last_s = float(self.lt_last_ui_log_s_by_axis.get(axis_id, 0.0))
++                if dev_tick is not None and (now_s - last_s) >= 0.5:
++                    self.lt_last_ui_log_s_by_axis[axis_id] = now_s
++                    self.log.debug("LIFETICK Core tx UI telem: axis=%s device_tick=%s", axis_id, int(dev_tick))
++            except Exception:
++                pass
++
++        if not self.args.ui_telem_disable:
++            self.stats["ui_telem_out"] += max(1, len(self.axis_ids))
++            self.last_seen["ui_telem_ts"] = time.monotonic()
++            self.log.debug("tx ui telem: tick=%s estop=%s fault=%s", snap.tick, snap.estop, snap.fault)
++
++        # Structured heartbeat for supervisor birds-eye (PLC telemetry remains unchanged).
++        emit_birds_eye_status(
++            status=self.status,
++            snap=snap,
++            state=self.state,
++            router=self.router,
++            axis_ids=self.axis_ids,
++            last_intents_meta=self.last_intents_meta,
++            last_seen=self.last_seen,
++        )
+diff --git a/src/steuerung3d/apps/core_udp_service/runtime_loop_impl.py b/src/steuerung3d/apps/core_udp_service/runtime_loop_impl.py
+index e54886d..c207517 100644
+--- a/src/steuerung3d/apps/core_udp_service/runtime_loop_impl.py
++++ b/src/steuerung3d/apps/core_udp_service/runtime_loop_impl.py
+@@ -2,20 +2,17 @@ from __future__ import annotations
+ 
+ import logging
+ import time
+-from typing import List, Optional, Tuple
++from typing import List, Tuple
+ 
+ from steuerung3d.common.timebase import Timebase
+ from steuerung3d.core.engine import CoreEngine
+ from steuerung3d.core.intent_handler import apply_intent
+-from steuerung3d.core.command_frame import CommandFrame
+ from steuerung3d.core.state import MachineState
+-from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapshot
+ from steuerung3d.core.net import parse_hostport
+ from steuerung3d.protocol.core_runner import CoreRunner
+ from steuerung3d.protocol.axis_router import AxisRouter
+ from steuerung3d.protocol.udp_channels import UdpIntentIn, UdpTelemetryOut, UdpTelemetryFanout
+ from steuerung3d.protocol.udp_plc_channels import UdpPlcTelemetryIn, UdpPlcCommandOut
+-from steuerung3d.util.heartbeat import ChangeTracker
+ 
+ from .cli_validation import (
+     uniq_axes_or_error,
+@@ -25,7 +22,7 @@ from .cli_validation import (
+ from .runtime_helpers import apply_mode_aggregation as _apply_mode_aggregation
+ from .runtime_helpers import compute_one_shots_by_axis as _compute_one_shots_by_axis
+ from .fatal_ui import fatal as _fatal
+-from .reporter import emit_birds_eye_status, log_periodic_heartbeat
++from .runtime_handlers import DeviceStepper, SnapshotHandler, build_intent_drain
+ from .targets import expand_dev_cmd_targets as _expand_dev_cmd_targets
+ from .targets import expand_targets as _expand_targets
+ 
+@@ -119,10 +116,6 @@ def run_core_udp_service(*, args, status) -> int:
+         "cmd_ts": None,
+     }
+     t0 = time.monotonic()
+-    t_last_report = t0
+-
+-    # Track key state transitions (avoid log spam while still giving operators context).
+-    state_ch = ChangeTracker()
+ 
+     log.info("=== core_udp_service starting ===")
+     log.info("Operator: IntentIn  bind=%s", intent_in_bind)
+@@ -187,144 +180,39 @@ def run_core_udp_service(*, args, status) -> int:
+         ui_telem_out_by_axis=axis_ui_outs,
+     )
+ 
+-    def drain_intents():
+-        ints = op_intent_in.drain_intents(limit=200)
+-        if ints:
+-            stats["intents_in"] += len(ints)
+-            last_seen["intent_ts"] = time.monotonic()
+-            try:
+-                last_intents_meta["count"] = int(len(ints))
+-                last_intents_meta["types"] = sorted({type(i).__name__ for i in ints})
+-            except Exception:
+-                last_intents_meta["count"] = int(len(ints))
+-                last_intents_meta["types"] = []
+-            log.debug("rx intents: %d (last=%s)", len(ints), type(ints[-1]).__name__)
+-        return ints
+-
+-    def device_step(state, cmd_frame, dt):
+-        nonlocal t_last_report
+-
+-        # Per-axis command routing (no broadcast).
+-        estop_reset_by_axis, param_ops_by_axis = _compute_one_shots_by_axis(state, axis_ids)
+-
+-        sent = router.publish_command_frames(
+-            cmd_frame,
+-            estop_reset_by_axis=estop_reset_by_axis,
+-            param_ops_by_axis=param_ops_by_axis,
+-        )
+-        stats["cmd_out"] += max(1, sent)
+-        last_seen["cmd_ts"] = time.monotonic()
+-
+-        snaps = dev_telem_in.drain_telemetry(limit=50)
+-        if snaps:
+-            stats["dev_telem_in"] += len(snaps)
+-            last_seen["dev_telem_ts"] = time.monotonic()
+-            # Update axis-scoped caches from all received device snapshots.
+-            router.ingest_device_telemetry(snaps)
+-            # Device-side measured telemetry can arrive from multiple sources
+-            # (e.g. one DenSi process per axis). Apply *all* snapshots so each
+-            # axis' measured/meta fields get updated, instead of only the most
+-            # recent datagram.
+-            for snap in snaps:
+-                apply_measured_snapshot(state, snap)
+-            log.debug(
+-                "rx dev telem: %d (last estop=%s fault=%s tick=%s)",
+-                len(snaps),
+-                snaps[-1].estop,
+-                snaps[-1].fault,
+-                snaps[-1].tick,
+-            )
+-        else:
+-            log.debug("rx dev telem: 0")
+-
+-        # Aggregate core mode (single source of truth for birds-eye).
+-        try:
+-            _apply_mode_aggregation(state, router=router, axis_ids=axis_ids, dt=dt)
+-        except Exception:
+-            log.exception("core mode aggregation failed")
+-
+-        log.debug("tx cmd frame: tick=%s estop=%s fault=%s core_mode=%s",
+-                  cmd_frame.tick, cmd_frame.estop, cmd_frame.fault, cmd_frame.core_mode)
+-
+-        now = time.monotonic()
+-        if now - t_last_report >= 1.0:
+-            log_periodic_heartbeat(
+-                log=log,
+-                now=now,
+-                t0=t0,
+-                state=state,
+-                stats=stats,
+-                last_seen=last_seen,
+-            )
+-            t_last_report = now
+-
+-    # Lifetick tracing: log Core->UI device tick at most every 0.5s per axis.
+-    _lt_last_ui_log_s_by_axis: dict[str, float] = {}
+-
+-    def on_snapshot(snap: TelemetrySnapshot):
+-        # Log key state changes once (helps a lot during field debugging).
+-        try:
+-            mode_v = str(getattr(snap, "core_mode", ""))
+-            estop_v = bool(getattr(snap, "estop", False))
+-            fault_v = bool(getattr(snap, "fault", False))
+-            rig_v = str(getattr(snap, "rig_mode", ""))
+-            if (
+-                state_ch.changed("core_mode", mode_v)
+-                or state_ch.changed("estop", estop_v)
+-                or state_ch.changed("fault", fault_v)
+-                or state_ch.changed("rig_mode", rig_v)
+-            ):
+-                log.info("state: core_mode=%s estop=%s fault=%s rig_mode=%s", mode_v, estop_v, fault_v, rig_v)
+-
+-            claims = tuple(sorted(dict(getattr(st, "axis_claims", {}) or {}).items()))
+-            if state_ch.changed("claims", claims):
+-                log.info("claims: %s", dict(claims))
+-
+-            pe = bool(getattr(st, "param_edit_active", False))
+-            pg = str(getattr(st, "param_edit_group", ""))
+-            if state_ch.changed("param_edit", (pe, pg)):
+-                log.info("param_edit: active=%s group=%s", pe, pg)
+-        except Exception:
+-            pass
+-
+-        if not args.ui_telem_disable:
+-            # One HiP per axis: send a *sliced* snapshot to each UI target.
+-            router.publish_ui_snapshot(snap)
+-
+-        if c2_fanout is not None:
+-            c2_fanout.publish_telemetry(snap)
+-            stats["c2_telem_out"] += max(1, len(c2_telem_outs))
+-            last_seen["c2_telem_ts"] = time.monotonic()
+-
+-        # LIFETICK trace: Core -> HiP (TelemetrySnapshot.axes[axis].device_tick)
+-        for axis_id in axis_ids:
+-            try:
+-                ax = dict(getattr(snap, "axes", {}) or {}).get(axis_id)
+-                dev_tick = getattr(ax, "device_tick", None)
+-                now_s = time.monotonic()
+-                last_s = float(_lt_last_ui_log_s_by_axis.get(axis_id, 0.0))
+-                if dev_tick is not None and (now_s - last_s) >= 0.5:
+-                    _lt_last_ui_log_s_by_axis[axis_id] = now_s
+-                    log.debug("LIFETICK Core tx UI telem: axis=%s device_tick=%s", axis_id, int(dev_tick))
+-            except Exception:
+-                pass
+-
+-        if not args.ui_telem_disable:
+-            stats["ui_telem_out"] += max(1, len(axis_ids))
+-            last_seen["ui_telem_ts"] = time.monotonic()
++    drain_intents = build_intent_drain(
++        op_intent_in=op_intent_in,
++        stats=stats,
++        last_seen=last_seen,
++        last_intents_meta=last_intents_meta,
++        log=log,
++    )
+ 
+-            log.debug("tx ui telem: tick=%s estop=%s fault=%s", snap.tick, snap.estop, snap.fault)
++    device_step = DeviceStepper(
++        router=router,
++        axis_ids=axis_ids,
++        dev_telem_in=dev_telem_in,
++        stats=stats,
++        last_seen=last_seen,
++        t0=t0,
++        apply_mode_aggregation=_apply_mode_aggregation,
++        compute_one_shots_by_axis=_compute_one_shots_by_axis,
++        log=log,
++    )
+ 
+-        # Structured heartbeat for supervisor birds-eye (PLC telemetry remains unchanged).
+-        emit_birds_eye_status(
+-            status=status,
+-            snap=snap,
+-            state=st,
+-            router=router,
+-            axis_ids=axis_ids,
+-            last_intents_meta=last_intents_meta,
+-            last_seen=last_seen,
+-        )
++    on_snapshot = SnapshotHandler(
++        router=router,
++        axis_ids=axis_ids,
++        args=args,
++        c2_fanout=c2_fanout,
++        c2_telem_outs=c2_telem_outs,
++        stats=stats,
++        last_seen=last_seen,
++        status=status,
++        state=st,
++        last_intents_meta=last_intents_meta,
++        log=log,
++    )
+ 
+     eng = CoreEngine(
+         timebase=tb,
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/den_si/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/den_si/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..8465660
+Binary files /dev/null and b/src/steuerung3d/apps/den_si/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/den_si/__pycache__/__main__.cpython-311.pyc b/src/steuerung3d/apps/den_si/__pycache__/__main__.cpython-311.pyc
+new file mode 100644
+index 0000000..36552bb
+Binary files /dev/null and b/src/steuerung3d/apps/den_si/__pycache__/__main__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/densi_fleet/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/densi_fleet/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..90b2b8d
+Binary files /dev/null and b/src/steuerung3d/apps/densi_fleet/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/densi_fleet/__pycache__/__main__.cpython-311.pyc b/src/steuerung3d/apps/densi_fleet/__pycache__/__main__.cpython-311.pyc
+new file mode 100644
+index 0000000..f865715
+Binary files /dev/null and b/src/steuerung3d/apps/densi_fleet/__pycache__/__main__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/dev_stack/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/dev_stack/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..db3a642
+Binary files /dev/null and b/src/steuerung3d/apps/dev_stack/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/dev_stack/__pycache__/__main__.cpython-311.pyc b/src/steuerung3d/apps/dev_stack/__pycache__/__main__.cpython-311.pyc
+new file mode 100644
+index 0000000..11c0b16
+Binary files /dev/null and b/src/steuerung3d/apps/dev_stack/__pycache__/__main__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/hi_p/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/hi_p/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..7ecbe99
+Binary files /dev/null and b/src/steuerung3d/apps/hi_p/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/hi_p/__pycache__/__main__.cpython-311.pyc b/src/steuerung3d/apps/hi_p/__pycache__/__main__.cpython-311.pyc
+new file mode 100644
+index 0000000..0a94c6f
+Binary files /dev/null and b/src/steuerung3d/apps/hi_p/__pycache__/__main__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/inputd/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/inputd/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..e13657f
+Binary files /dev/null and b/src/steuerung3d/apps/inputd/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/inputd/__pycache__/__main__.cpython-311.pyc b/src/steuerung3d/apps/inputd/__pycache__/__main__.cpython-311.pyc
+new file mode 100644
+index 0000000..6f8c6d5
+Binary files /dev/null and b/src/steuerung3d/apps/inputd/__pycache__/__main__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/inputd/__pycache__/config.cpython-311.pyc b/src/steuerung3d/apps/inputd/__pycache__/config.cpython-311.pyc
+new file mode 100644
+index 0000000..55be586
+Binary files /dev/null and b/src/steuerung3d/apps/inputd/__pycache__/config.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/inputd/__pycache__/pygame_backend.cpython-311.pyc b/src/steuerung3d/apps/inputd/__pycache__/pygame_backend.cpython-311.pyc
+new file mode 100644
+index 0000000..3331b58
+Binary files /dev/null and b/src/steuerung3d/apps/inputd/__pycache__/pygame_backend.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/joy2intent/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/joy2intent/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..8f76168
+Binary files /dev/null and b/src/steuerung3d/apps/joy2intent/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/joy2intent/__pycache__/__main__.cpython-311.pyc b/src/steuerung3d/apps/joy2intent/__pycache__/__main__.cpython-311.pyc
+new file mode 100644
+index 0000000..aff1fa3
+Binary files /dev/null and b/src/steuerung3d/apps/joy2intent/__pycache__/__main__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/joy2intent/__pycache__/config.cpython-311.pyc b/src/steuerung3d/apps/joy2intent/__pycache__/config.cpython-311.pyc
+new file mode 100644
+index 0000000..57aac28
+Binary files /dev/null and b/src/steuerung3d/apps/joy2intent/__pycache__/config.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/joy2intent/__pycache__/mapping.cpython-311.pyc b/src/steuerung3d/apps/joy2intent/__pycache__/mapping.cpython-311.pyc
+new file mode 100644
+index 0000000..8757bd6
+Binary files /dev/null and b/src/steuerung3d/apps/joy2intent/__pycache__/mapping.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/joy2intent/__pycache__/state.cpython-311.pyc b/src/steuerung3d/apps/joy2intent/__pycache__/state.cpython-311.pyc
+new file mode 100644
+index 0000000..38e1863
+Binary files /dev/null and b/src/steuerung3d/apps/joy2intent/__pycache__/state.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/log_viewer/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/log_viewer/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..219d399
+Binary files /dev/null and b/src/steuerung3d/apps/log_viewer/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/log_viewer/__pycache__/__main__.cpython-311.pyc b/src/steuerung3d/apps/log_viewer/__pycache__/__main__.cpython-311.pyc
+new file mode 100644
+index 0000000..1fbb31d
+Binary files /dev/null and b/src/steuerung3d/apps/log_viewer/__pycache__/__main__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/plc_sim/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/plc_sim/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..38c547d
+Binary files /dev/null and b/src/steuerung3d/apps/plc_sim/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/plc_sim/__pycache__/__main__.cpython-311.pyc b/src/steuerung3d/apps/plc_sim/__pycache__/__main__.cpython-311.pyc
+new file mode 100644
+index 0000000..642c3f1
+Binary files /dev/null and b/src/steuerung3d/apps/plc_sim/__pycache__/__main__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/plc_sim_ui/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/plc_sim_ui/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..2cfefe3
+Binary files /dev/null and b/src/steuerung3d/apps/plc_sim_ui/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/plc_sim_ui/__pycache__/__main__.cpython-311.pyc b/src/steuerung3d/apps/plc_sim_ui/__pycache__/__main__.cpython-311.pyc
+new file mode 100644
+index 0000000..b2498a4
+Binary files /dev/null and b/src/steuerung3d/apps/plc_sim_ui/__pycache__/__main__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/plc_sim_ui/__pycache__/widgets.cpython-311.pyc b/src/steuerung3d/apps/plc_sim_ui/__pycache__/widgets.cpython-311.pyc
+new file mode 100644
+index 0000000..d4af1a1
+Binary files /dev/null and b/src/steuerung3d/apps/plc_sim_ui/__pycache__/widgets.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/plc_sim_ui/__pycache__/window.cpython-311.pyc b/src/steuerung3d/apps/plc_sim_ui/__pycache__/window.cpython-311.pyc
+new file mode 100644
+index 0000000..76670b8
+Binary files /dev/null and b/src/steuerung3d/apps/plc_sim_ui/__pycache__/window.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/plc_stack/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/plc_stack/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..04673c4
+Binary files /dev/null and b/src/steuerung3d/apps/plc_stack/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/plc_stack/__pycache__/__main__.cpython-311.pyc b/src/steuerung3d/apps/plc_stack/__pycache__/__main__.cpython-311.pyc
+new file mode 100644
+index 0000000..7d9798c
+Binary files /dev/null and b/src/steuerung3d/apps/plc_stack/__pycache__/__main__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/plc_stack/__pycache__/builder.cpython-311.pyc b/src/steuerung3d/apps/plc_stack/__pycache__/builder.cpython-311.pyc
+new file mode 100644
+index 0000000..eb91312
+Binary files /dev/null and b/src/steuerung3d/apps/plc_stack/__pycache__/builder.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/replay_player/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/replay_player/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..1f669c6
+Binary files /dev/null and b/src/steuerung3d/apps/replay_player/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/replay_player/__pycache__/__main__.cpython-311.pyc b/src/steuerung3d/apps/replay_player/__pycache__/__main__.cpython-311.pyc
+new file mode 100644
+index 0000000..7f42d60
+Binary files /dev/null and b/src/steuerung3d/apps/replay_player/__pycache__/__main__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/yellow/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..de497c6
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/__pycache__/__main__.cpython-311.pyc b/src/steuerung3d/apps/yellow/__pycache__/__main__.cpython-311.pyc
+new file mode 100644
+index 0000000..64ab242
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/__pycache__/__main__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/__pycache__/ports.cpython-311.pyc b/src/steuerung3d/apps/yellow/__pycache__/ports.cpython-311.pyc
+new file mode 100644
+index 0000000..7dea312
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/__pycache__/ports.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/__pycache__/qss_loader.cpython-311.pyc b/src/steuerung3d/apps/yellow/__pycache__/qss_loader.cpython-311.pyc
+new file mode 100644
+index 0000000..e0f398f
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/__pycache__/qss_loader.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/__pycache__/ui_shell.cpython-311.pyc b/src/steuerung3d/apps/yellow/__pycache__/ui_shell.cpython-311.pyc
+new file mode 100644
+index 0000000..c9a9765
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/__pycache__/ui_shell.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/binders/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/yellow/binders/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..ee107cd
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/binders/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/binders/__pycache__/densi_qt_binder.cpython-311.pyc b/src/steuerung3d/apps/yellow/binders/__pycache__/densi_qt_binder.cpython-311.pyc
+new file mode 100644
+index 0000000..ca5b621
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/binders/__pycache__/densi_qt_binder.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/binders/__pycache__/hip_qt_binder.cpython-311.pyc b/src/steuerung3d/apps/yellow/binders/__pycache__/hip_qt_binder.cpython-311.pyc
+new file mode 100644
+index 0000000..db9204b
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/binders/__pycache__/hip_qt_binder.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/binders/__pycache__/hip_qt_binder_apply_impl.cpython-311.pyc b/src/steuerung3d/apps/yellow/binders/__pycache__/hip_qt_binder_apply_impl.cpython-311.pyc
+new file mode 100644
+index 0000000..dc8e264
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/binders/__pycache__/hip_qt_binder_apply_impl.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/binders/__pycache__/hip_qt_binder_init_impl.cpython-311.pyc b/src/steuerung3d/apps/yellow/binders/__pycache__/hip_qt_binder_init_impl.cpython-311.pyc
+new file mode 100644
+index 0000000..c7160a6
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/binders/__pycache__/hip_qt_binder_init_impl.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/controllers/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/yellow/controllers/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..ec1460c
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/controllers/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/controllers/__pycache__/controller_utils.cpython-311.pyc b/src/steuerung3d/apps/yellow/controllers/__pycache__/controller_utils.cpython-311.pyc
+new file mode 100644
+index 0000000..f584b29
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/controllers/__pycache__/controller_utils.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/controllers/__pycache__/densi_controller.cpython-311.pyc b/src/steuerung3d/apps/yellow/controllers/__pycache__/densi_controller.cpython-311.pyc
+new file mode 100644
+index 0000000..d5cbeed
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/controllers/__pycache__/densi_controller.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/controllers/__pycache__/hip_controller.cpython-311.pyc b/src/steuerung3d/apps/yellow/controllers/__pycache__/hip_controller.cpython-311.pyc
+new file mode 100644
+index 0000000..bf7c46d
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/controllers/__pycache__/hip_controller.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/domain/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/yellow/domain/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..d24c5ae
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/domain/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/domain/__pycache__/banner_facts.cpython-311.pyc b/src/steuerung3d/apps/yellow/domain/__pycache__/banner_facts.cpython-311.pyc
+new file mode 100644
+index 0000000..8c8fb54
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/domain/__pycache__/banner_facts.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/domain/__pycache__/estop_facts.cpython-311.pyc b/src/steuerung3d/apps/yellow/domain/__pycache__/estop_facts.cpython-311.pyc
+new file mode 100644
+index 0000000..cf58d90
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/domain/__pycache__/estop_facts.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/domain/__pycache__/joy_motion_map.cpython-311.pyc b/src/steuerung3d/apps/yellow/domain/__pycache__/joy_motion_map.cpython-311.pyc
+new file mode 100644
+index 0000000..616f211
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/domain/__pycache__/joy_motion_map.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/domain/__pycache__/param_txn.cpython-311.pyc b/src/steuerung3d/apps/yellow/domain/__pycache__/param_txn.cpython-311.pyc
+new file mode 100644
+index 0000000..bd818a6
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/domain/__pycache__/param_txn.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/domain/__pycache__/taster_edge_state.cpython-311.pyc b/src/steuerung3d/apps/yellow/domain/__pycache__/taster_edge_state.cpython-311.pyc
+new file mode 100644
+index 0000000..68edb55
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/domain/__pycache__/taster_edge_state.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/domain/__pycache__/ui_banner.cpython-311.pyc b/src/steuerung3d/apps/yellow/domain/__pycache__/ui_banner.cpython-311.pyc
+new file mode 100644
+index 0000000..7bd49b5
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/domain/__pycache__/ui_banner.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/domain/__pycache__/ui_estop.cpython-311.pyc b/src/steuerung3d/apps/yellow/domain/__pycache__/ui_estop.cpython-311.pyc
+new file mode 100644
+index 0000000..067650f
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/domain/__pycache__/ui_estop.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/domain/__pycache__/ui_format.cpython-311.pyc b/src/steuerung3d/apps/yellow/domain/__pycache__/ui_format.cpython-311.pyc
+new file mode 100644
+index 0000000..9fcdf89
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/domain/__pycache__/ui_format.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/domain/__pycache__/yellow_maps.cpython-311.pyc b/src/steuerung3d/apps/yellow/domain/__pycache__/yellow_maps.cpython-311.pyc
+new file mode 100644
+index 0000000..84d8ae2
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/domain/__pycache__/yellow_maps.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..d6a9564
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..f0db390
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/cut_markers.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/cut_markers.cpython-311.pyc
+new file mode 100644
+index 0000000..f9ee2b2
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/cut_markers.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/drive_status.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/drive_status.cpython-311.pyc
+new file mode 100644
+index 0000000..132ff58
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/drive_status.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/engine.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/engine.cpython-311.pyc
+new file mode 100644
+index 0000000..9813a47
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/engine.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/engine_types.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/engine_types.cpython-311.pyc
+new file mode 100644
+index 0000000..b976d37
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/engine_types.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/estop_fsm.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/estop_fsm.cpython-311.pyc
+new file mode 100644
+index 0000000..7a507ab
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/estop_fsm.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/inputs.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/inputs.cpython-311.pyc
+new file mode 100644
+index 0000000..fa80f5d
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/inputs.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/motion_clamp.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/motion_clamp.cpython-311.pyc
+new file mode 100644
+index 0000000..96a0fd4
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/motion_clamp.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/param_defaults.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/param_defaults.cpython-311.pyc
+new file mode 100644
+index 0000000..356e625
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/param_defaults.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/param_ops.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/param_ops.cpython-311.pyc
+new file mode 100644
+index 0000000..a2f297c
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/param_ops.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/plc_anton_vel_cmd.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/plc_anton_vel_cmd.cpython-311.pyc
+new file mode 100644
+index 0000000..6cf4291
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/plc_anton_vel_cmd.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/resync.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/resync.cpython-311.pyc
+new file mode 100644
+index 0000000..a26dafd
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/resync.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/setpoint_semantics.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/setpoint_semantics.cpython-311.pyc
+new file mode 100644
+index 0000000..017ac8b
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/setpoint_semantics.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/step_impl.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/step_impl.cpython-311.pyc
+new file mode 100644
+index 0000000..b14e988
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/step_impl.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/taster_edge_state.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/taster_edge_state.cpython-311.pyc
+new file mode 100644
+index 0000000..769ae43
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/taster_edge_state.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/types.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/types.cpython-311.pyc
+new file mode 100644
+index 0000000..b5c6137
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/types.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/densi/__pycache__/viewmodel.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/viewmodel.cpython-311.pyc
+new file mode 100644
+index 0000000..8a494d9
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/densi/__pycache__/viewmodel.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/hip/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..cf7bf05
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/hip/__pycache__/attach_state.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/attach_state.cpython-311.pyc
+new file mode 100644
+index 0000000..9b03bdd
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/attach_state.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/hip/__pycache__/engine.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/engine.cpython-311.pyc
+new file mode 100644
+index 0000000..4cf210a
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/engine.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/hip/__pycache__/intent_policy.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/intent_policy.cpython-311.pyc
+new file mode 100644
+index 0000000..cd483ab
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/intent_policy.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/hip/__pycache__/param_ui.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/param_ui.cpython-311.pyc
+new file mode 100644
+index 0000000..ea4c03c
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/param_ui.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/hip/__pycache__/presentation.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/presentation.cpython-311.pyc
+new file mode 100644
+index 0000000..7f37358
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/presentation.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/hip/__pycache__/step_context.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/step_context.cpython-311.pyc
+new file mode 100644
+index 0000000..2a9e628
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/step_context.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/hip/__pycache__/step_impl.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/step_impl.cpython-311.pyc
+new file mode 100644
+index 0000000..dc2effa
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/step_impl.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/hip/__pycache__/types.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/types.cpython-311.pyc
+new file mode 100644
+index 0000000..0b2e747
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/types.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/engines/hip/__pycache__/viewmodel.cpython-311.pyc b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/viewmodel.cpython-311.pyc
+new file mode 100644
+index 0000000..4ca7e86
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/engines/hip/__pycache__/viewmodel.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..272a109
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/densi/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..b25f7dc
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_banner_render.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_banner_render.cpython-311.pyc
+new file mode 100644
+index 0000000..802cbb8
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_banner_render.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_banner_vm.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_banner_vm.cpython-311.pyc
+new file mode 100644
+index 0000000..501ace5
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_banner_vm.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_cut_markers_render.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_cut_markers_render.cpython-311.pyc
+new file mode 100644
+index 0000000..9c6d5a9
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_cut_markers_render.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_cut_markers_vm.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_cut_markers_vm.cpython-311.pyc
+new file mode 100644
+index 0000000..105a199
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_cut_markers_vm.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_estop_checkboxes_render.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_estop_checkboxes_render.cpython-311.pyc
+new file mode 100644
+index 0000000..f0bbf12
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_estop_checkboxes_render.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_estop_dots_render.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_estop_dots_render.cpython-311.pyc
+new file mode 100644
+index 0000000..44937ed
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_estop_dots_render.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_estop_dots_vm.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_estop_dots_vm.cpython-311.pyc
+new file mode 100644
+index 0000000..0cc52b1
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_estop_dots_vm.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_header_online_render.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_header_online_render.cpython-311.pyc
+new file mode 100644
+index 0000000..ef267a2
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_header_online_render.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_header_online_vm.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_header_online_vm.cpython-311.pyc
+new file mode 100644
+index 0000000..540b2b3
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_header_online_vm.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_lifetick_render.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_lifetick_render.cpython-311.pyc
+new file mode 100644
+index 0000000..39495b0
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_lifetick_render.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_lifetick_vm.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_lifetick_vm.cpython-311.pyc
+new file mode 100644
+index 0000000..577784b
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_lifetick_vm.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_limits_render.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_limits_render.cpython-311.pyc
+new file mode 100644
+index 0000000..dc928be
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_limits_render.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_limits_vm.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_limits_vm.cpython-311.pyc
+new file mode 100644
+index 0000000..1545a4e
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_limits_vm.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_readouts_render.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_readouts_render.cpython-311.pyc
+new file mode 100644
+index 0000000..0263d4b
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_readouts_render.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_readouts_vm.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_readouts_vm.cpython-311.pyc
+new file mode 100644
+index 0000000..5f19ec3
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/densi/__pycache__/densi_readouts_vm.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/hip/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..7240bfc
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_banner_render.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_banner_render.cpython-311.pyc
+new file mode 100644
+index 0000000..d8a4811
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_banner_render.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_banner_vm.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_banner_vm.cpython-311.pyc
+new file mode 100644
+index 0000000..69a1118
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_banner_vm.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_cut_markers_render.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_cut_markers_render.cpython-311.pyc
+new file mode 100644
+index 0000000..4a55744
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_cut_markers_render.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_drive_status_render.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_drive_status_render.cpython-311.pyc
+new file mode 100644
+index 0000000..a856249
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_drive_status_render.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_estop_render.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_estop_render.cpython-311.pyc
+new file mode 100644
+index 0000000..4259972
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_estop_render.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_estop_vm.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_estop_vm.cpython-311.pyc
+new file mode 100644
+index 0000000..071c586
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_estop_vm.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_header_dots_render.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_header_dots_render.cpython-311.pyc
+new file mode 100644
+index 0000000..7d2994f
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_header_dots_render.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_header_dots_vm.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_header_dots_vm.cpython-311.pyc
+new file mode 100644
+index 0000000..5af5a74
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_header_dots_vm.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_readouts_render.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_readouts_render.cpython-311.pyc
+new file mode 100644
+index 0000000..168b48d
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_readouts_render.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_sliders_render.cpython-311.pyc b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_sliders_render.cpython-311.pyc
+new file mode 100644
+index 0000000..ae2e604
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/panels/hip/__pycache__/hip_sliders_render.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/qtutil/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/yellow/qtutil/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..4e1a3ae
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/qtutil/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/qtutil/__pycache__/binder_helpers.cpython-311.pyc b/src/steuerung3d/apps/yellow/qtutil/__pycache__/binder_helpers.cpython-311.pyc
+new file mode 100644
+index 0000000..7415ee9
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/qtutil/__pycache__/binder_helpers.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/qtutil/__pycache__/bindings.cpython-311.pyc b/src/steuerung3d/apps/yellow/qtutil/__pycache__/bindings.cpython-311.pyc
+new file mode 100644
+index 0000000..74e6b06
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/qtutil/__pycache__/bindings.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/qtutil/__pycache__/modal_lock.cpython-311.pyc b/src/steuerung3d/apps/yellow/qtutil/__pycache__/modal_lock.cpython-311.pyc
+new file mode 100644
+index 0000000..cba4a5c
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/qtutil/__pycache__/modal_lock.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/qtutil/__pycache__/param_ui_apply.cpython-311.pyc b/src/steuerung3d/apps/yellow/qtutil/__pycache__/param_ui_apply.cpython-311.pyc
+new file mode 100644
+index 0000000..6449233
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/qtutil/__pycache__/param_ui_apply.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/qtutil/__pycache__/param_widget_binder.cpython-311.pyc b/src/steuerung3d/apps/yellow/qtutil/__pycache__/param_widget_binder.cpython-311.pyc
+new file mode 100644
+index 0000000..3bf852b
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/qtutil/__pycache__/param_widget_binder.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/qtutil/__pycache__/perf_watchdog.cpython-311.pyc b/src/steuerung3d/apps/yellow/qtutil/__pycache__/perf_watchdog.cpython-311.pyc
+new file mode 100644
+index 0000000..e81b783
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/qtutil/__pycache__/perf_watchdog.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/qtutil/__pycache__/ui_contract.cpython-311.pyc b/src/steuerung3d/apps/yellow/qtutil/__pycache__/ui_contract.cpython-311.pyc
+new file mode 100644
+index 0000000..1ae1cf7
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/qtutil/__pycache__/ui_contract.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/qtutil/__pycache__/ui_format.cpython-311.pyc b/src/steuerung3d/apps/yellow/qtutil/__pycache__/ui_format.cpython-311.pyc
+new file mode 100644
+index 0000000..ed13ae1
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/qtutil/__pycache__/ui_format.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/qtutil/__pycache__/ui_panel_state.cpython-311.pyc b/src/steuerung3d/apps/yellow/qtutil/__pycache__/ui_panel_state.cpython-311.pyc
+new file mode 100644
+index 0000000..bf865dc
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/qtutil/__pycache__/ui_panel_state.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/qtutil/__pycache__/ui_params.cpython-311.pyc b/src/steuerung3d/apps/yellow/qtutil/__pycache__/ui_params.cpython-311.pyc
+new file mode 100644
+index 0000000..dfbf011
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/qtutil/__pycache__/ui_params.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/qtutil/__pycache__/ui_update.cpython-311.pyc b/src/steuerung3d/apps/yellow/qtutil/__pycache__/ui_update.cpython-311.pyc
+new file mode 100644
+index 0000000..2db0108
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/qtutil/__pycache__/ui_update.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/qtutil/__pycache__/widget_cache.cpython-311.pyc b/src/steuerung3d/apps/yellow/qtutil/__pycache__/widget_cache.cpython-311.pyc
+new file mode 100644
+index 0000000..ef7abce
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/qtutil/__pycache__/widget_cache.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/runtimes/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/apps/yellow/runtimes/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..5918094
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/runtimes/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/runtimes/__pycache__/densi_runtime.cpython-311.pyc b/src/steuerung3d/apps/yellow/runtimes/__pycache__/densi_runtime.cpython-311.pyc
+new file mode 100644
+index 0000000..d5c40d4
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/runtimes/__pycache__/densi_runtime.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/runtimes/__pycache__/densi_runtime_impl.cpython-311.pyc b/src/steuerung3d/apps/yellow/runtimes/__pycache__/densi_runtime_impl.cpython-311.pyc
+new file mode 100644
+index 0000000..92218a5
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/runtimes/__pycache__/densi_runtime_impl.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/runtimes/__pycache__/densi_runtime_types.cpython-311.pyc b/src/steuerung3d/apps/yellow/runtimes/__pycache__/densi_runtime_types.cpython-311.pyc
+new file mode 100644
+index 0000000..1a5fb46
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/runtimes/__pycache__/densi_runtime_types.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/runtimes/__pycache__/hip_runtime.cpython-311.pyc b/src/steuerung3d/apps/yellow/runtimes/__pycache__/hip_runtime.cpython-311.pyc
+new file mode 100644
+index 0000000..661dce2
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/runtimes/__pycache__/hip_runtime.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/runtimes/__pycache__/hip_runtime_impl.cpython-311.pyc b/src/steuerung3d/apps/yellow/runtimes/__pycache__/hip_runtime_impl.cpython-311.pyc
+new file mode 100644
+index 0000000..0d22994
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/runtimes/__pycache__/hip_runtime_impl.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/runtimes/__pycache__/runtime_kernel.cpython-311.pyc b/src/steuerung3d/apps/yellow/runtimes/__pycache__/runtime_kernel.cpython-311.pyc
+new file mode 100644
+index 0000000..a86f12a
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/runtimes/__pycache__/runtime_kernel.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/runtimes/__pycache__/runtime_utils.cpython-311.pyc b/src/steuerung3d/apps/yellow/runtimes/__pycache__/runtime_utils.cpython-311.pyc
+new file mode 100644
+index 0000000..9763c6a
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/runtimes/__pycache__/runtime_utils.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/apps/yellow/ui/__pycache__/joy_style.cpython-311.pyc b/src/steuerung3d/apps/yellow/ui/__pycache__/joy_style.cpython-311.pyc
+new file mode 100644
+index 0000000..a6eeedf
+Binary files /dev/null and b/src/steuerung3d/apps/yellow/ui/__pycache__/joy_style.cpython-311.pyc differ
+diff --git a/src/steuerung3d/cli/__main__.py b/src/steuerung3d/cli/__main__.py
+index a07fffb..0ecc305 100644
+--- a/src/steuerung3d/cli/__main__.py
++++ b/src/steuerung3d/cli/__main__.py
+@@ -31,7 +31,7 @@ def _profile_arg(value: str) -> str:
+     """argparse type for --profile.
+ 
+     Accepts either:
+-      - a known profile name (resolved via configs/stacks/<name>.toml)
++      - a known profile name (resolved via configs/profiles/<name>.toml; legacy: configs/stacks)
+       - an explicit TOML path
+ 
+     Raises a helpful error listing known profile names.
+@@ -54,7 +54,7 @@ def _profile_arg(value: str) -> str:
+         )
+     raise argparse.ArgumentTypeError(
+         f"unknown profile '{v}' and no profiles discovered. "
+-        "(Tip: expected configs/stacks/*.toml or a direct .toml path)"
++        "(Tip: expected configs/profiles/*.toml (or legacy configs/stacks) or a direct .toml path)"
+     )
+ 
+ 
+@@ -66,14 +66,14 @@ class St3DArgumentParser(argparse.ArgumentParser):
+         if "--profile" in message:
+             names = discover_stack_profiles()
+             if names:
+-                extra_lines = ["", "Available profiles (configs/stacks/*.toml):"]
++                extra_lines = ["", "Available profiles (configs/profiles/*.toml; legacy configs/stacks):"]
+                 extra_lines += [f"  - {n}" for n in names]
+                 extra_lines += ["", "Tip: python -m steuerung3d profiles"]
+                 extra = "\n".join(extra_lines) + "\n"
+             else:
+                 extra = (
+-                    "\nNo profiles found under configs/stacks/. "
+-                    "Provide a direct .toml path, or add configs/stacks/<name>.toml.\n"
++                    "\nNo profiles found under configs/profiles/ (or legacy configs/stacks/). "
++                    "Provide a direct .toml path, or add configs/profiles/<name>.toml.\n"
+                 )
+ 
+         self.print_usage(sys.stderr)
+@@ -85,7 +85,7 @@ def build_parser() -> argparse.ArgumentParser:
+     sub = p.add_subparsers(dest="cmd", required=True)
+ 
+     sp = sub.add_parser("profiles", help="list available stack profiles")
+-    sp.add_argument("--dir", default=None, help="override stacks dir (default: configs/stacks)")
++    sp.add_argument("--dir", default=None, help="override profiles dir (default: configs/profiles)")
+     sp.add_argument("--paths", action="store_true", help="print full paths")
+     sp.set_defaults(_fn=cmd_profiles)
+ 
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/cli/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/cli/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..1e51f02
+Binary files /dev/null and b/src/steuerung3d/cli/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/cli/__pycache__/__main__.cpython-311.pyc b/src/steuerung3d/cli/__pycache__/__main__.cpython-311.pyc
+new file mode 100644
+index 0000000..f9620bc
+Binary files /dev/null and b/src/steuerung3d/cli/__pycache__/__main__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/cli/__pycache__/commands.cpython-311.pyc b/src/steuerung3d/cli/__pycache__/commands.cpython-311.pyc
+new file mode 100644
+index 0000000..db8bcf8
+Binary files /dev/null and b/src/steuerung3d/cli/__pycache__/commands.cpython-311.pyc differ
+diff --git a/src/steuerung3d/cli/commands.py b/src/steuerung3d/cli/commands.py
+index 74ae8d6..6cd8b9c 100644
+--- a/src/steuerung3d/cli/commands.py
++++ b/src/steuerung3d/cli/commands.py
+@@ -18,27 +18,38 @@ from steuerung3d.core.stack_runtime import StackRuntime, expand_processes
+ 
+ 
+ def discover_stack_profiles(stacks_dir: Path | None = None) -> list[str]:
+-    """Return available stack profile *names* (without .toml)."""
+-    d = stacks_dir or (Path("configs") / "stacks")
+-    if not d.exists() or not d.is_dir():
+-        return []
+-    out: list[str] = []
+-    for p in sorted(d.glob("*.toml")):
+-        if p.is_file():
+-            out.append(p.stem)
+-    return out
++    """Return available stack profile *names* (without .toml).
++
++    Canonical location is ``configs/profiles``.
++    ``configs/stacks`` remains supported for backward compatibility.
++    """
++
++    if stacks_dir is not None:
++        dirs = [stacks_dir]
++    else:
++        dirs = [Path("configs") / "profiles", Path("configs") / "stacks"]
++
++    names: set[str] = set()
++    for d in dirs:
++        if not d.exists() or not d.is_dir():
++            continue
++        for p in sorted(d.glob("*.toml")):
++            if p.is_file():
++                names.add(p.stem)
++    return sorted(names)
+ 
+ 
+ def print_profiles(stacks_dir: Path | None = None, *, as_paths: bool = False) -> None:
+     names = discover_stack_profiles(stacks_dir)
+-    d = stacks_dir or (Path("configs") / "stacks")
++    d = stacks_dir or (Path("configs") / "profiles")
+     if not names:
+-        print(f"[profiles] none found (looked in {d})")
++        print(f"[profiles] none found (looked in {d} and configs/stacks)")
+         return
+-    print(f"[profiles] available ({len(names)}) in {d}:")
++    print(f"[profiles] available ({len(names)}) in {d} (and configs/stacks):")
+     for n in names:
+         if as_paths:
+-            print(f"- {d / (n + '.toml')}")
++            p = default_profile_path(n) if stacks_dir is None else (d / (n + ".toml"))
++            print(f"- {p}")
+         else:
+             print(f"- {n}")
+ 
+@@ -51,6 +62,10 @@ def default_profile_path(name_or_path: str) -> Path:
+     p = Path(name_or_path)
+     if p.suffix.lower() == ".toml" or p.exists():
+         return p
++    # Prefer canonical dir, fall back to legacy.
++    cand = Path("configs") / "profiles" / f"{name_or_path}.toml"
++    if cand.exists():
++        return cand
+     return Path("configs") / "stacks" / f"{name_or_path}.toml"
+ 
+ 
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/common/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/common/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..629d2f9
+Binary files /dev/null and b/src/steuerung3d/common/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/common/__pycache__/staleness.cpython-311.pyc b/src/steuerung3d/common/__pycache__/staleness.cpython-311.pyc
+new file mode 100644
+index 0000000..443c713
+Binary files /dev/null and b/src/steuerung3d/common/__pycache__/staleness.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/common/__pycache__/timebase.cpython-311.pyc b/src/steuerung3d/common/__pycache__/timebase.cpython-311.pyc
+new file mode 100644
+index 0000000..baf9e40
+Binary files /dev/null and b/src/steuerung3d/common/__pycache__/timebase.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/config/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/config/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..cc92ca3
+Binary files /dev/null and b/src/steuerung3d/config/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/config/__pycache__/lifetick_config.cpython-311.pyc b/src/steuerung3d/config/__pycache__/lifetick_config.cpython-311.pyc
+new file mode 100644
+index 0000000..d5cc03a
+Binary files /dev/null and b/src/steuerung3d/config/__pycache__/lifetick_config.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/config/__pycache__/log_viewer_config.cpython-311.pyc b/src/steuerung3d/config/__pycache__/log_viewer_config.cpython-311.pyc
+new file mode 100644
+index 0000000..73b5b0e
+Binary files /dev/null and b/src/steuerung3d/config/__pycache__/log_viewer_config.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/config/__pycache__/plc_stack_config.cpython-311.pyc b/src/steuerung3d/config/__pycache__/plc_stack_config.cpython-311.pyc
+new file mode 100644
+index 0000000..6f0f78c
+Binary files /dev/null and b/src/steuerung3d/config/__pycache__/plc_stack_config.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/config/__pycache__/toml_loader.cpython-311.pyc b/src/steuerung3d/config/__pycache__/toml_loader.cpython-311.pyc
+new file mode 100644
+index 0000000..3b0eccd
+Binary files /dev/null and b/src/steuerung3d/config/__pycache__/toml_loader.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/core/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..2c3ea66
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/app_catalog.cpython-311.pyc b/src/steuerung3d/core/__pycache__/app_catalog.cpython-311.pyc
+new file mode 100644
+index 0000000..0946648
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/app_catalog.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/axis_fsm.cpython-311.pyc b/src/steuerung3d/core/__pycache__/axis_fsm.cpython-311.pyc
+new file mode 100644
+index 0000000..500e0cc
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/axis_fsm.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/axis_types.cpython-311.pyc b/src/steuerung3d/core/__pycache__/axis_types.cpython-311.pyc
+new file mode 100644
+index 0000000..36feeba
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/axis_types.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/command_frame.cpython-311.pyc b/src/steuerung3d/core/__pycache__/command_frame.cpython-311.pyc
+new file mode 100644
+index 0000000..9538cc8
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/command_frame.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/control_in.cpython-311.pyc b/src/steuerung3d/core/__pycache__/control_in.cpython-311.pyc
+new file mode 100644
+index 0000000..a3ce26c
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/control_in.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/core_mode.cpython-311.pyc b/src/steuerung3d/core/__pycache__/core_mode.cpython-311.pyc
+new file mode 100644
+index 0000000..f1f84c8
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/core_mode.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/engine.cpython-311.pyc b/src/steuerung3d/core/__pycache__/engine.cpython-311.pyc
+new file mode 100644
+index 0000000..757f963
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/engine.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/executor.cpython-311.pyc b/src/steuerung3d/core/__pycache__/executor.cpython-311.pyc
+new file mode 100644
+index 0000000..8be4366
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/executor.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/intent_handler.cpython-311.pyc b/src/steuerung3d/core/__pycache__/intent_handler.cpython-311.pyc
+new file mode 100644
+index 0000000..74d8021
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/intent_handler.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/intent_handler_impl.cpython-311.pyc b/src/steuerung3d/core/__pycache__/intent_handler_impl.cpython-311.pyc
+new file mode 100644
+index 0000000..70fc62d
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/intent_handler_impl.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/intents.cpython-311.pyc b/src/steuerung3d/core/__pycache__/intents.cpython-311.pyc
+new file mode 100644
+index 0000000..85a66ac
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/intents.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/joy_facts.cpython-311.pyc b/src/steuerung3d/core/__pycache__/joy_facts.cpython-311.pyc
+new file mode 100644
+index 0000000..14707b0
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/joy_facts.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/joy_state.cpython-311.pyc b/src/steuerung3d/core/__pycache__/joy_state.cpython-311.pyc
+new file mode 100644
+index 0000000..2fd7cf9
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/joy_state.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/mode_aggregate.cpython-311.pyc b/src/steuerung3d/core/__pycache__/mode_aggregate.cpython-311.pyc
+new file mode 100644
+index 0000000..292dfc5
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/mode_aggregate.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/net.cpython-311.pyc b/src/steuerung3d/core/__pycache__/net.cpython-311.pyc
+new file mode 100644
+index 0000000..2798cb0
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/net.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/param_registry.cpython-311.pyc b/src/steuerung3d/core/__pycache__/param_registry.cpython-311.pyc
+new file mode 100644
+index 0000000..04ba014
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/param_registry.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/ramp.cpython-311.pyc b/src/steuerung3d/core/__pycache__/ramp.cpython-311.pyc
+new file mode 100644
+index 0000000..acbf944
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/ramp.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/rig_logic.cpython-311.pyc b/src/steuerung3d/core/__pycache__/rig_logic.cpython-311.pyc
+new file mode 100644
+index 0000000..39406d6
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/rig_logic.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/rig_types.cpython-311.pyc b/src/steuerung3d/core/__pycache__/rig_types.cpython-311.pyc
+new file mode 100644
+index 0000000..9f89ff7
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/rig_types.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/run_dirs.cpython-311.pyc b/src/steuerung3d/core/__pycache__/run_dirs.cpython-311.pyc
+new file mode 100644
+index 0000000..4af9eef
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/run_dirs.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/stack_loader.cpython-311.pyc b/src/steuerung3d/core/__pycache__/stack_loader.cpython-311.pyc
+new file mode 100644
+index 0000000..841a8f4
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/stack_loader.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/stack_meta.cpython-311.pyc b/src/steuerung3d/core/__pycache__/stack_meta.cpython-311.pyc
+new file mode 100644
+index 0000000..cb598ad
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/stack_meta.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/stack_render.cpython-311.pyc b/src/steuerung3d/core/__pycache__/stack_render.cpython-311.pyc
+new file mode 100644
+index 0000000..c25d725
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/stack_render.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/stack_runtime.cpython-311.pyc b/src/steuerung3d/core/__pycache__/stack_runtime.cpython-311.pyc
+new file mode 100644
+index 0000000..570ad88
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/stack_runtime.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/stack_runtime_impl.cpython-311.pyc b/src/steuerung3d/core/__pycache__/stack_runtime_impl.cpython-311.pyc
+new file mode 100644
+index 0000000..32630b5
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/stack_runtime_impl.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/stack_runtime_processes.cpython-311.pyc b/src/steuerung3d/core/__pycache__/stack_runtime_processes.cpython-311.pyc
+new file mode 100644
+index 0000000..2b61541
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/stack_runtime_processes.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/stack_spec.cpython-311.pyc b/src/steuerung3d/core/__pycache__/stack_spec.cpython-311.pyc
+new file mode 100644
+index 0000000..eaa561d
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/stack_spec.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/state.cpython-311.pyc b/src/steuerung3d/core/__pycache__/state.cpython-311.pyc
+new file mode 100644
+index 0000000..881767a
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/state.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/status.cpython-311.pyc b/src/steuerung3d/core/__pycache__/status.cpython-311.pyc
+new file mode 100644
+index 0000000..0fc5b24
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/status.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/__pycache__/telemetry.cpython-311.pyc b/src/steuerung3d/core/__pycache__/telemetry.cpython-311.pyc
+new file mode 100644
+index 0000000..22a526b
+Binary files /dev/null and b/src/steuerung3d/core/__pycache__/telemetry.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/controllers/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/core/controllers/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..fea9d69
+Binary files /dev/null and b/src/steuerung3d/core/controllers/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/src/steuerung3d/core/engine.py b/src/steuerung3d/core/engine.py
+index b655c97..058458f 100644
+--- a/src/steuerung3d/core/engine.py
++++ b/src/steuerung3d/core/engine.py
+@@ -71,28 +71,13 @@ class CoreEngine:
+             self.state.update_param_commit_timeout(max_age_ticks=max_age_ticks)
+ 
+         # ---- clear one-shot requests after emitting once ----
+-        if hasattr(self.state, "clear_one_shots"):
+-            self.state.clear_one_shots()
+-        else:
+-            # Fallback for older snapshots
+-            self.state.estop_reset_req = False
+-            if hasattr(self.state, "estop_reset_req_by_axis"):
+-                self.state.estop_reset_req_by_axis.clear()
+-
+-            self.state.resync_req = False
+-            if hasattr(self.state, "resync_req_by_axis"):
+-                self.state.resync_req_by_axis.clear()
+-
+-            self.state.pending_param_ops.clear()
+-            if hasattr(self.state, "pending_param_ops_by_axis"):
+-                self.state.pending_param_ops_by_axis.clear()
++        self.state.clear_transients()
+ 
+         # 5) emit telemetry snapshot
+         if self.on_snapshot is not None:
+             self.on_snapshot(TelemetrySnapshot.from_state(self.state))
+ 
+-        # one-shot transactional acks (HIP<->Core)
+-        self.state.core_acks.clear()
++
+ 
+     def run_for_ticks(self, n: int) -> None:
+         if n < 0:
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/intent_handlers/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/core/intent_handlers/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..3d7b0f4
+Binary files /dev/null and b/src/steuerung3d/core/intent_handlers/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/intent_handlers/__pycache__/claims.cpython-311.pyc b/src/steuerung3d/core/intent_handlers/__pycache__/claims.cpython-311.pyc
+new file mode 100644
+index 0000000..1e1a61c
+Binary files /dev/null and b/src/steuerung3d/core/intent_handlers/__pycache__/claims.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/intent_handlers/__pycache__/enforce.cpython-311.pyc b/src/steuerung3d/core/intent_handlers/__pycache__/enforce.cpython-311.pyc
+new file mode 100644
+index 0000000..3b5b01d
+Binary files /dev/null and b/src/steuerung3d/core/intent_handlers/__pycache__/enforce.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/intent_handlers/__pycache__/lease.cpython-311.pyc b/src/steuerung3d/core/intent_handlers/__pycache__/lease.cpython-311.pyc
+new file mode 100644
+index 0000000..45803ae
+Binary files /dev/null and b/src/steuerung3d/core/intent_handlers/__pycache__/lease.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/intent_handlers/__pycache__/params.cpython-311.pyc b/src/steuerung3d/core/intent_handlers/__pycache__/params.cpython-311.pyc
+new file mode 100644
+index 0000000..85ce51a
+Binary files /dev/null and b/src/steuerung3d/core/intent_handlers/__pycache__/params.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/intent_handlers/__pycache__/plc_write_keys.cpython-311.pyc b/src/steuerung3d/core/intent_handlers/__pycache__/plc_write_keys.cpython-311.pyc
+new file mode 100644
+index 0000000..afa1f97
+Binary files /dev/null and b/src/steuerung3d/core/intent_handlers/__pycache__/plc_write_keys.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/intent_handlers/__pycache__/reset_resync.cpython-311.pyc b/src/steuerung3d/core/intent_handlers/__pycache__/reset_resync.cpython-311.pyc
+new file mode 100644
+index 0000000..0f68228
+Binary files /dev/null and b/src/steuerung3d/core/intent_handlers/__pycache__/reset_resync.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/intent_handlers/__pycache__/txn.cpython-311.pyc b/src/steuerung3d/core/intent_handlers/__pycache__/txn.cpython-311.pyc
+new file mode 100644
+index 0000000..21d8e0e
+Binary files /dev/null and b/src/steuerung3d/core/intent_handlers/__pycache__/txn.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/intent_routes/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/core/intent_routes/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..e023a42
+Binary files /dev/null and b/src/steuerung3d/core/intent_routes/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/intent_routes/__pycache__/control.cpython-311.pyc b/src/steuerung3d/core/intent_routes/__pycache__/control.cpython-311.pyc
+new file mode 100644
+index 0000000..25c32d2
+Binary files /dev/null and b/src/steuerung3d/core/intent_routes/__pycache__/control.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/intent_routes/__pycache__/leases.cpython-311.pyc b/src/steuerung3d/core/intent_routes/__pycache__/leases.cpython-311.pyc
+new file mode 100644
+index 0000000..6770a54
+Binary files /dev/null and b/src/steuerung3d/core/intent_routes/__pycache__/leases.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/intent_routes/__pycache__/motion.cpython-311.pyc b/src/steuerung3d/core/intent_routes/__pycache__/motion.cpython-311.pyc
+new file mode 100644
+index 0000000..ba56c6b
+Binary files /dev/null and b/src/steuerung3d/core/intent_routes/__pycache__/motion.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/intent_routes/__pycache__/params.cpython-311.pyc b/src/steuerung3d/core/intent_routes/__pycache__/params.cpython-311.pyc
+new file mode 100644
+index 0000000..e4e4e84
+Binary files /dev/null and b/src/steuerung3d/core/intent_routes/__pycache__/params.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/core/intent_routes/__pycache__/safety.cpython-311.pyc b/src/steuerung3d/core/intent_routes/__pycache__/safety.cpython-311.pyc
+new file mode 100644
+index 0000000..4e6e23b
+Binary files /dev/null and b/src/steuerung3d/core/intent_routes/__pycache__/safety.cpython-311.pyc differ
+diff --git a/src/steuerung3d/core/state.py b/src/steuerung3d/core/state.py
+index 5a88248..678659d 100644
+--- a/src/steuerung3d/core/state.py
++++ b/src/steuerung3d/core/state.py
+@@ -133,6 +133,35 @@ class MachineState:
+     core_axis_gate: Dict[str, Dict[str, object]] = field(default_factory=dict)
+     core_motion_allowed: bool = False
+ 
++    def clear_one_shots(self) -> None:
++        """Clear one-shot request fields after they have been emitted once.
++
++        Semantic policy (2026-02-28):
++        - The per-axis maps (``*_by_axis``) are the canonical source of truth.
++        - The legacy global fields (``estop_reset_req``, ``resync_req``, ``pending_param_ops``)
++          are maintained only for backward compatibility and are cleared here as well.
++        """
++
++        # Reset / resync pulses (one-shot)
++        self.estop_reset_req = False
++        self.estop_reset_req_by_axis.clear()
++
++        self.resync_req = False
++        self.resync_req_by_axis.clear()
++
++        # Parameter ops are one-shot as well (UI can re-issue if needed)
++        self.pending_param_ops.clear()
++        self.pending_param_ops_by_axis.clear()
++
++    def clear_transients(self) -> None:
++        """Clear transient/one-shot state after a full engine tick.
++
++        This consolidates the end-of-tick cleanup into a single supported write-path.
++        """
++
++        self.clear_one_shots()
++        self.core_acks.clear()
++
+ 
+     def ensure_axis(self, axis_id: str) -> AxisState:
+         axis_id = str(axis_id)
+@@ -215,23 +244,3 @@ class MachineState:
+             if hip_id and self.claim_owner(axis_id) != hip_id:
+                 return
+         self.axis_claims.pop(axis_id, None)
+-
+-def clear_one_shots(self) -> None:
+-    """Clear one-shot request fields after they have been emitted once.
+-
+-    Semantic policy (2026-02-28):
+-    - The per-axis maps (``*_by_axis``) are the canonical source of truth.
+-    - The legacy global fields (``estop_reset_req``, ``resync_req``, ``pending_param_ops``)
+-      are maintained only for backward compatibility and are cleared here as well.
+-    """
+-
+-    # Reset / resync pulses (one-shot)
+-    self.estop_reset_req = False
+-    self.estop_reset_req_by_axis.clear()
+-
+-    self.resync_req = False
+-    self.resync_req_by_axis.clear()
+-
+-    # Parameter ops are one-shot as well (UI can re-issue if needed)
+-    self.pending_param_ops.clear()
+-    self.pending_param_ops_by_axis.clear()
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/legacy/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/legacy/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..9737591
+Binary files /dev/null and b/src/steuerung3d/legacy/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/legacy/__pycache__/drive_status_decoder.cpython-311.pyc b/src/steuerung3d/legacy/__pycache__/drive_status_decoder.cpython-311.pyc
+new file mode 100644
+index 0000000..37c27c7
+Binary files /dev/null and b/src/steuerung3d/legacy/__pycache__/drive_status_decoder.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..4a899ce
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/axis_router.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/axis_router.cpython-311.pyc
+new file mode 100644
+index 0000000..d25e0a4
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/axis_router.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/banner_estate.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/banner_estate.cpython-311.pyc
+new file mode 100644
+index 0000000..066961f
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/banner_estate.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/codec.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/codec.cpython-311.pyc
+new file mode 100644
+index 0000000..d010b7e
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/codec.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/core_runner.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/core_runner.cpython-311.pyc
+new file mode 100644
+index 0000000..734def7
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/core_runner.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/drive_status.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/drive_status.cpython-311.pyc
+new file mode 100644
+index 0000000..7d34f85
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/drive_status.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/estop_bits.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/estop_bits.cpython-311.pyc
+new file mode 100644
+index 0000000..d442ec7
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/estop_bits.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/inmem_bus.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/inmem_bus.cpython-311.pyc
+new file mode 100644
+index 0000000..30d245d
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/inmem_bus.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/legacy_plc.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/legacy_plc.cpython-311.pyc
+new file mode 100644
+index 0000000..2e562d7
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/legacy_plc.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/parse_primitives.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/parse_primitives.cpython-311.pyc
+new file mode 100644
+index 0000000..529ea25
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/parse_primitives.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/plc_codec.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/plc_codec.cpython-311.pyc
+new file mode 100644
+index 0000000..d0f927d
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/plc_codec.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/plc_codec_fields.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/plc_codec_fields.cpython-311.pyc
+new file mode 100644
+index 0000000..28627ea
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/plc_codec_fields.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/plc_codec_impl.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/plc_codec_impl.cpython-311.pyc
+new file mode 100644
+index 0000000..31d9d34
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/plc_codec_impl.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/plc_codec_utils.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/plc_codec_utils.cpython-311.pyc
+new file mode 100644
+index 0000000..ba8f440
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/plc_codec_utils.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/plc_wire.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/plc_wire.cpython-311.pyc
+new file mode 100644
+index 0000000..75e5634
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/plc_wire.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/raw_controls.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/raw_controls.cpython-311.pyc
+new file mode 100644
+index 0000000..a6217c8
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/raw_controls.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/recording.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/recording.cpython-311.pyc
+new file mode 100644
+index 0000000..1e67d17
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/recording.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/transport.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/transport.cpython-311.pyc
+new file mode 100644
+index 0000000..e426277
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/transport.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/udp_channels.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/udp_channels.cpython-311.pyc
+new file mode 100644
+index 0000000..603aa2b
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/udp_channels.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/udp_plc_channels.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/udp_plc_channels.cpython-311.pyc
+new file mode 100644
+index 0000000..ea73c87
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/udp_plc_channels.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/protocol/__pycache__/udp_transport_v2.cpython-311.pyc b/src/steuerung3d/protocol/__pycache__/udp_transport_v2.cpython-311.pyc
+new file mode 100644
+index 0000000..f3cb2eb
+Binary files /dev/null and b/src/steuerung3d/protocol/__pycache__/udp_transport_v2.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/tools/__pycache__/smoke_autoclaim.cpython-311.pyc b/src/steuerung3d/tools/__pycache__/smoke_autoclaim.cpython-311.pyc
+new file mode 100644
+index 0000000..0a0cf15
+Binary files /dev/null and b/src/steuerung3d/tools/__pycache__/smoke_autoclaim.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/tools/__pycache__/udp_listen.cpython-311.pyc b/src/steuerung3d/tools/__pycache__/udp_listen.cpython-311.pyc
+new file mode 100644
+index 0000000..e35d0d9
+Binary files /dev/null and b/src/steuerung3d/tools/__pycache__/udp_listen.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/tools/__pycache__/verify_fsm_wiring.cpython-311.pyc b/src/steuerung3d/tools/__pycache__/verify_fsm_wiring.cpython-311.pyc
+new file mode 100644
+index 0000000..e0decc4
+Binary files /dev/null and b/src/steuerung3d/tools/__pycache__/verify_fsm_wiring.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/ui/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/ui/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..6ec92a2
+Binary files /dev/null and b/src/steuerung3d/ui/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/ui/__pycache__/birdseye_format.cpython-311.pyc b/src/steuerung3d/ui/__pycache__/birdseye_format.cpython-311.pyc
+new file mode 100644
+index 0000000..47e37ea
+Binary files /dev/null and b/src/steuerung3d/ui/__pycache__/birdseye_format.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/util/__pycache__/__init__.cpython-311.pyc b/src/steuerung3d/util/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..719df0b
+Binary files /dev/null and b/src/steuerung3d/util/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/util/__pycache__/app_bootstrap.cpython-311.pyc b/src/steuerung3d/util/__pycache__/app_bootstrap.cpython-311.pyc
+new file mode 100644
+index 0000000..47a9260
+Binary files /dev/null and b/src/steuerung3d/util/__pycache__/app_bootstrap.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/util/__pycache__/heartbeat.cpython-311.pyc b/src/steuerung3d/util/__pycache__/heartbeat.cpython-311.pyc
+new file mode 100644
+index 0000000..9c4eff2
+Binary files /dev/null and b/src/steuerung3d/util/__pycache__/heartbeat.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/util/__pycache__/log_context.cpython-311.pyc b/src/steuerung3d/util/__pycache__/log_context.cpython-311.pyc
+new file mode 100644
+index 0000000..c3dae93
+Binary files /dev/null and b/src/steuerung3d/util/__pycache__/log_context.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/util/__pycache__/ratelimit.cpython-311.pyc b/src/steuerung3d/util/__pycache__/ratelimit.cpython-311.pyc
+new file mode 100644
+index 0000000..1679a01
+Binary files /dev/null and b/src/steuerung3d/util/__pycache__/ratelimit.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/src/steuerung3d/util/__pycache__/tick.cpython-311.pyc b/src/steuerung3d/util/__pycache__/tick.cpython-311.pyc
+new file mode 100644
+index 0000000..10e61a6
+Binary files /dev/null and b/src/steuerung3d/util/__pycache__/tick.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/__init__.cpython-311.pyc b/tests/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..353fa62
+Binary files /dev/null and b/tests/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/conftest.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/conftest.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..5478313
+Binary files /dev/null and b/tests/__pycache__/conftest.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_axis_router.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_axis_router.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..1b849cd
+Binary files /dev/null and b/tests/__pycache__/test_axis_router.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_birds_eye_status_emitter.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_birds_eye_status_emitter.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..b843c5e
+Binary files /dev/null and b/tests/__pycache__/test_birds_eye_status_emitter.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_claims_autoclaim.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_claims_autoclaim.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..21dd72b
+Binary files /dev/null and b/tests/__pycache__/test_claims_autoclaim.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_codex_smoke.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_codex_smoke.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..575bfb1
+Binary files /dev/null and b/tests/__pycache__/test_codex_smoke.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_core_mode_aggregate.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_core_mode_aggregate.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..bb6aa3c
+Binary files /dev/null and b/tests/__pycache__/test_core_mode_aggregate.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_core_mode_runtime.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_core_mode_runtime.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..63ce6e5
+Binary files /dev/null and b/tests/__pycache__/test_core_mode_runtime.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_core_reset_policy.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_core_reset_policy.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..f7c7542
+Binary files /dev/null and b/tests/__pycache__/test_core_reset_policy.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_core_udp_service_modules_import.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_core_udp_service_modules_import.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..a437bd6
+Binary files /dev/null and b/tests/__pycache__/test_core_udp_service_modules_import.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_hip_joy_policy.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_hip_joy_policy.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..48e6f9d
+Binary files /dev/null and b/tests/__pycache__/test_hip_joy_policy.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_intents.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_intents.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..16bec10
+Binary files /dev/null and b/tests/__pycache__/test_intents.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_joy2intent_gamepad.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_joy2intent_gamepad.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..52adec2
+Binary files /dev/null and b/tests/__pycache__/test_joy2intent_gamepad.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_joy_facts.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_joy_facts.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..cdc6144
+Binary files /dev/null and b/tests/__pycache__/test_joy_facts.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_joy_motion_pipeline.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_joy_motion_pipeline.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..429425b
+Binary files /dev/null and b/tests/__pycache__/test_joy_motion_pipeline.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_joy_state_telemetry.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_joy_state_telemetry.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..efefeea
+Binary files /dev/null and b/tests/__pycache__/test_joy_state_telemetry.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_livetick_echo_pipeline.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_livetick_echo_pipeline.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..241515b
+Binary files /dev/null and b/tests/__pycache__/test_livetick_echo_pipeline.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_mode_aggregate_motion_allowed.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_mode_aggregate_motion_allowed.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..926c5d5
+Binary files /dev/null and b/tests/__pycache__/test_mode_aggregate_motion_allowed.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_plc_twincat_legacy_edge_roundtrip.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_plc_twincat_legacy_edge_roundtrip.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..0576793
+Binary files /dev/null and b/tests/__pycache__/test_plc_twincat_legacy_edge_roundtrip.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_plc_twincat_legacy_fleet_from_toml.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_plc_twincat_legacy_fleet_from_toml.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..5c94d3a
+Binary files /dev/null and b/tests/__pycache__/test_plc_twincat_legacy_fleet_from_toml.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_protocol_codec_intents.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_protocol_codec_intents.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..4e5ba4e
+Binary files /dev/null and b/tests/__pycache__/test_protocol_codec_intents.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_protocol_imports.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_protocol_imports.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..39b0f94
+Binary files /dev/null and b/tests/__pycache__/test_protocol_imports.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_protocol_legacy_plc_uplink.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_protocol_legacy_plc_uplink.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..33d1c96
+Binary files /dev/null and b/tests/__pycache__/test_protocol_legacy_plc_uplink.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_ramp.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_ramp.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..41432dd
+Binary files /dev/null and b/tests/__pycache__/test_ramp.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_repo_guard_no_archive_imports.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_repo_guard_no_archive_imports.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..0d62e63
+Binary files /dev/null and b/tests/__pycache__/test_repo_guard_no_archive_imports.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_rig_workflow.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_rig_workflow.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..aced974
+Binary files /dev/null and b/tests/__pycache__/test_rig_workflow.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_snapshot_axes_list.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_snapshot_axes_list.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..6f61a5e
+Binary files /dev/null and b/tests/__pycache__/test_snapshot_axes_list.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_stack_boot_profiles.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_stack_boot_profiles.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..16b2355
+Binary files /dev/null and b/tests/__pycache__/test_stack_boot_profiles.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_stack_profile_core_is_udp.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_stack_profile_core_is_udp.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..3991b39
+Binary files /dev/null and b/tests/__pycache__/test_stack_profile_core_is_udp.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_stale_command_frame_safe.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_stale_command_frame_safe.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..bc1c0d5
+Binary files /dev/null and b/tests/__pycache__/test_stale_command_frame_safe.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_state_ensure_axis.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_state_ensure_axis.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..eb80685
+Binary files /dev/null and b/tests/__pycache__/test_state_ensure_axis.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_state_machine_modes.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_state_machine_modes.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..072a4e6
+Binary files /dev/null and b/tests/__pycache__/test_state_machine_modes.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_udp_axis_discovery.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_udp_axis_discovery.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..c74b151
+Binary files /dev/null and b/tests/__pycache__/test_udp_axis_discovery.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_ui_banner_helpers.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_ui_banner_helpers.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..8eb342c
+Binary files /dev/null and b/tests/__pycache__/test_ui_banner_helpers.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_ui_estop_helpers.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_ui_estop_helpers.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..158e5f4
+Binary files /dev/null and b/tests/__pycache__/test_ui_estop_helpers.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/__pycache__/test_yellow_boundaries_no_qt.cpython-311-pytest-8.2.2.pyc b/tests/__pycache__/test_yellow_boundaries_no_qt.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..bdba7f9
+Binary files /dev/null and b/tests/__pycache__/test_yellow_boundaries_no_qt.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/integration/__pycache__/test_densi_plc_anton_loop.cpython-311-pytest-8.2.2.pyc b/tests/integration/__pycache__/test_densi_plc_anton_loop.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..92abef6
+Binary files /dev/null and b/tests/integration/__pycache__/test_densi_plc_anton_loop.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/integration/__pycache__/test_roundtrip_core_densi_plc.cpython-311-pytest-8.2.2.pyc b/tests/integration/__pycache__/test_roundtrip_core_densi_plc.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..d191845
+Binary files /dev/null and b/tests/integration/__pycache__/test_roundtrip_core_densi_plc.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/integration/__pycache__/test_roundtrip_core_hip_plc.cpython-311-pytest-8.2.2.pyc b/tests/integration/__pycache__/test_roundtrip_core_hip_plc.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..dd1bdf8
+Binary files /dev/null and b/tests/integration/__pycache__/test_roundtrip_core_hip_plc.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/protocol/__pycache__/test_protocol_import_smoke.cpython-311-pytest-8.2.2.pyc b/tests/protocol/__pycache__/test_protocol_import_smoke.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..5e454dc
+Binary files /dev/null and b/tests/protocol/__pycache__/test_protocol_import_smoke.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/__init__.cpython-311.pyc b/tests/unit/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..6bceb45
+Binary files /dev/null and b/tests/unit/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_birdseye_format.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_birdseye_format.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..08696da
+Binary files /dev/null and b/tests/unit/__pycache__/test_birdseye_format.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_command_frame_regression.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_command_frame_regression.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..d5868a8
+Binary files /dev/null and b/tests/unit/__pycache__/test_command_frame_regression.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_core_udp_service_cli.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_core_udp_service_cli.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..c60e39e
+Binary files /dev/null and b/tests/unit/__pycache__/test_core_udp_service_cli.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_densi_banner_vm.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_densi_banner_vm.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..fde0fc1
+Binary files /dev/null and b/tests/unit/__pycache__/test_densi_banner_vm.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_densi_controller_sanity.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_densi_controller_sanity.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..19967e5
+Binary files /dev/null and b/tests/unit/__pycache__/test_densi_controller_sanity.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_densi_cut_markers.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_densi_cut_markers.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..2686f73
+Binary files /dev/null and b/tests/unit/__pycache__/test_densi_cut_markers.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_densi_cut_markers_vm.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_densi_cut_markers_vm.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..83369d9
+Binary files /dev/null and b/tests/unit/__pycache__/test_densi_cut_markers_vm.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_densi_engine_import.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_densi_engine_import.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..9dd07f7
+Binary files /dev/null and b/tests/unit/__pycache__/test_densi_engine_import.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_densi_estop_dots_vm.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_densi_estop_dots_vm.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..290fca9
+Binary files /dev/null and b/tests/unit/__pycache__/test_densi_estop_dots_vm.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_densi_header_online_vm.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_densi_header_online_vm.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..98ca9a4
+Binary files /dev/null and b/tests/unit/__pycache__/test_densi_header_online_vm.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_densi_lifetick_vm.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_densi_lifetick_vm.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..658d8e5
+Binary files /dev/null and b/tests/unit/__pycache__/test_densi_lifetick_vm.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_densi_limits_vm.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_densi_limits_vm.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..ca1a4fd
+Binary files /dev/null and b/tests/unit/__pycache__/test_densi_limits_vm.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_densi_motion_clamp.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_densi_motion_clamp.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..d3ee91a
+Binary files /dev/null and b/tests/unit/__pycache__/test_densi_motion_clamp.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_densi_param_ops_core.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_densi_param_ops_core.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..eb44015
+Binary files /dev/null and b/tests/unit/__pycache__/test_densi_param_ops_core.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_densi_plc_anton_motion.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_densi_plc_anton_motion.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..0964ec4
+Binary files /dev/null and b/tests/unit/__pycache__/test_densi_plc_anton_motion.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_densi_readouts_vm.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_densi_readouts_vm.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..71f5a65
+Binary files /dev/null and b/tests/unit/__pycache__/test_densi_readouts_vm.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_densi_setpoint_semantics.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_densi_setpoint_semantics.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..c733bdd
+Binary files /dev/null and b/tests/unit/__pycache__/test_densi_setpoint_semantics.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_engine_tick.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_engine_tick.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..f7e5a2f
+Binary files /dev/null and b/tests/unit/__pycache__/test_engine_tick.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_estop_facts.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_estop_facts.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..7fff1b9
+Binary files /dev/null and b/tests/unit/__pycache__/test_estop_facts.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_frederik_panel.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_frederik_panel.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..cc3484e
+Binary files /dev/null and b/tests/unit/__pycache__/test_frederik_panel.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_hip_birdseye_joy.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_hip_birdseye_joy.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..1f6fa54
+Binary files /dev/null and b/tests/unit/__pycache__/test_hip_birdseye_joy.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_hip_engine.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_hip_engine.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..8d281d4
+Binary files /dev/null and b/tests/unit/__pycache__/test_hip_engine.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_hip_engine_shadow_helpers.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_hip_engine_shadow_helpers.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..f5e3db8
+Binary files /dev/null and b/tests/unit/__pycache__/test_hip_engine_shadow_helpers.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_hip_mode_mapping.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_hip_mode_mapping.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..bc07e8e
+Binary files /dev/null and b/tests/unit/__pycache__/test_hip_mode_mapping.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_hip_panel_vms.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_hip_panel_vms.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..a34686c
+Binary files /dev/null and b/tests/unit/__pycache__/test_hip_panel_vms.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_hip_runtime.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_hip_runtime.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..f2f9220
+Binary files /dev/null and b/tests/unit/__pycache__/test_hip_runtime.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_hip_viewmodel_joy.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_hip_viewmodel_joy.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..680ae00
+Binary files /dev/null and b/tests/unit/__pycache__/test_hip_viewmodel_joy.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_joy_motion_map.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_joy_motion_map.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..a15774f
+Binary files /dev/null and b/tests/unit/__pycache__/test_joy_motion_map.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_livetick_roundtrip.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_livetick_roundtrip.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..0c8bef9
+Binary files /dev/null and b/tests/unit/__pycache__/test_livetick_roundtrip.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_param_registry_and_observed_commit.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_param_registry_and_observed_commit.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..0c1beb5
+Binary files /dev/null and b/tests/unit/__pycache__/test_param_registry_and_observed_commit.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_plc_codec_anton.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_plc_codec_anton.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..1f9f7e8
+Binary files /dev/null and b/tests/unit/__pycache__/test_plc_codec_anton.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_plc_device_builder.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_plc_device_builder.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..56cf6cc
+Binary files /dev/null and b/tests/unit/__pycache__/test_plc_device_builder.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_plc_line_codec.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_plc_line_codec.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..0febac4
+Binary files /dev/null and b/tests/unit/__pycache__/test_plc_line_codec.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_record_replay_smoke.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_record_replay_smoke.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..4e30bd4
+Binary files /dev/null and b/tests/unit/__pycache__/test_record_replay_smoke.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_rig_lease.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_rig_lease.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..c37d447
+Binary files /dev/null and b/tests/unit/__pycache__/test_rig_lease.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_sim_axis_plant.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_sim_axis_plant.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..ca433d3
+Binary files /dev/null and b/tests/unit/__pycache__/test_sim_axis_plant.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_stale_command_frame_safe.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_stale_command_frame_safe.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..f0785fe
+Binary files /dev/null and b/tests/unit/__pycache__/test_stale_command_frame_safe.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_staleness_helpers.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_staleness_helpers.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..c9245bb
+Binary files /dev/null and b/tests/unit/__pycache__/test_staleness_helpers.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_tick_delta_16bit.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_tick_delta_16bit.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..f31a333
+Binary files /dev/null and b/tests/unit/__pycache__/test_tick_delta_16bit.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_tick_util.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_tick_util.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..df8624e
+Binary files /dev/null and b/tests/unit/__pycache__/test_tick_util.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_toml_driven_multi_axis.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_toml_driven_multi_axis.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..3ef711e
+Binary files /dev/null and b/tests/unit/__pycache__/test_toml_driven_multi_axis.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_transport_inmem.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_transport_inmem.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..bb7f372
+Binary files /dev/null and b/tests/unit/__pycache__/test_transport_inmem.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_udp_listen.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_udp_listen.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..0f1a32f
+Binary files /dev/null and b/tests/unit/__pycache__/test_udp_listen.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_udp_plc_channels_bool_tokens.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_udp_plc_channels_bool_tokens.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..a12b3e6
+Binary files /dev/null and b/tests/unit/__pycache__/test_udp_plc_channels_bool_tokens.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_udp_telemetry_fanout.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_udp_telemetry_fanout.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..02db519
+Binary files /dev/null and b/tests/unit/__pycache__/test_udp_telemetry_fanout.cpython-311-pytest-8.2.2.pyc differ
+diff --git a/snap/dev-chore-docs-dedupe-rawstring-rename/tests/unit/__pycache__/test_yellow_widget_presence.cpython-311-pytest-8.2.2.pyc b/tests/unit/__pycache__/test_yellow_widget_presence.cpython-311-pytest-8.2.2.pyc
+new file mode 100644
+index 0000000..2fe1230
+Binary files /dev/null and b/tests/unit/__pycache__/test_yellow_widget_presence.cpython-311-pytest-8.2.2.pyc differ

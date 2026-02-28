@@ -21,4 +21,5 @@ Package-level defaults / embedded example configs shipped with the library.
 ## Notes
 
 - This README was auto-generated to help orient the repo. If something is inaccurate, update it to match reality.
-- Stack profiles (e.g. `configs/stacks/1dev_sim.toml`) currently point joy2intent to `configs/joy2intent_bindings_gamepad.toml`.
+- Stack profiles live in `configs/profiles/*.toml` (canonical).
+  `configs/stacks/` remains supported for backward compatibility.

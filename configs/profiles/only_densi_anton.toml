@@ -1,0 +1,19 @@
+[stack]
+name = "only_densi_anton"
+
+[rig]
+axes = ["Anton"]
+
+[net]
+status_in = "127.0.0.1:51200"
+
+[services.densi]
+# REQUIRED by stack_runtime.expand_processes()
+module = "steuerung3d.apps.den_si"
+config = "configs/services/densi.toml"
+
+# Service-specific config
+axis = "Anton"
+cmd_in = "127.0.0.1:52001"
+telem_out = "127.0.0.1:52020"
+wire_proto = "plc"
