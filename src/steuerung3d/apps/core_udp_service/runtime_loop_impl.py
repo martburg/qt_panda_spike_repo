@@ -7,9 +7,8 @@ from typing import List, Optional, Tuple
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.command_frame import CommandFrame, coerce_param_ops
+from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.state import MachineState
-from steuerung3d.core.mode_aggregate import aggregate_core_mode
 from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapshot
 from steuerung3d.core.net import parse_hostport
 from steuerung3d.protocol.core_runner import CoreRunner
@@ -23,7 +22,8 @@ from .cli_validation import (
     validate_dev_cmd_targets,
     validate_ui_telem_targets,
 )
-from .facts_builder import build_aggregate_inputs
+from .runtime_helpers import apply_mode_aggregation as _apply_mode_aggregation
+from .runtime_helpers import compute_one_shots_by_axis as _compute_one_shots_by_axis
 from .fatal_ui import fatal as _fatal
 from .reporter import emit_birds_eye_status, log_periodic_heartbeat
 from .targets import expand_dev_cmd_targets as _expand_dev_cmd_targets
@@ -36,50 +36,6 @@ __all__ = [
     "_expand_targets",
     "_expand_dev_cmd_targets",
 ]
-
-
-
-def _compute_one_shots_by_axis(state: MachineState, axis_ids: list[str]) -> tuple[dict[str, bool], dict[str, list]]:
-    """Compute per-axis one-shot signals for strict device routing.
-
-    Returns:
-        (estop_reset_by_axis, param_ops_by_axis)
-
-    Notes:
-    - Multi-axis: use per-axis maps directly.
-    - Single-axis: preserve backward compatibility by allowing the legacy global
-      fields to apply to the single configured axis.
-    """
-    multi_axis = len(axis_ids) > 1
-    if multi_axis:
-        estop_reset_by_axis = dict(getattr(state, "estop_reset_req_by_axis", {}) or {})
-        per_axis_raw = dict(getattr(state, "pending_param_ops_by_axis", {}) or {})
-        param_ops_by_axis = {k: coerce_param_ops(v) for k, v in per_axis_raw.items()}
-        return estop_reset_by_axis, param_ops_by_axis
-
-    axis0 = axis_ids[0]
-    estop_reset_by_axis = {
-        axis0: bool(
-            dict(getattr(state, "estop_reset_req_by_axis", {}) or {}).get(axis0, False)
-            or getattr(state, "estop_reset_req", False)
-        )
-    }
-    per_axis_ops = coerce_param_ops(dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).get(axis0, []))
-    global_ops = coerce_param_ops(getattr(state, "pending_param_ops", []) or [])
-    param_ops_by_axis = {axis0: (per_axis_ops + global_ops)}
-    return estop_reset_by_axis, param_ops_by_axis
-
-
-def _apply_mode_aggregation(state: MachineState, *, router: AxisRouter, axis_ids: list[str], dt: float) -> None:
-    """Compute and apply core mode aggregation (aggregator remains pure)."""
-    inputs = build_aggregate_inputs(state=state, router=router, axis_ids=axis_ids, dt=dt)
-    result = aggregate_core_mode(inputs)
-    state.core_mode = result.core_mode
-    state.core_blocked_by = list(result.blocked_by)
-    state.core_axis_gate = dict(result.axis_gate)
-    state.core_motion_allowed = bool(result.motion_allowed)
-
-
 def run_core_udp_service(*, args, status) -> int:
     # --- UDP endpoints ---
     intent_in_bind = parse_hostport(args.intent_in)

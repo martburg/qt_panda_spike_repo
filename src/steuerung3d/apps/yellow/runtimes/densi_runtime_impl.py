@@ -31,7 +31,8 @@ try:
 except Exception:  # pragma: no cover
     StatusEmitter = None  # type: ignore
 
-from ..engines.densi.engine import DenSiEngine, DenSiTickResult
+from ..engines.densi.engine import DenSiEngine
+from ..engines.densi.engine_types import DenSiTickResult
 from ..engines.densi.inputs import DensiInputs
 from ..engines.densi.viewmodel import DensiViewModel
 from ..panels.densi.densi_banner_vm import compute_densi_banner_vm
@@ -41,18 +42,7 @@ from ..panels.densi.densi_header_online_vm import compute_densi_header_online_vm
 from ..panels.densi.densi_lifetick_vm import compute_densi_lifetick_vm
 from ..panels.densi.densi_readouts_vm import compute_densi_readouts_vm
 from ..domain.taster_edge_state import TasterEdgeState, update_taster_edge_state, within_brake_grace
-
-
-@dataclass(frozen=True)
-class DensiRuntimeResult:
-    frames: List[CommandFrame]
-    tick_result: DenSiTickResult
-    snap: TelemetrySnapshot
-    view_model: DensiViewModel
-    last_cmd: CommandFrame | None
-    last_cmd_ns: int | None
-    seen_first_cmd: bool
-    cmd_rx_count: int
+from .densi_runtime_types import DensiRuntimeResult
 
 
 class DensiRuntime:

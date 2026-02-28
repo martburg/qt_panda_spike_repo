@@ -35,6 +35,7 @@ from ...domain.estop_facts import (
     estop_ok_keys,
 )
 
+from .engine_types import DenSiTickResult
 from .types import EStopState, L0Top, L0Sub
 from .step_impl import step as _step
 from .cut_markers import clear_cut_markers as _clear_cut_markers
@@ -52,35 +53,6 @@ from .param_defaults import apply_densi_param_defaults
 from .motion_clamp import apply_estop_clamp_to_state, compute_moving_guard
 from .plc_anton_vel_cmd import step_plc_anton_vel_cmd
 from .setpoint_semantics import normalize_cmd_for_plant
-
-
-
-@dataclass
-class DenSiTickResult:
-    """Result of one DenSi engine tick."""
-
-    cmd_rx_count: int
-    last_cmd: CommandFrame
-    last_cmd_ns: int | None
-
-    l0_top: L0Top
-    l0_sub: L0Sub
-
-    reset_able: bool
-    ready_for_sollvel: bool
-    moving: bool
-    motion_ready: bool
-
-    estop_word: int
-    estop_bits: dict[str, bool]
-    estop_edge: bool
-
-    applied_param_values: dict[str, float]
-
-    # UI nicety: controller can choose whether to refresh estop checkboxes.
-    # Legacy behavior refreshed checkboxes only when ResetAble toggled.
-    reset_able_changed: bool = False
-
 
 @dataclass
 class DenSiEngine:

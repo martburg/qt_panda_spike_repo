@@ -21,3 +21,16 @@ Developer tooling and local scripts (Obsidian ingestion, helper .cmd launchers).
 ## Notes
 
 - This README was auto-generated to help orient the repo. If something is inaccurate, update it to match reality.
+
+## Code quality checks
+
+This repo keeps lightweight static checks (optional but recommended):
+
+- `ruff` (lint + import sorting)
+- `pyright` (basic type checks)
+
+Suggested local runs:
+
+- `python -m ruff check .`
+- `python -m ruff format .` (if you choose to format with ruff)
+- `pyright`

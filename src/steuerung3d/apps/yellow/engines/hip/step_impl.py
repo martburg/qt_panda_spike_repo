@@ -9,16 +9,8 @@ from dataclasses import asdict
 import logging
 from typing import Any, Iterable
 
-from steuerung3d.core.intents import (
-    ClaimAxis,
-    EchoLifeTick,
-    EnableAxis,
-    JogWinch,
-    ReleaseAxis,
-    RequestEstopReset,
-    RequestResync,
-)
-from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
+from steuerung3d.core.intents import ClaimAxis, EchoLifeTick, EnableAxis, JogWinch, RequestEstopReset, RequestResync
+from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import ESTOP_SPECS, decode_estop_word
 
@@ -28,7 +20,7 @@ from ...domain.ui_estop import age_to_online_state, infer_estop_profile
 from ...domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 from ...domain.joy_motion_map import map_soll_speed_to_jog_winch
 from .types import HipPresentationData
-from .attach_state import NOT_ATTACHED, build_attach_combo, compute_attach_state
+from .attach_state import NOT_ATTACHED, compute_attach_state
 from .intent_policy import (
     claim_allowed,
     gate_motion_intents,
@@ -64,6 +56,7 @@ from .types import (
     HipUiInputs,
 )
 from .viewmodel import HipCutMarkersState, HipDriveStatusState, HipReadoutsState, HipViewModel
+from .step_context import build_step_context
 
 log = logging.getLogger("hi_p")
 
@@ -71,48 +64,22 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     """Run one HiP engine tick."""
     self = engine
 
-    snap = inputs.snap
-    ui = inputs.ui
-    hip_id = str(inputs.hip_id or "")
-    joy_in = inputs.joy if isinstance(inputs.joy, JoyState) else JoyState()
-    self.state.joy = JoyState(
-        deadman=bool(getattr(joy_in, "deadman", False)),
-        select_hip=bool(getattr(joy_in, "select_hip", False)),
-        soll_speed=clamp_soll_speed(getattr(joy_in, "soll_speed", 0.0)),
-    )
-    if getattr(self._param_txn, "hip_id", "") != hip_id:
-        self._param_txn.hip_id = hip_id
+    ctx = build_step_context(engine=self, inputs=inputs)
+
+    snap = ctx.snap
+    ui = ctx.ui
+    hip_id = ctx.hip_id
+    axis_ids = ctx.axis_ids
 
     axes = getattr(snap, "axes", None)
     axes = axes if isinstance(axes, dict) else {}
-    axis_ids = sorted(list(axes.keys()))
 
-    ui_axis = str(ui.axis_selected or "").strip()
-    if ui.axis_selection_changed:
-        self.state.last_ui_axis_selected = ui_axis
-    elif self.state.last_ui_axis_selected:
-        ui_axis = self.state.last_ui_axis_selected
+    attach_combo = ctx.attach_combo
+    selected_axis = ctx.selected_axis
+    fixed_applied = ctx.fixed_applied
+    intents: list[object] = list(ctx.intents)
 
     fixed_axis = str(inputs.fixed_axis or "").strip()
-    prev_selected = str(self.state.selected_axis or "").strip()
-    fixed_applied = bool(self.state.fixed_axis_applied)
-
-    attach_combo, selected_axis, fixed_applied = build_attach_combo(
-        axis_ids=list(axis_ids),
-        ui_axis=str(ui_axis or ""),
-        fixed_axis=str(fixed_axis or ""),
-        prev_selected=str(prev_selected or ""),
-        fixed_applied=bool(fixed_applied),
-        lock_axis_combo=bool(inputs.lock_axis_combo),
-    )
-
-    intents: list[object] = []
-    if ui.axis_selection_changed:
-        if prev_selected and (not selected_axis or prev_selected != selected_axis):
-            intents.append(ReleaseAxis(axis_id=prev_selected, hip_id=hip_id))
-        if selected_axis and selected_axis != prev_selected:
-            intents.append(ClaimAxis(axis_id=selected_axis, hip_id=hip_id))
-
     axis_id = str(selected_axis or fixed_axis or "").strip()
     attached = bool(selected_axis or fixed_axis)
     mode_now = str(getattr(snap, "core_mode", "") or "")

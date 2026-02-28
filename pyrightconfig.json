@@ -1,0 +1,8 @@
+{
+  "include": ["src"],
+  "exclude": ["**/__pycache__", ".run"],
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": "none"
+}

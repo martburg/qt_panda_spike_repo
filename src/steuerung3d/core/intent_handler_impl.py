@@ -40,57 +40,13 @@ from steuerung3d.core.intent_handlers.lease import (
 from steuerung3d.core.intent_handlers.claims import claim_axis as _claim_axis
 from steuerung3d.core.intent_handlers.claims import release_axis as _release_axis
 from steuerung3d.core.intent_handlers.reset_resync import axis_reset_allowed
+from steuerung3d.core.intent_handlers.enforce import enforce_core_mode_actions
+from steuerung3d.core.intent_handlers.plc_write_keys import PLC_WRITE_KEYS
+from steuerung3d.core.intent_handlers.txn import txn_ack as _txn_ack
+from steuerung3d.core.intent_handlers.txn import txn_seen_or_mark as _txn_seen_or_mark
 
 
 log = logging.getLogger("core")
-
-# PLC Modus 'w' expects the full parameter set on each write.
-# We merge partial UI writes with last-known params to avoid zeroing untouched fields.
-_PLC_WRITE_KEYS = {
-    'HardMax','UserMax','UserMin','HardMin',
-    'VelMax','AccMax','DccMax','MaxAmp',
-    'P','I','D','IL','RampForm',
-    'Pitch','PosMax','PosMin',
-    'PosWin','VelWin','AccMove','VelMaxMot',
-}
-
-
-def _txn_ack(state: MachineState, req_id: str) -> None:
-    """Record a one-shot ack for HIP (emitted in telemetry)."""
-    if req_id:
-        state.core_acks.append(req_id)
-
-
-def _txn_seen_or_mark(state: MachineState, req_id: str, *, max_keep: int = 512) -> bool:
-    """Return True if req_id was seen before; else mark it as seen.
-
-    We keep a bounded map (req_id -> last_seen_tick) to prevent unbounded growth.
-    """
-    if not req_id:
-        return False
-    if req_id in state.seen_req_ids:
-        state.seen_req_ids[req_id] = int(state.tick)
-        return True
-    state.seen_req_ids[req_id] = int(state.tick)
-    if len(state.seen_req_ids) > max_keep:
-        # drop oldest entries
-        items = sorted(state.seen_req_ids.items(), key=lambda kv: kv[1])
-        for k, _t in items[: len(items) - max_keep]:
-            state.seen_req_ids.pop(k, None)
-    return False
-
-
-def enforce_core_mode_actions(state: MachineState) -> None:
-    core_mode = core_mode_value(getattr(state, "core_mode", "")).upper()
-    if core_mode == CoreMode.ESTOP.value:
-        for cmd in state.axis_cmd.values():
-            cmd.enable = False
-            cmd.vel = 0.0
-        return
-    if core_mode in (CoreMode.FAULT.value, CoreMode.IDLE.value, CoreMode.ARMED.value, CoreMode.READY.value):
-        for cmd in state.axis_cmd.values():
-            cmd.vel = 0.0
-        return
 
 
 def apply_intent(state: MachineState, intent: Intent) -> None:
@@ -321,7 +277,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
             state.param_commit_match_streak = 0
 
             # Merge with last-known params so PLC 'w' writes are full-snapshot.
-            wire_vals = {k: float(v) for k, v in (state.params or {}).items() if k in _PLC_WRITE_KEYS}
+            wire_vals = {k: float(v) for k, v in (state.params or {}).items() if k in PLC_WRITE_KEYS}
             wire_vals.update({k: float(v) for k, v in cleaned.items()})
             op = ParamWriteOp(group=grp, values=wire_vals)
 

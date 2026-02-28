@@ -12,16 +12,15 @@ The runtime consumes a :class:`~steuerung3d.core.stack_spec.StackSpec`.
 from __future__ import annotations
 
 import subprocess
-import sys
 import os
 import time
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from .run_dirs import make_session_dir
-from .stack_render import make_context, render_argv
-from .stack_spec import ProcessSpec, ServiceSpec, StackSpec
+from .stack_runtime_processes import expand_processes as _expand_processes
+from .stack_spec import ProcessSpec, StackSpec
 from .stack_meta import write_meta
 from .status import StatusCollector, env_for_process
 
@@ -46,51 +45,7 @@ class RunningProcess:
 
 def expand_processes(spec: StackSpec, *, session_dir: Path) -> List[ProcessSpec]:
     """Expand services into concrete process specs."""
-    stack_ctx = {"name": spec.name}
-    rig_ctx = {"axes": spec.axes, **(spec.rig or {})}
-    net_ctx = dict(spec.net)
-
-    processes: List[ProcessSpec] = []
-
-    def add_process(name: str, argv: List[str], svc_env: Dict[str, str]):
-        log_path = session_dir / f"{name}.log"
-        processes.append(ProcessSpec(name=name, argv=argv, log_path=log_path, env=svc_env))
-
-    for svc_key, svc in spec.services.items():
-        if not svc.enabled:
-            continue
-        if not svc.module:
-            raise ValueError(f"Service '{svc_key}' has no module")
-
-        if svc.mode == "per_axis":
-            for i, axis in enumerate(spec.axes):
-                ctx = make_context(stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=axis, axis_index=i)
-                argv = [sys.executable, "-m", svc.module]
-                argv += render_argv(_service_args_with_config(svc), ctx)
-                add_process(f"{svc_key}-{axis}", argv, dict(svc.env))
-        else:
-            # Single service instance, or an explicit pool.
-            count = getattr(svc, "count", None)
-            if isinstance(count, int) and count > 1:
-                for i in range(int(count)):
-                    ctx = make_context(stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=None, axis_index=None)
-                    argv = [sys.executable, "-m", svc.module]
-                    argv += render_argv(_service_args_with_config(svc), ctx)
-                    add_process(f"{svc_key}-{i+1}", argv, dict(svc.env))
-            else:
-                ctx = make_context(stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=None, axis_index=None)
-                argv = [sys.executable, "-m", svc.module]
-                argv += render_argv(_service_args_with_config(svc), ctx)
-                add_process(svc_key, argv, dict(svc.env))
-
-    return _order_processes(processes)
-
-
-def _service_args_with_config(svc: ServiceSpec) -> List[object]:
-    args: List[object] = list(svc.args)
-    if svc.config:
-        args = args + ["--config", svc.config]
-    return args
+    return _order_processes(_expand_processes(spec, session_dir=session_dir))
 
 
 def _order_processes(processes: List[ProcessSpec]) -> List[ProcessSpec]:
