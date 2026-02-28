@@ -12,6 +12,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 
+from steuerung3d.protocol.parse_primitives import parse_bool as _parse_bool
+from steuerung3d.protocol.parse_primitives import parse_float as _parse_float
+from steuerung3d.protocol.parse_primitives import parse_int as _parse_int
 
 def _split_fields(line: str, sep: str) -> List[str]:
     """Split a PLC line into fields.
@@ -94,28 +97,15 @@ class PlcLineCodec:
 
 
 def parse_int(v: str, default: int = 0) -> int:
-    try:
-        return int(v)
-    except Exception:
-        return default
+    return _parse_int(v, default=default)
 
 
 def parse_float(v: str, default: float = 0.0) -> float:
-    try:
-        return float(v)
-    except Exception:
-        return default
+    return _parse_float(v, default=default)
 
 
 def parse_bool(v: str, default: bool = False) -> bool:
-    if v is None:
-        return default
-    s = str(v).strip().lower()
-    if s in ("1", "true", "t", "yes", "y", "on"):
-        return True
-    if s in ("0", "false", "f", "no", "n", "off"):
-        return False
-    return default
+    return _parse_bool(v, default=default)
 
 
 def coerce(mapping: Mapping[str, str], *, key: str, typ: str) -> Optional[object]:

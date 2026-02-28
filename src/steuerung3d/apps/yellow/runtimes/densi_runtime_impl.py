@@ -19,9 +19,8 @@ from typing import List
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
+from .runtime_kernel import compute_health, emit_runtime_status, with_health_fields
 from .runtime_utils import (
-    compute_runtime_health,
-    emit_status,
     should_interval_log,
 )
 
@@ -228,7 +227,7 @@ class DensiRuntime:
         if not self._status:
             return
 
-        h = compute_runtime_health(
+        h = compute_health(
             now_ns=int(now_ns),
             last_rx_ns=self._last_cmd_ns,
             stale_after_ms=self._stale_after_ms,
@@ -238,11 +237,7 @@ class DensiRuntime:
         )
         axis = self._axis_ids[0] if self._axis_ids else ""
         mode = self._last_mode or ""
-        online = bool(h.online)
-        age_ms = h.age_ms
-        stale = bool(h.stale)
-        level = str(h.level)
-        age_disp = str(h.age_disp)
+        online = bool(getattr(h, "online", False))
         cmd = self._last_cmd
         cmd_mode = str(getattr(cmd, "core_mode", "") or "") if cmd is not None else ""
         cmd_intent = bool(getattr(cmd, "intent", False)) if cmd is not None else False
@@ -282,21 +277,14 @@ class DensiRuntime:
             f"estop={int(estop_now)} applied={vel_applied:+.2f}"
         )
 
-        emit_status(
-            self._status,
-            level=level,
-            summary=summary,
-            fields={
+        fields = with_health_fields(
+            {
                 "component": "densi",
                 "axis": axis,
                 "core_mode": mode,
                 "online": bool(online),
-                "age_ms": (-1 if age_ms is None else float(age_ms)),
-                "stale": bool(stale),
-                "estop": bool(estop_now),
-                "fault": bool(fault_now),
                 "tick": int(getattr(self.engine.state, "tick", 0) or 0),
-                "last_cmd_rx_age_ms": (-1 if age_ms is None else float(age_ms)),
+                "last_cmd_rx_age_ms": (-1 if getattr(h, "age_ms", None) is None else float(getattr(h, "age_ms", 0.0))),
                 "cmd_core_mode": str(cmd_mode),
                 "cmd_intent": bool(cmd_intent),
                 "cmd_enable": bool(cmd_enable),
@@ -306,6 +294,16 @@ class DensiRuntime:
                 "pos": float(pos_applied),
                 "lifetick_age_ticks": lifetick_age_ticks,
             },
+            health=h,
+            estop=bool(estop_now),
+            fault=bool(fault_now),
+        )
+
+        emit_runtime_status(
+            self._status,
+            level=str(getattr(h, "level", "") or ""),
+            summary=summary,
+            fields=fields,
             log=self._log,
             exc_tag="densi.status.emit",
             exc_msg="DenSi status emission failed",

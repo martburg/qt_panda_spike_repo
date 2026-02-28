@@ -1,57 +1,119 @@
 from __future__ import annotations
 
+"""Core intent application.
+
+This module applies high-level Intents to the in-memory MachineState.
+
+Refactor note (Lane 1):
+The previous implementation used one large match/case block.
+We now route intents through small domain modules under
+`steuerung3d.core.intent_routes`.
+
+Semantics are preserved.
+"""
+
 import logging
+from typing import Callable, Dict, Type
 
-from steuerung3d.core.intents import (
-    ClearFault,
-    EnableAxis,
-    ClaimAxis,
-    ReleaseAxis,
-    RequestRigLease,
-    ReleaseRigLease,
-    RequestAxisLease,
-    ReleaseAxisLease,
-    JogAxis,
-    JogWinch,
-    JogCartesian,
-    SetControlMode,
-    SmoothStop,
-    SetEstop,
-    RequestEstopReset,
-    RequestResync,
-    ParamEditBegin,
-    ParamWrite,
-    ParamCancel,
-    EchoLifeTick,
-    JoyStateUpdate,
-    Intent,
-)
-from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
 from steuerung3d.core.core_mode import CoreMode, core_mode_value
-from steuerung3d.core.state import MachineState
-from steuerung3d.core.command_frame import ParamEditBeginOp, ParamWriteOp, ParamCancelOp
-from steuerung3d.core.param_registry import normalize_group_values
-
-from steuerung3d.core.intent_handlers.lease import (
-    axis_lease_allows as _axis_lease_allows,
-    axis_lease_holders as _axis_lease_holders,
-    set_lease_denial as _set_lease_denial,
-)
 from steuerung3d.core.intent_handlers.claims import claim_axis as _claim_axis
 from steuerung3d.core.intent_handlers.claims import release_axis as _release_axis
-from steuerung3d.core.intent_handlers.reset_resync import axis_reset_allowed
 from steuerung3d.core.intent_handlers.enforce import enforce_core_mode_actions
-from steuerung3d.core.intent_handlers.plc_write_keys import PLC_WRITE_KEYS
-from steuerung3d.core.intent_handlers.txn import txn_ack as _txn_ack
-from steuerung3d.core.intent_handlers.txn import txn_seen_or_mark as _txn_seen_or_mark
+from steuerung3d.core.intents import (
+    ClaimAxis,
+    EchoLifeTick,
+    EnableAxis,
+    Intent,
+    JogAxis,
+    JogCartesian,
+    JogWinch,
+    JoyStateUpdate,
+    ParamCancel,
+    ParamEditBegin,
+    ParamWrite,
+    ReleaseAxis,
+    ReleaseAxisLease,
+    ReleaseRigLease,
+    RequestAxisLease,
+    RequestEstopReset,
+    RequestResync,
+    RequestRigLease,
+    SetControlMode,
+    SetEstop,
+    SmoothStop,
+)
+from steuerung3d.core.state import MachineState
 
+from steuerung3d.core.intent_routes.control import (
+    handle_echo_lifetick,
+    handle_joy_state_update,
+    handle_set_control_mode,
+    handle_smooth_stop,
+)
+from steuerung3d.core.intent_routes.leases import (
+    handle_release_axis_lease,
+    handle_release_rig_lease,
+    handle_request_axis_lease,
+    handle_request_rig_lease,
+)
+from steuerung3d.core.intent_routes.motion import (
+    handle_enable_axis,
+    handle_jog_axis,
+    handle_jog_cartesian,
+    handle_jog_winch,
+)
+from steuerung3d.core.intent_routes.params import (
+    handle_param_cancel,
+    handle_param_edit_begin,
+    handle_param_write,
+)
+from steuerung3d.core.intent_routes.safety import (
+    handle_request_estop_reset,
+    handle_request_resync,
+    handle_set_estop,
+)
 
 log = logging.getLogger("core")
 
+Handler = Callable[[MachineState, Intent], None]
+
+
+UNGATED_DISPATCH: Dict[Type[Intent], Handler] = {
+    # Operator control (non-safety)
+    SetControlMode: lambda s, i: handle_set_control_mode(s, i),
+    SmoothStop: lambda s, i: handle_smooth_stop(s, i),
+    # Claims
+    ClaimAxis: lambda s, i: _claim_axis(s, i.axis_id, i.hip_id, i.req_id),
+    ReleaseAxis: lambda s, i: _release_axis(s, i.axis_id, i.hip_id, i.req_id),
+    # Leases
+    RequestRigLease: lambda s, i: handle_request_rig_lease(s, i),
+    ReleaseRigLease: lambda s, i: handle_release_rig_lease(s, i),
+    RequestAxisLease: lambda s, i: handle_request_axis_lease(s, i),
+    ReleaseAxisLease: lambda s, i: handle_release_axis_lease(s, i),
+    # UI livetick echo + joy
+    EchoLifeTick: lambda s, i: handle_echo_lifetick(s, i),
+    JoyStateUpdate: lambda s, i: handle_joy_state_update(s, i),
+    # Safety / global requests
+    SetEstop: lambda s, i: handle_set_estop(s, i),
+    RequestEstopReset: lambda s, i: handle_request_estop_reset(s, i),
+    RequestResync: lambda s, i: handle_request_resync(s, i),
+    # Params
+    ParamEditBegin: lambda s, i: handle_param_edit_begin(s, i),
+    ParamWrite: lambda s, i: handle_param_write(s, i),
+    ParamCancel: lambda s, i: handle_param_cancel(s, i),
+}
+
+
+LIVE_ONLY_DISPATCH: Dict[Type[Intent], Handler] = {
+    EnableAxis: lambda s, i: handle_enable_axis(s, i),
+    JogAxis: lambda s, i: handle_jog_axis(s, i),
+    JogWinch: lambda s, i: handle_jog_winch(s, i),
+    JogCartesian: lambda s, i: handle_jog_cartesian(s, i),
+}
+
 
 def apply_intent(state: MachineState, intent: Intent) -> None:
-    """
-    Apply an intent to MachineState.
+    """Apply an intent to MachineState.
 
     Policy (now, with latched ESTOP):
       - ESTOP state is device-authoritative (measured via telemetry).
@@ -60,348 +122,25 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
       - Motion/control intents only apply in LIVE.
     """
 
-    match intent:
-
-        # --- OPERATOR CONTROL SUB-MODE (non-safety) ---
-        case SetControlMode(mode=cmode):
-            # v0.1: store if present; higher layers may display it.
-            # Keep this decoupled from core safety Mode (IDLE/LIVE/ESTOP).
-            setattr(state, "control_mode", str(cmode))
-            return
-
-        case SmoothStop():
-            # v0.1: immediate zero velocity on all commanded axes.
-            for cmd in state.axis_cmd.values():
-                cmd.vel = 0.0
-            return
-
-        # --- CLAIMS (exclusive control) ---
-        case ClaimAxis(axis_id=axis_id, hip_id=hip_id, req_id=req_id):
-            _claim_axis(state, axis_id, hip_id, req_id)
-            return
-
-        case ReleaseAxis(axis_id=axis_id, hip_id=hip_id, req_id=req_id):
-            _release_axis(state, axis_id, hip_id, req_id)
-            return
-
-        # --- LEASES (rig + axis) ---
-        case RequestRigLease(hip_id=hip_id, req_id=req_id):
-            if _txn_seen_or_mark(state, req_id):
-                return
-            hip_id = str(hip_id or "")
-            if not hip_id:
-                return
-            cur = str(getattr(state, "lease_rig", "") or "")
-            if cur in ("", hip_id):
-                state.lease_rig = hip_id
-                state.lease_last_denial_reason = ""
-                _txn_ack(state, req_id)
-            else:
-                _set_lease_denial(state, f"rig_held_by:{cur}", req_id=req_id)
-            return
-
-        case ReleaseRigLease(hip_id=hip_id, req_id=req_id):
-            if _txn_seen_or_mark(state, req_id):
-                return
-            hip_id = str(hip_id or "")
-            cur = str(getattr(state, "lease_rig", "") or "")
-            if hip_id and cur == hip_id:
-                state.lease_rig = ""
-                state.lease_last_denial_reason = ""
-                _txn_ack(state, req_id)
-            else:
-                _set_lease_denial(state, "rig_not_held", req_id=req_id)
-            return
-
-        case RequestAxisLease(axis_id=axis_id, hip_id=hip_id, req_id=req_id):
-            if _txn_seen_or_mark(state, req_id):
-                return
-            axis_id = str(axis_id or "")
-            hip_id = str(hip_id or "")
-            if not axis_id or not hip_id:
-                return
-            holders = _axis_lease_holders(state, axis_id)
-            if holders and hip_id not in holders:
-                _set_lease_denial(state, f"axis_held_by:{','.join(holders)}", req_id=req_id)
-                return
-            holders = list(dict.fromkeys(holders + [hip_id]))
-            if not hasattr(state, "lease_axis_holders"):
-                state.lease_axis_holders = {}
-            state.lease_axis_holders[axis_id] = holders
-            state.lease_last_denial_reason = ""
-            _txn_ack(state, req_id)
-            return
-
-        case ReleaseAxisLease(axis_id=axis_id, hip_id=hip_id, req_id=req_id):
-            if _txn_seen_or_mark(state, req_id):
-                return
-            axis_id = str(axis_id or "")
-            hip_id = str(hip_id or "")
-            if not axis_id or not hip_id:
-                return
-            holders = _axis_lease_holders(state, axis_id)
-            if hip_id not in holders:
-                _set_lease_denial(state, "axis_not_held", req_id=req_id)
-                return
-            holders = [h for h in holders if h != hip_id]
-            if not hasattr(state, "lease_axis_holders"):
-                state.lease_axis_holders = {}
-            if holders:
-                state.lease_axis_holders[axis_id] = holders
-            else:
-                state.lease_axis_holders.pop(axis_id, None)
-            state.lease_last_denial_reason = ""
-            _txn_ack(state, req_id)
-            return
-
-        # --- UI livetick echo (not safety-critical) ---
-        case EchoLifeTick(axis_id=axis_id, value=value, hip_id=_hip_id):
-            axis_id = str(axis_id or "")
-            if not axis_id:
-                return
-            # Store as 16-bit like the legacy PLC fields.
-            v16 = int(value) & 0xFFFF
-            state.lifetick_echo_by_axis[axis_id] = v16
-            log.debug("LIFETICK Core rx EchoLifeTick: axis=%s value=%d hip_id=%s", axis_id, v16, str(_hip_id or ""))
-            return
-
-        case JoyStateUpdate(deadman=_deadman, select_hip=_select_hip, soll_speed=_soll_speed):
-            state.joy = JoyState(
-                deadman=bool(_deadman),
-                select_hip=bool(_select_hip),
-                soll_speed=clamp_soll_speed(float(_soll_speed)),
-            )
-            return
-
-        # --- SAFETY / GLOBAL REQUESTS ---
-
-        case SetEstop(estop=want_estop):
-            # Tests + legacy expectations: SetEstop immediately latches the
-            # core-side estop flag and forces the mode normalization path.
-            state.estop = bool(want_estop)
-
-            if state.estop:
-                # Block motion: disable all axes and clear measured velocity.
-                for ax in state.axes.values():
-                    ax.enabled = False
-                    ax.vel = 0.0
-                # Also clear commanded velocities and enables.
-                for cmd in state.axis_cmd.values():
-                    cmd.enable = False
-                    cmd.vel = 0.0
-
-            enforce_core_mode_actions(state)
-            return
-        case RequestEstopReset(axis_id=axis_id, hip_id=hip_id):
-            # Historical name: RequestEstopReset. In v0.1 this acts as per-axis "clear fault / drive reset".
-            axis_id = str(axis_id or "")
-            hip_id = str(hip_id or "")
-
-            allowed, _reason = axis_reset_allowed(state, axis_id, hip_id)
-            if not allowed:
-                key = axis_id or "<none>"
-                state.estop_reset_denied_count_by_axis[key] = int(
-                    state.estop_reset_denied_count_by_axis.get(key, 0)
-                ) + 1
-                return
-
-            if axis_id:
-                state.estop_reset_req_by_axis[axis_id] = True
-            else:
-                key = axis_id or "<none>"
-                state.estop_reset_denied_count_by_axis[key] = int(
-                    state.estop_reset_denied_count_by_axis.get(key, 0)
-                ) + 1
-                return
-
-            enforce_core_mode_actions(state)
-            return
-
-        case RequestResync(axis_id=axis_id, hip_id=hip_id):
-            # Legacy ReSync pulse request.
-            axis_id = str(axis_id or "")
-            hip_id = str(hip_id or "")
-
-            if axis_id:
-                owner = state.claim_owner(axis_id)
-                if owner and hip_id and owner != hip_id:
-                    return
-                if hasattr(state, "resync_req_by_axis"):
-                    state.resync_req_by_axis[axis_id] = True
-                else:
-                    state.resync_req = True
-            else:
-                # Backward-compat (single-axis): allow global pulse.
-                state.resync_req = True
-            return
-
-        case ParamEditBegin(axis_id=axis_id, hip_id=hip_id, group=grp, req_id=req_id, session_id=session_id):
-            _txn_ack(state, req_id)
-            if _txn_seen_or_mark(state, req_id):
-                return
-
-            axis_id = str(axis_id or "")
-            hip_id = str(hip_id or "")
-            op = ParamEditBeginOp(group=grp)
-
-            if axis_id and hasattr(state, "pending_param_ops_by_axis"):
-                owner = state.claim_owner(axis_id)
-                if owner and hip_id and owner != hip_id:
-                    return
-                state.pending_param_ops_by_axis.setdefault(axis_id, []).append(op)
-            else:
-                state.pending_param_ops.append(op)
-            return
-
-        case ParamWrite(axis_id=axis_id, hip_id=hip_id, group=grp, values=vals, req_id=req_id, session_id=session_id):
-            _txn_ack(state, req_id)
-            if _txn_seen_or_mark(state, req_id):
-                return
-
-            axis_id = str(axis_id or "")
-            hip_id = str(hip_id or "")
-
-            cleaned = {str(k): float(v) for k, v in dict(vals).items()}
-            cleaned, _warnings = normalize_group_values(str(grp), cleaned)
-
-            # Begin an "observed" commit: we cannot rely on PLC ACKs, so we
-            # consider the write applied once telemetry.params matches these values.
-            state.param_commit_req_id = str(req_id or "")
-            state.param_commit_group = str(grp or "")
-            state.param_commit_desired = dict(cleaned)
-            state.param_commit_start_tick = int(state.tick)
-            state.param_commit_status = "pending"
-            state.param_commit_unmatched = list(sorted(cleaned.keys()))
-            state.param_commit_last_device_tick = -1
-            state.param_commit_observed_ticks = 0
-            state.param_commit_match_streak = 0
-
-            # Merge with last-known params so PLC 'w' writes are full-snapshot.
-            wire_vals = {k: float(v) for k, v in (state.params or {}).items() if k in PLC_WRITE_KEYS}
-            wire_vals.update({k: float(v) for k, v in cleaned.items()})
-            op = ParamWriteOp(group=grp, values=wire_vals)
-
-            if axis_id and hasattr(state, "pending_param_ops_by_axis"):
-                owner = state.claim_owner(axis_id)
-                if owner and hip_id and owner != hip_id:
-                    return
-                state.pending_param_ops_by_axis.setdefault(axis_id, []).append(op)
-            else:
-                state.pending_param_ops.append(op)
-            return
-
-        case ParamCancel(axis_id=axis_id, hip_id=hip_id, group=grp, req_id=req_id, session_id=session_id):
-            _txn_ack(state, req_id)
-            if _txn_seen_or_mark(state, req_id):
-                return
-
-            axis_id = str(axis_id or "")
-            hip_id = str(hip_id or "")
-
-            # Cancel pending observed commit for this group (if any)
-            if str(getattr(state, "param_commit_status", "idle")) == "pending" and str(
-                getattr(state, "param_commit_group", "")
-            ) == str(grp):
-                state.param_commit_status = "cancelled"
-                state.param_commit_unmatched = []
-
-            op = ParamCancelOp(group=grp)
-
-            if axis_id and hasattr(state, "pending_param_ops_by_axis"):
-                owner = state.claim_owner(axis_id)
-                if owner and hip_id and owner != hip_id:
-                    return
-                state.pending_param_ops_by_axis.setdefault(axis_id, []).append(op)
-            else:
-                state.pending_param_ops.append(op)
-            return
-        # fallthrough to mode-gated below
-        case _:
-            pass
+    handler = UNGATED_DISPATCH.get(type(intent))
+    if handler is not None:
+        handler(state, intent)
+        return
 
     # --- MODE-GATED INTENTS (LIVE only) ---
     core_mode = core_mode_value(getattr(state, "core_mode", "")).upper()
+    is_live = False
     if core_mode:
         is_live = core_mode == CoreMode.LIVE.value
 
-    if not is_live:
-        enforce_core_mode_actions(state)
-        return
-    if state.estop or state.fault:
+    if not is_live or bool(state.estop) or bool(state.fault):
         enforce_core_mode_actions(state)
         return
 
-    match intent:
-        case EnableAxis(axis_id=axis_id, enable=enable, hip_id=hip_id):
-            state.ensure_axis(axis_id)
-            if not _axis_lease_allows(state, axis_id, hip_id):
-                state.lease_last_denial_reason = f"axis_lease_required:{axis_id}"
-                return
-            claim = state.claim_owner(axis_id)
-            if claim and hip_id and claim != hip_id:
-                return
-            if claim and not hip_id:
-                # Backward-compat: if a claim exists and the intent lacks hip_id, ignore.
-                return
-            cmd = state.axis_cmd[axis_id]  # ensured by ensure_axis() above
-            cmd.enable = bool(enable)
-            if not cmd.enable:
-                cmd.vel = 0.0
-            return
+    handler = LIVE_ONLY_DISPATCH.get(type(intent))
+    if handler is not None:
+        handler(state, intent)
+        return
 
-        case JogAxis(axis_id=axis_id, vel=vel, hip_id=hip_id):
-            state.ensure_axis(axis_id)
-            if not _axis_lease_allows(state, axis_id, hip_id):
-                state.lease_last_denial_reason = f"axis_lease_required:{axis_id}"
-                return
-            claim = state.claim_owner(axis_id)
-            if claim and hip_id and claim != hip_id:
-                return
-            if claim and not hip_id:
-                return
-            cmd = state.axis_cmd[axis_id]  # ensured by ensure_axis() above
-            if cmd.enable:
-                cmd.vel = float(vel)
-            return
-
-        case JogWinch(winch_id=winch_id, rate=rate, hip_id=hip_id):
-            # Semantic alias: winches are axes at this layer.
-            axis_id = str(winch_id)
-            state.ensure_axis(axis_id)
-            if not _axis_lease_allows(state, axis_id, hip_id):
-                state.lease_last_denial_reason = f"axis_lease_required:{axis_id}"
-                return
-            claim = state.claim_owner(axis_id)
-            if claim and hip_id and claim != hip_id:
-                return
-            if claim and not hip_id:
-                return
-            cmd = state.axis_cmd[axis_id]  # ensured by ensure_axis() above
-            if cmd.enable:
-                cmd.vel = float(rate)
-            return
-
-        case JogCartesian(vx=vx, vy=vy, vz=vz, hip_id=hip_id):
-            # v0.1: if the system has axes named X/Y/Z, map directly to JogAxis.
-            # Otherwise ignore (kinematics layer not implemented yet).
-            lease_rig = str(getattr(state, "lease_rig", "") or "")
-            if not lease_rig or (hip_id and lease_rig != hip_id):
-                state.lease_last_denial_reason = "rig_lease_required"
-                return
-            for axis_id, vel in (("X", vx), ("Y", vy), ("Z", vz)):
-                if axis_id in state.axes or axis_id in state.axis_cmd:
-                    if not _axis_lease_allows(state, axis_id, hip_id):
-                        state.lease_last_denial_reason = f"axis_lease_required:{axis_id}"
-                        continue
-                    claim = state.claim_owner(axis_id)
-                    if claim and hip_id and claim != hip_id:
-                        continue
-                    if claim and not hip_id:
-                        continue
-                    cmd = state.ensure_axis_cmd(axis_id)
-                    if cmd.enable:
-                        cmd.vel = float(vel)
-            return
-
-        case _:
-            return
+    # Unknown / intentionally ignored intents are a no-op.
+    return

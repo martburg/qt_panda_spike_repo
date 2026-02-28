@@ -34,11 +34,7 @@ from ..engines.hip.viewmodel import HipViewModel
 from ..panels.hip.hip_banner_vm import compute_hip_banner_vm
 from ..panels.hip.hip_estop_vm import compute_hip_estop_vm
 from ..panels.hip.hip_header_dots_vm import compute_hip_header_dots_vm
-from .runtime_utils import (
-    compute_runtime_health,
-    emit_status,
-)
-
+from .runtime_kernel import compute_health, emit_runtime_status, with_health_fields
 
 @dataclass(frozen=True)
 class HipRuntimeInputs:
@@ -392,7 +388,7 @@ class HipRuntime:
         if not getattr(self, "_status", None):
             return
 
-        h = compute_runtime_health(
+        h = compute_health(
             now_ns=int(now_ns),
             last_rx_ns=self._last_rx_ns,
             stale_after_ms=self._stale_after_ms,
@@ -400,15 +396,12 @@ class HipRuntime:
             estop=bool(self._last_estop),
             fault=bool(self._last_fault),
         )
-        age_ms = h.age_ms
-        stale = bool(h.stale)
-        level = str(h.level)
         axis = str(getattr(self.engine.state, "selected_axis", "") or "") or (self._fixed_axis or "")
         estate = str(self._last_estate or "")
         mode = str(self._last_mode or "")
         armed = bool(str(estate or "").upper() in ("ARMED", "READY"))
         ready = bool(str(estate or "").upper() == "READY")
-        age_disp = str(h.age_disp)
+        age_disp = str(getattr(h, "age_disp", "") or "")
         joy = getattr(self.engine.state, "joy", JoyState())
         dm = 1 if bool(getattr(joy, "deadman", False)) else 0
         sel = 1 if bool(getattr(joy, "select_hip", False)) else 0
@@ -418,24 +411,27 @@ class HipRuntime:
             f"age_ms={age_disp} JOY dm={dm} sel={sel} sp={sp:+.2f}"
         )
 
-        emit_status(
-            self._status,
-            level=level,
-            summary=summary,
-            fields={
+        fields = with_health_fields(
+            {
                 "axis": axis,
                 "mode": mode,
                 "estate": str(estate or ""),
                 "armed": bool(armed),
                 "ready": bool(ready),
-                "age_ms": (-1 if age_ms is None else float(age_ms)),
-                "stale": bool(stale),
-                "estop": bool(self._last_estop),
-                "fault": bool(self._last_fault),
                 "joy_deadman": bool(getattr(joy, "deadman", False)),
                 "joy_select_hip": bool(getattr(joy, "select_hip", False)),
                 "joy_soll_speed": float(sp),
             },
+            health=h,
+            estop=bool(self._last_estop),
+            fault=bool(self._last_fault),
+        )
+
+        emit_runtime_status(
+            self._status,
+            level=str(getattr(h, "level", "") or ""),
+            summary=summary,
+            fields=fields,
             log=self._log,
             exc_tag="hip.status.emit",
             exc_msg="HiP status emission failed",
