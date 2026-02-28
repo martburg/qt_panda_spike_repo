@@ -16,7 +16,7 @@ def test_stale_command_frame_is_ignored_when_claim_owner_differs() -> None:
     st.ensure_axis("Anton")
 
     # Simulate an existing claim by a different controller.
-    st.axis_claims["Anton"] = "hip-A"
+    st.set_axis_claim("Anton", "hip-A")
 
     # apply_intent does not take a tick argument; state timekeeping is handled elsewhere.
     apply_intent(st, EnableAxis(axis_id="Anton", enable=True, hip_id="hip-B"))

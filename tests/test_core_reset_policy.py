@@ -14,7 +14,7 @@ def test_estop_reset_denied_without_axis() -> None:
 
 def test_estop_reset_denied_without_hip() -> None:
     st = MachineState()
-    st.axis_claims["X"] = "hipA"
+    st.set_axis_claim("X", "hipA")
     apply_intent(st, RequestEstopReset(axis_id="X", hip_id=""))
     assert not st.estop_reset_req_by_axis
     assert st.estop_reset_denied_count_by_axis.get("X") == 1
@@ -22,7 +22,7 @@ def test_estop_reset_denied_without_hip() -> None:
 
 def test_estop_reset_allowed_for_claim_owner() -> None:
     st = MachineState()
-    st.axis_claims["X"] = "hipA"
+    st.set_axis_claim("X", "hipA")
     apply_intent(st, RequestEstopReset(axis_id="X", hip_id="hipA"))
     assert st.estop_reset_req_by_axis.get("X") is True
 
@@ -36,7 +36,7 @@ def test_estop_reset_allowed_for_lease_holder() -> None:
 
 def test_estop_reset_denied_for_other_hip() -> None:
     st = MachineState()
-    st.axis_claims["X"] = "hipA"
+    st.set_axis_claim("X", "hipA")
     apply_intent(st, RequestEstopReset(axis_id="X", hip_id="hipB"))
     assert not st.estop_reset_req_by_axis
     assert st.estop_reset_denied_count_by_axis.get("X") == 1

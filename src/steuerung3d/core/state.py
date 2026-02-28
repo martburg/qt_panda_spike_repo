@@ -183,3 +183,35 @@ class MachineState:
             return False
         owner = self.claim_owner(axis_id)
         return bool(owner) and (owner == hip_id)
+
+    def set_axis_claim(self, axis_id: str, hip_id: str) -> None:
+        """Set exclusive control claim for *axis_id*.
+
+        This is the supported write-path for ``axis_claims`` in production code
+        (intent handlers). Tests may use it for setup as well.
+
+        Notes:
+        - Ensures the axis exists (so downstream logic can rely on ``ensure_axis``).
+        - Does not perform policy checks; callers are responsible (e.g. ClaimAxis handler).
+        """
+        axis_id = str(axis_id or "")
+        hip_id = str(hip_id or "")
+        if not axis_id or not hip_id:
+            return
+        self.ensure_axis(axis_id)
+        self.axis_claims[axis_id] = hip_id
+
+    def clear_axis_claim(self, axis_id: str, *, hip_id: str | None = None) -> None:
+        """Clear exclusive control claim for *axis_id*.
+
+        If *hip_id* is provided, the claim is only cleared if it matches the
+        current claim owner.
+        """
+        axis_id = str(axis_id or "")
+        if not axis_id:
+            return
+        if hip_id is not None:
+            hip_id = str(hip_id or "")
+            if hip_id and self.claim_owner(axis_id) != hip_id:
+                return
+        self.axis_claims.pop(axis_id, None)
