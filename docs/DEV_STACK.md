@@ -2,6 +2,11 @@
 
 There are two ways to run local demos:
 
+For stack/profile structure and interpolation rules, see:
+
+- `docs/PROFILES.md`
+
+
 1) **Profile-driven boot (recommended)**
 
 ```powershell

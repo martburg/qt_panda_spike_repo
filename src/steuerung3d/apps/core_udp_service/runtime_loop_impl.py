@@ -39,6 +39,47 @@ __all__ = [
 
 
 
+def _compute_one_shots_by_axis(state: MachineState, axis_ids: list[str]) -> tuple[dict[str, bool], dict[str, list]]:
+    """Compute per-axis one-shot signals for strict device routing.
+
+    Returns:
+        (estop_reset_by_axis, param_ops_by_axis)
+
+    Notes:
+    - Multi-axis: use per-axis maps directly.
+    - Single-axis: preserve backward compatibility by allowing the legacy global
+      fields to apply to the single configured axis.
+    """
+    multi_axis = len(axis_ids) > 1
+    if multi_axis:
+        estop_reset_by_axis = dict(getattr(state, "estop_reset_req_by_axis", {}) or {})
+        per_axis_raw = dict(getattr(state, "pending_param_ops_by_axis", {}) or {})
+        param_ops_by_axis = {k: coerce_param_ops(v) for k, v in per_axis_raw.items()}
+        return estop_reset_by_axis, param_ops_by_axis
+
+    axis0 = axis_ids[0]
+    estop_reset_by_axis = {
+        axis0: bool(
+            dict(getattr(state, "estop_reset_req_by_axis", {}) or {}).get(axis0, False)
+            or getattr(state, "estop_reset_req", False)
+        )
+    }
+    per_axis_ops = coerce_param_ops(dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).get(axis0, []))
+    global_ops = coerce_param_ops(getattr(state, "pending_param_ops", []) or [])
+    param_ops_by_axis = {axis0: (per_axis_ops + global_ops)}
+    return estop_reset_by_axis, param_ops_by_axis
+
+
+def _apply_mode_aggregation(state: MachineState, *, router: AxisRouter, axis_ids: list[str], dt: float) -> None:
+    """Compute and apply core mode aggregation (aggregator remains pure)."""
+    inputs = build_aggregate_inputs(state=state, router=router, axis_ids=axis_ids, dt=dt)
+    result = aggregate_core_mode(inputs)
+    state.core_mode = result.core_mode
+    state.core_blocked_by = list(result.blocked_by)
+    state.core_axis_gate = dict(result.axis_gate)
+    state.core_motion_allowed = bool(result.motion_allowed)
+
+
 def run_core_udp_service(*, args, status) -> int:
     # --- UDP endpoints ---
     intent_in_bind = parse_hostport(args.intent_in)
@@ -207,19 +248,8 @@ def run_core_udp_service(*, args, status) -> int:
     def device_step(state, cmd_frame, dt):
         nonlocal t_last_report
 
-        # Per-axis command routing (no broadcast). Router reduces multi-axis frames.
-        multi_axis = len(axis_ids) > 1
-        if multi_axis:
-            estop_reset_by_axis = dict(getattr(state, "estop_reset_req_by_axis", {}) or {})
-            param_ops_by_axis = {k: coerce_param_ops(v) for k, v in dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).items()}
-        else:
-            axis0 = axis_ids[0]
-            estop_reset_by_axis = {
-                axis0: bool(dict(getattr(state, "estop_reset_req_by_axis", {}) or {}).get(axis0, False) or getattr(state, "estop_reset_req", False))
-            }
-            per_axis_ops = coerce_param_ops(dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).get(axis0, []))
-            global_ops = coerce_param_ops(getattr(state, "pending_param_ops", []) or [])
-            param_ops_by_axis = {axis0: (per_axis_ops or global_ops)}
+        # Per-axis command routing (no broadcast).
+        estop_reset_by_axis, param_ops_by_axis = _compute_one_shots_by_axis(state, axis_ids)
 
         sent = router.publish_command_frames(
             cmd_frame,
@@ -253,13 +283,7 @@ def run_core_udp_service(*, args, status) -> int:
 
         # Aggregate core mode (single source of truth for birds-eye).
         try:
-            inputs = build_aggregate_inputs(state=state, router=router, axis_ids=axis_ids, dt=dt)
-            result = aggregate_core_mode(inputs)
-            # Apply aggregation result explicitly (aggregator remains pure)
-            state.core_mode = result.core_mode
-            state.core_blocked_by = list(result.blocked_by)
-            state.core_axis_gate = dict(result.axis_gate)
-            state.core_motion_allowed = bool(result.motion_allowed)
+            _apply_mode_aggregation(state, router=router, axis_ids=axis_ids, dt=dt)
         except Exception:
             log.exception("core mode aggregation failed")
 

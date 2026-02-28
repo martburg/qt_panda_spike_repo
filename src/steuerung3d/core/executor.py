@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from steuerung3d.config.lifetick_config import LifetickTraceConfig, load_lifetick_config
-from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, coerce_param_ops
+from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamOp, coerce_param_ops
 from steuerung3d.core.core_mode import CoreMode, core_mode_value
 from steuerung3d.core.intent_handlers.lease import axis_lease_allows_any
 from steuerung3d.core.rig_logic import densi_online
@@ -83,6 +83,45 @@ def _compute_resync_any(state: MachineState) -> bool:
     return False
 
 
+def _compute_estop_reset_any(state: MachineState) -> bool:
+    """Return whether any estop-reset pulse should be emitted this tick.
+
+    Canonical source is ``state.estop_reset_req_by_axis`` (per-axis, one-shot).
+    ``state.estop_reset_req`` is legacy/global and only kept for compatibility.
+    """
+    if bool(getattr(state, "estop_reset_req", False)):
+        return True
+    m = getattr(state, "estop_reset_req_by_axis", {})
+    if isinstance(m, dict):
+        try:
+            return any(bool(v) for v in m.values())
+        except Exception:
+            return bool(getattr(state, "estop_reset_req", False))
+    return False
+
+
+def _compute_param_ops_any(state: MachineState) -> list[ParamOp]:
+    """Flatten any pending ParamOps into a single list for CommandFrame.
+
+    Notes:
+    - In multi-axis mode, core_udp_service routes param ops per-axis separately.
+      This aggregate is mainly for single-axis adapters and backward compatibility.
+    - We keep legacy ``pending_param_ops`` as well, but prefer per-axis storage.
+    """
+    ops: list[ParamOp] = []
+    per_axis = getattr(state, "pending_param_ops_by_axis", {})
+    if isinstance(per_axis, dict):
+        for axis_id in sorted(per_axis.keys()):
+            v = per_axis.get(axis_id) or []
+            if isinstance(v, list):
+                ops.extend(v)
+    legacy = getattr(state, "pending_param_ops", []) or []
+    if isinstance(legacy, list):
+        ops.extend(legacy)
+    return ops
+
+
+
 def build_command_frame(state: MachineState) -> CommandFrame:
     axes: Dict[str, AxisSetpoint] = {}
     for axis_id, cmd in state.axis_cmd.items():
@@ -143,8 +182,8 @@ def build_command_frame(state: MachineState) -> CommandFrame:
         fault=state.fault,
         core_mode=core_mode,
         axes=axes,
-        estop_reset=state.estop_reset_req,  # pulse from HI-P intent
+        estop_reset=_compute_estop_reset_any(state),  # pulse from HI-P intent (derived)
         resync=resync_any,  # legacy ReSync pulse
-        param_ops=coerce_param_ops(getattr(state, "pending_param_ops", [])),
+        param_ops=coerce_param_ops(_compute_param_ops_any(state)),
         lifetick_echo=lifetick_echo,
     )

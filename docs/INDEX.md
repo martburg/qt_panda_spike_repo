@@ -8,6 +8,7 @@ This repo is a **src/** layout Python project.
 - **Architecture overview**: `docs/ARCHITECTURE.md`
 - **Repo layout & hygiene**: `docs/REPO_STRUCTURE.md`, `docs/REPO_HYGIENE.md`
 - **How to run the dev stack**: `docs/DEV_STACK.md`
+- **Profiles / stacks (TOML wiring)**: `docs/PROFILES.md`
 - **Testing**: `docs/testing.md`, `docs/MANUAL_TESTING.md`
 
 ## Protocols

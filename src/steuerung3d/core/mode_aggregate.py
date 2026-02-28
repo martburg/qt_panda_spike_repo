@@ -154,6 +154,18 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
         if core_mode != CoreMode.LIVE:
             motion_allowed = False
 
+
+        # LIVE may still be "blocked" from motion (e.g. no Select while moving),
+        # but it must never be blocked by hard safety reasons once it reaches LIVE.
+        if core_mode == CoreMode.LIVE:
+            allowed_live_codes = {"NO_SELECT_FOR_MOTION"}
+            bad = [r for r in blocked_by if getattr(r, "code", None) not in allowed_live_codes]
+            if bad:
+                raise AssertionError(
+                    "aggregate_core_mode contract violated: LIVE must not carry hard blocked_by reasons "
+                    f"(bad={[getattr(r,'code',None) for r in bad]})"
+                )
+
         return AggregateResult(
             core_mode=core_mode,
             blocked_by=blocked_by,

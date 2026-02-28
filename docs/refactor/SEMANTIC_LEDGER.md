@@ -35,3 +35,11 @@ Human / Joint
 ---
 
 # Entries
+
+This file mirrors the repo-root `SEMANTIC_LEDGER.md`.
+
+If you update semantics, update both:
+- `/SEMANTIC_LEDGER.md`
+- `/docs/refactor/SEMANTIC_LEDGER.md`
+
+See latest entry in the repo root.

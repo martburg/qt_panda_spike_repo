@@ -80,3 +80,17 @@ def test_motion_allowed_false_when_deadman_released() -> None:
     )
     assert res.core_mode == CoreMode.READY
     assert res.motion_allowed is False
+
+def test_motion_allowed_true_when_live_and_select() -> None:
+    res = aggregate_core_mode(
+        AggregateInputs(
+            axes=[_axis("A", estop_bits=_bits())],
+            stale_after_ms=100,
+            joy_deadman=True,
+            joy_select_hip=True,
+            joy_soll_speed=0.5,
+        )
+    )
+    assert res.core_mode == CoreMode.LIVE
+    assert res.motion_allowed is True
+    assert res.blocked_by == []

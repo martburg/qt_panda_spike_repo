@@ -17,6 +17,10 @@ Command frames are for **commands**, not truth.
 - For “reset request”, we send a **pulse**:
   - `CommandFrame.estop_reset` (bool pulse, one tick)
 
+Semantic note (2026-02-28):
+- Core stores reset requests canonically as **per-axis one-shots** (`estop_reset_req_by_axis`)
+- `CommandFrame.estop_reset` is derived as `any(estop_reset_req_by_axis.values())` (plus legacy fallback)
+
 ### Intents
 - HI-P emits **RequestEstopReset** when the operator clicks `btnEStopReset`.
 - This is a *request*, not a guarantee: the Safety SPS/device may still refuse until conditions are safe.

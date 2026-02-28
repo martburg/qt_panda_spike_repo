@@ -21,3 +21,34 @@ This file records *declared* semantic changes (RefOS Lane 2) made during stabili
   - **How:** Removed `dev_*.toml` from the Python package directory; updated README to point to `/configs`.
   - **Files:** `src/steuerung3d/config/README.md` (and removed `src/steuerung3d/config/dev_*.toml`).
   - **Expected impact:** All tooling and documentation should reference `/configs/*` paths for runtime configuration.
+
+## 2026-02-28 — One-shot derived invariants + core-mode contract tightening
+
+**Lane:** 2 (Declared Semantic Fix)
+
+### Change
+1) One-shot signals (`estop_reset`, `resync`, `param_ops`) are now treated as **derived outputs**
+   from per-axis state maps (canonical):
+   - `estop_reset_req_by_axis`
+   - `resync_req_by_axis`
+   - `pending_param_ops_by_axis`
+
+   Legacy globals remain as compatibility fallbacks, but the system’s source of truth is the per-axis maps.
+
+2) `aggregate_core_mode` contract is tightened:
+   - `motion_allowed` may only be true in `core_mode == LIVE` (existing invariant)
+   - When `core_mode == LIVE`, `blocked_by` must not contain hard safety reasons.
+     Currently allowed LIVE-only code: `NO_SELECT_FOR_MOTION`
+
+### Motivation
+- Prevent invariant drift caused by dual tracking (global bool/list + per-axis maps)
+- Make mode aggregation semantics explicit and enforceable in tests
+- Reduce “heisenbugs” from stale one-shot flags surviving beyond a tick
+
+### Tests
+- Added LIVE+Select motion_allowed=true test
+- Existing aggregation tests continue to cover the main state ladder
+
+### Notes
+- Multi-axis routing in core_udp_service continues to route per-axis param ops and reset pulses strictly.
+- `MachineState.clear_one_shots()` centralizes one-shot clearing to keep the tick loop clean.

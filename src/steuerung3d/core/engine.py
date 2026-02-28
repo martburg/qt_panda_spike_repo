@@ -70,19 +70,22 @@ class CoreEngine:
             max_age_ticks = max(5, int(1.5 / dt)) if dt > 0 else 50
             self.state.update_param_commit_timeout(max_age_ticks=max_age_ticks)
 
-        # ---- NEW: clear one-shot requests after sending once ----
-        self.state.estop_reset_req = False
-        if hasattr(self.state, 'estop_reset_req_by_axis'):
-            self.state.estop_reset_req_by_axis.clear()
+        # ---- clear one-shot requests after emitting once ----
+        if hasattr(self.state, "clear_one_shots"):
+            self.state.clear_one_shots()
+        else:
+            # Fallback for older snapshots
+            self.state.estop_reset_req = False
+            if hasattr(self.state, "estop_reset_req_by_axis"):
+                self.state.estop_reset_req_by_axis.clear()
 
-        # legacy resync pulse (one-shot)
-        self.state.resync_req = False
-        if hasattr(self.state, 'resync_req_by_axis'):
-            self.state.resync_req_by_axis.clear()
-        # parameter ops are also one-shot (they can be re-issued by the UI if needed)
-        self.state.pending_param_ops.clear()
-        if hasattr(self.state, 'pending_param_ops_by_axis'):
-            self.state.pending_param_ops_by_axis.clear()
+            self.state.resync_req = False
+            if hasattr(self.state, "resync_req_by_axis"):
+                self.state.resync_req_by_axis.clear()
+
+            self.state.pending_param_ops.clear()
+            if hasattr(self.state, "pending_param_ops_by_axis"):
+                self.state.pending_param_ops_by_axis.clear()
 
         # 5) emit telemetry snapshot
         if self.on_snapshot is not None:
