@@ -26,7 +26,7 @@ from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.plc_codec import decode_uplink_to_snapshot, encode_downlink
 
 from .plc_config import PlcWireSpec
-from .validate import require_single_axis_id
+from .validate import PlcValidationError, require_single_axis_id
 
 
 @dataclass

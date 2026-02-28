@@ -7,7 +7,11 @@ from __future__ import annotations
 
 from dataclasses import asdict
 import logging
-from typing import Any, Iterable
+from typing import Any, Iterable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # Only needed for type checking; avoids runtime import cycles.
+    from .engine import HipEngine
 
 from steuerung3d.core.intents import ClaimAxis, EchoLifeTick, EnableAxis, JogWinch, RequestEstopReset, RequestResync
 from steuerung3d.core.joy_state import JoyState
@@ -59,6 +63,7 @@ from .viewmodel import HipCutMarkersState, HipDriveStatusState, HipReadoutsState
 from .step_context import build_step_context
 
 log = logging.getLogger("hi_p")
+
 
 def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     """Run one HiP engine tick."""

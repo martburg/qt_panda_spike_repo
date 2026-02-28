@@ -1,0 +1,115 @@
+diff --git a/src/steuerung3d/adapters/plc/plc_codec.py b/src/steuerung3d/adapters/plc/plc_codec.py
+index dc611ce..72ec293 100644
+--- a/src/steuerung3d/adapters/plc/plc_codec.py
++++ b/src/steuerung3d/adapters/plc/plc_codec.py
+@@ -26,7 +26,7 @@ from steuerung3d.core.telemetry import TelemetrySnapshot
+ from steuerung3d.protocol.plc_codec import decode_uplink_to_snapshot, encode_downlink
+ 
+ from .plc_config import PlcWireSpec
+-from .validate import require_single_axis_id
++from .validate import PlcValidationError, require_single_axis_id
+ 
+ 
+ @dataclass
+
+diff --git a/src/steuerung3d/apps/densi_fleet/__main__.py b/src/steuerung3d/apps/densi_fleet/__main__.py
+index cf2d2b3..0d97ab7 100644
+--- a/src/steuerung3d/apps/densi_fleet/__main__.py
++++ b/src/steuerung3d/apps/densi_fleet/__main__.py
+@@ -12,6 +12,7 @@ from typing import List, Tuple
+ 
+ import tomllib
+ 
++from steuerung3d.core.net import parse_hostport
+ 
+ def _is_windows() -> bool:
+     return os.name == "nt"
+
+diff --git a/src/steuerung3d/apps/yellow/engines/densi/step_impl.py b/src/steuerung3d/apps/yellow/engines/densi/step_impl.py
+index 436be84..04bc148 100644
+--- a/src/steuerung3d/apps/yellow/engines/densi/step_impl.py
++++ b/src/steuerung3d/apps/yellow/engines/densi/step_impl.py
+@@ -8,7 +8,11 @@ from __future__ import annotations
+ from dataclasses import dataclass, replace
+ from datetime import datetime
+ import time
+-from typing import Callable
++from typing import Callable, TYPE_CHECKING
++
++if TYPE_CHECKING:
++    # Only needed for type checking; avoids runtime import cycles.
++    from .engine import DenSiEngine
+ 
+ from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
+ from steuerung3d.adapters.sim.device import SimDevice
+
+diff --git a/src/steuerung3d/apps/yellow/engines/hip/step_context.py b/src/steuerung3d/apps/yellow/engines/hip/step_context.py
+index 62d6877..3bdd8ed 100644
+--- a/src/steuerung3d/apps/yellow/engines/hip/step_context.py
++++ b/src/steuerung3d/apps/yellow/engines/hip/step_context.py
+@@ -1,6 +1,11 @@
+ from __future__ import annotations
+ 
+ from dataclasses import dataclass
++from typing import TYPE_CHECKING
++
++if TYPE_CHECKING:
++    # Only needed for type checking; avoids runtime import cycles.
++    from .engine import HipEngine
+ 
+ from steuerung3d.core.intents import ClaimAxis, ReleaseAxis
+ from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
+
+diff --git a/src/steuerung3d/apps/yellow/engines/hip/step_impl.py b/src/steuerung3d/apps/yellow/engines/hip/step_impl.py
+index 69f2fe1..bd0ab1e 100644
+--- a/src/steuerung3d/apps/yellow/engines/hip/step_impl.py
++++ b/src/steuerung3d/apps/yellow/engines/hip/step_impl.py
+@@ -7,7 +7,11 @@ from __future__ import annotations
+ 
+ from dataclasses import asdict
+ import logging
+-from typing import Any, Iterable
++from typing import Any, Iterable, TYPE_CHECKING
++
++if TYPE_CHECKING:
++    # Only needed for type checking; avoids runtime import cycles.
++    from .engine import HipEngine
+ 
+ from steuerung3d.core.intents import ClaimAxis, EchoLifeTick, EnableAxis, JogWinch, RequestEstopReset, RequestResync
+ from steuerung3d.core.joy_state import JoyState
+@@ -60,6 +64,7 @@ from .step_context import build_step_context
+ 
+ log = logging.getLogger("hi_p")
+ 
++
+ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
+     """Run one HiP engine tick."""
+     self = engine
+
+diff --git a/src/steuerung3d/core/stack_runtime_impl.py b/src/steuerung3d/core/stack_runtime_impl.py
+index 227eabe..57ac8d8 100644
+--- a/src/steuerung3d/core/stack_runtime_impl.py
++++ b/src/steuerung3d/core/stack_runtime_impl.py
+@@ -12,17 +12,19 @@ The runtime consumes a :class:`~steuerung3d.core.stack_spec.StackSpec`.
+ from __future__ import annotations
+ 
+ import subprocess
++import sys
+ import os
+ import time
+ from dataclasses import dataclass, replace
+ from pathlib import Path
+-from typing import List, Optional
++from typing import Dict, List, Optional
+ 
+ from .run_dirs import make_session_dir
+-from .stack_runtime_processes import expand_processes as _expand_processes
++from .stack_runtime_processes import expand_processes as _expand_processes, service_args_with_config as _service_args_with_config
+ from .stack_spec import ProcessSpec, StackSpec
+ from .stack_meta import write_meta
+ from .status import StatusCollector, env_for_process
++from .stack_render import make_context, render_argv
+ 
+ from steuerung3d.ui.birdseye_format import (
+     LogTailer,
+

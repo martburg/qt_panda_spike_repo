@@ -12,17 +12,19 @@ The runtime consumes a :class:`~steuerung3d.core.stack_spec.StackSpec`.
 from __future__ import annotations
 
 import subprocess
+import sys
 import os
 import time
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from .run_dirs import make_session_dir
-from .stack_runtime_processes import expand_processes as _expand_processes
+from .stack_runtime_processes import expand_processes as _expand_processes, service_args_with_config as _service_args_with_config
 from .stack_spec import ProcessSpec, StackSpec
 from .stack_meta import write_meta
 from .status import StatusCollector, env_for_process
+from .stack_render import make_context, render_argv
 
 from steuerung3d.ui.birdseye_format import (
     LogTailer,

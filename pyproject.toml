@@ -1,0 +1,82 @@
+# dev/pyproject.toml
+# Steuerung3D Remake — tooling config (ruff + optional pytest).
+# Keep this file minimal and "boring": mostly hygiene + consistency.
+
+[tool.ruff]
+# Match your codebase style; adjust if you already enforce another value.
+line-length = 100
+target-version = "py311"
+
+# Keep Ruff focused on *real* code.
+src = ["src", "tests", "tools"]
+
+# Ruff will still respect .gitignore; this is additional hard exclusion.
+exclude = [
+  ".git",
+  ".venv",
+  "venv",
+  "build",
+  "dist",
+  ".run",
+  ".pytest_cache",
+  "__pycache__",
+  "legacy/attic_src",
+  "legacy/attic",
+  "archive",
+]
+
+[tool.ruff.format]
+# Ruff formatter (replaces black for many repos)
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+skip-magic-trailing-comma = false
+
+[tool.ruff.lint]
+# High-signal rule sets that stay mostly "Lane 1" (mechanical).
+select = [
+  "E",    # pycodestyle errors
+  "F",    # pyflakes (incl F821)
+  "I",    # import sorting
+  "UP",   # pyupgrade
+  "B",    # flake8-bugbear (common gotchas)
+  "SIM",  # simplify
+  "PERF", # performance micro-idioms
+  "ARG",  # unused arguments (good for dead params)
+]
+
+# Avoid noisy/controversial rules by default.
+ignore = [
+  "E501", # line length is handled by formatter; avoid lint churn
+]
+
+# Allow autofix where safe.
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["steuerung3d"]
+combine-as-imports = true
+
+[tool.ruff.lint.per-file-ignores]
+# Tests often use patterns that are fine (fixtures, inline imports, etc.).
+"tests/**" = [
+  "ARG001", # unused function args (pytest fixtures)
+  "ARG002",
+  "E402",   # imports not at top (sometimes used in tests)
+]
+
+# Tools/scripts can be a bit looser.
+"tools/**" = [
+  "E402",
+]
+
+# If you later decide to lint legacy code, remove these ignores/excludes gradually.
+
+# Optional: if you want Ruff to enforce "type-only imports" patterns later,
+# we can add ruff's flake8-type-checking rules, but I didn't enable them yet
+# because they can create churn in a refactor-heavy repo.
+#
+# e.g. add "TC" to select and configure:
+# [tool.ruff.lint.flake8-type-checking]
+# strict = false

@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # Only needed for type checking; avoids runtime import cycles.
+    from .engine import HipEngine
 
 from steuerung3d.core.intents import ClaimAxis, ReleaseAxis
 from steuerung3d.core.joy_state import JoyState, clamp_soll_speed

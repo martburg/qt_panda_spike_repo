@@ -12,6 +12,7 @@ from typing import List, Tuple
 
 import tomllib
 
+from steuerung3d.core.net import parse_hostport
 
 def _is_windows() -> bool:
     return os.name == "nt"

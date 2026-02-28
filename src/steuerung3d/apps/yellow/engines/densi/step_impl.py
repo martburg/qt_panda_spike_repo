@@ -8,7 +8,11 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import datetime
 import time
-from typing import Callable
+from typing import Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # Only needed for type checking; avoids runtime import cycles.
+    from .engine import DenSiEngine
 
 from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
 from steuerung3d.adapters.sim.device import SimDevice
