@@ -1,5 +1,16 @@
 import importlib.util
+import sys
+from pathlib import Path
+
 import pytest
+
+
+# Ensure `src/` layout works when running `pytest` directly (no editable install).
+# This keeps test collection robust in fresh environments and CI.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_SRC = _REPO_ROOT / "src"
+if _SRC.is_dir() and str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
 
 
 def pytest_configure(config):

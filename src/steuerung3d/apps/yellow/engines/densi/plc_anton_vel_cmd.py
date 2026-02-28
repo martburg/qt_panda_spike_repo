@@ -19,6 +19,8 @@ from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.state import MachineState
 from steuerung3d.common.staleness import age_ticks, is_stale
 
+from .param_defaults import apply_densi_param_defaults
+
 
 @dataclass(frozen=True)
 class PlcAntonVelCmdConfig:
@@ -202,7 +204,6 @@ def step_plc_anton_vel_cmd(
             params["GuideIstSpeed"] = float(guide_speed)
             params["GuidePosIst"] = float(params.get("GuidePosIst", 0.0)) + float(guide_speed) * float(dt_s)
         else:
-            params.setdefault("GuideIstSpeed", 0.0)
-            params.setdefault("GuidePosIst", 0.0)
+            apply_densi_param_defaults(params, keys=("GuideIstSpeed", "GuidePosIst"))
 
     state.params.update(params)

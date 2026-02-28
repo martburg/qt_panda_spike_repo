@@ -48,6 +48,7 @@ from .estop_fsm import (
 )
 from .resync import handle_resync_cmd as _handle_resync_cmd
 from .param_ops import apply_densi_param_ops
+from .param_defaults import apply_densi_param_defaults
 from .motion_clamp import apply_estop_clamp_to_state, compute_moving_guard
 from .plc_anton_vel_cmd import step_plc_anton_vel_cmd
 from .setpoint_semantics import normalize_cmd_for_plant
@@ -186,35 +187,7 @@ class DenSiEngine:
             pass
 
         # Defaults expected by UI + protocol contract tests
-        self.state.params.setdefault("PosChain0", 0.0)
-        self.state.params.setdefault("PosChain1", 0.0)
-        self.state.params.setdefault("PosChain2", 0.0)
-        self.state.params.setdefault("PosChain3", 0.0)
-
-        self.state.params.setdefault("GuiderMin", -0.5)
-        self.state.params.setdefault("GuiderMax", 0.5)
-
-        self.state.params.setdefault("AccMax", 1.0)
-        self.state.params.setdefault("AccMove", 1.0)
-        self.state.params.setdefault("DccMax", 1.0)
-        self.state.params.setdefault("VelMax", 1.0)
-        self.state.params.setdefault("HardMax", 300.0)
-        self.state.params.setdefault("HardMin", 0.0)
-        self.state.params.setdefault("UserMax", 300.0)
-        self.state.params.setdefault("UserMin", 0.0)
-        self.state.params.setdefault("P", 0.0)
-        self.state.params.setdefault("I", 0.0)
-        self.state.params.setdefault("D", 0.0)
-        self.state.params.setdefault("IL", 0.0)
-        self.state.params.setdefault("GuideIstSpeed", 0.0)
-        self.state.params.setdefault("GuidePosIst", 0.0)
-        self.state.params.setdefault("AxisAmp", 100.0)
-
-        # Latched cut markers start cleared
-        self.state.params.setdefault("CutPos", 0.0)
-        self.state.params.setdefault("CutVel", 0.0)
-        self.state.params.setdefault("CutTime", 0.0)
-        self.state.params.setdefault("PosDiffFor", 0.0)
+        apply_densi_param_defaults(self.state.params)
 
         # Reflect initial L0 state
         try:
