@@ -57,7 +57,7 @@ Before deleting a module tree, ensure all of the following are true:
 1. **No supported app imports it**
    - `core_udp_service`, `hi_p`, `den_si`, `joy2intent` must not import it.
 2. **No supported profile depends on it**
-   - `configs/stacks/*.toml` used in CI / daily work must not reference it.
+   - `configs/stacks/*.toml` are legacy mirrors; CI / daily work should use `configs/profiles/*.toml`.
 3. **Tests cover the supported alternative**
    - any behavior the obsolete module provided has a test for the replacement.
 4. **Docs updated**

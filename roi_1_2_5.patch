@@ -1,0 +1,309 @@
+diff --git a/README.md b/README.md
+index f5e359a..9b2856e 100644
+--- a/README.md
++++ b/README.md
+@@ -72,7 +72,9 @@ python -m steuerung3d logs core --profile dev_sim --follow
+ python -m steuerung3d down   --profile dev_sim
+ ```
+ 
+-Profiles live in `configs/stacks/*.toml` and own the **rig axes + wiring** (ports, services enabled, per-axis expansion).
++Profiles live in `configs/profiles/*.toml` and own the **rig axes + wiring** (ports, services enabled, per-axis expansion).
++
++Legacy note: `configs/stacks/` remains as a compatibility mirror for older docs/scripts; edit `configs/profiles/` as the source of truth.
+ 
+ ### Session logging (per run, per process)
+ 
+diff --git a/repo/dev-chore-docs-dedupe-rawstring-rename/configs/stacks/README.md b/configs/stacks/README.md
+new file mode 100644
+index 0000000..178ed2c
+--- /dev/null
++++ b/configs/stacks/README.md
+@@ -0,0 +1,20 @@
++# Legacy: configs/stacks
++
++`configs/profiles/*.toml` is the **source of truth**.
++
++This directory (`configs/stacks/*.toml`) remains as a **compatibility mirror** for older
++docs/scripts that still reference the historic "stack" naming.
++
++Do **not** edit files here directly.
++
++To refresh the mirror after changing profiles:
++
++```powershell
++python tools/sync_legacy_stacks.py
++```
++
++To verify the mirror is in sync:
++
++```powershell
++python tools/check_legacy_stacks.py
++```
+diff --git a/configs/stacks/only_densi_anton.toml b/configs/stacks/only_densi_anton.toml
+index 8bce9fa..063684f 100644
+--- a/configs/stacks/only_densi_anton.toml
++++ b/configs/stacks/only_densi_anton.toml
+@@ -16,4 +16,4 @@ config = "configs/services/densi.toml"
+ axis = "Anton"
+ cmd_in = "127.0.0.1:52001"
+ telem_out = "127.0.0.1:52020"
+-wire_proto = "plc" 
++wire_proto = "plc"
+diff --git a/docs/DEV_STACK.md b/docs/DEV_STACK.md
+index 09adb70..975b25a 100644
+--- a/docs/DEV_STACK.md
++++ b/docs/DEV_STACK.md
+@@ -225,7 +225,9 @@ From repo root:
+ python -m steuerung3d up --profile 1dev_sim
+ ```
+ 
+-To run multi-axis demos, use a stack profile under `configs/stacks/` (or create one) and point it at the desired axes and ports.
++To run multi-axis demos, use a profile under `configs/profiles/` (or create one) and point it at the desired axes and ports.
++
++Legacy note: `configs/stacks/` exists as a compatibility mirror; treat `configs/profiles/` as the source of truth.
+ 
+ 
+ ### How to verify wiring quickly
+diff --git a/docs/DOCS_ALIGNMENT_REPORT_2026-02-20.md b/docs/DOCS_ALIGNMENT_REPORT_2026-02-20.md
+index 3269d40..2ad24a0 100644
+--- a/docs/DOCS_ALIGNMENT_REPORT_2026-02-20.md
++++ b/docs/DOCS_ALIGNMENT_REPORT_2026-02-20.md
+@@ -8,7 +8,7 @@ This pass focused on **eliminating stale entry points and file references** intr
+ 
+ - Rewritten to match the **actual config files present** under `configs/`.
+ - Clarifies the two supported configuration surfaces:
+-  - **Profile-driven stacks** (`configs/stacks/*.toml`, via `python -m steuerung3d up --profile ...`)
++  - **Profiles** (`configs/profiles/*.toml`, via `python -m steuerung3d up --profile ...`; legacy mirror: `configs/stacks/*.toml`)
+   - **Single-process runners** (e.g. `apps/dev_stack`, `apps/plc_stack`, `apps/joy2intent`, `apps/inputd`)
+ - Removed references to non-existent files:
+   - `configs/dev_stack.toml`
+diff --git a/docs/STACK_BOOT_STATUS.md b/docs/STACK_BOOT_STATUS.md
+index c2b96d1..96038f9 100644
+--- a/docs/STACK_BOOT_STATUS.md
++++ b/docs/STACK_BOOT_STATUS.md
+@@ -85,7 +85,9 @@ When status is enabled, the supervisor prints a compact birds-eye view based on
+ 
+ ## Config notes
+ 
+-Profiles live in `configs/stacks/*.toml`.
++Profiles live in `configs/profiles/*.toml`.
++
++Legacy note: `configs/stacks/` remains as a compatibility mirror (kept in sync from `configs/profiles/`).
+ 
+ - Profiles own the **rig axes + wiring**.
+ - The `dev_sim` profile includes the status channel:
+@@ -125,13 +127,13 @@ By default the HiP windows start **unattached**; the operator picks which device
+ - Then it starts a HiP pool sized to the discovered devices (`count = "auto"`, min 1).
+ - DenSi sims are suppressed automatically in REAL mode.
+ 
+-See example profile: `configs/stacks/dev_real.toml`.
++See example profile: `configs/profiles/dev_real.toml`.
+ 
+ ---
+ 
+ ## Tests
+ 
+-`pytest -q` is green (last seen: 71 passed, 1 skipped).
++`pytest -q` is green (last seen: 199 passed, 5 skipped).
+ 
+ Regression tests cover stack expansion + wrapper behavior. The status module is currently exercised by integration runs (unit tests can be added later if needed).
+ 
+diff --git a/docs/config.md b/docs/config.md
+index 98baffe..f659fed 100644
+--- a/docs/config.md
++++ b/docs/config.md
+@@ -13,7 +13,8 @@ The goal is to make local development easy *without* coupling core logic to any
+ 
+ Profiles live in:
+ 
+-- `configs/stacks/*.toml`
++- `configs/profiles/*.toml` (source of truth)
++- `configs/stacks/*.toml` (legacy compatibility mirror)
+ 
+ They describe:
+ 
+diff --git a/docs/refactor/OBSOLETE_SURFACE_AREA.md b/docs/refactor/OBSOLETE_SURFACE_AREA.md
+index 6dc1ed2..af03565 100644
+--- a/docs/refactor/OBSOLETE_SURFACE_AREA.md
++++ b/docs/refactor/OBSOLETE_SURFACE_AREA.md
+@@ -57,7 +57,7 @@ Before deleting a module tree, ensure all of the following are true:
+ 1. **No supported app imports it**
+    - `core_udp_service`, `hi_p`, `den_si`, `joy2intent` must not import it.
+ 2. **No supported profile depends on it**
+-   - `configs/stacks/*.toml` used in CI / daily work must not reference it.
++   - `configs/stacks/*.toml` are legacy mirrors; CI / daily work should use `configs/profiles/*.toml`.
+ 3. **Tests cover the supported alternative**
+    - any behavior the obsolete module provided has a test for the replacement.
+ 4. **Docs updated**
+diff --git a/pyproject.toml b/pyproject.toml
+index 252e5c7..22edeb5 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -2,6 +2,34 @@
+ # Steuerung3D Remake — tooling config (ruff + optional pytest).
+ # Keep this file minimal and "boring": mostly hygiene + consistency.
+ 
++[build-system]
++requires = ["setuptools>=68", "wheel"]
++build-backend = "setuptools.build_meta"
++
++[project]
++name = "steuerung3d"
++version = "0.0.0"
++description = "Steuerung3D Remake"
++readme = "README.md"
++requires-python = ">=3.11"
++
++# Keep runtime deps minimal; this repo is largely self-contained.
++dependencies = []
++
++[project.optional-dependencies]
++# Developer convenience: keep tests/linting one command away.
++dev = [
++  "pytest>=7",
++  "ruff>=0.6",
++  "pyright>=1.1",
++]
++
++[tool.setuptools]
++package-dir = {"" = "src"}
++
++[tool.setuptools.packages.find]
++where = ["src"]
++
+ [tool.ruff]
+ # Match your codebase style; adjust if you already enforce another value.
+ line-length = 100
+diff --git a/tools/check.py b/tools/check.py
+index b97c8e9..ac18cc1 100644
+--- a/tools/check.py
++++ b/tools/check.py
+@@ -14,6 +14,11 @@ def run(cmd: list[str]) -> int:
+ def main() -> int:
+     repo_root = Path(__file__).resolve().parents[1]
+ 
++    # keep legacy configs/stacks in sync with configs/profiles
++    rc = run([sys.executable, str(repo_root / "tools" / "check_legacy_stacks.py")])
++    if rc != 0:
++        return rc
++
+     # ruff
+     rc = run([sys.executable, "-m", "ruff", "check", str(repo_root)])
+     if rc != 0:
+diff --git a/repo/dev-chore-docs-dedupe-rawstring-rename/tools/check_legacy_stacks.py b/tools/check_legacy_stacks.py
+new file mode 100644
+index 0000000..772e118
+--- /dev/null
++++ b/tools/check_legacy_stacks.py
+@@ -0,0 +1,62 @@
++# tools/check_legacy_stacks.py
++"""Ensure legacy configs/stacks mirrors configs/profiles.
++
++We keep `configs/stacks/*.toml` only for backward compatibility (older docs/scripts).
++To avoid drift, treat `configs/profiles/*.toml` as the source of truth and enforce
++that stacks are exact copies.
++
++If you need to refresh the mirror, run:
++
++    python tools/sync_legacy_stacks.py
++"""
++
++from __future__ import annotations
++
++import sys
++from pathlib import Path
++
++
++def main() -> int:
++    repo_root = Path(__file__).resolve().parents[1]
++    profiles_dir = repo_root / "configs" / "profiles"
++    stacks_dir = repo_root / "configs" / "stacks"
++
++    if not profiles_dir.exists():
++        print(f"[legacy-stacks] no profiles dir: {profiles_dir}")
++        return 2
++
++    if not stacks_dir.exists():
++        print(f"[legacy-stacks] no stacks dir: {stacks_dir}")
++        return 2
++
++    profiles = sorted(p for p in profiles_dir.glob("*.toml") if p.is_file())
++    stacks = {p.name: p for p in stacks_dir.glob("*.toml") if p.is_file()}
++
++    errors: list[str] = []
++
++    for prof in profiles:
++        mirror = stacks.get(prof.name)
++        if mirror is None:
++            errors.append(f"missing mirror: configs/stacks/{prof.name}")
++            continue
++        if prof.read_text(encoding="utf-8") != mirror.read_text(encoding="utf-8"):
++            errors.append(f"drift: configs/stacks/{prof.name} differs from configs/profiles/{prof.name}")
++
++    extra = sorted(set(stacks.keys()) - {p.name for p in profiles})
++    for name in extra:
++        # Keep this strict: extra files are almost always stale copies.
++        errors.append(f"stale mirror (no corresponding profile): configs/stacks/{name}")
++
++    if errors:
++        print("[legacy-stacks] FAIL")
++        for e in errors:
++            print(" -", e)
++        print("\nRefresh mirror with: python tools/sync_legacy_stacks.py")
++        return 1
++
++    print(f"[legacy-stacks] OK ({len(profiles)} mirrored profiles)")
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/repo/dev-chore-docs-dedupe-rawstring-rename/tools/sync_legacy_stacks.py b/tools/sync_legacy_stacks.py
+new file mode 100644
+index 0000000..c12d910
+--- /dev/null
++++ b/tools/sync_legacy_stacks.py
+@@ -0,0 +1,43 @@
++# tools/sync_legacy_stacks.py
++"""Sync legacy configs/stacks mirrors from configs/profiles.
++
++This repo has moved to `configs/profiles/*.toml` as the source of truth.
++`configs/stacks/*.toml` remains as a compatibility mirror for older docs/scripts.
++
++Run this script after changing profiles to keep the mirror in sync:
++
++    python tools/sync_legacy_stacks.py
++"""
++
++from __future__ import annotations
++
++import shutil
++from pathlib import Path
++
++
++def main() -> int:
++    repo_root = Path(__file__).resolve().parents[1]
++    profiles_dir = repo_root / "configs" / "profiles"
++    stacks_dir = repo_root / "configs" / "stacks"
++
++    stacks_dir.mkdir(parents=True, exist_ok=True)
++
++    profiles = sorted(p for p in profiles_dir.glob("*.toml") if p.is_file())
++    profile_names = {p.name for p in profiles}
++
++    # Copy/overwrite mirrors
++    for prof in profiles:
++        dst = stacks_dir / prof.name
++        shutil.copyfile(prof, dst)
++
++    # Remove stale mirrors
++    for stale in stacks_dir.glob("*.toml"):
++        if stale.name not in profile_names:
++            stale.unlink()
++
++    print(f"[legacy-stacks] synced {len(profiles)} profile(s) -> configs/stacks")
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())

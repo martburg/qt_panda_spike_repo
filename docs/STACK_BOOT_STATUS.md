@@ -85,7 +85,9 @@ When status is enabled, the supervisor prints a compact birds-eye view based on 
 
 ## Config notes
 
-Profiles live in `configs/stacks/*.toml`.
+Profiles live in `configs/profiles/*.toml`.
+
+Legacy note: `configs/stacks/` remains as a compatibility mirror (kept in sync from `configs/profiles/`).
 
 - Profiles own the **rig axes + wiring**.
 - The `dev_sim` profile includes the status channel:
@@ -125,13 +127,13 @@ By default the HiP windows start **unattached**; the operator picks which device
 - Then it starts a HiP pool sized to the discovered devices (`count = "auto"`, min 1).
 - DenSi sims are suppressed automatically in REAL mode.
 
-See example profile: `configs/stacks/dev_real.toml`.
+See example profile: `configs/profiles/dev_real.toml`.
 
 ---
 
 ## Tests
 
-`pytest -q` is green (last seen: 71 passed, 1 skipped).
+`pytest -q` is green (last seen: 199 passed, 5 skipped).
 
 Regression tests cover stack expansion + wrapper behavior. The status module is currently exercised by integration runs (unit tests can be added later if needed).
 

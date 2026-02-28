@@ -72,7 +72,9 @@ python -m steuerung3d logs core --profile dev_sim --follow
 python -m steuerung3d down   --profile dev_sim
 ```
 
-Profiles live in `configs/stacks/*.toml` and own the **rig axes + wiring** (ports, services enabled, per-axis expansion).
+Profiles live in `configs/profiles/*.toml` and own the **rig axes + wiring** (ports, services enabled, per-axis expansion).
+
+Legacy note: `configs/stacks/` remains as a compatibility mirror for older docs/scripts; edit `configs/profiles/` as the source of truth.
 
 ### Session logging (per run, per process)
 

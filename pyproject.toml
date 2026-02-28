@@ -2,6 +2,34 @@
 # Steuerung3D Remake — tooling config (ruff + optional pytest).
 # Keep this file minimal and "boring": mostly hygiene + consistency.
 
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "steuerung3d"
+version = "0.0.0"
+description = "Steuerung3D Remake"
+readme = "README.md"
+requires-python = ">=3.11"
+
+# Keep runtime deps minimal; this repo is largely self-contained.
+dependencies = []
+
+[project.optional-dependencies]
+# Developer convenience: keep tests/linting one command away.
+dev = [
+  "pytest>=7",
+  "ruff>=0.6",
+  "pyright>=1.1",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.ruff]
 # Match your codebase style; adjust if you already enforce another value.
 line-length = 100

@@ -225,7 +225,9 @@ From repo root:
 python -m steuerung3d up --profile 1dev_sim
 ```
 
-To run multi-axis demos, use a stack profile under `configs/stacks/` (or create one) and point it at the desired axes and ports.
+To run multi-axis demos, use a profile under `configs/profiles/` (or create one) and point it at the desired axes and ports.
+
+Legacy note: `configs/stacks/` exists as a compatibility mirror; treat `configs/profiles/` as the source of truth.
 
 
 ### How to verify wiring quickly
