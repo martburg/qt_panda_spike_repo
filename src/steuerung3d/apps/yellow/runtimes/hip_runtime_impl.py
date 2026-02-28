@@ -35,11 +35,8 @@ from ..panels.hip.hip_banner_vm import compute_hip_banner_vm
 from ..panels.hip.hip_estop_vm import compute_hip_estop_vm
 from ..panels.hip.hip_header_dots_vm import compute_hip_header_dots_vm
 from .runtime_utils import (
-    compute_age_ms,
-    compute_status_level,
-    compute_stale,
+    compute_runtime_health,
     emit_status,
-    format_age_ms,
 )
 
 
@@ -395,15 +392,23 @@ class HipRuntime:
         if not getattr(self, "_status", None):
             return
 
-        age_ms = compute_age_ms(int(now_ns), self._last_rx_ns)
-        stale = compute_stale(age_ms, self._stale_after_ms)
-        level = compute_status_level(self._last_estop, self._last_fault, stale)
+        h = compute_runtime_health(
+            now_ns=int(now_ns),
+            last_rx_ns=self._last_rx_ns,
+            stale_after_ms=self._stale_after_ms,
+            seen_first_rx=bool(self._seen_first_telem),
+            estop=bool(self._last_estop),
+            fault=bool(self._last_fault),
+        )
+        age_ms = h.age_ms
+        stale = bool(h.stale)
+        level = str(h.level)
         axis = str(getattr(self.engine.state, "selected_axis", "") or "") or (self._fixed_axis or "")
         estate = str(self._last_estate or "")
         mode = str(self._last_mode or "")
         armed = bool(str(estate or "").upper() in ("ARMED", "READY"))
         ready = bool(str(estate or "").upper() == "READY")
-        age_disp = format_age_ms(age_ms)
+        age_disp = str(h.age_disp)
         joy = getattr(self.engine.state, "joy", JoyState())
         dm = 1 if bool(getattr(joy, "deadman", False)) else 0
         sel = 1 if bool(getattr(joy, "select_hip", False)) else 0

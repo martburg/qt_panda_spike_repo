@@ -20,11 +20,9 @@ from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
 from .runtime_utils import (
-    compute_age_ms,
-    compute_status_level,
-    compute_stale,
+    compute_runtime_health,
     emit_status,
-    format_age_ms,
+    should_interval_log,
 )
 
 # Optional structured status heartbeat (used by stack supervisor birds-eye)
@@ -240,13 +238,21 @@ class DensiRuntime:
         if not self._status:
             return
 
-        age_ms = compute_age_ms(int(now_ns), self._last_cmd_ns)
-        stale = compute_stale(age_ms, self._stale_after_ms)
-        level = compute_status_level(self._last_estop, self._last_fault, stale)
+        h = compute_runtime_health(
+            now_ns=int(now_ns),
+            last_rx_ns=self._last_cmd_ns,
+            stale_after_ms=self._stale_after_ms,
+            seen_first_rx=bool(self._seen_first_cmd),
+            estop=bool(self._last_estop),
+            fault=bool(self._last_fault),
+        )
         axis = self._axis_ids[0] if self._axis_ids else ""
         mode = self._last_mode or ""
-        online = bool(self._seen_first_cmd) and (not stale)
-        age_disp = format_age_ms(age_ms)
+        online = bool(h.online)
+        age_ms = h.age_ms
+        stale = bool(h.stale)
+        level = str(h.level)
+        age_disp = str(h.age_disp)
         cmd = self._last_cmd
         cmd_mode = str(getattr(cmd, "core_mode", "") or "") if cmd is not None else ""
         cmd_intent = bool(getattr(cmd, "intent", False)) if cmd is not None else False
@@ -315,13 +321,6 @@ class DensiRuntime:
             exc_msg="DenSi status emission failed",
         )
 
-    @staticmethod
-    def _lt_should_log(now_s: float, last_log_s: float, interval_s: float = 1.0) -> bool:
-        try:
-            return (float(now_s) - float(last_log_s)) >= float(interval_s)
-        except Exception:
-            return True
-
     def _step_lifetick_debug(self, *, now_ns: int, last_cmd: CommandFrame | None) -> None:
         now_s = time.monotonic()
         _echo_map = getattr(last_cmd, "lifetick_echo", {}) if last_cmd is not None else {}
@@ -340,7 +339,7 @@ class DensiRuntime:
                         getattr(last_cmd, "tick", None),
                     )
 
-            if self._lt_should_log(now_s, self._lt_last_cmd_log_s):
+            if should_interval_log(now_s, self._lt_last_cmd_log_s):
                 axis0 = self._axis_ids[0]
                 self._log.debug(
                     "DenSi rx cmd: tick=%s lifetick_echo[%s]=%s (map=%s)",
@@ -351,7 +350,7 @@ class DensiRuntime:
                 )
                 self._lt_last_cmd_log_s = now_s
         else:
-            if self._lt_should_log(now_s, self._lt_last_cmd_log_s):
+            if should_interval_log(now_s, self._lt_last_cmd_log_s):
                 self._log.debug("DenSi rx cmd: <no cmd yet>")
                 self._lt_last_cmd_log_s = now_s
 
@@ -367,7 +366,7 @@ class DensiRuntime:
                 if self._last_cmd_ns is not None:
                     self._hb.set("cmd_age_ms", int((int(now_ns) - int(self._last_cmd_ns)) / 1_000_000.0))
 
-            if self._axis_ids and _axis_id == self._axis_ids[0] and self._lt_should_log(now_s, self._lt_last_telem_log_s):
+            if self._axis_ids and _axis_id == self._axis_ids[0] and should_interval_log(now_s, self._lt_last_telem_log_s):
                 self._lt_last_telem_log_s = now_s
                 self._log.debug(
                     "LIFETICK DenSi device: axis=%s tx=%d rx=%d diff=%d",
