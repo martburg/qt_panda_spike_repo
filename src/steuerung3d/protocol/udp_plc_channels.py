@@ -20,6 +20,7 @@ import os
 from typing import Any, Dict, List, Optional, Tuple
 
 from steuerung3d.adapters.links.udp_link import UdpLink
+from steuerung3d.protocol.parse_primitives import parse_bool, parse_float
 
 
 def _to_bytes(line: str) -> bytes:
@@ -131,7 +132,8 @@ class UdpPlcCommandIn:
 
         ST semantics:
         - Modus == 'w' means the write-extension fields are present (parameter write).
-        - Intent is a boolean string ('True'/'False') and is *not* used for param edit ops.
+        - Intent is a boolean *string* in the ST ('True'/'False', case-sensitive compare in ST)
+          and is *not* used for param edit ops.
         """
         out: List[Any] = []
         try:
@@ -142,32 +144,49 @@ class UdpPlcCommandIn:
 
         axis_id = (self.axis_id or "X").strip() or "X"
 
-        def _to_int(x: str, default: int = 0) -> int:
-            try:
-                return int(float(str(x).strip()))
-            except Exception:
-                return default
+def _to_int(x: object, default: int = 0) -> int:
+    # Accept "1", "1.0", etc. (legacy tolerant)
+    try:
+        return int(float(str(x).strip()))
+    except Exception:
+        return int(default)
 
-        def _to_float(x: str, default: float = 0.0) -> float:
-            try:
-                return float(str(x).strip())
-            except Exception:
-                return default
+def _to_float(x: object, default: float = 0.0) -> float:
+    return float(parse_float(x, default=default))
 
-        def _to_bool_token(x: str, default: bool = False) -> bool:
-            if x is None:
-                return default
-            s = str(x).strip().lower()
-            if s in ("true", "t", "yes", "y", "on", "1"):
-                return True
-            if s in ("false", "f", "no", "n", "off", "0", ""):
-                return False
-            try:
-                # Accept legacy numeric tokens as well (e.g. ControlIN word).
-                iv = int(s, 10)
-                return iv != 0
-            except Exception:
-                return default
+def _to_bool_token(x: object, default: bool = False) -> bool:
+    """Parse legacy PLC-ish booleans.
+
+    ST truth (KommAnton__MAIN.st):
+      - `Intent` is compared against the *string* 'True' (case-sensitive).
+      - Other on-wire flags are typically numeric (WORD/INT/DWORD) where non-zero means true.
+
+    We preserve a quirk of the previous implementation:
+      - empty token => False (even if default=True)
+    """
+    try:
+        s = str(x).strip()
+    except Exception:
+        return bool(default)
+    if s == "":
+        return False
+
+    sl = s.lower()
+
+    # First accept the centralized token set (1/0, true/false, on/off, ...).
+    v = parse_bool(s, default=default)
+    if sl in ("1", "0", "true", "false", "t", "f", "yes", "no", "y", "n", "on", "off"):
+        return bool(v)
+
+    # Then accept legacy numeric-ish tokens as well (e.g. DWORD bitfields): non-zero => True.
+    try:
+        return int(sl, 10) != 0
+    except Exception:
+        try:
+            return float(sl) != 0.0
+        except Exception:
+            return bool(default)
+
 
         group_defaults = {
             "pos":    ["HardMax", "UserMax", "UserMin", "HardMin", "PosWin"],
