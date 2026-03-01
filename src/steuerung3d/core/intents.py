@@ -102,6 +102,29 @@ class RequestResync:
 
 
 @dataclass(frozen=True)
+class RequestMainReset:
+    """Request reset pulse for the *main* amplifier (legacy ControlIN bit6).
+
+    TwinCAT legacy expects a momentary command bit in the ControlIN word.
+    """
+
+    type: Literal["main_reset"] = "main_reset"
+    axis_id: str = ""
+    hip_id: str = ""
+
+
+@dataclass(frozen=True)
+class RequestGuiderReset:
+    """Request reset pulse for the *guider* amplifier (legacy GuideControlUI bit2).
+
+    """
+
+    type: Literal["guider_reset"] = "guider_reset"
+    axis_id: str = ""
+    hip_id: str = ""
+
+
+@dataclass(frozen=True)
 class ClearFault:
     type: Literal["clear_fault"] = "clear_fault"
 
@@ -250,6 +273,8 @@ Intent = Union[
     SetEstop,
     RequestEstopReset,  # NEW
     RequestResync,
+    RequestMainReset,
+    RequestGuiderReset,
     ClearFault,
     ParamEditBegin,
     ParamWrite,

@@ -5,7 +5,7 @@ import logging
 from steuerung3d.apps.yellow.engines.hip.engine import HipEngine, HipUiInputs
 from steuerung3d.apps.yellow.runtimes.hip_runtime import HipRuntime, HipRuntimeInputs
 from steuerung3d.core.intents import ClaimAxis
-from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
+from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
 from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 
 
@@ -41,6 +41,16 @@ def _snap(axis_id: str = "A", device_tick: int = 10) -> TelemetrySnapshot:
                 device_tick=device_tick & 0xFFFF,
             )
         },
+        densis={
+            axis_id: DensiTelemetry(
+                device_id=axis_id,
+                online=True,
+                claimed_by_hip="",
+                participating=False,
+                anchor_xyz=None,
+                last_seen_age_ticks=0,
+            )
+        },
     )
 
 
@@ -51,6 +61,8 @@ def test_hip_runtime_sets_startup_on_stale_gap() -> None:
         axis_selection_changed=False,
         estop_reset_clicked=False,
         resync_clicked=False,
+            main_reset_clicked=False,
+            guider_reset_clicked=False,
         param_actions=[],
         param_values={},
     )
@@ -70,6 +82,8 @@ def test_hip_runtime_emits_claim_axis_intent() -> None:
         axis_selection_changed=True,
         estop_reset_clicked=False,
         resync_clicked=False,
+            main_reset_clicked=False,
+            guider_reset_clicked=False,
         param_actions=[],
         param_values={},
     )

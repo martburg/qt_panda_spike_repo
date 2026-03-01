@@ -237,7 +237,7 @@ class DenSiQtBinder:
             set_enabled(self._btn_diag_resync, False)
 
         # Disable operator-only buttons
-        for name in ("btnReset", "btnRecover"):
+        for name in ("btnMainReset", "btnRecover"):
             b = self.win.findChild(QPushButton, name)
             if b is not None:
                 set_enabled(b, False)

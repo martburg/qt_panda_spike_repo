@@ -117,3 +117,6 @@ class CommandFrame:
     # NEW (optional): UI-originating livetick echo values by axis.
     # Keep empty by default so existing regression fingerprints stay stable.
     lifetick_echo: Dict[str, int] = field(default_factory=dict)
+    # NEW: per-axis amplifier reset pulses (bit-wrangled into ControlIN / GuideControlUI)
+    main_reset_by_axis: Dict[str, bool] = field(default_factory=dict)
+    guider_reset_by_axis: Dict[str, bool] = field(default_factory=dict)

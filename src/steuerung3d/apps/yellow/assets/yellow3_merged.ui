@@ -230,7 +230,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="btnReset">
+           <widget class="QPushButton" name="btnMainReset">
             <property name="minimumSize">
              <size>
               <width>0</width>

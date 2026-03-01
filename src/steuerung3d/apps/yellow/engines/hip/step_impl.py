@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     # Only needed for type checking; avoids runtime import cycles.
     from .engine import HipEngine
 
-from steuerung3d.core.intents import ClaimAxis, EchoLifeTick, EnableAxis, JogWinch, RequestEstopReset, RequestResync
+from steuerung3d.core.intents import ClaimAxis, EchoLifeTick, EnableAxis, JogWinch, RequestEstopReset, RequestResync, RequestMainReset, RequestGuiderReset
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import ESTOP_SPECS, decode_estop_word
@@ -335,6 +335,11 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     # --- UI actions -> intents (param ops, estop reset, resync) ---
     if ui.estop_reset_clicked and axis_id:
         intents.append(RequestEstopReset(axis_id=axis_id, hip_id=hip_id))
+
+    if ui.main_reset_clicked and axis_id:
+        intents.append(RequestMainReset(axis_id=axis_id, hip_id=hip_id))
+    if ui.guider_reset_clicked and axis_id:
+        intents.append(RequestGuiderReset(axis_id=axis_id, hip_id=hip_id))
 
     resync_ignored = False
     resync_reason = ""

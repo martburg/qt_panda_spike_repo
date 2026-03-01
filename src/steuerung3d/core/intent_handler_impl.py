@@ -37,6 +37,8 @@ from steuerung3d.core.intents import (
     RequestAxisLease,
     RequestEstopReset,
     RequestResync,
+    RequestMainReset,
+    RequestGuiderReset,
     RequestRigLease,
     SetControlMode,
     SetEstop,
@@ -70,6 +72,8 @@ from steuerung3d.core.intent_routes.params import (
 from steuerung3d.core.intent_routes.safety import (
     handle_request_estop_reset,
     handle_request_resync,
+    handle_request_main_reset,
+    handle_request_guider_reset,
     handle_set_estop,
 )
 
@@ -97,6 +101,8 @@ UNGATED_DISPATCH: Dict[Type[Intent], Handler] = {
     SetEstop: lambda s, i: handle_set_estop(s, i),
     RequestEstopReset: lambda s, i: handle_request_estop_reset(s, i),
     RequestResync: lambda s, i: handle_request_resync(s, i),
+    RequestMainReset: lambda s, i: handle_request_main_reset(s, i),
+    RequestGuiderReset: lambda s, i: handle_request_guider_reset(s, i),
     # Params
     ParamEditBegin: lambda s, i: handle_param_edit_begin(s, i),
     ParamWrite: lambda s, i: handle_param_write(s, i),

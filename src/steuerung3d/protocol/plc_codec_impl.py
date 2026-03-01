@@ -66,14 +66,32 @@ def encode_downlink(
     vel_eff = float(vel) if enable else 0.0
 
     intent = bool(getattr(frame, "intent", True))
+
+    main_reset = False
+    guider_reset = False
+    try:
+        main_reset = bool(getattr(frame, "main_reset_by_axis", {}).get(axis_id, False))
+    except Exception:
+        main_reset = False
+    try:
+        guider_reset = bool(getattr(frame, "guider_reset_by_axis", {}).get(axis_id, False))
+    except Exception:
+        guider_reset = False
+
+    # Legacy bitfields (mirrors ST extract):
+    #   ControlIN bit0 = enable; bit6 = main amplifier reset
+    #   GuideControlUI bit2 = guider amplifier reset
+    control_word = (1 if enable else 0) | (64 if main_reset else 0)
+    guide_word = (4 if guider_reset else 0)
+
     base: Dict[str, str] = {
         "LifetickUIrx": str(int(lifetick_ui_rx)),
         "Modus": modus,
         "OwnPID": str(pid),
         "ControlPIDTx": str(pid),
         "Intent": _bool_token(intent, true_token, false_token),
-        "ControlIN": _bool_token(enable, true_token, false_token),
-        "GuideControlUI": "0",
+        "ControlIN": str(int(control_word)),
+        "GuideControlUI": str(int(guide_word)),
         "SpeedSollIN": _fmt(vel_eff),
         "GuideSollSpeedUI": "0",
         "PosSoll": _fmt(pos),

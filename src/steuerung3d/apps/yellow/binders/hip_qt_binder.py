@@ -68,6 +68,8 @@ class HipQtBinder:
     _events: list[HipParamAction] = field(default_factory=list)
     _estop_reset_clicked: bool = False
     _resync_clicked: bool = False
+    _main_reset_clicked: bool = False
+    _guider_reset_clicked: bool = False
     _axis_selection_changed: bool = False
     _axis_selected_value: str = ""
     _suppress_axis_signal: bool = False
@@ -99,6 +101,12 @@ class HipQtBinder:
     def _on_resync_clicked(self) -> None:
         self._resync_clicked = True
 
+    def _on_main_reset_clicked(self) -> None:
+        self._main_reset_clicked = True
+
+    def _on_guider_reset_clicked(self) -> None:
+        self._guider_reset_clicked = True
+
     def _on_axis_selected(self, axis_id: str) -> None:
         if self._suppress_axis_signal:
             return
@@ -124,11 +132,15 @@ class HipQtBinder:
         self._events.clear()
         estop_reset_clicked = bool(self._estop_reset_clicked)
         resync_clicked = bool(self._resync_clicked)
+        main_reset_clicked = bool(self._main_reset_clicked)
+        guider_reset_clicked = bool(self._guider_reset_clicked)
         axis_selection_changed = bool(self._axis_selection_changed)
         if axis_selection_changed and self._axis_selected_value:
             axis_selected = self._axis_selected_value
         self._estop_reset_clicked = False
         self._resync_clicked = False
+        self._main_reset_clicked = False
+        self._guider_reset_clicked = False
         self._axis_selection_changed = False
         self._axis_selected_value = ""
 
@@ -141,6 +153,8 @@ class HipQtBinder:
             axis_selection_changed=axis_selection_changed,
             estop_reset_clicked=estop_reset_clicked,
             resync_clicked=resync_clicked,
+            main_reset_clicked=main_reset_clicked,
+            guider_reset_clicked=guider_reset_clicked,
             param_actions=events,
             param_values=param_values,
         )

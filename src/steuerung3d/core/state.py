@@ -81,6 +81,10 @@ class MachineState:
     resync_req: bool = False  # legacy/global (single-axis)
     resync_req_by_axis: Dict[str, bool] = field(default_factory=dict)
 
+    # Main/guider amplifier reset pulses (one-shot), emitted via ControlIN/GuideControlUI bitfields
+    main_reset_req_by_axis: Dict[str, bool] = field(default_factory=dict)
+    guider_reset_req_by_axis: Dict[str, bool] = field(default_factory=dict)
+
     estop_status_word: int = 0   # NEW: measured bitfield
 
     # --- parameters (axis-agnostic v0.1) ---
@@ -148,6 +152,9 @@ class MachineState:
 
         self.resync_req = False
         self.resync_req_by_axis.clear()
+
+        self.main_reset_req_by_axis.clear()
+        self.guider_reset_req_by_axis.clear()
 
         # Parameter ops are one-shot as well (UI can re-issue if needed)
         self.pending_param_ops.clear()

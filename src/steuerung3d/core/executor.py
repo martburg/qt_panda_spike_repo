@@ -100,6 +100,16 @@ def _compute_estop_reset_any(state: MachineState) -> bool:
     return False
 
 
+def _compute_main_reset_by_axis(state: MachineState) -> dict[str, bool]:
+    m = getattr(state, "main_reset_req_by_axis", {})
+    return dict(m) if isinstance(m, dict) else {}
+
+
+def _compute_guider_reset_by_axis(state: MachineState) -> dict[str, bool]:
+    m = getattr(state, "guider_reset_req_by_axis", {})
+    return dict(m) if isinstance(m, dict) else {}
+
+
 def _compute_param_ops_any(state: MachineState) -> list[ParamOp]:
     """Flatten any pending ParamOps into a single list for CommandFrame.
 
@@ -186,4 +196,6 @@ def build_command_frame(state: MachineState) -> CommandFrame:
         resync=resync_any,  # legacy ReSync pulse
         param_ops=coerce_param_ops(_compute_param_ops_any(state)),
         lifetick_echo=lifetick_echo,
+        main_reset_by_axis=_compute_main_reset_by_axis(state),
+        guider_reset_by_axis=_compute_guider_reset_by_axis(state),
     )

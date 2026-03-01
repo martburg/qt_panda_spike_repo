@@ -182,12 +182,15 @@ def _apply_attach_state(b, vm: HipViewModel) -> None:
         set_enabled(b._tabs_main, bool(vm.attach_state.tabs_enabled))
 
     btn_setup = b._find_button("btnSetupToggle")
-    btnReset = b._find_button("btnReset")
+    btnMainReset = b._find_button("btnMainReset")
+    btnGuiderReset = b._find_button("btnGuiderReset")
     btn_rec = b._find_button("btnRecover")
     if btn_setup is not None:
         set_enabled(btn_setup, bool(vm.attach_state.setup_enabled))
-    if btnReset is not None:
-        set_enabled(btnReset, bool(vm.attach_state.main_amp_reset_enabled))
+    if btnMainReset is not None:
+        set_enabled(btnMainReset, bool(vm.attach_state.main_amp_reset_enabled))
+    if btnGuiderReset is not None:
+        set_enabled(btnGuiderReset, bool(getattr(vm.attach_state, "guider_amp_reset_enabled", False)))
     if btn_rec is not None:
         set_enabled(btn_rec, False)
 

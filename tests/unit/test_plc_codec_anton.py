@@ -64,7 +64,7 @@ def test_encode_downlink_uses_true_false_tokens() -> None:
     dec = decode_downlink(payload)
     assert dec is not None
     assert dec.fields.get("Intent") == "True"
-    assert dec.fields.get("ControlIN") == "True"
+    assert dec.fields.get("ControlIN") == "1"
     assert dec.fields.get("EStopReset") == "True"
     assert dec.fields.get("ReSync") == "False"
     assert dec.fields.get("GUINotHaltIN") == "True"

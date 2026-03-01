@@ -53,3 +53,26 @@ This file records *declared* semantic changes (RefOS Lane 2) made during stabili
 - Multi-axis routing in core_udp_service continues to route per-axis param ops and reset pulses strictly.
 - `MachineState.clear_one_shots()` centralizes one-shot clearing to keep the tick loop clean.
 - Bugfix/tightening: `clear_one_shots` is now a real `MachineState` method (was accidentally module-level in one snapshot), and the engine uses `state.clear_transients()` for end-of-tick cleanup.
+
+
+## 2026-03-01 — HiP axis picker starts unattached and lists live DenSi devices only
+
+**Lane:** 2 (Declared Semantic Fix)
+
+### Change
+- The HiP axis picker (`cmbAxis`) now **starts in `NotAttached`** on cold boot.
+- The picker list now contains **live DenSi devices only**, based on `TelemetrySnapshot.densis[...].online`.
+  (Previously it was derived from `snap.axes` keys, which can include configured axes even when no DenSi is running.)
+- If the operator is already attached to an axis and it goes offline, that axis remains visible in the picker
+  so the operator can intentionally release it.
+
+### Motivation
+- Avoid accidental implicit attachment caused by a Qt default combobox selection.
+- Present the operator with the correct mental model: *"pick a running DenSi to connect"*.
+- Fix a smoke-test failure where the picker listed all configured axes (Anton/Burt/Cecil/Debby/SIMUL) but none were reachable.
+
+### Files
+- `src/steuerung3d/apps/yellow/engines/hip/step_context.py`
+
+### Tests
+- Updated `tests/unit/test_hip_runtime.py` fixture to include `TelemetrySnapshot.densis` so Hip runtime unit tests continue to model discovery.

@@ -162,7 +162,12 @@ class UdpPlcCommandIn:
                 return True
             if s in ("false", "f", "no", "n", "off", "0", ""):
                 return False
-            return default
+            try:
+                # Accept legacy numeric tokens as well (e.g. ControlIN word).
+                iv = int(s, 10)
+                return iv != 0
+            except Exception:
+                return default
 
         group_defaults = {
             "pos":    ["HardMax", "UserMax", "UserMin", "HardMin", "PosWin"],

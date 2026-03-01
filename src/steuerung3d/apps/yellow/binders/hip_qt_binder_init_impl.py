@@ -108,6 +108,8 @@ def post_init(self: "HipQtBinder") -> None:
     # Buttons
     self._btn_estop_reset: QPushButton | None = self._wcache.button("btnEStopReset")
     self._btn_diag_resync: QPushButton | None = self._wcache.button("btnDiagResync")
+    self._btn_main_reset: QPushButton | None = self._wcache.button("btnMainReset")
+    self._btn_guider_reset: QPushButton | None = self._wcache.button("btnGuiderReset")
 
     # Estop diagnostic checkboxes (read-only)
     self._estop_checks: dict[str, QCheckBox] = {}
@@ -123,6 +125,10 @@ def post_init(self: "HipQtBinder") -> None:
         set_enabled(self._btn_estop_reset, False)
     if self._btn_diag_resync is not None:
         set_enabled(self._btn_diag_resync, False)
+    if getattr(self, "_btn_main_reset", None) is not None:
+        set_enabled(self._btn_main_reset, False)
+    if getattr(self, "_btn_guider_reset", None) is not None:
+        set_enabled(self._btn_guider_reset, False)
 
     # Modal lock helpers (best-effort)
     try:
@@ -250,6 +256,8 @@ def _log_binder_missing(self: "HipQtBinder") -> None:
         # buttons
         "btnEStopReset": self._btn_estop_reset,
         "btnDiagResync": self._btn_diag_resync,
+        "btnMainReset": getattr(self, "_btn_main_reset", None),
+        "btnGuiderReset": getattr(self, "_btn_guider_reset", None),
     }
     missing = sorted([k for k, v in expected.items() if v is None])
     if missing:
@@ -269,6 +277,10 @@ def wire_signals(self: "HipQtBinder") -> None:
         self._btn_estop_reset.clicked.connect(self._on_estop_reset_clicked)
     if self._btn_diag_resync is not None:
         self._btn_diag_resync.clicked.connect(self._on_resync_clicked)
+    if getattr(self, "_btn_main_reset", None) is not None:
+        self._btn_main_reset.clicked.connect(self._on_main_reset_clicked)
+    if getattr(self, "_btn_guider_reset", None) is not None:
+        self._btn_guider_reset.clicked.connect(self._on_guider_reset_clicked)
 
     wiring = {
         "pos": ("btnPosEdit", "btnPosWrite", "btnPosCancel"),

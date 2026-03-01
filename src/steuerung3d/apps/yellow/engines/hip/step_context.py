@@ -43,18 +43,35 @@ def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepCon
     if getattr(self._param_txn, "hip_id", "") != hip_id:
         self._param_txn.hip_id = hip_id
 
-    axes = getattr(snap, "axes", None)
-    axes = axes if isinstance(axes, dict) else {}
-    axis_ids = sorted(list(axes.keys()))
+    # Axis picker should present *live* DenSi devices only.
+    # TelemetrySnapshot.densis is Core's discovery registry ("seen recently"),
+    # whereas snap.axes may include configured axes even when no DenSi is running.
+    densis = getattr(snap, "densis", None)
+    densis = densis if isinstance(densis, dict) else {}
+    axis_ids = sorted(
+        [str(dev_id) for dev_id, d in densis.items() if bool(getattr(d, "online", False))]
+    )
 
     ui_axis = str(ui.axis_selected or "").strip()
     if ui.axis_selection_changed:
+        # Trust explicit user action.
         self.state.last_ui_axis_selected = ui_axis
     elif self.state.last_ui_axis_selected:
+        # Sticky selection within a session (but not on cold boot).
         ui_axis = self.state.last_ui_axis_selected
+    else:
+        # Cold boot: start unattached. Some Qt UIs may have a default combobox
+        # selection (e.g. "Anton") even before the operator touches it.
+        ui_axis = ""
 
     fixed_axis = str(inputs.fixed_axis or "").strip()
     prev_selected = str(self.state.selected_axis or "").strip()
+    # If we were already attached to an axis that just went offline, keep it
+    # visible in the picker so the operator can intentionally release it.
+    if prev_selected and prev_selected not in axis_ids:
+        axis_ids = list(axis_ids) + [prev_selected]
+    # Normalize/dedupe while keeping deterministic ordering.
+    axis_ids = sorted({str(x) for x in axis_ids if str(x).strip()})
     fixed_applied = bool(self.state.fixed_axis_applied)
 
     attach_combo, selected_axis, fixed_applied = build_attach_combo(

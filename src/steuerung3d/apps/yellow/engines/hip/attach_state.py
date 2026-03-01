@@ -20,6 +20,7 @@ def compute_attach_state(inputs: HipAttachInputs) -> HipAttachState:
 
     setup_enabled = bool(attached) and (not modal_locked)
     main_amp_reset_enabled = bool(attached) and (not modal_locked)
+    guider_amp_reset_enabled = bool(attached) and (not modal_locked)
 
     resync_enabled = (
         bool(attached)
@@ -35,6 +36,7 @@ def compute_attach_state(inputs: HipAttachInputs) -> HipAttachState:
         tabs_enabled=tabs_enabled,
         setup_enabled=setup_enabled,
         main_amp_reset_enabled=main_amp_reset_enabled,
+        guider_amp_reset_enabled=guider_amp_reset_enabled,
         resync_enabled=resync_enabled,
         estop_reset_enabled=estop_reset_enabled,
     )

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from steuerung3d.core.intents import RequestEstopReset, RequestResync, SetEstop
+from steuerung3d.core.intents import RequestEstopReset, RequestResync, RequestMainReset, RequestGuiderReset, SetEstop
 from steuerung3d.core.intent_handlers.enforce import enforce_core_mode_actions
 from steuerung3d.core.intent_handlers.reset_resync import axis_reset_allowed
 from steuerung3d.core.state import MachineState
@@ -55,3 +55,32 @@ def handle_request_resync(state: MachineState, intent: RequestResync) -> None:
             state.resync_req = True
     else:
         state.resync_req = True
+
+
+def _claim_allows(state: MachineState, axis_id: str, hip_id: str) -> bool:
+    axis_id = str(axis_id or "")
+    hip_id = str(hip_id or "")
+    if not axis_id:
+        return False
+    owner = state.claim_owner(axis_id)
+    if owner and hip_id and owner != hip_id:
+        return False
+    return True
+
+
+def handle_request_main_reset(state: MachineState, intent: RequestMainReset) -> None:
+    axis_id = str(getattr(intent, "axis_id", "") or "")
+    hip_id = str(getattr(intent, "hip_id", "") or "")
+    if not _claim_allows(state, axis_id, hip_id):
+        return
+    state.main_reset_req_by_axis[axis_id] = True
+    enforce_core_mode_actions(state)
+
+
+def handle_request_guider_reset(state: MachineState, intent: RequestGuiderReset) -> None:
+    axis_id = str(getattr(intent, "axis_id", "") or "")
+    hip_id = str(getattr(intent, "hip_id", "") or "")
+    if not _claim_allows(state, axis_id, hip_id):
+        return
+    state.guider_reset_req_by_axis[axis_id] = True
+    enforce_core_mode_actions(state)

@@ -28,6 +28,7 @@ class HipAttachState:
     tabs_enabled: bool | None
     setup_enabled: bool
     main_amp_reset_enabled: bool
+    guider_amp_reset_enabled: bool
     resync_enabled: bool
     estop_reset_enabled: bool | None
 
@@ -60,6 +61,8 @@ class HipUiInputs:
     resync_clicked: bool
     param_actions: list[HipParamAction]
     param_values: dict[str, dict[str, float]]
+    main_reset_clicked: bool = False
+    guider_reset_clicked: bool = False
 
 
 @dataclass(frozen=True)
