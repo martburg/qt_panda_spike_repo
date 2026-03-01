@@ -73,6 +73,8 @@ This file records *declared* semantic changes (RefOS Lane 2) made during stabili
 
 ### Files
 - `src/steuerung3d/apps/yellow/engines/hip/step_context.py`
+- `src/steuerung3d/apps/yellow/binders/hip_qt_binder_apply_impl.py` (dedupe NotAttached; follow VM selection)
+- `src/steuerung3d/apps/yellow/binders/hip_qt_binder_init_impl.py` (force cold-boot NotAttached in combobox)
 
 ### Tests
 - Updated `tests/unit/test_hip_runtime.py` fixture to include `TelemetrySnapshot.densis` so Hip runtime unit tests continue to model discovery.

@@ -13,6 +13,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..engines.hip.attach_state import NOT_ATTACHED
+
 from ..qtutil.ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
 from ..qtutil.param_widget_binder import ParamWidgetBinder
 from ..qtutil.modal_lock import ModalLock
@@ -26,7 +28,7 @@ from ..qtutil.ui_update import (
 from ..qtutil.widget_cache import WidgetCache
 from ..qtutil.ui_format import fmt_f_unit_de
 from ..qtutil.ui_contract import log_missing_optional_once, log_missing_required_once
-from ..qtutil.binder_helpers import safe_set_text
+from ..qtutil.binder_helpers import block_signals, safe_set_text
 from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 from ..panels.hip.hip_banner_render import HipBannerBindings
 from ..panels.hip.hip_estop_render import HipEstopBindings
@@ -272,6 +274,17 @@ def _log_binder_missing(self: "HipQtBinder") -> None:
 
 def wire_signals(self: "HipQtBinder") -> None:
     if self._cmbAxis is not None:
+        # Force deterministic cold-boot state: NotAttached selected and no phantom selection
+        # from the .ui file before the operator clicks.
+        self._suppress_axis_signal = True
+        try:
+            with block_signals(self._cmbAxis):
+                self._cmbAxis.clear()
+                self._cmbAxis.addItems([NOT_ATTACHED])
+                self._cmbAxis.setCurrentText(NOT_ATTACHED)
+        finally:
+            self._suppress_axis_signal = False
+
         self._cmbAxis.currentTextChanged.connect(self._on_axis_selected)
     if self._btn_estop_reset is not None:
         self._btn_estop_reset.clicked.connect(self._on_estop_reset_clicked)

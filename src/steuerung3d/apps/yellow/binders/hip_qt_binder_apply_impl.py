@@ -139,25 +139,22 @@ def _apply_attach_combo(b, vm: HipViewModel) -> None:
     if vm.attach_combo is None or b._cmbAxis is None:
         return
 
-    base_items = [str(x) for x in (vm.attach_combo.items or [])]
-    items = [NOT_ATTACHED] + base_items
+    # Items come from the engine (Qt-free) and already include the NOT_ATTACHED sentinel.
+    base_items = [str(x).strip() for x in (vm.attach_combo.items or []) if str(x).strip()]
 
-    # VM's preferred selection
-    vm_cur = (vm.attach_combo.current or "").strip() or NOT_ATTACHED
-    if vm_cur not in items:
-        vm_cur = NOT_ATTACHED
+    # Enforce the invariant: exactly one NOT_ATTACHED at the top.
+    if not base_items:
+        items = [NOT_ATTACHED]
+    else:
+        rest = [x for x in base_items if x != NOT_ATTACHED]
+        items = [NOT_ATTACHED] + rest
 
-    # UI's current selection (what the user sees right now)
-    ui_cur = b._cmbAxis.currentText().strip() or NOT_ATTACHED
-    if ui_cur not in items:
-        ui_cur = NOT_ATTACHED
-
-    # Critical rule:
-    # - While NOT attached, prefer the UI selection (so we don't fight the user).
-    # - Once attached, follow VM (the controller is the source of truth).
-    desired = vm_cur
-    if vm.attach_state is not None and (not bool(getattr(vm.attach_state, "attached", False))):
-        desired = ui_cur
+    # VM's preferred selection is the source of truth, even while unattached.
+    # This prevents a Qt Designer default combobox selection (e.g. "Anton") from
+    # appearing selected on cold boot before the operator clicks.
+    desired = (vm.attach_combo.current or "").strip() or NOT_ATTACHED
+    if desired not in items:
+        desired = NOT_ATTACHED
 
     existing = [b._cmbAxis.itemText(i) for i in range(b._cmbAxis.count())]
     need_rebuild = (existing != items) or (b._cmbAxis.currentText().strip() != desired)
@@ -173,6 +170,7 @@ def _apply_attach_combo(b, vm: HipViewModel) -> None:
             b._suppress_axis_signal = False
 
     set_enabled(b._cmbAxis, bool(vm.attach_combo.enabled))
+
 
 def _apply_attach_state(b, vm: HipViewModel) -> None:
     if vm.attach_state is None:

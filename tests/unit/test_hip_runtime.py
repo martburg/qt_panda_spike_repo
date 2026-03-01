@@ -61,8 +61,8 @@ def test_hip_runtime_sets_startup_on_stale_gap() -> None:
         axis_selection_changed=False,
         estop_reset_clicked=False,
         resync_clicked=False,
-            main_reset_clicked=False,
-            guider_reset_clicked=False,
+        main_reset_clicked=False,
+        guider_reset_clicked=False,
         param_actions=[],
         param_values={},
     )
@@ -82,8 +82,8 @@ def test_hip_runtime_emits_claim_axis_intent() -> None:
         axis_selection_changed=True,
         estop_reset_clicked=False,
         resync_clicked=False,
-            main_reset_clicked=False,
-            guider_reset_clicked=False,
+        main_reset_clicked=False,
+        guider_reset_clicked=False,
         param_actions=[],
         param_values={},
     )
