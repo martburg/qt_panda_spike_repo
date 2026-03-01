@@ -96,8 +96,8 @@ class TelemetrySnapshot:
                 vel=float(ax.vel),
                 enabled=bool(ax.enabled),
                 fault=bool(ax.fault),
-                vel_cmd=float(getattr(state.axis_cmd.get(axis_id, None), 'vel', 0.0)) if hasattr(state, 'axis_cmd') else 0.0,
-                enable_cmd=bool(getattr(state.axis_cmd.get(axis_id, None), 'enable', False)) if hasattr(state, 'axis_cmd') else False,
+                vel_cmd=float(getattr(state.axis_cmd.get(axis_id, None), 'vel', 0.0)),
+                enable_cmd=bool(getattr(state.axis_cmd.get(axis_id, None), 'enable', False)),
                 device_tick=int(getattr(ax, 'meta', {}).get('device_tick', 0)) & 0xFFFF,
                 lifetick_rx=int(getattr(ax, 'meta', {}).get('lifetick_rx', 0)) & 0xFFFF,
                 lifetick_age=int(getattr(ax, 'meta', {}).get('lifetick_age', 0)) & 0xFFFF,
@@ -109,8 +109,8 @@ class TelemetrySnapshot:
 
         densis = {}
         try:
-            offline_after = int(getattr(state, "densi_offline_after_ticks", 200))
-            for dev_id, d in dict(getattr(state, "densi_registry", {})).items():
+            offline_after = int(state.densi_offline_after_ticks)
+            for dev_id, d in dict(state.densi_registry).items():
                 last_seen = int(getattr(d, "last_seen_core_tick", -1))
                 if last_seen < 0:
                     age = int(offline_after) + 1
@@ -129,13 +129,13 @@ class TelemetrySnapshot:
         except Exception:
             densis = {}
 
-        lease_rig = str(getattr(state, "lease_rig", ""))
+        lease_rig = str(state.lease_rig)
         lease_axis: Dict[str, list[str]] = {}
         lease_axis_holders: Dict[str, list[str]] = {}
         try:
             lease_axis_holders = {
                 str(k): [str(x) for x in list(v)]
-                for k, v in dict(getattr(state, "lease_axis_holders", {}) or {}).items()
+                for k, v in dict(state.lease_axis_holders or {}).items()
                 if isinstance(v, (list, tuple))
             }
         except Exception:

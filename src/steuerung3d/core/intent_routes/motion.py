@@ -3,10 +3,11 @@ from __future__ import annotations
 from steuerung3d.core.intents import EnableAxis, JogAxis, JogCartesian, JogWinch
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.intent_handlers.lease import axis_lease_allows as _axis_lease_allows
+from steuerung3d.core.axis_ids import normalize_axis_id
 
 
 def handle_enable_axis(state: MachineState, intent: EnableAxis) -> None:
-    axis_id = str(getattr(intent, "axis_id", "") or "")
+    axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     enable = bool(getattr(intent, "enable", False))
     hip_id = getattr(intent, "hip_id", "")
 
@@ -26,7 +27,7 @@ def handle_enable_axis(state: MachineState, intent: EnableAxis) -> None:
 
 
 def handle_jog_axis(state: MachineState, intent: JogAxis) -> None:
-    axis_id = str(getattr(intent, "axis_id", "") or "")
+    axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     vel = float(getattr(intent, "vel", 0.0))
     hip_id = getattr(intent, "hip_id", "")
 
@@ -45,7 +46,7 @@ def handle_jog_axis(state: MachineState, intent: JogAxis) -> None:
 
 
 def handle_jog_winch(state: MachineState, intent: JogWinch) -> None:
-    axis_id = str(getattr(intent, "winch_id", "") or "")
+    axis_id = normalize_axis_id(getattr(intent, "winch_id", ""))
     rate = float(getattr(intent, "rate", 0.0))
     hip_id = getattr(intent, "hip_id", "")
 

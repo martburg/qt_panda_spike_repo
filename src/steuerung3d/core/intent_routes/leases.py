@@ -14,6 +14,7 @@ from steuerung3d.core.intent_handlers.lease import (
 )
 from steuerung3d.core.intent_handlers.txn import txn_ack as _txn_ack
 from steuerung3d.core.intent_handlers.txn import txn_seen_or_mark as _txn_seen_or_mark
+from steuerung3d.core.axis_ids import normalize_axis_id
 
 
 def handle_request_rig_lease(state: MachineState, intent: RequestRigLease) -> None:
@@ -50,7 +51,7 @@ def handle_request_axis_lease(state: MachineState, intent: RequestAxisLease) -> 
     req_id = getattr(intent, "req_id", "")
     if _txn_seen_or_mark(state, req_id):
         return
-    axis_id = str(getattr(intent, "axis_id", "") or "")
+    axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     hip_id = str(getattr(intent, "hip_id", "") or "")
     if not axis_id or not hip_id:
         return
@@ -59,8 +60,6 @@ def handle_request_axis_lease(state: MachineState, intent: RequestAxisLease) -> 
         _set_lease_denial(state, f"axis_held_by:{','.join(holders)}", req_id=req_id)
         return
     holders = list(dict.fromkeys(holders + [hip_id]))
-    if not hasattr(state, "lease_axis_holders"):
-        state.lease_axis_holders = {}
     state.lease_axis_holders[axis_id] = holders
     state.lease_last_denial_reason = ""
     _txn_ack(state, req_id)
@@ -70,7 +69,7 @@ def handle_release_axis_lease(state: MachineState, intent: ReleaseAxisLease) -> 
     req_id = getattr(intent, "req_id", "")
     if _txn_seen_or_mark(state, req_id):
         return
-    axis_id = str(getattr(intent, "axis_id", "") or "")
+    axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     hip_id = str(getattr(intent, "hip_id", "") or "")
     if not axis_id or not hip_id:
         return
@@ -79,8 +78,6 @@ def handle_release_axis_lease(state: MachineState, intent: ReleaseAxisLease) -> 
         _set_lease_denial(state, "axis_not_held", req_id=req_id)
         return
     holders = [h for h in holders if h != hip_id]
-    if not hasattr(state, "lease_axis_holders"):
-        state.lease_axis_holders = {}
     if holders:
         state.lease_axis_holders[axis_id] = holders
     else:

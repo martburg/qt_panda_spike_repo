@@ -28,10 +28,8 @@ def _normalize_rig_mode(value) -> RigMode:
 
 
 def ensure_densi(state: MachineState, device_id: str) -> None:
-    if not hasattr(state, "densi_registry"):
-        state.densi_registry = {}
     if device_id not in state.densi_registry:
-        # lazy import to avoid circulars
+        # state.densi_registry is a first-class field on MachineState
         from steuerung3d.core.rig_types import DensiRuntime
         state.densi_registry[device_id] = DensiRuntime(device_id=device_id)
 
@@ -48,7 +46,7 @@ def note_densi_seen(state: MachineState, device_id: str, *, device_tick: int | N
 def densi_online(state: MachineState, device_id: str) -> bool:
     ensure_densi(state, device_id)
     d = state.densi_registry[device_id]
-    timeout = int(getattr(state, "densi_offline_after_ticks", 200))
+    timeout = int(state.densi_offline_after_ticks)
     if d.last_seen_core_tick < 0:
         return False
     return not is_stale(int(state.tick), int(d.last_seen_core_tick), int(timeout) + 1)
@@ -61,9 +59,7 @@ def frozen(state: MachineState) -> bool:
 
 def freeze_config(state: MachineState) -> None:
     """Capture a frozen snapshot of participating devices + anchors."""
-    if not hasattr(state, "rig_sync_config"):
-        state.rig_sync_config = RigSyncConfig()
-    reg = getattr(state, "densi_registry", {})
+    reg = state.densi_registry
     participating = [d.device_id for d in reg.values() if bool(d.participating)]
     anchors: Dict[str, Tuple[float, float, float]] = {}
     for dev in participating:
@@ -78,7 +74,7 @@ def unfreeze_config(state: MachineState) -> None:
 
 
 def validate_can_freeze(state: MachineState) -> tuple[bool, str]:
-    reg = getattr(state, "densi_registry", {})
+    reg = state.densi_registry
     participating = [d for d in reg.values() if bool(d.participating)]
     if not participating:
         return False, "no participating densis"
@@ -92,26 +88,24 @@ def validate_can_freeze(state: MachineState) -> tuple[bool, str]:
 
 def capture_last_good(state: MachineState) -> None:
     """Store last-known-good lengths (measured pos) for participating axes."""
-    cfg: RigSyncConfig = getattr(state, "rig_sync_config", RigSyncConfig())
+    cfg: RigSyncConfig = state.rig_sync_config
     if not cfg.participating:
         return
-    if not hasattr(state, "rig_last_good"):
-        state.rig_last_good = {}
     lg = state.rig_last_good
     lg["tick"] = int(state.tick)
     lg["lengths"] = {ax: float(state.axes[ax].pos) for ax in cfg.participating if ax in state.axes}
 
 
 def start_recover_to_last_good(state: MachineState) -> None:
-    cfg: RigSyncConfig = getattr(state, "rig_sync_config", RigSyncConfig())
-    lg = getattr(state, "rig_last_good", {})
+    cfg: RigSyncConfig = state.rig_sync_config
+    lg = state.rig_last_good
     lengths = dict(lg.get("lengths", {}) or {})
-    rp: RecoverPlan = getattr(state, "rig_recover_plan", RecoverPlan())
+    rp: RecoverPlan = state.rig_recover_plan
     rp.active = True
     rp.target_lengths = {ax: float(lengths.get(ax, 0.0)) for ax in cfg.participating if ax in lengths}
     rp.started_tick = int(state.tick)
     if rp.timeout_ticks <= 0:
-        rp.timeout_ticks = int(getattr(state, "rig_recover_timeout_ticks", 400))
+        rp.timeout_ticks = int(state.rig_recover_timeout_ticks)
     state.rig_recover_plan = rp
 
 
@@ -121,7 +115,7 @@ def start_resync_now(state: MachineState) -> None:
 
 
 def stop_recover(state: MachineState) -> None:
-    rp: RecoverPlan = getattr(state, "rig_recover_plan", RecoverPlan())
+    rp: RecoverPlan = state.rig_recover_plan
     rp.active = False
     rp.target_lengths = {}
     state.rig_recover_plan = rp
@@ -132,16 +126,6 @@ def enforce_rig_invariants(state: MachineState) -> None:
 
     This function MUST be safe to call every tick. It should never throw.
     """
-    # ensure optional fields exist
-    if not hasattr(state, "rig_mode"):
-        state.rig_mode = RigMode.DISCOVERY
-    if not hasattr(state, "densi_registry"):
-        state.densi_registry = {}
-    if not hasattr(state, "rig_sync_config"):
-        state.rig_sync_config = RigSyncConfig()
-    if not hasattr(state, "rig_recover_plan"):
-        state.rig_recover_plan = RecoverPlan()
-
     rm = _normalize_rig_mode(getattr(state, "rig_mode", RigMode.DISCOVERY))
     state.rig_mode = rm
 
@@ -153,7 +137,7 @@ def enforce_rig_invariants(state: MachineState) -> None:
         return
 
     if rm in (RigMode.ARMED_SYNC, RigMode.SYNC_ACTIVE, RigMode.SYNC_RECOVER):
-        cfg: RigSyncConfig = getattr(state, "rig_sync_config", RigSyncConfig())
+        cfg: RigSyncConfig = state.rig_sync_config
         # participant offline/fault => FAULT_SYNC
         for dev in cfg.participating:
             if not densi_online(state, dev):
@@ -175,7 +159,7 @@ def enforce_rig_invariants(state: MachineState) -> None:
     if rm2 != RigMode.SYNC_RECOVER:
         return
 
-    rp: RecoverPlan = getattr(state, "rig_recover_plan", RecoverPlan())
+    rp: RecoverPlan = state.rig_recover_plan
     if not bool(rp.active):
         return
 

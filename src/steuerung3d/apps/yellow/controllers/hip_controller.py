@@ -36,6 +36,7 @@ from ..binders.hip_qt_binder import HipQtBinder
 from .controller_utils import init_observability, run_guarded, start_poll_timer
 from ..engines.hip.engine import HipEngine, HipUiInputs
 from ..runtimes.hip_runtime import HipRuntime
+from steuerung3d.core.axis_ids import normalize_axis_id
 
 log = logging.getLogger("hi_p")
 
@@ -55,6 +56,9 @@ class HiPController:
 
     def __post_init__(self) -> None:
         self.ui = YellowBindings.from_window(self.win)
+
+        # Soft-error counters for swallowed exceptions (binder/UI)
+        self._soft_errors: dict[str, int] = {}
 
         # --- Qt binder (UI-only) ---
         self._binder = HipQtBinder(self.win, log)
@@ -86,7 +90,7 @@ class HiPController:
         try:
             self._binder.apply_startup_state()
         except Exception:
-            pass
+            self._soft_errors["binder.apply_startup_state"] = int(self._soft_errors.get("binder.apply_startup_state", 0)) + 1
 
     # -------------------------------------------------------------------------
     # Initialization helpers
@@ -116,7 +120,7 @@ class HiPController:
         self._hip_id: str = os.environ.get("STEUERUNG3D_HIP_ID", "hip")
 
     def set_fixed_axis(self, axis_id: str, *, lock_combo: bool = True) -> None:
-        self._fixed_axis = (axis_id or "").strip()
+        self._fixed_axis = normalize_axis_id(axis_id)
         self._lock_axis_combo = bool(lock_combo)
         try:
             self._hip_runtime.set_fixed_axis(self._fixed_axis, lock_combo=self._lock_axis_combo)
@@ -231,6 +235,12 @@ class HiPController:
             "sel": bool(sel),
             "dm": bool(dm),
         }
+        try:
+            soft = dict(getattr(self, "_soft_errors", {}) or {})
+            fields["soft_errors_total"] = int(sum(int(v) for v in soft.values()))
+            fields["soft_errors_by_key"] = {str(k): int(v) for k, v in soft.items()}
+        except Exception:
+            pass
         if enable is not None:
             fields["enable"] = bool(enable)
 
@@ -265,7 +275,7 @@ class HiPController:
                     try:
                         ui_inputs = self._binder.read_inputs()
                     except Exception:
-                        pass
+                        self._soft_errors["binder.read_inputs"] = int(self._soft_errors.get("binder.read_inputs", 0)) + 1
 
                 rt_inputs = self._hip_runtime.collect_inputs(snaps=snaps, now_ns=now_ns, ui=ui_inputs)
                 rt_result = self._hip_runtime.tick(inputs=rt_inputs)
@@ -308,7 +318,7 @@ class HiPController:
                         try:
                             self._binder.apply_startup_state()
                         except Exception:
-                            pass
+                            self._soft_errors["binder.apply_startup_state"] = int(self._soft_errors.get("binder.apply_startup_state", 0)) + 1
                     return
 
                 if rt_result.view_model is None:
@@ -318,6 +328,7 @@ class HiPController:
                     try:
                         self._binder.apply(rt_result.view_model)
                     except Exception:
+                        self._soft_errors["binder.apply"] = int(self._soft_errors.get("binder.apply", 0)) + 1
                         now_s = time.time()
                         last = getattr(self, "_binder_apply_err_last_s", 0.0)
                         if now_s - last > 1.0:  # rate-limit so logs don't explode

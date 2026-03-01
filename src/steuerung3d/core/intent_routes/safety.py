@@ -4,6 +4,7 @@ from steuerung3d.core.intents import RequestEstopReset, RequestResync, RequestMa
 from steuerung3d.core.intent_handlers.enforce import enforce_core_mode_actions
 from steuerung3d.core.intent_handlers.reset_resync import axis_reset_allowed
 from steuerung3d.core.state import MachineState
+from steuerung3d.core.axis_ids import normalize_axis_id
 
 
 def handle_set_estop(state: MachineState, intent: SetEstop) -> None:
@@ -22,7 +23,7 @@ def handle_set_estop(state: MachineState, intent: SetEstop) -> None:
 
 
 def handle_request_estop_reset(state: MachineState, intent: RequestEstopReset) -> None:
-    axis_id = str(getattr(intent, "axis_id", "") or "")
+    axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     hip_id = str(getattr(intent, "hip_id", "") or "")
 
     allowed, _reason = axis_reset_allowed(state, axis_id, hip_id)
@@ -42,23 +43,20 @@ def handle_request_estop_reset(state: MachineState, intent: RequestEstopReset) -
 
 
 def handle_request_resync(state: MachineState, intent: RequestResync) -> None:
-    axis_id = str(getattr(intent, "axis_id", "") or "")
+    axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     hip_id = str(getattr(intent, "hip_id", "") or "")
 
     if axis_id:
         owner = state.claim_owner(axis_id)
         if owner and hip_id and owner != hip_id:
             return
-        if hasattr(state, "resync_req_by_axis"):
-            state.resync_req_by_axis[axis_id] = True
-        else:
-            state.resync_req = True
+        state.resync_req_by_axis[axis_id] = True
     else:
         state.resync_req = True
 
 
 def _claim_allows(state: MachineState, axis_id: str, hip_id: str) -> bool:
-    axis_id = str(axis_id or "")
+    axis_id = normalize_axis_id(axis_id)
     hip_id = str(hip_id or "")
     if not axis_id:
         return False
@@ -69,7 +67,7 @@ def _claim_allows(state: MachineState, axis_id: str, hip_id: str) -> bool:
 
 
 def handle_request_main_reset(state: MachineState, intent: RequestMainReset) -> None:
-    axis_id = str(getattr(intent, "axis_id", "") or "")
+    axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     hip_id = str(getattr(intent, "hip_id", "") or "")
     if not _claim_allows(state, axis_id, hip_id):
         return
@@ -78,7 +76,7 @@ def handle_request_main_reset(state: MachineState, intent: RequestMainReset) -> 
 
 
 def handle_request_guider_reset(state: MachineState, intent: RequestGuiderReset) -> None:
-    axis_id = str(getattr(intent, "axis_id", "") or "")
+    axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     hip_id = str(getattr(intent, "hip_id", "") or "")
     if not _claim_allows(state, axis_id, hip_id):
         return

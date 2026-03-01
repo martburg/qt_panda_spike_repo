@@ -7,6 +7,8 @@ from steuerung3d.core.command_frame import ParamOp
 
 from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.joy_state import JoyState
+from steuerung3d.core.axis_ids import normalize_axis_id
+from steuerung3d.core.rig_types import DensiRuntime, RecoverPlan, RigMode, RigSyncConfig
 
 
 @dataclass
@@ -51,6 +53,16 @@ class MachineState:
     # Default is intentionally conservative to tolerate ~100-200ms RTT + jitter.
     # (Core tick is typically 10ms -> 200 ticks ~= 2.0s)
     densi_offline_after_ticks: int = 200
+
+    # DenSi runtime registry (core is the authority).
+    densi_registry: Dict[str, DensiRuntime] = field(default_factory=dict)
+
+    # Rig workflow (core-local; published via telemetry for UI/debug)
+    rig_mode: RigMode = RigMode.DISCOVERY
+    rig_sync_config: RigSyncConfig = field(default_factory=RigSyncConfig)
+    rig_recover_plan: RecoverPlan = field(default_factory=RecoverPlan)
+    rig_last_good: Dict[str, Any] = field(default_factory=dict)
+    rig_recover_timeout_ticks: int = 400
 
     axes: Dict[str, AxisState] = field(default_factory=dict)
     axis_cmd: Dict[str, AxisCommandState] = field(default_factory=dict)
@@ -171,7 +183,7 @@ class MachineState:
 
 
     def ensure_axis(self, axis_id: str) -> AxisState:
-        axis_id = str(axis_id)
+        axis_id = normalize_axis_id(axis_id)
         if axis_id not in self.axis_ctl:
             self.axis_ctl[axis_id] = AxisControl()
         ctl = self.axis_ctl[axis_id]
@@ -181,14 +193,14 @@ class MachineState:
         return ctl.measured
 
     def ensure_axis_cmd(self, axis_id: str) -> AxisCommandState:
-        axis_id = str(axis_id)
+        axis_id = normalize_axis_id(axis_id)
         self.ensure_axis(axis_id)
         return self.axis_cmd[axis_id]
 
     def axis_owner(self, axis_id: str) -> str:
         """Best-effort owner resolution (claim first, then lease)."""
 
-        axis_id = str(axis_id or "")
+        axis_id = normalize_axis_id(axis_id)
         if not axis_id:
             return ""
 
@@ -202,18 +214,15 @@ class MachineState:
     def claim_owner(self, axis_id: str) -> str:
         """Return current claim owner for *axis_id* (empty if none)."""
 
-        axis_id = str(axis_id or "")
+        axis_id = normalize_axis_id(axis_id)
         if not axis_id:
             return ""
-        claims = getattr(self, "axis_claims", {}) or {}
-        if not isinstance(claims, dict):
-            return ""
-        return str(claims.get(axis_id, "") or "")
+        return str((self.axis_claims or {}).get(axis_id, "") or "")
 
     def is_claim_owner(self, axis_id: str, hip_id: str) -> bool:
         """Return whether *hip_id* matches the claim owner for *axis_id*."""
 
-        axis_id = str(axis_id or "")
+        axis_id = normalize_axis_id(axis_id)
         hip_id = str(hip_id or "")
         if not axis_id or not hip_id:
             return False
@@ -230,7 +239,7 @@ class MachineState:
         - Ensures the axis exists (so downstream logic can rely on ``ensure_axis``).
         - Does not perform policy checks; callers are responsible (e.g. ClaimAxis handler).
         """
-        axis_id = str(axis_id or "")
+        axis_id = normalize_axis_id(axis_id)
         hip_id = str(hip_id or "")
         if not axis_id or not hip_id:
             return
@@ -243,7 +252,7 @@ class MachineState:
         If *hip_id* is provided, the claim is only cleared if it matches the
         current claim owner.
         """
-        axis_id = str(axis_id or "")
+        axis_id = normalize_axis_id(axis_id)
         if not axis_id:
             return
         if hip_id is not None:

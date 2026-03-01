@@ -49,6 +49,8 @@ class DenSiController:
     stale_after_ms: int = 500
 
     def __post_init__(self) -> None:
+        # Soft-error counters for swallowed exceptions (binder/UI)
+        self._soft_errors: dict[str, int] = {}
         """Bind widgets and initialize the DenSi device-side simulator."""
         self._init_wire_proto_and_ui()
         self._init_observability()
@@ -80,12 +82,12 @@ class DenSiController:
             if seed:
                 self.state.params.update(dict(seed))
         except Exception:
-            pass
+            self._soft_errors["binder.seed_params_from_ui"] = int(self._soft_errors.get("binder.seed_params_from_ui", 0)) + 1
 
         try:
             self._binder.init_estop_checkboxes(estop_word=int(self.engine.inj_estop_word))
         except Exception:
-            pass
+            self._soft_errors["binder.init_estop_checkboxes"] = int(self._soft_errors.get("binder.init_estop_checkboxes", 0)) + 1
 
     # ------------------------------------------------------------------
     # Initialization helpers
@@ -132,14 +134,53 @@ class DenSiController:
         with self._wd.tick():
             now_ns = int(time.monotonic_ns())
             inputs = self._runtime.collect_inputs(now_ns=now_ns)
-            ui_inputs = self._binder.read_inputs()
-            inputs = replace(inputs, ui=ui_inputs.ui)
+            try:
+                ui_inputs = self._binder.read_inputs()
+                inputs = replace(inputs, ui=ui_inputs.ui)
+            except Exception:
+                self._soft_errors["binder.read_inputs"] = int(self._soft_errors.get("binder.read_inputs", 0)) + 1
             runtime_res = self._runtime.tick(inputs=inputs)
 
             try:
                 self._binder.apply(runtime_res.view_model)
             except Exception:
-                pass
+                self._soft_errors["binder.apply"] = int(self._soft_errors.get("binder.apply", 0)) + 1
+
+            self._emit_birdseye(runtime_res)
+
+    def _emit_birdseye(self, runtime_res) -> None:
+        status = getattr(self, "_status", None)
+        if status is None:
+            return
+
+        soft = dict(getattr(self, "_soft_errors", {}) or {})
+        soft_total = int(sum(int(v) for v in soft.values()))
+        level = "WARN" if soft_total else "OK"
+
+        dev_id = ""
+        try:
+            dev_id = str(getattr(getattr(self, "device", None), "device_id", "") or "")
+        except Exception:
+            dev_id = ""
+
+        axes = []
+        try:
+            axes = list(getattr(getattr(runtime_res, "snap", None), "axes", {}) or {})
+        except Exception:
+            axes = []
+
+        summary = f"den_si dev={dev_id or '-'} axes={len(axes)} soft_err={soft_total}"
+        fields = {
+            "component": "den_si",
+            "device_id": dev_id,
+            "axes_count": int(len(axes)),
+            "soft_errors_total": soft_total,
+            "soft_errors_by_key": {str(k): int(v) for k, v in soft.items()},
+        }
+        try:
+            status.emit_every(level=level, summary=summary, fields=fields)
+        except Exception:
+            return
 
     # ------------------------------------------------------------------
     # Static helpers (tests depend on these)

@@ -135,7 +135,7 @@ def _compute_param_ops_any(state: MachineState) -> list[ParamOp]:
 def build_command_frame(state: MachineState) -> CommandFrame:
     axes: Dict[str, AxisSetpoint] = {}
     for axis_id, cmd in state.axis_cmd.items():
-        if hasattr(state, "densi_registry") and axis_id in dict(getattr(state, "densi_registry", {})):
+        if axis_id in (state.densi_registry or {}):
             if not densi_online(state, axis_id):
                 axes[axis_id] = AxisSetpoint(enable=False, vel=0.0)
                 continue

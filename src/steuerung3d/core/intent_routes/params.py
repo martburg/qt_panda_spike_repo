@@ -7,6 +7,7 @@ from steuerung3d.core.intent_handlers.txn import txn_ack as _txn_ack
 from steuerung3d.core.intent_handlers.txn import txn_seen_or_mark as _txn_seen_or_mark
 from steuerung3d.core.param_registry import normalize_group_values
 from steuerung3d.core.state import MachineState
+from steuerung3d.core.axis_ids import normalize_axis_id
 
 
 def handle_param_edit_begin(state: MachineState, intent: ParamEditBegin) -> None:
@@ -15,12 +16,12 @@ def handle_param_edit_begin(state: MachineState, intent: ParamEditBegin) -> None
     if _txn_seen_or_mark(state, req_id):
         return
 
-    axis_id = str(getattr(intent, "axis_id", "") or "")
+    axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     hip_id = str(getattr(intent, "hip_id", "") or "")
     grp = getattr(intent, "group", "")
     op = ParamEditBeginOp(group=grp)
 
-    if axis_id and hasattr(state, "pending_param_ops_by_axis"):
+    if axis_id:
         owner = state.claim_owner(axis_id)
         if owner and hip_id and owner != hip_id:
             return
@@ -35,7 +36,7 @@ def handle_param_write(state: MachineState, intent: ParamWrite) -> None:
     if _txn_seen_or_mark(state, req_id):
         return
 
-    axis_id = str(getattr(intent, "axis_id", "") or "")
+    axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     hip_id = str(getattr(intent, "hip_id", "") or "")
     grp = getattr(intent, "group", "")
     vals = getattr(intent, "values", {})
@@ -57,7 +58,7 @@ def handle_param_write(state: MachineState, intent: ParamWrite) -> None:
     wire_vals.update({k: float(v) for k, v in cleaned.items()})
     op = ParamWriteOp(group=grp, values=wire_vals)
 
-    if axis_id and hasattr(state, "pending_param_ops_by_axis"):
+    if axis_id:
         owner = state.claim_owner(axis_id)
         if owner and hip_id and owner != hip_id:
             return
@@ -72,7 +73,7 @@ def handle_param_cancel(state: MachineState, intent: ParamCancel) -> None:
     if _txn_seen_or_mark(state, req_id):
         return
 
-    axis_id = str(getattr(intent, "axis_id", "") or "")
+    axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     hip_id = str(getattr(intent, "hip_id", "") or "")
     grp = getattr(intent, "group", "")
 
@@ -84,7 +85,7 @@ def handle_param_cancel(state: MachineState, intent: ParamCancel) -> None:
 
     op = ParamCancelOp(group=grp)
 
-    if axis_id and hasattr(state, "pending_param_ops_by_axis"):
+    if axis_id:
         owner = state.claim_owner(axis_id)
         if owner and hip_id and owner != hip_id:
             return
