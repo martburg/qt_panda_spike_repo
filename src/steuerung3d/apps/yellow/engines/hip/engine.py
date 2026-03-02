@@ -11,62 +11,26 @@ from dataclasses import asdict
 import logging
 from typing import Any, Iterable
 
-from steuerung3d.core.intents import (
-    ClaimAxis,
-    EchoLifeTick,
-    EnableAxis,
-    JogWinch,
-    ReleaseAxis,
-    RequestEstopReset,
-    RequestResync,
-)
-from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
+from steuerung3d.core.intents import EchoLifeTick
 from steuerung3d.core.telemetry import TelemetrySnapshot
-from steuerung3d.protocol.estop_bits import ESTOP_SPECS, decode_estop_word
 
-from ...domain.param_txn import ParamEditTxnClient, RetryEvent
+from ...domain.param_txn import ParamEditTxnClient
 from ...domain.taster_edge_state import TasterEdgeState, update_taster_edge_state, within_brake_grace
-from ...domain.ui_estop import age_to_online_state, infer_estop_profile
-from ...domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
-from ...domain.joy_motion_map import map_soll_speed_to_jog_winch
-from .types import HipPresentationData
-from .attach_state import NOT_ATTACHED, build_attach_combo, compute_attach_state
-from .intent_policy import (
-    claim_allowed,
-    gate_motion_intents,
-    get_claim_owner,
-    is_motion_intent,
-    should_emit_enable,
-    should_emit_speed,
-)
-from .presentation import (
-    compute_banner_estate,
-    compute_cut_markers_state,
-    compute_drive_status_texts,
-    compute_readouts_state,
-    compute_tick_text,
-    get_lifetick_age,
-    parse_estop_word_from_snapshot,
-    read_amp_and_temp,
-    read_axis_pos_vel,
-)
+from .attach_state import compute_attach_state
+from .intent_policy import gate_motion_intents, is_motion_intent
+from .presentation import compute_banner_estate
 from .step_impl import step as _step
-from .param_ui import run_param_txn
-
 from .types import (
     HipAttachInputs,
     HipBannerInputs,
-    HipParamAction,
     HipParamButtons,
-    HipParamCommitDialog,
     HipParamGroup,
     HipParamUiState,
     HipState,
     HipStepInputs,
     HipStepResult,
-    HipUiInputs,
 )
-from .viewmodel import HipCutMarkersState, HipDriveStatusState, HipReadoutsState, HipViewModel
+from .viewmodel import HipViewModel
 
 log = logging.getLogger("hi_p")
 

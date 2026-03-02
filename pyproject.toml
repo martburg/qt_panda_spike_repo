@@ -103,11 +103,11 @@ combine-as-imports = true
   "E402",   # allow non-top imports in engine.py (e.g. for telemetry)
   "F811",   # allow redefinition of unused imports in engine.py (e.g. for telemetry)
 ]
-"src/steuerung3d/apps/yellow/engines/hip/engine.py" = [
-  "F401",   # allow unused imports in engine.py (e.g. for telemetry)
-  "E402",   # allow non-top imports in engine.py (e.g. for telemetry)
-  "F811",   # allow redefinition of unused imports in engine.py (e.g. for telemetry)
-]
+#"src/steuerung3d/apps/yellow/engines/hip/engine.py" = [
+#  "F401",   # allow unused imports in engine.py (e.g. for telemetry)
+#  "E402",   # allow non-top imports in engine.py (e.g. for telemetry)
+#  "F811",   # allow redefinition of unused imports in engine.py (e.g. for telemetry)
+#]
 # Tests often use patterns that are fine (fixtures, inline imports, etc.).
 "tests/**" = [
   "ARG001", # unused function args (pytest fixtures)
