@@ -1,0 +1,16 @@
+# Normalize line endings across platforms.
+* text=auto
+
+# Source files: keep LF to reduce churn between Windows/Linux.
+*.py text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary

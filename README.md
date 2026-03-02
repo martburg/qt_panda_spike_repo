@@ -48,6 +48,12 @@ pip install pytest
 pytest -q
 ```
 
+Recommended local gate (lint + format + optional typecheck + tests):
+
+```powershell
+python tools/check.py
+```
+
 Manual runbook:
 
 - `docs/MANUAL_TESTING.md` (recommended after `pytest -q` stays green)
