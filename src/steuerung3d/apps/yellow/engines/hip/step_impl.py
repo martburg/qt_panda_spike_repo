@@ -6,16 +6,13 @@ No semantic changes intended; this is a mechanical extraction from `engine.py`.
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict
-from typing import TYPE_CHECKING, Any, Iterable
-
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     # Only needed for type checking; avoids runtime import cycles.
     from .engine import HipEngine
 
 from steuerung3d.core.intents import (
     ClaimAxis,
-    EchoLifeTick,
     EnableAxis,
     JogWinch,
     RequestEstopReset,
@@ -24,24 +21,14 @@ from steuerung3d.core.intents import (
     RequestResync,
 )
 from steuerung3d.core.joy_state import JoyState
-from steuerung3d.core.telemetry import TelemetrySnapshot
-from steuerung3d.protocol.estop_bits import ESTOP_SPECS, decode_estop_word
+from steuerung3d.protocol.estop_bits import  decode_estop_word
 
 from ...domain.joy_motion_map import map_soll_speed_to_jog_winch
-from ...domain.param_txn import ParamEditTxnClient, RetryEvent
-from ...domain.taster_edge_state import (
-    TasterEdgeState,
-    update_taster_edge_state,
-    within_brake_grace,
-)
 from ...domain.ui_estop import age_to_online_state, infer_estop_profile
-from ...domain.yellow_maps import LIMIT_WIDGETS as _LIMIT_WIDGETS, PARAM_WIDGETS as _PARAM_WIDGETS
-from .attach_state import NOT_ATTACHED, compute_attach_state
 from .intent_policy import (
     claim_allowed,
     gate_motion_intents,
     get_claim_owner,
-    is_motion_intent,
     should_emit_enable,
     should_emit_speed,
 )
@@ -60,19 +47,12 @@ from .presentation import (
 from .step_context import build_step_context
 from .types import (
     HipAttachInputs,
-    HipBannerInputs,
-    HipParamAction,
-    HipParamButtons,
-    HipParamCommitDialog,
-    HipParamGroup,
-    HipParamUiState,
     HipPresentationData,
-    HipState,
     HipStepInputs,
     HipStepResult,
-    HipUiInputs,
+
 )
-from .viewmodel import HipCutMarkersState, HipDriveStatusState, HipReadoutsState, HipViewModel
+from .viewmodel import HipCutMarkersState, HipDriveStatusState
 
 log = logging.getLogger("hi_p")
 
