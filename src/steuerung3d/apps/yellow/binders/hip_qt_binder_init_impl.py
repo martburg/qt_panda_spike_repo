@@ -28,7 +28,7 @@ from ..qtutil.binder_helpers import block_signals, safe_set_text
 from ..qtutil.modal_lock import ModalLock
 from ..qtutil.param_ui_apply import ParamUiBindings
 from ..qtutil.param_widget_binder import ParamWidgetBinder
-from ..qtutil.ui_contract import log_missing_optional_once, log_missing_required_once
+from ..qtutil.ui_contract import log_missing_required_once
 from ..qtutil.ui_format import fmt_f_unit_de
 from ..qtutil.ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
 from ..qtutil.ui_update import (

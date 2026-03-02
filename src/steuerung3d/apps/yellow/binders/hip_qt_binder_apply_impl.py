@@ -17,8 +17,6 @@ from ..qtutil.param_ui_apply import apply_param_ui
 from ..qtutil.ui_format import fmt_f_unit_de
 from ..qtutil.ui_update import (
     set_enabled,
-    set_enabled_repolish,
-    set_state_by_object_name,
     set_state_property,
     update_slider,
 )
@@ -26,7 +24,6 @@ from ..ui.joy_style import JOY_DEADMAN_PROP, JOY_SELECT_HIP_PROP
 
 if TYPE_CHECKING:
     from ..engines.hip.engine import HipViewModel
-    from .hip_qt_binder import HipQtBinder
 
 def apply(b, vm: HipViewModel) -> None:
     # Always-visible UI
