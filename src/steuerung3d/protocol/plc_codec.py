@@ -1,11 +1,11 @@
-from __future__ import annotations
-
 """Legacy PLC ';' delimited UDP codec (public API).
 
 Implementation details live in :mod:`steuerung3d.protocol.plc_codec_impl`.
 
 Lane 1 refactor: no semantic changes; public imports stay stable.
 """
+
+from __future__ import annotations
 
 from steuerung3d.protocol.plc_codec_impl import (
     _PARAM_KEYMAP,

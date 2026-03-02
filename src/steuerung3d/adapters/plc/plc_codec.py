@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """PLC codec adapter (canonical).
 
 This module provides the *adapter* interface used by the PLC edge layer:
@@ -16,6 +14,7 @@ Important semantic note:
   The canonical PLC telegrams are *per axis endpoint* (e.g. Anton/Burt/...).
   Therefore, this adapter currently supports exactly one axis_id per endpoint.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Optional

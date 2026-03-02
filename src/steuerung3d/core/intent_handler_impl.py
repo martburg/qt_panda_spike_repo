@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Core intent application.
 
 This module applies high-level Intents to the in-memory MachineState.
@@ -11,6 +9,7 @@ We now route intents through small domain modules under
 
 Semantics are preserved.
 """
+from __future__ import annotations
 
 import logging
 from typing import Callable, Dict, Type
