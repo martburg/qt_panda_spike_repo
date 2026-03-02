@@ -13,8 +13,6 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass
-from typing import List
 
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.telemetry import TelemetrySnapshot
