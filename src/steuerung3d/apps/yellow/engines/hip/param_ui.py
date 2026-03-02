@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from steuerung3d.core.telemetry import TelemetrySnapshot
 

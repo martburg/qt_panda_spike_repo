@@ -43,7 +43,7 @@ from .param_ops import apply_densi_param_ops
 from .plc_anton_vel_cmd import step_plc_anton_vel_cmd
 from .resync import handle_resync_cmd as _handle_resync_cmd
 from .setpoint_semantics import normalize_cmd_for_plant
-from .types import EStopState, L0Sub, L0Top
+from .types import L0Sub, L0Top
 
 
 @dataclass
