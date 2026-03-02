@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 
 from steuerung3d.adapters.plc.udp_device import UdpPlcDevice
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame

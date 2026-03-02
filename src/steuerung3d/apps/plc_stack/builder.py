@@ -94,9 +94,12 @@ def build_plc_device(
       (device, endpoints)
     """
     if link_factory is None:
-        link_factory = lambda *, bind, target: UdpLink(bind=bind, target=target)
+        def link_factory(*, bind, target):
+            return UdpLink(bind=bind, target=target)
+
     if codec_factory is None:
-        codec_factory = lambda *, spec: PlcCodec(spec=spec)
+        def codec_factory(*, spec):
+            return PlcCodec(spec=spec)
 
     endpoints: list[PlcEndpoint] = []
     for ep_cfg in cfg.plc_endpoints:

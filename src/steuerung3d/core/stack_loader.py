@@ -173,8 +173,8 @@ def load_stack_profile(
         if module_s.endswith(".apps.den_si") or module_s.endswith(".den_si"):
             args2 = list(raw_args)
 
-            def _has_flag(flag: str) -> bool:
-                return any(str(a) == flag for a in args2)
+            def _has_flag(flag: str,_args2=args2) -> bool:
+                return any(str(a) == flag for a in _args2)
 
             if (not _has_flag("--axis")) and tbl.get("axis"):
                 args2 += ["--axis", str(tbl["axis"])]

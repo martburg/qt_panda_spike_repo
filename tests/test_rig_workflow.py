@@ -18,12 +18,11 @@ try:
         ArmSync,
         EnterSync,
         RecoverToLastGood,
-        ResyncNow,
         SetDensiAnchor,
         SetDensiParticipating,
         SetRigMode,
     )
-    from steuerung3d.core.rig_logic import enforce_rig_invariants, note_densi_seen
+    from steuerung3d.core.rig_logic import  note_densi_seen
     from steuerung3d.core.rig_types import RigMode
 except Exception as e:  # noqa: BLE001,F841
     pytest.skip(

@@ -12,7 +12,6 @@ If you need to refresh the mirror, run:
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 

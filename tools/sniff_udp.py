@@ -2,7 +2,6 @@
 import argparse
 import socket
 import sys
-import time
 
 
 def main():

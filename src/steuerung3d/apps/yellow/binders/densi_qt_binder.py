@@ -196,7 +196,7 @@ class DenSiQtBinder:
             if b is not None:
                 set_enabled(b, False)
 
-        for _grp, mapping in _PARAM_WIDGETS.items():
+        for _grp, _mapping in _PARAM_WIDGETS.items():
             for _key, _wname, _obj, le in self._param_binder.iter_param_line_edits():
                 set_state_property(le, "true", prop="paramField")
                 set_enabled(le, False)

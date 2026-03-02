@@ -117,8 +117,8 @@ class _DenSiProbe(threading.Thread):
                     self.last_seen_downlink = dict(d.fields)
                     if d.is_write:
                         # Reflect written filter fields if present.
-                        def _f(name, cur):
-                            v = d.fields.get(name, "")
+                        def _f(name, cur, _d=d):
+                            v = _d.fields.get(name, "")
                             if v == "":
                                 return cur
                             try:

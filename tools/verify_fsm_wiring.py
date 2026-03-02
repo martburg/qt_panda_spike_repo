@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional
-
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.axis_types import AxisTelemetry as LegacyAxisTelemetry
 from steuerung3d.core.command_frame import CommandFrame

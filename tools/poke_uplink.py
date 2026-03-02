@@ -1,5 +1,4 @@
 import socket
-import time
 
 REMOTE = ("127.0.0.11", 15001)  # adjust to one of your sim endpoints
 TIMEOUT_S = 1.0
