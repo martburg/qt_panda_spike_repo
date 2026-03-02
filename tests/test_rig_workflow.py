@@ -25,14 +25,12 @@ try:
     )
     from steuerung3d.core.rig_logic import enforce_rig_invariants, note_densi_seen
     from steuerung3d.core.rig_types import RigMode
-except Exception as e:  # noqa: BLE001
+except Exception as e:  # noqa: BLE001,F841
     pytest.skip(
         "Rig workflow not available in this milestone (deferred). "
         "Re-enable once rig intents + rig_logic are implemented.",
         allow_module_level=True,
     )
-
-import math
 
 from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.intent_handler import apply_intent

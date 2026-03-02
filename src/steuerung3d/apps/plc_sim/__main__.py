@@ -61,7 +61,6 @@ def run_server(host: str, port: int, dt_s: float, verbose: bool = False) -> int:
     if verbose:
         print(f"PLCsim listening on udp://{host}:{port} dt={dt_s}s")
 
-    last_rx_t = time.time()
     last_tick = 0
 
     while True:
@@ -72,9 +71,6 @@ def run_server(host: str, port: int, dt_s: float, verbose: bool = False) -> int:
             continue
         except KeyboardInterrupt:
             return 0
-
-        now = time.time()
-        last_rx_t = now
 
         resp_lines = []
         for line in _iter_lines(payload):

@@ -44,7 +44,6 @@ def sync_reset_able_bit(
         return False, int(inj_estop_word)
 
     cause_keys = estop_cause_keys()
-    ok_keys = estop_ok_keys()
     trip_causes = any(bool(inj_bits.get(k, False)) for k in cause_keys)
 
     try:

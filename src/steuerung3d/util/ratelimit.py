@@ -12,6 +12,7 @@ exceptions at a controlled frequency (default: once per 2 seconds per key).
 """
 
 from __future__ import annotations
+
 import logging
 import time
 from dataclasses import dataclass, field

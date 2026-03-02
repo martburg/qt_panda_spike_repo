@@ -100,7 +100,7 @@ def main() -> int:
     device = _load_device_from_config(config_path, plant)
 
     axis_ids = _axis_ids_from_config(config_path)
-    axis_demo = axis_ids[0]
+
 
     # Ensure all axes exist so snapshots have stable keys
     for aid in axis_ids:
