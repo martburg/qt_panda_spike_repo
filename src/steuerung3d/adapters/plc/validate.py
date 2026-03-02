@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Type
+from typing import TYPE_CHECKING, Dict, List, Type
 
 if TYPE_CHECKING:
     from .plc_endpoint import PlcEndpoint

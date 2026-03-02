@@ -14,8 +14,7 @@ from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
-    QFrame,
-    QGridLayout,
+     QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,

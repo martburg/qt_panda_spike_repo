@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import argparse
 import csv
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, List, Sequence
 
 from steuerung3d.config.log_viewer_config import LogViewerConfig, load_log_viewer_config
 from steuerung3d.core.command_frame import CommandFrame

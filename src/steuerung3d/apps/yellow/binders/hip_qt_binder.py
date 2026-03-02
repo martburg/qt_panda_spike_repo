@@ -15,45 +15,21 @@ import logging
 from dataclasses import dataclass, field
 
 from PySide6.QtWidgets import (
-    QAbstractSlider,
-    QCheckBox,
-    QComboBox,
     QFrame,
     QLineEdit,
     QPushButton,
-    QTabWidget,
     QWidget,
 )
 
-from steuerung3d.protocol.estop_bits import ESTOP_SPECS
 
-from ..domain.yellow_maps import LIMIT_WIDGETS as _LIMIT_WIDGETS, PARAM_WIDGETS as _PARAM_WIDGETS
+from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS
 from ..engines.hip.engine import (
     HipParamAction,
     HipUiInputs,
     HipViewModel,
 )
-from ..panels.hip.hip_banner_render import HipBannerBindings, apply_hip_banner
-from ..panels.hip.hip_cut_markers_render import HipCutMarkersBindings, apply_hip_cut_markers
-from ..panels.hip.hip_drive_status_render import HipDriveStatusBindings, apply_hip_drive_status
-from ..panels.hip.hip_estop_render import HipEstopBindings, apply_hip_estop
-from ..panels.hip.hip_header_dots_render import HipHeaderDotsBindings, apply_hip_header_dots
-from ..panels.hip.hip_readouts_render import HipReadoutsBindings, apply_hip_readouts
-from ..panels.hip.hip_sliders_render import HipSlidersBindings, apply_hip_sliders
-from ..qtutil.binder_helpers import block_signals, safe_set_text
 from ..qtutil.modal_lock import ModalLock
-from ..qtutil.param_ui_apply import ParamUiBindings, apply_param_ui
-from ..qtutil.param_widget_binder import ParamWidgetBinder
-from ..qtutil.ui_contract import log_missing_optional_once, log_missing_required_once
-from ..qtutil.ui_format import fmt_f_unit_de
-from ..qtutil.ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
-from ..qtutil.ui_update import (
-    set_enabled,
-    set_enabled_repolish,
-    set_state_by_object_name,
-    set_state_property,
-    update_slider,
-)
+
 from . import hip_qt_binder_apply_impl as _apply_impl, hip_qt_binder_init_impl as _init_impl
 
 

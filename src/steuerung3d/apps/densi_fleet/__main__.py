@@ -9,7 +9,7 @@ import time
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 from steuerung3d.core.net import parse_hostport
 

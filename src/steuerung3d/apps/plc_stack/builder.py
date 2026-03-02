@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional, Protocol, Tuple
+from typing import Callable, Optional, Protocol
 
 from steuerung3d.adapters.links.udp_link import UdpLink
 from steuerung3d.adapters.plc.multi_plc_device import MultiPlcDevice
