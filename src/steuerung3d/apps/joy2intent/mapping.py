@@ -118,12 +118,12 @@ def _pressed_buttons(rc: Any) -> Set[int]:
     """Return set of pressed button indices for different rc types."""
     if hasattr(rc, "pressed"):
         try:
-            return set(getattr(rc, "pressed"))
+            return set(rc.pressed)
         except Exception:
             return set()
     if hasattr(rc, "buttons"):
         try:
-            return {i for i, v in enumerate(getattr(rc, "buttons")) if v}
+            return {i for i, v in enumerate(rc.buttons) if v}
         except Exception:
             return set()
     return set()
@@ -132,7 +132,7 @@ def _pressed_buttons(rc: Any) -> Set[int]:
 def _axes(rc: Any) -> List[float]:
     if hasattr(rc, "axes"):
         try:
-            return list(getattr(rc, "axes"))
+            return list(rc.axes)
         except Exception:
             return []
     return []

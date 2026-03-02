@@ -75,7 +75,7 @@ def apply_param_values_to_line_edits(
                 continue
 
             try:
-                if skip_focused and bool(getattr(le, "hasFocus")()):
+                if skip_focused and bool(le.hasFocus()):
                     continue
             except Exception:
                 pass

@@ -11,7 +11,7 @@ log = logging.getLogger("core")
 
 
 def handle_set_control_mode(state: MachineState, intent: SetControlMode) -> None:
-    setattr(state, "control_mode", str(getattr(intent, "mode", "")))
+    state.control_mode = str(getattr(intent, "mode", ""))
 
 
 def handle_smooth_stop(state: MachineState, _intent: SmoothStop) -> None:

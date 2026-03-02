@@ -77,7 +77,7 @@ def validate_endpoints(endpoints: List[PlcEndpoint]) -> None:
         owned_by[axis_id] = e.name
 
         # codec/spec should match endpoint assignment
-        spec_axes = list(getattr(e.codec, "spec").axis_ids)  # PlcCodec.spec.axis_ids
+        spec_axes = list(e.codec.spec.axis_ids)  # PlcCodec.spec.axis_ids
         if spec_axes != e.axis_ids:
             raise PlcValidationError(
                 f"Endpoint '{e.name}': codec.spec.axis_ids={spec_axes} "

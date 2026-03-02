@@ -154,7 +154,7 @@ def build_core(cfg: PlcStackConfig, *, device_step: DeviceStep, enable_logging: 
         drain_intents=transport.drain_intents,
         handle_intent=apply_intent,
         device_step=device_step,
-        on_snapshot=getattr(transport, "publish_telemetry"),
+        on_snapshot=transport.publish_telemetry,
         on_command_frame=(rec.record_command_frame if rec is not None else None),
     )
 
