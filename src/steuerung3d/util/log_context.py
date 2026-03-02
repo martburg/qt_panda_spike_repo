@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Callable
 
 
 def install_log_context(*, role: str | None = None, axis: str | None = None) -> None:

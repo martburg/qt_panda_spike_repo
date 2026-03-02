@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from steuerung3d.util.log_context import install_log_context
 

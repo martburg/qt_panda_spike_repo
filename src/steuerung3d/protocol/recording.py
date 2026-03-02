@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic_ns
-from typing import Any, Dict, Iterable, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.intents import Intent

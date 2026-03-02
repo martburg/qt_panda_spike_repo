@@ -17,7 +17,6 @@ try:
     from steuerung3d.core.intents import (
         ArmSync,
         EnterSync,
-        RecoverToLastGood,
         SetDensiAnchor,
         SetDensiParticipating,
         SetRigMode,

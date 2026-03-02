@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from steuerung3d.protocol.parse_primitives import (
-    parse_bool as _parse_bool,
     parse_float as _parse_float,
-    parse_int as _parse_int,
 )
 
 
