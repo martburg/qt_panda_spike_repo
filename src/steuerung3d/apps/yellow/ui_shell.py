@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
 from PySide6.QtCore import QFile, QTimer
@@ -14,7 +13,6 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFrame,
     QLabel,
-    QLayout,
     QLineEdit,
     QPushButton,
     QSpinBox,

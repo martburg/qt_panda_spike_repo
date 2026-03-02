@@ -11,7 +11,7 @@ objects like AxisTelemetry.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 # Base uplink fields 0..37 (see legacy_plc_anton.md)
 UPLINK_BASE_FIELDS: List[str] = [

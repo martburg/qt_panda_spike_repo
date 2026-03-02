@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.intent_handlers.lease import (
-    axis_lease_allows as _axis_lease_allows,
     axis_lease_holders as _axis_lease_holders,
     set_lease_denial as _set_lease_denial,
 )

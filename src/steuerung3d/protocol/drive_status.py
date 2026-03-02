@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 # Legacy bit meanings (from your Decoder.py):
 # bit0: Output powered

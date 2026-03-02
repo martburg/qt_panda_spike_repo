@@ -6,9 +6,9 @@ Encodes/decodes JSON-ish frames between components.
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Any, Dict, Union
+from typing import Any, Dict
 
-from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamOp, decode_param_ops
+from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, decode_param_ops
 from steuerung3d.core.intents import (
     ClaimAxis,
     ClearFault,

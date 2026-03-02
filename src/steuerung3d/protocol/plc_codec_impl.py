@@ -13,11 +13,11 @@ Design goals:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
-from steuerung3d.protocol.legacy_plc import LegacyPlcUplink, parse_uplink
+from steuerung3d.protocol.legacy_plc import parse_uplink
 from steuerung3d.protocol.plc_codec_fields import (
     DOWNLINK_BASE_FIELDS,
     DOWNLINK_WRITE_FIELDS,
