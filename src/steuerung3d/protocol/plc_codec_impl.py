@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Legacy PLC ';' delimited UDP codec (canonical: KommAnton__MAIN.st).
 
@@ -12,6 +10,7 @@ Design goals:
 - preserve canonical token ordering (see KommAnton__MAIN.st)
 """
 
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 

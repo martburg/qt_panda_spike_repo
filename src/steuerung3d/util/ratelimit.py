@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """steuerung3d.util.ratelimit
 
 Rate-limited logging helpers.
@@ -13,6 +11,7 @@ This module provides a tiny per-key rate limiter and a convenience helper to log
 exceptions at a controlled frequency (default: once per 2 seconds per key).
 """
 
+from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
