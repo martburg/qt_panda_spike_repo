@@ -15,7 +15,6 @@ import logging
 import time
 from dataclasses import dataclass, replace
 
-from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QWidget
 
 # Optional structured status heartbeat (used by stack supervisor birds-eye)

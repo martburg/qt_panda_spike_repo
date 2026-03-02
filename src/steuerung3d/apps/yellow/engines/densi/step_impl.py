@@ -5,44 +5,19 @@ No semantic changes intended; this is a mechanical extraction from `engine.py`.
 
 from __future__ import annotations
 
-import time
-from dataclasses import dataclass, replace
-from datetime import datetime
-from typing import TYPE_CHECKING, Callable
+
+from dataclasses import dataclass
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     # Only needed for type checking; avoids runtime import cycles.
     from .engine import DenSiEngine
 
-from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
-from steuerung3d.adapters.sim.device import SimDevice
-from steuerung3d.common.timebase import Timebase
-from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
-from steuerung3d.core.state import MachineState
-from steuerung3d.protocol.estop_bits import ESTOP_SPECS
+from steuerung3d.core.command_frame import  CommandFrame
 
-from ...domain.estop_facts import (
-    decode_estop_word,
-    encode_estop_word,
-    estop_cause_keys,
-    estop_ok_keys,
-)
-from .cut_markers import (
-    clear_cut_markers as _clear_cut_markers,
-    maybe_latch_cut_markers as _maybe_latch_cut_markers,
-)
 from .drive_status import update_drive_status_words
-from .estop_fsm import (
-    apply_estop_state_machine,
-    compute_estop_edge_and_update_state as _compute_estop_edge_and_update_state,
-    derive_estop_inputs as _derive_estop_inputs,
-    sync_reset_able_bit as _sync_reset_able_bit,
-)
-from .motion_clamp import apply_estop_clamp_to_state, compute_moving_guard
-from .param_ops import apply_densi_param_ops
-from .plc_anton_vel_cmd import step_plc_anton_vel_cmd
-from .resync import handle_resync_cmd as _handle_resync_cmd
-from .setpoint_semantics import normalize_cmd_for_plant
+
 from .types import L0Sub, L0Top
 
 

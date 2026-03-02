@@ -14,10 +14,8 @@ from __future__ import annotations
 import logging
 import os
 import time
-import uuid
 from dataclasses import dataclass
 
-from more_itertools import last
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QWidget
 
