@@ -1,24 +1,21 @@
 from __future__ import annotations
 
 import argparse
-
-from steuerung3d.core.net import parse_hostport
-import sys
-
 import logging
+import sys
 from pathlib import Path
-
-from steuerung3d.util.app_bootstrap import bootstrap_logging
-from steuerung3d.config.toml_loader import load_toml
 
 from PySide6.QtWidgets import QApplication
 
-from steuerung3d.apps.yellow.ui_shell import build_yellow_window
-from steuerung3d.apps.yellow.controllers.hip_controller import HiPController
-#from steuerung3d.protocol.transport import InMemTransport
-from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn
 # and import HiPController directly if you changed controllers/__init__.py:
 from steuerung3d.apps.yellow.controllers.hip_controller import HiPController
+from steuerung3d.apps.yellow.ui_shell import build_yellow_window
+from steuerung3d.config.toml_loader import load_toml
+from steuerung3d.core.net import parse_hostport
+
+#from steuerung3d.protocol.transport import InMemTransport
+from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn
+from steuerung3d.util.app_bootstrap import bootstrap_logging
 
 log = logging.getLogger("hi_p")
 

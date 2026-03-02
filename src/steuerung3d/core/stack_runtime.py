@@ -9,8 +9,6 @@ splitting implementation into smaller modules.
 
 from __future__ import annotations
 
-from .stack_runtime_impl import StackRuntime, expand_processes
-
 # Historically these were imported here and consumed by tests via this module.
 from steuerung3d.ui.birdseye_format import (  # noqa: F401
     birdseye_multiline_default,
@@ -18,6 +16,8 @@ from steuerung3d.ui.birdseye_format import (  # noqa: F401
     format_birds_eye,
     tail_lines,
 )
+
+from .stack_runtime_impl import StackRuntime, expand_processes
 
 __all__ = [
     "StackRuntime",

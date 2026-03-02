@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
+from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
 from steuerung3d.protocol.legacy_plc import UPLINK_BASE_FIELDS, UPLINK_TAIL_FIELDS, parse_uplink
 from steuerung3d.protocol.plc_codec import decode_downlink, encode_downlink
 from steuerung3d.protocol.plc_wire import encode_plc_telemetry
-from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
-from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
 
 
 def test_decode_downlink_base_fields() -> None:

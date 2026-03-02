@@ -11,7 +11,6 @@ motion vs other flags) changes in exactly one place.
 
 from __future__ import annotations
 
-
 # Known / used today
 CONTROL_IN_ENABLE_MASK: int = 0x0001
 

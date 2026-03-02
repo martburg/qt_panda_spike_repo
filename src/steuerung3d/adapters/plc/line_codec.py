@@ -12,9 +12,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 
-from steuerung3d.protocol.parse_primitives import parse_bool as _parse_bool
-from steuerung3d.protocol.parse_primitives import parse_float as _parse_float
-from steuerung3d.protocol.parse_primitives import parse_int as _parse_int
+from steuerung3d.protocol.parse_primitives import (
+    parse_bool as _parse_bool,
+    parse_float as _parse_float,
+    parse_int as _parse_int,
+)
+
 
 def _split_fields(line: str, sep: str) -> List[str]:
     """Split a PLC line into fields.

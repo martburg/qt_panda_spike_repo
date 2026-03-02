@@ -1,4 +1,4 @@
-from steuerung3d.util.tick import tick_delta_16, compute_time_tick
+from steuerung3d.util.tick import compute_time_tick, tick_delta_16
 
 
 def test_tick_delta_16_basic():

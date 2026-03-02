@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from steuerung3d.core.command_frame import (
-    ParamEditBeginOp,
     ParamCancelOp,
+    ParamEditBeginOp,
     ParamWriteOp,
     coerce_param_ops,
 )

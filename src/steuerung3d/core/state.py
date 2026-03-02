@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Any
+from typing import Any, Dict
 
+from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.command_frame import ParamOp
-
 from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.joy_state import JoyState
-from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.rig_types import DensiRuntime, RecoverPlan, RigMode, RigSyncConfig
 
 

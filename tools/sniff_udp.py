@@ -4,6 +4,7 @@ import socket
 import sys
 import time
 
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--host", default="127.0.0.1")

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from steuerung3d.core.command_frame import CommandFrame
 
-from .types import L0Top, L0Sub
+from .types import L0Sub, L0Top
 
 
 @dataclass

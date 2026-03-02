@@ -26,7 +26,11 @@ def __getattr__(name: str):
 
 		return locals()[name]
 	if name in ("HipBannerState", "HipEstopState", "HipHeaderDots"):
-		from ...engines.hip.viewmodel import HipBannerState, HipEstopState, HipHeaderDots  # type: ignore
+		from ...engines.hip.viewmodel import (  # type: ignore
+			HipBannerState,
+			HipEstopState,
+			HipHeaderDots,
+		)
 
 		return locals()[name]
 	raise AttributeError(name)

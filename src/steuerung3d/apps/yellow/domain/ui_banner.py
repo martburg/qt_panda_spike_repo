@@ -23,7 +23,6 @@ from __future__ import annotations
 
 from .banner_facts import BANNER_DYNAMIC_EXCLUDE, derive_banner_estate_from_word
 
-
 # --- UI styling ---------------------------------------------------------------
 
 BANNER_COLORS: dict[str, tuple[str, str]] = {

@@ -4,31 +4,29 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QWidget
 
+from ..engines.hip.attach_state import NOT_ATTACHED
+from ..panels.hip.hip_banner_render import apply_hip_banner
+from ..panels.hip.hip_cut_markers_render import apply_hip_cut_markers
+from ..panels.hip.hip_drive_status_render import apply_hip_drive_status
+from ..panels.hip.hip_estop_render import apply_hip_estop
+from ..panels.hip.hip_header_dots_render import apply_hip_header_dots
+from ..panels.hip.hip_readouts_render import apply_hip_readouts
+from ..panels.hip.hip_sliders_render import apply_hip_sliders
+from ..qtutil.binder_helpers import block_signals, safe_set_text
 from ..qtutil.param_ui_apply import apply_param_ui
+from ..qtutil.ui_format import fmt_f_unit_de
 from ..qtutil.ui_update import (
     set_enabled,
     set_enabled_repolish,
     set_state_by_object_name,
     set_state_property,
-    update_slider
+    update_slider,
 )
-from ..qtutil.binder_helpers import block_signals, safe_set_text
-from ..qtutil.ui_format import fmt_f_unit_de
 from ..ui.joy_style import JOY_DEADMAN_PROP, JOY_SELECT_HIP_PROP
 
-from ..panels.hip.hip_banner_render import apply_hip_banner
-from ..panels.hip.hip_estop_render import apply_hip_estop
-from ..panels.hip.hip_header_dots_render import apply_hip_header_dots
-from ..panels.hip.hip_cut_markers_render import apply_hip_cut_markers
-from ..panels.hip.hip_drive_status_render import apply_hip_drive_status
-from ..panels.hip.hip_readouts_render import apply_hip_readouts
-from ..panels.hip.hip_sliders_render import apply_hip_sliders
-
-from ..engines.hip.attach_state import NOT_ATTACHED
-
 if TYPE_CHECKING:
-    from .hip_qt_binder import HipQtBinder
     from ..engines.hip.engine import HipViewModel
+    from .hip_qt_binder import HipQtBinder
 
 def apply(b, vm: HipViewModel) -> None:
     # Always-visible UI

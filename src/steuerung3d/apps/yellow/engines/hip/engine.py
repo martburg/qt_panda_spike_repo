@@ -7,8 +7,8 @@ comparison before cutover.
 
 from __future__ import annotations
 
-from dataclasses import asdict
 import logging
+from dataclasses import asdict
 from typing import Any, Iterable
 
 from steuerung3d.core.intents import (
@@ -24,12 +24,15 @@ from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import ESTOP_SPECS, decode_estop_word
 
-from ...domain.param_txn import ParamEditTxnClient, RetryEvent
-from ...domain.taster_edge_state import TasterEdgeState, update_taster_edge_state, within_brake_grace
-from ...domain.ui_estop import age_to_online_state, infer_estop_profile
-from ...domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
 from ...domain.joy_motion_map import map_soll_speed_to_jog_winch
-from .types import HipPresentationData
+from ...domain.param_txn import ParamEditTxnClient, RetryEvent
+from ...domain.taster_edge_state import (
+    TasterEdgeState,
+    update_taster_edge_state,
+    within_brake_grace,
+)
+from ...domain.ui_estop import age_to_online_state, infer_estop_profile
+from ...domain.yellow_maps import LIMIT_WIDGETS as _LIMIT_WIDGETS, PARAM_WIDGETS as _PARAM_WIDGETS
 from .attach_state import NOT_ATTACHED, build_attach_combo, compute_attach_state
 from .intent_policy import (
     claim_allowed,
@@ -39,6 +42,7 @@ from .intent_policy import (
     should_emit_enable,
     should_emit_speed,
 )
+from .param_ui import run_param_txn
 from .presentation import (
     compute_banner_estate,
     compute_cut_markers_state,
@@ -51,8 +55,6 @@ from .presentation import (
     read_axis_pos_vel,
 )
 from .step_impl import step as _step
-from .param_ui import run_param_txn
-
 from .types import (
     HipAttachInputs,
     HipBannerInputs,
@@ -61,6 +63,7 @@ from .types import (
     HipParamCommitDialog,
     HipParamGroup,
     HipParamUiState,
+    HipPresentationData,
     HipState,
     HipStepInputs,
     HipStepResult,

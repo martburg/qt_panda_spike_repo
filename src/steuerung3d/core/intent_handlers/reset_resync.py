@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from steuerung3d.core.state import MachineState
 from steuerung3d.core.intent_handlers.lease import axis_lease_holders
+from steuerung3d.core.state import MachineState
 
 
 def axis_reset_allowed(state: MachineState, axis_id: str, hip_id: str) -> tuple[bool, str]:

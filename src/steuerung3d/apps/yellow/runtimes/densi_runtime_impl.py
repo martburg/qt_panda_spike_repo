@@ -11,14 +11,15 @@ UI rendering stays in the controller until Patch 6.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
 import time
+from dataclasses import dataclass
 from typing import List
 
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.telemetry import TelemetrySnapshot
-from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
+from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
+
 from .runtime_kernel import compute_health, emit_runtime_status, with_health_fields
 from .runtime_utils import (
     should_interval_log,
@@ -30,6 +31,7 @@ try:
 except Exception:  # pragma: no cover
     StatusEmitter = None  # type: ignore
 
+from ..domain.taster_edge_state import TasterEdgeState, update_taster_edge_state, within_brake_grace
 from ..engines.densi.engine import DenSiEngine
 from ..engines.densi.engine_types import DenSiTickResult
 from ..engines.densi.inputs import DensiInputs
@@ -40,7 +42,6 @@ from ..panels.densi.densi_estop_dots_vm import compute_densi_estop_dots_vm
 from ..panels.densi.densi_header_online_vm import compute_densi_header_online_vm
 from ..panels.densi.densi_lifetick_vm import compute_densi_lifetick_vm
 from ..panels.densi.densi_readouts_vm import compute_densi_readouts_vm
-from ..domain.taster_edge_state import TasterEdgeState, update_taster_edge_state, within_brake_grace
 from .densi_runtime_types import DensiRuntimeResult
 
 

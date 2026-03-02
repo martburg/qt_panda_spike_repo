@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
-import os
 import pytest
 
 if os.getenv("RUN_LEGACY_TWINCAT_TESTS", "0") != "1":

@@ -1,4 +1,6 @@
-import pygame, time
+import time
+
+import pygame
 
 pygame.init()
 pygame.joystick.init()

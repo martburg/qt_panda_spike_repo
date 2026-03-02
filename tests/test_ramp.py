@@ -1,7 +1,7 @@
 # test_ramp.py
 import math
-from steuerung3d.core.ramp import RampInputs, RampState, ramp_step
 
+from steuerung3d.core.ramp import RampInputs, RampState, ramp_step
 
 
 def test_deadman_press_edge_sets_pos0():

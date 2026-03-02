@@ -6,8 +6,8 @@ from typing import Callable
 
 from PySide6.QtWidgets import QLineEdit
 
-from .densi_limits_vm import DenSiLimitsVM
 from ...qtutil.ui_update import set_enabled, set_text
+from .densi_limits_vm import DenSiLimitsVM
 
 
 def apply_densi_limits_vm(

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import logging
 
+from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.intents import EchoLifeTick, JoyStateUpdate, SetControlMode, SmoothStop
 from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
 from steuerung3d.core.state import MachineState
-from steuerung3d.core.axis_ids import normalize_axis_id
 
 log = logging.getLogger("core")
 

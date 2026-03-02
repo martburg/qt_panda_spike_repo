@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+
 @dataclass(frozen=True)
 class JoyFacts:
     """Normalized joystick facts used across core + UI.

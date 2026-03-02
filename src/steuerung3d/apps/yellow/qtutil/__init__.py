@@ -34,11 +34,11 @@ def __getattr__(name: str):
 
 		return locals()[name]
 	if name in ("safe_set_text", "block_signals"):
-		from .binder_helpers import safe_set_text, block_signals  # type: ignore
+		from .binder_helpers import block_signals, safe_set_text  # type: ignore
 
 		return locals()[name]
 	if name in ("set_text", "set_enabled", "update_slider"):
-		from .ui_update import set_text, set_enabled, update_slider  # type: ignore
+		from .ui_update import set_enabled, set_text, update_slider  # type: ignore
 
 		return locals()[name]
 	raise AttributeError(name)

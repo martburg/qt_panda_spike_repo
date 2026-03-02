@@ -15,8 +15,8 @@ we prefer “don’t crash” over “strict schema enforcement”.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from steuerung3d.adapters.links.udp_link import UdpLink
@@ -135,8 +135,8 @@ class UdpPlcCommandIn:
         """
         out: List[Any] = []
         try:
-            from steuerung3d.protocol.plc_codec import decode_downlink, _PARAM_KEYMAP
-            from steuerung3d.core.command_frame import CommandFrame, AxisSetpoint, ParamWriteOp
+            from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamWriteOp
+            from steuerung3d.protocol.plc_codec import _PARAM_KEYMAP, decode_downlink
         except Exception:
             return out
 

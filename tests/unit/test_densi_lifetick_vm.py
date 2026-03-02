@@ -2,8 +2,8 @@ import sys
 
 sys.path.insert(0, 'src')
 
-from steuerung3d.core.state import MachineState, AxisState
 from steuerung3d.apps.yellow.panels.densi.densi_lifetick_vm import compute_densi_lifetick_vm
+from steuerung3d.core.state import AxisState, MachineState
 
 
 def test_lifetick_vm_basic_diff():

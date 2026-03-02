@@ -1,10 +1,16 @@
 from __future__ import annotations
 
-from steuerung3d.core.intents import RequestEstopReset, RequestResync, RequestMainReset, RequestGuiderReset, SetEstop
+from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.intent_handlers.enforce import enforce_core_mode_actions
 from steuerung3d.core.intent_handlers.reset_resync import axis_reset_allowed
+from steuerung3d.core.intents import (
+    RequestEstopReset,
+    RequestGuiderReset,
+    RequestMainReset,
+    RequestResync,
+    SetEstop,
+)
 from steuerung3d.core.state import MachineState
-from steuerung3d.core.axis_ids import normalize_axis_id
 
 
 def handle_set_estop(state: MachineState, intent: SetEstop) -> None:

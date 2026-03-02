@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 
 from steuerung3d.core.command_frame import CommandFrame
+from steuerung3d.core.rig_logic import note_densi_seen
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import TelemetrySnapshot
-from steuerung3d.core.rig_logic import note_densi_seen
 
 from .plc_endpoint import PlcEndpoint
 

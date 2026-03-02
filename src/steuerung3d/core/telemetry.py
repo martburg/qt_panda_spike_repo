@@ -4,12 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict
 
-from steuerung3d.core.core_mode import core_mode_value
-from steuerung3d.core.state import AxisState, MachineState
-from steuerung3d.core.param_registry import eps_for_param
-from steuerung3d.core.joy_state import JoyState
 from steuerung3d.common.staleness import age_ticks, is_stale
+from steuerung3d.core.core_mode import core_mode_value
+from steuerung3d.core.joy_state import JoyState
+from steuerung3d.core.param_registry import eps_for_param
 from steuerung3d.core.rig_logic import note_densi_seen
+from steuerung3d.core.state import AxisState, MachineState
+
 
 @dataclass(frozen=True)
 class AxisTelemetry:

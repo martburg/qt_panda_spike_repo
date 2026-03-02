@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from PySide6.QtWidgets import QPushButton, QWidget, QFrame
+from PySide6.QtWidgets import QFrame, QPushButton, QWidget
 
 
 @dataclass

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 from steuerung3d.apps.yellow.domain.ui_banner import (
     BANNER_DYNAMIC_EXCLUDE,
     derive_banner_estate_from_word,

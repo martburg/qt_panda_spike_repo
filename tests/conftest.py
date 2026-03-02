@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-
 # Ensure `src/` layout works when running `pytest` directly (no editable install).
 # This keeps test collection robust in fresh environments and CI.
 _REPO_ROOT = Path(__file__).resolve().parents[1]

@@ -11,13 +11,13 @@ Implementation step contract (see docs/anton_vel_cmd_implementation_step.md):
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
+from dataclasses import dataclass
 from typing import Iterable
 
+from steuerung3d.common.staleness import age_ticks, is_stale
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.state import MachineState
-from steuerung3d.common.staleness import age_ticks, is_stale
 
 from .param_defaults import apply_densi_param_defaults
 

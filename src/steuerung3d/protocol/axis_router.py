@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Mapping, Optional, Protocol
 
 from steuerung3d.core.command_frame import CommandFrame, ParamOp, coerce_param_ops
-from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.core.joy_state import JoyState
+from steuerung3d.core.telemetry import TelemetrySnapshot
 
 
 class CommandFrameSink(Protocol):

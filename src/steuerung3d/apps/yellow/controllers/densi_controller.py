@@ -11,9 +11,9 @@ Orchestration only:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
 import logging
 import time
+from dataclasses import dataclass, replace
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QWidget
@@ -24,15 +24,14 @@ try:
 except Exception:  # pragma: no cover
     StatusEmitter = None  # type: ignore
 
-from ..domain import estop_facts
-
-from ..qtutil.bindings import YellowBindings
-from ..ports import CommandIn, TelemetryOut
-from ..qtutil.perf_watchdog import PerfWatchdog
 from ..binders.densi_qt_binder import DenSiQtBinder
-from .controller_utils import init_observability, start_poll_timer
+from ..domain import estop_facts
 from ..engines.densi.engine import DenSiEngine
+from ..ports import CommandIn, TelemetryOut
+from ..qtutil.bindings import YellowBindings
+from ..qtutil.perf_watchdog import PerfWatchdog
 from ..runtimes.densi_runtime import DensiRuntime
+from .controller_utils import init_observability, start_poll_timer
 
 log = logging.getLogger("den_si")
 

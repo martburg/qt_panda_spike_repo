@@ -11,16 +11,16 @@ Orchestration only:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
-import time
 import os
+import time
 import uuid
+from dataclasses import dataclass
 
+from more_itertools import last
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QWidget
 
-from more_itertools import last
 from steuerung3d.util.ratelimit import rl_log_exc
 
 # Optional structured status heartbeat (used by stack supervisor birds-eye)
@@ -29,14 +29,15 @@ try:
 except Exception:  # pragma: no cover
     StatusEmitter = None  # type: ignore
 
-from ..qtutil.bindings import YellowBindings
-from ..ports import IntentOut, TelemetryIn
-from ..qtutil.perf_watchdog import PerfWatchdog
-from ..binders.hip_qt_binder import HipQtBinder
-from .controller_utils import init_observability, run_guarded, start_poll_timer
-from ..engines.hip.engine import HipEngine, HipUiInputs
-from ..runtimes.hip_runtime import HipRuntime
 from steuerung3d.core.axis_ids import normalize_axis_id
+
+from ..binders.hip_qt_binder import HipQtBinder
+from ..engines.hip.engine import HipEngine, HipUiInputs
+from ..ports import IntentOut, TelemetryIn
+from ..qtutil.bindings import YellowBindings
+from ..qtutil.perf_watchdog import PerfWatchdog
+from ..runtimes.hip_runtime import HipRuntime
+from .controller_utils import init_observability, run_guarded, start_poll_timer
 
 log = logging.getLogger("hi_p")
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 from steuerung3d.util.tick import compute_time_tick
 
 

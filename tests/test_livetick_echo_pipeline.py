@@ -14,11 +14,11 @@ the staleness math (4) including WORD wrap.
 
 from __future__ import annotations
 
-from steuerung3d.core.state import MachineState
-from steuerung3d.core.telemetry import TelemetrySnapshot, AxisTelemetry, apply_measured_snapshot
-from steuerung3d.core.intents import EchoLifeTick
-from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.executor import build_command_frame
+from steuerung3d.core.intent_handler import apply_intent
+from steuerung3d.core.intents import EchoLifeTick
+from steuerung3d.core.state import MachineState
+from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot, apply_measured_snapshot
 
 
 def _snap_for_device_tick(axis_id: str, *, tick: int, t_s: float, device_tick: int) -> TelemetrySnapshot:

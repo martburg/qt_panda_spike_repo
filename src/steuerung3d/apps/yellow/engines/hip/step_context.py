@@ -10,8 +10,8 @@ if TYPE_CHECKING:
 from steuerung3d.core.intents import ClaimAxis, ReleaseAxis
 from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
 
-from .types import HipAttachCombo, HipStepInputs
 from .attach_state import build_attach_combo
+from .types import HipAttachCombo, HipStepInputs
 
 
 @dataclass(frozen=True)

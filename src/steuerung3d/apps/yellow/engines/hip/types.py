@@ -11,7 +11,7 @@ from steuerung3d.core.telemetry import TelemetrySnapshot
 from ...domain.param_txn import RetryEvent
 
 if TYPE_CHECKING:  # pragma: no cover
-    from .viewmodel import HipViewModel, HipCutMarkersState, HipDriveStatusState, HipReadoutsState
+    from .viewmodel import HipCutMarkersState, HipDriveStatusState, HipReadoutsState, HipViewModel
 
 
 @dataclass(frozen=True)

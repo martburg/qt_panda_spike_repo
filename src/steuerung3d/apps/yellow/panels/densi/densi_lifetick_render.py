@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QLineEdit
 
-from .densi_lifetick_vm import DenSiLifeTickVM
 from ...qtutil.ui_update import set_text
+from .densi_lifetick_vm import DenSiLifeTickVM
 
 
 def apply_densi_lifetick_vm(vm: DenSiLifeTickVM, *, txtTick: QLineEdit | None) -> None:

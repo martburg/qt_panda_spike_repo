@@ -15,16 +15,16 @@ import pytest
 
 try:
     from steuerung3d.core.intents import (
-        SetRigMode,
-        SetDensiParticipating,
-        SetDensiAnchor,
         ArmSync,
         EnterSync,
         RecoverToLastGood,
         ResyncNow,
+        SetDensiAnchor,
+        SetDensiParticipating,
+        SetRigMode,
     )
-    from steuerung3d.core.rig_types import RigMode
     from steuerung3d.core.rig_logic import enforce_rig_invariants, note_densi_seen
+    from steuerung3d.core.rig_types import RigMode
 except Exception as e:  # noqa: BLE001
     pytest.skip(
         "Rig workflow not available in this milestone (deferred). "
@@ -34,9 +34,9 @@ except Exception as e:  # noqa: BLE001
 
 import math
 
-from steuerung3d.core.state import MachineState
 from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.intent_handler import apply_intent
+from steuerung3d.core.state import MachineState
 
 
 def test_arm_sync_and_enter_sync() -> None:

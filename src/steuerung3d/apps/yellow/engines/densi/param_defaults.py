@@ -9,7 +9,6 @@ from __future__ import annotations
 from collections.abc import Iterable, MutableMapping
 from typing import Any
 
-
 # Defaults expected by UI + protocol contract tests.
 # NOTE: only add values here that are meant to exist even before any PLC/HiP
 # traffic arrives.

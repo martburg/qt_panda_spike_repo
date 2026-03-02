@@ -1,21 +1,19 @@
 from __future__ import annotations
 
 import argparse
-import sys
 import logging
+import sys
 from typing import Tuple
-
-from steuerung3d.core.net import parse_hostport
-
-from steuerung3d.util.app_bootstrap import bootstrap_logging
 
 from PySide6.QtWidgets import QApplication
 
-from steuerung3d.apps.yellow.ui_shell import build_yellow_window
 from steuerung3d.apps.yellow.controllers.densi_controller import DenSiController
+from steuerung3d.apps.yellow.ui_shell import build_yellow_window
+from steuerung3d.core.net import parse_hostport
 
 # Default JSON channels (core/UI style)
 from steuerung3d.protocol.udp_channels import UdpCommandIn, UdpTelemetryOut
+from steuerung3d.util.app_bootstrap import bootstrap_logging
 
 log = logging.getLogger("den_si")
 

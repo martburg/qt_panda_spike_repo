@@ -1,21 +1,25 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 from typing import Callable, Generic, List, Tuple, TypeVar
 
 from steuerung3d.adapters.links.udp_link import UdpLink
-from steuerung3d.core.intents import Intent
-from steuerung3d.protocol.raw_controls import RawControls
-from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.core.command_frame import CommandFrame
+from steuerung3d.core.intents import Intent
+from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.codec import (
-    encode_intent, decode_intent,
-    encode_raw_controls, decode_raw_controls,
-    encode_telemetry, decode_telemetry,
-    encode_command_frame, decode_command_frame,
+    decode_command_frame,
+    decode_intent,
+    decode_raw_controls,
+    decode_telemetry,
+    encode_command_frame,
+    encode_intent,
+    encode_raw_controls,
+    encode_telemetry,
 )
+from steuerung3d.protocol.raw_controls import RawControls
 
 log = logging.getLogger("udp")
 

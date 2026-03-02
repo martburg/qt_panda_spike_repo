@@ -22,9 +22,9 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QPushButton,
+    QSizePolicy,
     QSlider,
     QSpacerItem,
-    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )

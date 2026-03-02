@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+from steuerung3d.core.axis_ids import normalize_axis_id
+from steuerung3d.core.intent_handlers.lease import axis_lease_allows as _axis_lease_allows
 from steuerung3d.core.intents import EnableAxis, JogAxis, JogCartesian, JogWinch
 from steuerung3d.core.state import MachineState
-from steuerung3d.core.intent_handlers.lease import axis_lease_allows as _axis_lease_allows
-from steuerung3d.core.axis_ids import normalize_axis_id
 
 
 def handle_enable_axis(state: MachineState, intent: EnableAxis) -> None:

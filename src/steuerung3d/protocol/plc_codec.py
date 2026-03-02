@@ -8,8 +8,8 @@ Lane 1 refactor: no semantic changes; public imports stay stable.
 """
 
 from steuerung3d.protocol.plc_codec_impl import (
-    DecodedDownlink,
     _PARAM_KEYMAP,
+    DecodedDownlink,
     decode_downlink,
     decode_uplink_to_snapshot,
     encode_downlink,

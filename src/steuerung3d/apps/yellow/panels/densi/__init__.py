@@ -28,18 +28,24 @@ def __getattr__(name: str):
 		return locals()[name]
 	if name in ("DenSiCutMarkersVM", "CutMarkerEffects", "compute_densi_cut_markers_vm"):
 		from .densi_cut_markers_vm import (  # type: ignore
-			DenSiCutMarkersVM,
 			CutMarkerEffects,
+			DenSiCutMarkersVM,
 			compute_densi_cut_markers_vm,
 		)
 
 		return locals()[name]
 	if name in ("DenSiEstopDotsVM", "compute_densi_estop_dots_vm"):
-		from .densi_estop_dots_vm import DenSiEstopDotsVM, compute_densi_estop_dots_vm  # type: ignore
+		from .densi_estop_dots_vm import (  # type: ignore
+			DenSiEstopDotsVM,
+			compute_densi_estop_dots_vm,
+		)
 
 		return locals()[name]
 	if name in ("DenSiHeaderOnlineVM", "compute_densi_header_online_vm"):
-		from .densi_header_online_vm import DenSiHeaderOnlineVM, compute_densi_header_online_vm  # type: ignore
+		from .densi_header_online_vm import (  # type: ignore
+			DenSiHeaderOnlineVM,
+			compute_densi_header_online_vm,
+		)
 
 		return locals()[name]
 	if name in ("DenSiLifeTickVM", "compute_densi_lifetick_vm"):

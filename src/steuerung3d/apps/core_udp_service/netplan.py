@@ -4,12 +4,14 @@ from dataclasses import dataclass
 from typing import List, Tuple
 
 from steuerung3d.core.net import parse_hostport
-from steuerung3d.protocol.udp_channels import UdpIntentIn, UdpTelemetryOut, UdpTelemetryFanout
-from steuerung3d.protocol.udp_plc_channels import UdpPlcTelemetryIn, UdpPlcCommandOut
+from steuerung3d.protocol.udp_channels import UdpIntentIn, UdpTelemetryFanout, UdpTelemetryOut
+from steuerung3d.protocol.udp_plc_channels import UdpPlcCommandOut, UdpPlcTelemetryIn
 
 from .fatal_ui import fatal as _fatal
-from .targets import expand_dev_cmd_targets as _expand_dev_cmd_targets
-from .targets import expand_targets as _expand_targets
+from .targets import (
+    expand_dev_cmd_targets as _expand_dev_cmd_targets,
+    expand_targets as _expand_targets,
+)
 
 
 @dataclass(frozen=True)

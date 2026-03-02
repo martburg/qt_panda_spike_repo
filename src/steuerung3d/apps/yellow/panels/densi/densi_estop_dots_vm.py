@@ -9,11 +9,12 @@ This intentionally does NOT touch checkboxes; checkbox sync stays in the control
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Iterable
+from dataclasses import dataclass
+
+from steuerung3d.protocol.estop_bits import iter_specs
 
 from ...domain.ui_estop import compute_estop_dot_states, compute_header_estop_dot_states
-from steuerung3d.protocol.estop_bits import iter_specs
 
 
 @dataclass(frozen=True)

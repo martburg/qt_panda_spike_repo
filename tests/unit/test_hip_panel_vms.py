@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from steuerung3d.apps.yellow.panels.hip.hip_banner_vm import compute_hip_banner_vm
-from steuerung3d.apps.yellow.panels.hip.hip_header_dots_vm import compute_hip_header_dots_vm
-from steuerung3d.apps.yellow.panels.hip.hip_estop_vm import compute_hip_estop_vm
 from steuerung3d.apps.yellow.domain.ui_estop import infer_estop_profile
+from steuerung3d.apps.yellow.panels.hip.hip_banner_vm import compute_hip_banner_vm
+from steuerung3d.apps.yellow.panels.hip.hip_estop_vm import compute_hip_estop_vm
+from steuerung3d.apps.yellow.panels.hip.hip_header_dots_vm import compute_hip_header_dots_vm
 
 
 def test_hip_banner_vm_shapes() -> None:

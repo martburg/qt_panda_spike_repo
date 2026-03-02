@@ -1,11 +1,11 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 from transitions import Machine
 
-from .axis_types import AxisTelemetry, AxisRequest, AxisCommand
+from .axis_types import AxisCommand, AxisRequest, AxisTelemetry
 from .control_in import compute_control_in
-
 
 # States: keep them controller-side and semantic
 ST_DISCONNECTED = "disconnected"

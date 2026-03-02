@@ -7,13 +7,12 @@ from typing import Any, Callable, Dict, List, Tuple
 
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapshot
-
 from steuerung3d.protocol.axis_router import AxisRouter
 from steuerung3d.protocol.udp_channels import UdpIntentIn
 from steuerung3d.protocol.udp_plc_channels import UdpPlcTelemetryIn
+from steuerung3d.util.heartbeat import ChangeTracker
 
 from .reporter import emit_birds_eye_status, log_periodic_heartbeat
-from steuerung3d.util.heartbeat import ChangeTracker
 
 
 def build_intent_drain(

@@ -6,7 +6,7 @@ Qt controllers. Controllers should remain wiring + rendering only.
 
 from typing import TYPE_CHECKING
 
-from .densi.types import EStopState, L0Top, L0Sub
+from .densi.types import EStopState, L0Sub, L0Top
 
 if TYPE_CHECKING:
     from .densi.engine import DenSiEngine, DenSiTickResult
@@ -46,15 +46,15 @@ def __getattr__(name: str):
         "HipStepResult",
     }:
         from .hip.engine import (  # type: ignore
-            HipEngine,
             HipAttachInputs,
             HipAttachState,
             HipBannerInputs,
+            HipEngine,
             HipParamCommitDialog,
             HipState,
-            HipViewModel,
             HipStepInputs,
             HipStepResult,
+            HipViewModel,
         )
 
         return locals()[name]

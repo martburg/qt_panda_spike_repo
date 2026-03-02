@@ -1,5 +1,6 @@
 # save as sniff_telem.py and run: python sniff_telem.py
-import json, socket
+import json
+import socket
 
 HOST, PORT = "127.0.0.1", 51002  # <- HIP telemetry port
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

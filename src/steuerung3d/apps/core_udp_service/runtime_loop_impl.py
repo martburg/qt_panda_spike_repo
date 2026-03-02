@@ -7,24 +7,28 @@ from typing import List, Tuple
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.state import MachineState
 from steuerung3d.core.net import parse_hostport
-from steuerung3d.protocol.core_runner import CoreRunner
+from steuerung3d.core.state import MachineState
 from steuerung3d.protocol.axis_router import AxisRouter
-from steuerung3d.protocol.udp_channels import UdpIntentIn, UdpTelemetryOut, UdpTelemetryFanout
-from steuerung3d.protocol.udp_plc_channels import UdpPlcTelemetryIn, UdpPlcCommandOut
+from steuerung3d.protocol.core_runner import CoreRunner
+from steuerung3d.protocol.udp_channels import UdpIntentIn, UdpTelemetryFanout, UdpTelemetryOut
+from steuerung3d.protocol.udp_plc_channels import UdpPlcCommandOut, UdpPlcTelemetryIn
 
 from .cli_validation import (
     uniq_axes_or_error,
     validate_dev_cmd_targets,
     validate_ui_telem_targets,
 )
-from .runtime_helpers import apply_mode_aggregation as _apply_mode_aggregation
-from .runtime_helpers import compute_one_shots_by_axis as _compute_one_shots_by_axis
 from .fatal_ui import fatal as _fatal
 from .runtime_handlers import DeviceStepper, SnapshotHandler, build_intent_drain
-from .targets import expand_dev_cmd_targets as _expand_dev_cmd_targets
-from .targets import expand_targets as _expand_targets
+from .runtime_helpers import (
+    apply_mode_aggregation as _apply_mode_aggregation,
+    compute_one_shots_by_axis as _compute_one_shots_by_axis,
+)
+from .targets import (
+    expand_dev_cmd_targets as _expand_dev_cmd_targets,
+    expand_targets as _expand_targets,
+)
 
 log = logging.getLogger("core_udp_service")
 # Export helpers for CLI tests

@@ -1,9 +1,10 @@
+from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.mode_aggregate import (
     AggregateInputs,
     AxisSafetyFacts,
     aggregate_core_mode,
 )
-from steuerung3d.core.core_mode import CoreMode
+
 
 def _bits(**updates: bool) -> dict[str, bool]:
     return dict(updates)

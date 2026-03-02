@@ -1,23 +1,23 @@
 from __future__ import annotations
 
 import os
-import sys
-import time
 import socket
 import subprocess
+import sys
+import time
 from contextlib import closing
+from pathlib import Path
 
 import pytest
-from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = REPO_ROOT / 'src'
 
 
-from steuerung3d.protocol.udp_channels import UdpTelemetryIn, UdpIntentOut
 from steuerung3d.core.intents import EchoLifeTick
 from steuerung3d.protocol.legacy_plc import encode_uplink
 from steuerung3d.protocol.plc_codec import decode_downlink
+from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn
 
 
 def _pick_free_udp_port() -> int:

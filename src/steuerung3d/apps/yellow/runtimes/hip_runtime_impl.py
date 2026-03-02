@@ -10,12 +10,12 @@ UI rendering stays in the controller.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 
 from steuerung3d.core.intents import ParamEditBegin
-from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.core.joy_state import JoyState
+from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 from steuerung3d.util.ratelimit import RateLimiter
 
@@ -35,6 +35,7 @@ from ..panels.hip.hip_banner_vm import compute_hip_banner_vm
 from ..panels.hip.hip_estop_vm import compute_hip_estop_vm
 from ..panels.hip.hip_header_dots_vm import compute_hip_header_dots_vm
 from .runtime_kernel import compute_health, emit_runtime_status, with_health_fields
+
 
 @dataclass(frozen=True)
 class HipRuntimeInputs:

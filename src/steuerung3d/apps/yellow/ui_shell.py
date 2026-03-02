@@ -1,16 +1,26 @@
 from __future__ import annotations
 
-import sys
 import argparse
+import sys
 from pathlib import Path
 
 from PySide6.QtCore import QFile, QTimer
 from PySide6.QtUiTools import QUiLoader
-from PySide6.QtWidgets import QLayout
-from PySide6.QtWidgets import QTabWidget, QWidget, QPushButton
-from PySide6.QtWidgets import QFrame, QLabel
-from PySide6.QtWidgets import QAbstractButton, QLineEdit, QComboBox, QAbstractSlider
-from PySide6.QtWidgets import QSpinBox, QDoubleSpinBox, QCheckBox
+from PySide6.QtWidgets import (
+    QAbstractButton,
+    QAbstractSlider,
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QFrame,
+    QLabel,
+    QLayout,
+    QLineEdit,
+    QPushButton,
+    QSpinBox,
+    QTabWidget,
+    QWidget,
+)
 
 from .qss_loader import load_base_qss
 

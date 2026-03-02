@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.command_frame import ParamCancelOp, ParamEditBeginOp, ParamWriteOp
-from steuerung3d.core.intents import ParamCancel, ParamEditBegin, ParamWrite
 from steuerung3d.core.intent_handlers.plc_write_keys import PLC_WRITE_KEYS
-from steuerung3d.core.intent_handlers.txn import txn_ack as _txn_ack
-from steuerung3d.core.intent_handlers.txn import txn_seen_or_mark as _txn_seen_or_mark
+from steuerung3d.core.intent_handlers.txn import (
+    txn_ack as _txn_ack,
+    txn_seen_or_mark as _txn_seen_or_mark,
+)
+from steuerung3d.core.intents import ParamCancel, ParamEditBegin, ParamWrite
 from steuerung3d.core.param_registry import normalize_group_values
 from steuerung3d.core.state import MachineState
-from steuerung3d.core.axis_ids import normalize_axis_id
 
 
 def handle_param_edit_begin(state: MachineState, intent: ParamEditBegin) -> None:

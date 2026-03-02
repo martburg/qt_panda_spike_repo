@@ -21,7 +21,6 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any, Iterable, List
 
-
 _BRACE_RE = re.compile(r"\{([^{}]+)\}")
 
 

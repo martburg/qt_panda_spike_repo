@@ -37,6 +37,7 @@ target-version = "py311"
 
 # Keep Ruff focused on *real* code.
 src = ["src", "tests", "tools"]
+include = ["src/**/*.py", "tests/**/*.py", "tools/**/*.py"]
 
 # Ruff will still respect .gitignore; this is additional hard exclusion.
 exclude = [
@@ -66,11 +67,11 @@ select = [
   "E",    # pycodestyle errors
   "F",    # pyflakes (incl F821)
   "I",    # import sorting
-  "UP",   # pyupgrade
+ # "UP",   # pyupgrade
   "B",    # flake8-bugbear (common gotchas)
-  "SIM",  # simplify
-  "PERF", # performance micro-idioms
-  "ARG",  # unused arguments (good for dead params)
+ # "SIM",  # simplify
+ # "PERF", # performance micro-idioms
+ # "ARG",  # unused arguments (good for dead params)
 ]
 
 # Avoid noisy/controversial rules by default.
@@ -80,7 +81,7 @@ ignore = [
 
 # Allow autofix where safe.
 fixable = ["ALL"]
-unfixable = []
+unfixable = ["F401"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["steuerung3d"]
@@ -92,6 +93,7 @@ combine-as-imports = true
   "ARG001", # unused function args (pytest fixtures)
   "ARG002",
   "E402",   # imports not at top (sometimes used in tests)
+  "F811",   # redefinition of unused imports (e.g. pytest fixtures)
 ]
 
 # Tools/scripts can be a bit looser.

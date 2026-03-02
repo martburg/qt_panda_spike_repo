@@ -44,7 +44,12 @@ def apply_densi_param_ops(
     applied: dict[str, float] = {}
 
     # Import here to keep module import side-effects minimal and avoid cycles.
-    from steuerung3d.core.command_frame import ParamEditBeginOp, ParamCancelOp, ParamWriteOp, coerce_param_ops
+    from steuerung3d.core.command_frame import (
+        ParamCancelOp,
+        ParamEditBeginOp,
+        ParamWriteOp,
+        coerce_param_ops,
+    )
 
     for op in coerce_param_ops(param_ops or []):
         if not allow:

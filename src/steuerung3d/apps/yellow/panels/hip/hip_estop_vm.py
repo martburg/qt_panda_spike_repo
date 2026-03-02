@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Callable, Mapping, Any
+from typing import Any, Callable, Mapping
 
 from steuerung3d.protocol.estop_bits import ESTOP_SPECS
 
-from ...domain.ui_estop import compute_estop_dot_states, active_estop_keys_for_profile
+from ...domain.ui_estop import active_estop_keys_for_profile, compute_estop_dot_states
 from ...engines.hip.viewmodel import HipEstopState
 
 

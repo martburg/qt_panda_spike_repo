@@ -20,17 +20,17 @@ __all__ = [
 def __getattr__(name: str):
 	if name in __all__:
 		from .engine import (  # type: ignore
-			HipEngine,
 			HipAttachInputs,
 			HipAttachState,
 			HipBannerInputs,
+			HipEngine,
 			HipParamAction,
 			HipParamCommitDialog,
 			HipState,
-			HipUiInputs,
-			HipViewModel,
 			HipStepInputs,
 			HipStepResult,
+			HipUiInputs,
+			HipViewModel,
 		)
 
 		return locals()[name]

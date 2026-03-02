@@ -1,6 +1,6 @@
-from steuerung3d.protocol.transport import InMemTransport
 from steuerung3d.core.intents import SetEstop
-from steuerung3d.core.telemetry import TelemetrySnapshot, AxisTelemetry
+from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
+from steuerung3d.protocol.transport import InMemTransport
 
 
 def test_inmem_transport_roundtrip():

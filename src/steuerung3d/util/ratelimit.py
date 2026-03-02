@@ -13,9 +13,9 @@ This module provides a tiny per-key rate limiter and a convenience helper to log
 exceptions at a controlled frequency (default: once per 2 seconds per key).
 """
 
-from dataclasses import dataclass, field
 import logging
 import time
+from dataclasses import dataclass, field
 from typing import Callable, Dict
 
 

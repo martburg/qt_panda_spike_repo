@@ -8,39 +8,34 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any, Dict, Union
 
-from steuerung3d.protocol.raw_controls import RawControls
-
+from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamOp, decode_param_ops
 from steuerung3d.core.intents import (
+    ClaimAxis,
     ClearFault,
+    EchoLifeTick,
     EnableAxis,
     Intent,
     JogAxis,
-    JogWinch,
     JogCartesian,
-    SetControlMode,
-    SmoothStop,
-    ClaimAxis,
-    ReleaseAxis,
-    RequestRigLease,
-    ReleaseRigLease,
-    RequestAxisLease,
-    ReleaseAxisLease,
-    SetEstop,
-    RequestEstopReset,   # NEW
-    RequestResync,
+    JogWinch,
+    JoyStateUpdate,
+    ParamCancel,
     ParamEditBegin,
     ParamWrite,
-    ParamCancel,
-    EchoLifeTick,
-    JoyStateUpdate,
+    ReleaseAxis,
+    ReleaseAxisLease,
+    ReleaseRigLease,
+    RequestAxisLease,
+    RequestEstopReset,  # NEW
+    RequestResync,
+    RequestRigLease,
+    SetControlMode,
+    SetEstop,
+    SmoothStop,
 )
-
-from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
 from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
-
-from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamOp, decode_param_ops
-
-
+from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
+from steuerung3d.protocol.raw_controls import RawControls
 
 # ---------------------------
 # Intents

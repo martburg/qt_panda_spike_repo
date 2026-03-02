@@ -9,7 +9,7 @@ imports stable while splitting implementation into smaller modules.
 
 from __future__ import annotations
 
-from .runtime_loop_impl import run_core_udp_service, _expand_dev_cmd_targets, _expand_targets
+from .runtime_loop_impl import _expand_dev_cmd_targets, _expand_targets, run_core_udp_service
 
 __all__ = [
     "run_core_udp_service",

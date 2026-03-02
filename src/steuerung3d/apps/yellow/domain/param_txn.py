@@ -15,8 +15,8 @@ without importing Qt.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import time
+from dataclasses import dataclass, field
 from typing import Callable, Dict, Iterable, List, Optional
 
 from steuerung3d.core.intents import Intent, ParamCancel, ParamEditBegin, ParamWrite

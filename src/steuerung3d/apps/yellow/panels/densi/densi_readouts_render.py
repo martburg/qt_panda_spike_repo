@@ -10,10 +10,9 @@ values with minimal churn.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ...qtutil.ui_update import set_text, update_slider
-
 from .densi_readouts_vm import DenSiReadoutsVM
 
 if TYPE_CHECKING:  # pragma: no cover

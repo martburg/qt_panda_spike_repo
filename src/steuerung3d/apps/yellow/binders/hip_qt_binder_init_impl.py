@@ -13,12 +13,24 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..engines.hip.attach_state import NOT_ATTACHED
+from steuerung3d.protocol.estop_bits import ESTOP_SPECS
 
-from ..qtutil.ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
-from ..qtutil.param_widget_binder import ParamWidgetBinder
+from ..domain.yellow_maps import LIMIT_WIDGETS as _LIMIT_WIDGETS, PARAM_WIDGETS as _PARAM_WIDGETS
+from ..engines.hip.attach_state import NOT_ATTACHED
+from ..panels.hip.hip_banner_render import HipBannerBindings
+from ..panels.hip.hip_cut_markers_render import HipCutMarkersBindings
+from ..panels.hip.hip_drive_status_render import HipDriveStatusBindings
+from ..panels.hip.hip_estop_render import HipEstopBindings
+from ..panels.hip.hip_header_dots_render import HipHeaderDotsBindings
+from ..panels.hip.hip_readouts_render import HipReadoutsBindings
+from ..panels.hip.hip_sliders_render import HipSlidersBindings
+from ..qtutil.binder_helpers import block_signals, safe_set_text
 from ..qtutil.modal_lock import ModalLock
 from ..qtutil.param_ui_apply import ParamUiBindings
+from ..qtutil.param_widget_binder import ParamWidgetBinder
+from ..qtutil.ui_contract import log_missing_optional_once, log_missing_required_once
+from ..qtutil.ui_format import fmt_f_unit_de
+from ..qtutil.ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
 from ..qtutil.ui_update import (
     set_enabled,
     set_enabled_repolish,
@@ -26,18 +38,6 @@ from ..qtutil.ui_update import (
     set_state_property,
 )
 from ..qtutil.widget_cache import WidgetCache
-from ..qtutil.ui_format import fmt_f_unit_de
-from ..qtutil.ui_contract import log_missing_optional_once, log_missing_required_once
-from ..qtutil.binder_helpers import block_signals, safe_set_text
-from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
-from ..panels.hip.hip_banner_render import HipBannerBindings
-from ..panels.hip.hip_estop_render import HipEstopBindings
-from ..panels.hip.hip_header_dots_render import HipHeaderDotsBindings
-from ..panels.hip.hip_cut_markers_render import HipCutMarkersBindings
-from ..panels.hip.hip_drive_status_render import HipDriveStatusBindings
-from ..panels.hip.hip_readouts_render import HipReadoutsBindings
-from ..panels.hip.hip_sliders_render import HipSlidersBindings
-from steuerung3d.protocol.estop_bits import ESTOP_SPECS
 
 if TYPE_CHECKING:
     from .hip_qt_binder import HipQtBinder

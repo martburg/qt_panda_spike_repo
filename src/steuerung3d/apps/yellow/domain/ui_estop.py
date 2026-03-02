@@ -24,8 +24,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from .estop_facts import estop_cause_keys as _estop_cause_keys
-from .estop_facts import estop_ok_keys as _estop_ok_keys
+from .estop_facts import estop_cause_keys as _estop_cause_keys, estop_ok_keys as _estop_ok_keys
 
 
 @dataclass(frozen=True)

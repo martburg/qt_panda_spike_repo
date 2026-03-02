@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import List
 
-from steuerung3d.protocol.banner_estate import derive_banner_estate_from_word
-from steuerung3d.core.mode_aggregate import AggregateInputs, AxisSafetyFacts
 from steuerung3d.core.joy_facts import extract_joy_facts
+from steuerung3d.core.mode_aggregate import AggregateInputs, AxisSafetyFacts
+from steuerung3d.protocol.banner_estate import derive_banner_estate_from_word
 from steuerung3d.protocol.estop_bits import decode_estop_word
 
 

@@ -11,8 +11,8 @@ Business rules and state-machine logic must live in the runtime/engine.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import logging
+from dataclasses import dataclass, field
 
 from PySide6.QtWidgets import (
     QAbstractSlider,
@@ -23,20 +23,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..qtutil.ui_contract import log_missing_optional_once, log_missing_required_once
-from ..qtutil.param_widget_binder import ParamWidgetBinder
-from ..qtutil.ui_update import (
-    set_checked,
-    set_enabled,
-    set_state_by_object_name,
-    set_state_property,
-)
-from ..qtutil.widget_cache import WidgetCache
-from ..qtutil.ui_format import fmt_float_de
-from ..qtutil.binder_helpers import block_signals, safe_set_text
-from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS, LIMIT_WIDGETS as _LIMIT_WIDGETS
+from steuerung3d.protocol.estop_bits import decode_estop_word, iter_specs
+
+from ..domain.yellow_maps import LIMIT_WIDGETS as _LIMIT_WIDGETS, PARAM_WIDGETS as _PARAM_WIDGETS
+from ..engines.densi.inputs import DensiEstopToggle, DensiInputs, DensiUiInputs
+from ..engines.densi.viewmodel import DensiViewModel
 from ..panels.densi.densi_banner_render import DenSiBannerBindings, apply_densi_banner_vm
-from ..panels.densi.densi_cut_markers_render import DenSiCutMarkersBindings, apply_densi_cut_markers_vm
+from ..panels.densi.densi_cut_markers_render import (
+    DenSiCutMarkersBindings,
+    apply_densi_cut_markers_vm,
+)
 from ..panels.densi.densi_estop_checkboxes_render import (
     DenSiEstopCheckboxBindings,
     discover_densi_estop_checkboxes,
@@ -48,9 +44,17 @@ from ..panels.densi.densi_estop_dots_render import apply_densi_estop_dots_vm
 from ..panels.densi.densi_header_online_render import apply_densi_header_online_vm
 from ..panels.densi.densi_lifetick_render import apply_densi_lifetick_vm
 from ..panels.densi.densi_readouts_render import DenSiReadoutsBindings, apply_densi_readouts_vm
-from ..engines.densi.inputs import DensiInputs, DensiUiInputs, DensiEstopToggle
-from ..engines.densi.viewmodel import DensiViewModel
-from steuerung3d.protocol.estop_bits import decode_estop_word, iter_specs
+from ..qtutil.binder_helpers import block_signals, safe_set_text
+from ..qtutil.param_widget_binder import ParamWidgetBinder
+from ..qtutil.ui_contract import log_missing_optional_once, log_missing_required_once
+from ..qtutil.ui_format import fmt_float_de
+from ..qtutil.ui_update import (
+    set_checked,
+    set_enabled,
+    set_state_by_object_name,
+    set_state_property,
+)
+from ..qtutil.widget_cache import WidgetCache
 
 
 @dataclass

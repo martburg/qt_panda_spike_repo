@@ -6,11 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-from steuerung3d.protocol.recording import JsonlReader
+from steuerung3d.config.log_viewer_config import LogViewerConfig, load_log_viewer_config
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.telemetry import TelemetrySnapshot
-
-from steuerung3d.config.log_viewer_config import load_log_viewer_config, LogViewerConfig
+from steuerung3d.protocol.recording import JsonlReader
 
 
 def _parse_args() -> argparse.Namespace:

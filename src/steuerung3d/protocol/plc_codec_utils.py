@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from steuerung3d.protocol.parse_primitives import parse_bool as _parse_bool
-from steuerung3d.protocol.parse_primitives import parse_float as _parse_float
-from steuerung3d.protocol.parse_primitives import parse_int as _parse_int
+from steuerung3d.protocol.parse_primitives import (
+    parse_bool as _parse_bool,
+    parse_float as _parse_float,
+    parse_int as _parse_int,
+)
+
 
 def to_float(s: str, default: float = 0.0) -> float:
     return _parse_float(s, default=default)

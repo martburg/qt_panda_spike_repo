@@ -15,21 +15,20 @@ Design goals:
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-from steuerung3d.core.command_frame import CommandFrame, AxisSetpoint
-from steuerung3d.core.telemetry import TelemetrySnapshot, AxisTelemetry
-
-from steuerung3d.protocol.legacy_plc import parse_uplink, LegacyPlcUplink
+from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
+from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
+from steuerung3d.protocol.legacy_plc import LegacyPlcUplink, parse_uplink
 from steuerung3d.protocol.plc_codec_fields import (
     DOWNLINK_BASE_FIELDS,
     DOWNLINK_WRITE_FIELDS,
     PARAM_KEYMAP as _PARAM_KEYMAP,
 )
-from steuerung3d.protocol.plc_codec_utils import bool_token as _bool_token
-from steuerung3d.protocol.plc_codec_utils import fmt as _fmt
-from steuerung3d.protocol.plc_codec_utils import to_float as _to_float
-from steuerung3d.protocol.plc_codec_utils import to_int as _to_int
-
-
+from steuerung3d.protocol.plc_codec_utils import (
+    bool_token as _bool_token,
+    fmt as _fmt,
+    to_float as _to_float,
+    to_int as _to_int,
+)
 
 
 def encode_downlink(
@@ -201,7 +200,7 @@ def decode_uplink_to_snapshot(payload: bytes) -> Optional[TelemetrySnapshot]:
 
         # Active estop is defined by CAUSE bits (not by "word != 0", because OK/status bits can be set).
         try:
-            from steuerung3d.protocol.estop_bits import decode_estop_word, ESTOP_CAUSE_KEYS
+            from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, decode_estop_word
             estop_bits = decode_estop_word(int(estop_status_word))
             estop_active = any(bool(estop_bits.get(k, False)) for k in ESTOP_CAUSE_KEYS)
         except Exception:

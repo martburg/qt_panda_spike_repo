@@ -17,8 +17,6 @@ from PySide6.QtWidgets import QWidget
 
 from .widget_cache import WidgetCache
 
-
-
 _LOGGED_CONTEXTS: set[str] = set()
 
 

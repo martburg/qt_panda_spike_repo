@@ -6,8 +6,8 @@ from steuerung3d.apps.yellow.domain.banner_facts import derive_banner_estate_fro
 from steuerung3d.apps.yellow.domain.estop_facts import encode_estop_word
 from steuerung3d.apps.yellow.engines.hip.engine import HipEngine
 from steuerung3d.apps.yellow.runtimes.hip_runtime import HipRuntime
-from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS
+from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 
 
 class _StatusSink:

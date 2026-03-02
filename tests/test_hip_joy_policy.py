@@ -5,7 +5,7 @@ from dataclasses import replace
 from steuerung3d.apps.yellow.engines.hip.engine import HipEngine, HipStepInputs, HipUiInputs
 from steuerung3d.core.intents import ClaimAxis, EnableAxis, JogAxis, JogWinch
 from steuerung3d.core.joy_state import JoyState
-from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot, DensiTelemetry
+from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS, encode_estop_word
 
 

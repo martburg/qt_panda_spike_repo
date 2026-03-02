@@ -4,7 +4,6 @@ from typing import Dict
 
 from steuerung3d.core.state import MachineState
 
-
 # PLC Modus 'w' expects the full parameter set on each write.
 # We merge partial UI writes with last-known params to avoid zeroing untouched fields.
 PLC_WRITE_KEYS = {

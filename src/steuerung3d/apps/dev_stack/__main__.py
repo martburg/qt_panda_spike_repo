@@ -3,10 +3,13 @@ from __future__ import annotations
 import argparse
 import socket
 import time
+import tomllib
 from pathlib import Path
 
-import tomllib
-
+from steuerung3d.adapters.plc.udp_device import UdpPlcDevice
+from steuerung3d.adapters.plc_twincat_legacy.config import load_plc_twincat_legacy_fleet_from_toml
+from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
+from steuerung3d.adapters.sim.device import SimDevice
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
@@ -15,11 +18,6 @@ from steuerung3d.core.state import MachineState
 from steuerung3d.protocol.core_runner import CoreRunner
 from steuerung3d.protocol.recording import JsonlRecorder, LoggedTransport
 from steuerung3d.protocol.transport import InMemTransport
-
-from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
-from steuerung3d.adapters.sim.device import SimDevice
-from steuerung3d.adapters.plc.udp_device import UdpPlcDevice
-from steuerung3d.adapters.plc_twincat_legacy.config import load_plc_twincat_legacy_fleet_from_toml
 
 
 def _can_bind_ip(ip: str) -> bool:
@@ -55,7 +53,9 @@ def _load_device_from_config(config_path: Path, plant: SimAxisPlant):
                 f"[dev_stack] controller_ip={controller_ip} not present on this host -> "
                 f"using UDP SIM fallback for plc_twincat_legacy_fleet"
             )
-            from steuerung3d.adapters.plc_twincat_legacy.udp_sim import build_udp_sim_fleet_from_toml
+            from steuerung3d.adapters.plc_twincat_legacy.udp_sim import (
+                build_udp_sim_fleet_from_toml,
+            )
 
             # Returns an object with .step(...) and .close()
             return build_udp_sim_fleet_from_toml(config_path, dt_s=0.01)

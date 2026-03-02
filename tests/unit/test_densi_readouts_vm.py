@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+from steuerung3d.apps.yellow.panels.densi.densi_readouts_vm import compute_densi_readouts_vm
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
 from steuerung3d.core.state import MachineState
-
-from steuerung3d.apps.yellow.panels.densi.densi_readouts_vm import compute_densi_readouts_vm
 
 
 def test_compute_densi_readouts_vm_formats_and_sliders() -> None:

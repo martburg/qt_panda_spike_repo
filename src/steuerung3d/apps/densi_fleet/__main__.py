@@ -6,13 +6,13 @@ import shlex
 import subprocess
 import sys
 import time
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple
 
-import tomllib
-
 from steuerung3d.core.net import parse_hostport
+
 
 def _is_windows() -> bool:
     return os.name == "nt"

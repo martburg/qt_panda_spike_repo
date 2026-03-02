@@ -16,7 +16,6 @@ from collections.abc import Callable
 
 from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS, decode_estop_word
 
-
 # These bits are dynamic/transient and should NOT be used to decide whether the
 # OK-chain is tripped.
 #

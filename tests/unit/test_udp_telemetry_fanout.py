@@ -4,7 +4,7 @@ import socket
 import time
 
 from steuerung3d.core.telemetry import TelemetrySnapshot
-from steuerung3d.protocol.udp_channels import UdpTelemetryIn, UdpTelemetryOut, UdpTelemetryFanout
+from steuerung3d.protocol.udp_channels import UdpTelemetryFanout, UdpTelemetryIn, UdpTelemetryOut
 
 
 def _free_port() -> int:

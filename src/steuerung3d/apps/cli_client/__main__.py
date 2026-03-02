@@ -13,7 +13,6 @@ from steuerung3d.core.state import MachineState
 from steuerung3d.protocol.core_runner import CoreRunner
 from steuerung3d.protocol.transport import InMemTransport
 
-
 HELP = """commands:
   help
   estop on|off         -> SetEstop(True/False)

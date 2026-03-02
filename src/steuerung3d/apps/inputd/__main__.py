@@ -6,12 +6,11 @@ import time
 from pathlib import Path
 from typing import List, Optional
 
-from steuerung3d.util.app_bootstrap import bootstrap_logging
-from steuerung3d.util.heartbeat import Heartbeat, ChangeTracker
 from steuerung3d.core.status import StatusEmitter
-
 from steuerung3d.protocol.raw_controls import RawControls
 from steuerung3d.protocol.udp_channels import UdpRawControlsOut
+from steuerung3d.util.app_bootstrap import bootstrap_logging
+from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 
 from .config import InputdConfig, load_inputd_config
 from .pygame_backend import PygameJoystick, clamp, deadzone_expo

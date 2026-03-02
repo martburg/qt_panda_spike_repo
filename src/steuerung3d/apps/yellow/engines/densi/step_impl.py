@@ -5,10 +5,10 @@ No semantic changes intended; this is a mechanical extraction from `engine.py`.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, replace
 from datetime import datetime
-import time
-from typing import Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     # Only needed for type checking; avoids runtime import cycles.
@@ -27,10 +27,10 @@ from ...domain.estop_facts import (
     estop_cause_keys,
     estop_ok_keys,
 )
-
-from .types import EStopState, L0Top, L0Sub
-from .cut_markers import clear_cut_markers as _clear_cut_markers
-from .cut_markers import maybe_latch_cut_markers as _maybe_latch_cut_markers
+from .cut_markers import (
+    clear_cut_markers as _clear_cut_markers,
+    maybe_latch_cut_markers as _maybe_latch_cut_markers,
+)
 from .drive_status import update_drive_status_words
 from .estop_fsm import (
     apply_estop_state_machine,
@@ -38,12 +38,12 @@ from .estop_fsm import (
     derive_estop_inputs as _derive_estop_inputs,
     sync_reset_able_bit as _sync_reset_able_bit,
 )
-from .resync import handle_resync_cmd as _handle_resync_cmd
-from .param_ops import apply_densi_param_ops
 from .motion_clamp import apply_estop_clamp_to_state, compute_moving_guard
+from .param_ops import apply_densi_param_ops
 from .plc_anton_vel_cmd import step_plc_anton_vel_cmd
+from .resync import handle_resync_cmd as _handle_resync_cmd
 from .setpoint_semantics import normalize_cmd_for_plant
-
+from .types import EStopState, L0Sub, L0Top
 
 
 @dataclass

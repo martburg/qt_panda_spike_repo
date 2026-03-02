@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.intents import RequestRigLease, ReleaseRigLease
+from steuerung3d.core.intents import ReleaseRigLease, RequestRigLease
 from steuerung3d.core.state import MachineState
 
 

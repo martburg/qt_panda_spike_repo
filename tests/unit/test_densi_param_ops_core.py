@@ -2,9 +2,9 @@ import sys
 
 sys.path.insert(0, 'src')
 
-from steuerung3d.core.state import MachineState
-from steuerung3d.core.command_frame import ParamEditBeginOp, ParamWriteOp
 from steuerung3d.apps.yellow.engines.densi.param_ops import apply_densi_param_ops
+from steuerung3d.core.command_frame import ParamEditBeginOp, ParamWriteOp
+from steuerung3d.core.state import MachineState
 
 
 def test_param_ops_begin_write_ends_session_and_applies_values():

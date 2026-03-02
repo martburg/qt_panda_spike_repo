@@ -5,14 +5,13 @@ from __future__ import annotations
 from typing import Callable
 
 from ...domain import estop_facts
+from ...domain.banner_facts import BANNER_DYNAMIC_EXCLUDE, derive_banner_estate_from_word
 from ...domain.estop_facts import (
     decode_estop_word,
     encode_estop_word,
     estop_cause_keys,
     estop_ok_keys,
 )
-
-from ...domain.banner_facts import BANNER_DYNAMIC_EXCLUDE, derive_banner_estate_from_word
 from .types import EStopState
 
 

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import argparse
 import logging
 
-import argparse
-
-from steuerung3d.util.app_bootstrap import bootstrap_logging
 from steuerung3d.core.status import StatusEmitter
+from steuerung3d.util.app_bootstrap import bootstrap_logging
 
 from .runtime_loop import run_core_udp_service
 

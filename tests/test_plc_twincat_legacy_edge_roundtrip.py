@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+
 import pytest
 
 if os.getenv("RUN_LEGACY_TWINCAT_TESTS", "0") != "1":
@@ -15,9 +16,13 @@ import time
 from steuerung3d.adapters.plc_twincat_legacy.edge import TwinCATLegacyWinchEdge
 from steuerung3d.adapters.plc_twincat_legacy.udp_sim import TwinCATLegacyPlcUdpSim
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
-from steuerung3d.protocol.udp_channels import UdpCommandOut, UdpTelemetryIn
+from steuerung3d.protocol.udp_channels import (
+    UdpCommandIn,
+    UdpCommandOut,
+    UdpTelemetryIn,
+    UdpTelemetryOut,
+)
 from steuerung3d.protocol.udp_transport_v2 import UdpTransportV2
-from steuerung3d.protocol.udp_channels import UdpCommandIn, UdpTelemetryOut
 
 
 def _free_udp_port() -> int:

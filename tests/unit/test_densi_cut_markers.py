@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from steuerung3d.apps.yellow.engines.densi.cut_markers import clear_cut_markers, maybe_latch_cut_markers
+from steuerung3d.apps.yellow.engines.densi.cut_markers import (
+    clear_cut_markers,
+    maybe_latch_cut_markers,
+)
 from steuerung3d.core.state import MachineState
 
 

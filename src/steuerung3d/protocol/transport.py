@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from queue import Queue, Empty
+from queue import Empty, Queue
 from typing import List, Protocol, runtime_checkable
 
-from steuerung3d.core.intents import Intent
 from steuerung3d.core.command_frame import CommandFrame
+from steuerung3d.core.intents import Intent
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.raw_controls import RawControls
 

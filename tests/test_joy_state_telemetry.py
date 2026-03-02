@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from steuerung3d.common.timebase import Timebase
+from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.intents import JoyStateUpdate
 from steuerung3d.core.joy_state import JoyState
-from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.state import MachineState
 from steuerung3d.protocol.transport import InMemTransport
 
