@@ -29,6 +29,8 @@ from .types import (
     HipState,
     HipStepInputs,
     HipStepResult,
+    HipUiInputs,
+    HipParamAction
 )
 from .viewmodel import HipViewModel
 

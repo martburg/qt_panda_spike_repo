@@ -1,0 +1,15 @@
+diff --git a/src/steuerung3d/apps/yellow/engines/hip/engine.py b/src/steuerung3d/apps/yellow/engines/hip/engine.py
+--- a/src/steuerung3d/apps/yellow/engines/hip/engine.py
++++ b/src/steuerung3d/apps/yellow/engines/hip/engine.py
+@@ -1,10 +1,11 @@
+ from .types import (
+     HipAttachInputs,
+     HipBannerInputs,
+     HipParamButtons,
+     HipParamGroup,
+     HipParamUiState,
+     HipState,
+     HipStepInputs,
+     HipStepResult,
++    HipUiInputs,
+ )
