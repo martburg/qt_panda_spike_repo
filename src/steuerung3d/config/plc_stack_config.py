@@ -10,11 +10,13 @@ from steuerung3d.config.toml_loader import load_toml
 # Dataclasses (schema)
 # --------------------
 
+
 @dataclass(frozen=True)
 class AppConfig:
     dt_s: float = 0.01
     realtime: bool = True
     log_path: str = "logs/session_plc.jsonl"
+
 
 @dataclass(frozen=True)
 class PlcEndpointConfig:
@@ -31,14 +33,17 @@ class PlcEndpointConfig:
     true_token: str = "True"
     false_token: str = "False"
 
+
 @dataclass(frozen=True)
 class PlcStackConfig:
     app: AppConfig
     plc_endpoints: List[PlcEndpointConfig]
 
+
 # --------------------
 # Loader
 # --------------------
+
 
 def load_plc_stack_config(path: Path) -> PlcStackConfig:
     """Load PLC stack configuration from TOML.
@@ -96,6 +101,7 @@ def load_plc_stack_config(path: Path) -> PlcStackConfig:
     _validate(endpoints)
     return PlcStackConfig(app=app, plc_endpoints=endpoints)
 
+
 def _validate(endpoints: List[PlcEndpointConfig]) -> None:
     if not endpoints:
         raise ValueError("No plc_endpoints configured. Add at least one [[plc_endpoints]] entry.")
@@ -120,4 +126,3 @@ def _validate(endpoints: List[PlcEndpointConfig]) -> None:
             if ax in owned:
                 raise ValueError(f"Axis '{ax}' is owned by both '{owned[ax]}' and '{e.name}'")
             owned[ax] = e.name
-

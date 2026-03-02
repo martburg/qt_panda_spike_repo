@@ -39,7 +39,9 @@ def main() -> int:
             errors.append(f"missing mirror: configs/stacks/{prof.name}")
             continue
         if prof.read_text(encoding="utf-8") != mirror.read_text(encoding="utf-8"):
-            errors.append(f"drift: configs/stacks/{prof.name} differs from configs/profiles/{prof.name}")
+            errors.append(
+                f"drift: configs/stacks/{prof.name} differs from configs/profiles/{prof.name}"
+            )
 
     extra = sorted(set(stacks.keys()) - {p.name for p in profiles})
     for name in extra:

@@ -12,8 +12,10 @@ DEN_SI_DT = "0.1"
 LOG_LEVEL = "debug"
 
 CORE_CMD = f"python -m steuerung3d.apps.core_udp_service --log-level {LOG_LEVEL}"
-DEN_SI_CMD = f"python -m steuerung3d.apps.den_si --axis {AXIS_ID} --dt {DEN_SI_DT} --log-level {LOG_LEVEL}"
-HIP_CMD  = f"python -m steuerung3d.apps.hi_p --log-level {LOG_LEVEL}"
+DEN_SI_CMD = (
+    f"python -m steuerung3d.apps.den_si --axis {AXIS_ID} --dt {DEN_SI_DT} --log-level {LOG_LEVEL}"
+)
+HIP_CMD = f"python -m steuerung3d.apps.hi_p --log-level {LOG_LEVEL}"
 
 
 def _run(cmd: list[str]) -> None:
@@ -22,22 +24,29 @@ def _run(cmd: list[str]) -> None:
 
 def launch_with_windows_terminal() -> None:
     # Window #1: core
-    _run([
-        "wt",
-        "new-tab", "--title", "core",
-        "cmd.exe", "/k", CORE_CMD
-    ])
+    _run(["wt", "new-tab", "--title", "core", "cmd.exe", "/k", CORE_CMD])
 
     # Window #2: den-si + hi-p split panes
     # Start den-si in first pane, split vertical for hi-p.
-    _run([
-        "wt",
-        "new-tab", "--title", "den-si",
-        "cmd.exe", "/k", DEN_SI_CMD,
-        ";",
-        "split-pane", "-V", "--title", "hi-p",
-        "cmd.exe", "/k", HIP_CMD
-    ])
+    _run(
+        [
+            "wt",
+            "new-tab",
+            "--title",
+            "den-si",
+            "cmd.exe",
+            "/k",
+            DEN_SI_CMD,
+            ";",
+            "split-pane",
+            "-V",
+            "--title",
+            "hi-p",
+            "cmd.exe",
+            "/k",
+            HIP_CMD,
+        ]
+    )
 
 
 def launch_with_powershell_fallback() -> None:
@@ -51,8 +60,8 @@ def launch_with_powershell_fallback() -> None:
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
 
     core_log = logs_dir / f"core-{ts}.log"
-    den_log  = logs_dir / f"den-si-{ts}.log"
-    hip_log  = logs_dir / f"hi-p-{ts}.log"
+    den_log = logs_dir / f"den-si-{ts}.log"
+    hip_log = logs_dir / f"hi-p-{ts}.log"
 
     # Window #1
     subprocess.Popen(

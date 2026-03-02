@@ -4,8 +4,12 @@ from steuerung3d.apps.yellow.domain.joy_motion_map import map_soll_speed_to_jog_
 
 
 def test_map_soll_speed_clamps() -> None:
-    it_neg = map_soll_speed_to_jog_winch(winch_id="Anton", soll_speed=-2.0, vel_max=2.0, hip_id="hip")
-    it_pos = map_soll_speed_to_jog_winch(winch_id="Anton", soll_speed=2.0, vel_max=2.0, hip_id="hip")
+    it_neg = map_soll_speed_to_jog_winch(
+        winch_id="Anton", soll_speed=-2.0, vel_max=2.0, hip_id="hip"
+    )
+    it_pos = map_soll_speed_to_jog_winch(
+        winch_id="Anton", soll_speed=2.0, vel_max=2.0, hip_id="hip"
+    )
     assert it_neg is not None
     assert it_pos is not None
     assert it_neg.rate == -2.0

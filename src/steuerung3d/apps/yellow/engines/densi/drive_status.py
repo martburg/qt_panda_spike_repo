@@ -34,7 +34,9 @@ def make_drive_status_word(
     return int(w)
 
 
-def update_drive_status_words(*, state: MachineState, inj_estop_word: int, drive_ready: bool) -> None:
+def update_drive_status_words(
+    *, state: MachineState, inj_estop_word: int, drive_ready: bool
+) -> None:
     bits = decode_estop_word(int(inj_estop_word))
     taster = bool(bits.get("taster", False))
 

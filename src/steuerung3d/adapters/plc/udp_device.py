@@ -25,7 +25,7 @@ class UdpPlcDevice:
 
     remote: Tuple[str, int] = ("127.0.0.1", 55001)
     timeout_s: float = 0.02
-    codec: PlcLineCodec = field(default_factory=lambda: PlcLineCodec())    
+    codec: PlcLineCodec = field(default_factory=lambda: PlcLineCodec())
     _sock: Optional[socket.socket] = None
 
     def _ensure_sock(self) -> socket.socket:

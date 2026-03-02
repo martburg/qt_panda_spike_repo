@@ -14,11 +14,13 @@ def test_coerce_param_ops_none_and_nonlist():
 
 
 def test_coerce_param_ops_dicts_to_dataclasses():
-    ops = coerce_param_ops([
-        {"type": "param_edit_begin", "group": "pos"},
-        {"type": "param_write", "group": "pos", "values": {"UserMax": 1, "UserMin": -2.5}},
-        {"type": "param_cancel", "group": "pos"},
-    ])
+    ops = coerce_param_ops(
+        [
+            {"type": "param_edit_begin", "group": "pos"},
+            {"type": "param_write", "group": "pos", "values": {"UserMax": 1, "UserMin": -2.5}},
+            {"type": "param_cancel", "group": "pos"},
+        ]
+    )
     assert len(ops) == 3
     assert isinstance(ops[0], ParamEditBeginOp)
     assert isinstance(ops[1], ParamWriteOp)

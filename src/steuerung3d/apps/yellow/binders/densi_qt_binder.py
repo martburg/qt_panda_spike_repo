@@ -78,7 +78,9 @@ class DenSiQtBinder:
 
         # Widgets
         self._txtTick: QLineEdit | None = self.win.findChild(QLineEdit, "txtTick")
-        self._txt_hdr_banner_left: QLineEdit | None = self.win.findChild(QLineEdit, "txtHdrBannerLeft")
+        self._txt_hdr_banner_left: QLineEdit | None = self.win.findChild(
+            QLineEdit, "txtHdrBannerLeft"
+        )
         self._txt_hdr_banner_right: QLineEdit | None = self.win.findChild(
             QLineEdit, "txtHdrBannerRight"
         )
@@ -93,23 +95,31 @@ class DenSiQtBinder:
         self._txtCutTime: QLineEdit | None = self.win.findChild(QLineEdit, "txtCutTime")
         self._txtPosdiff: QLineEdit | None = self.win.findChild(QLineEdit, "txtPosdiff")
 
-        self._txt_guider_range_min: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMin")
-        self._txt_guider_range_max: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeMax")
-        self._txt_guider_range_val: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderRangeValue")
-        self._txt_guider_speed: QLineEdit | None = self.win.findChild(
-            QLineEdit, "txtGuiderSpeed"
+        self._txt_guider_range_min: QLineEdit | None = self.win.findChild(
+            QLineEdit, "txtGuiderRangeMin"
         )
+        self._txt_guider_range_max: QLineEdit | None = self.win.findChild(
+            QLineEdit, "txtGuiderRangeMax"
+        )
+        self._txt_guider_range_val: QLineEdit | None = self.win.findChild(
+            QLineEdit, "txtGuiderRangeValue"
+        )
+        self._txt_guider_speed: QLineEdit | None = self.win.findChild(QLineEdit, "txtGuiderSpeed")
 
         self._sld_vel_cmd: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldVelCmd")
-        self._sld_limit_range: QAbstractSlider | None = self.win.findChild(QAbstractSlider, "sldLimitRange")
-
-        self._btn_diag_resync: QPushButton | None = self.win.findChild(
-            QPushButton, "btnDiagResync"
+        self._sld_limit_range: QAbstractSlider | None = self.win.findChild(
+            QAbstractSlider, "sldLimitRange"
         )
+
+        self._btn_diag_resync: QPushButton | None = self.win.findChild(QPushButton, "btnDiagResync")
         self._btn_es_start: QPushButton | None = self.win.findChild(QPushButton, "btnESStart")
 
-        self._btn_estop_all_set: QPushButton | None = self.win.findChild(QPushButton, "btnEStopAllSet")
-        self._btn_estop_all_clear: QPushButton | None = self.win.findChild(QPushButton, "btnEStopAllClear")
+        self._btn_estop_all_set: QPushButton | None = self.win.findChild(
+            QPushButton, "btnEStopAllSet"
+        )
+        self._btn_estop_all_clear: QPushButton | None = self.win.findChild(
+            QPushButton, "btnEStopAllClear"
+        )
 
         self._cmbAxis: QComboBox | None = self.win.findChild(QComboBox, "cmbAxis")
 
@@ -186,10 +196,18 @@ class DenSiQtBinder:
 
     def lock_param_ui_device_side(self) -> None:
         btn_names = [
-            "btnPosEdit", "btnPosWrite", "btnPosCancel",
-            "btnVelEdit", "btnVelWrite", "btnVelCancel",
-            "btnFilterEdit", "btnFilterWrite", "btnFilterCancel",
-            "btnGuiderEdit", "btnGuiderWrite", "btnGuiderCancel",
+            "btnPosEdit",
+            "btnPosWrite",
+            "btnPosCancel",
+            "btnVelEdit",
+            "btnVelWrite",
+            "btnVelCancel",
+            "btnFilterEdit",
+            "btnFilterWrite",
+            "btnFilterCancel",
+            "btnGuiderEdit",
+            "btnGuiderWrite",
+            "btnGuiderCancel",
         ]
         for name in btn_names:
             b = self._wcache.button(name)
@@ -231,7 +249,9 @@ class DenSiQtBinder:
             set_enabled=lambda cb, en: set_enabled(cb, en),
             readonly_keys={"reset_able"},
         )
-        wire_densi_estop_checkboxes(bindings=self._estop_cb_bindings, on_toggled=self._on_estop_checkbox_toggled)
+        wire_densi_estop_checkboxes(
+            bindings=self._estop_cb_bindings, on_toggled=self._on_estop_checkbox_toggled
+        )
 
     def reset_ui_startup(self) -> None:
         safe_set_text(self._txtTick, "--")
@@ -327,7 +347,9 @@ class DenSiQtBinder:
         self._ui_actions.diag_resync_clicked = True
 
     def _on_estop_checkbox_toggled(self, key: str, checked: bool) -> None:
-        self._ui_actions.estop_bit_toggles.append(DensiEstopToggle(key=str(key), checked=bool(checked)))
+        self._ui_actions.estop_bit_toggles.append(
+            DensiEstopToggle(key=str(key), checked=bool(checked))
+        )
 
     # ------------------------------------------------------------------
     # UI helpers

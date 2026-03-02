@@ -1,6 +1,6 @@
 import sys
 
-sys.path.insert(0, 'src')
+sys.path.insert(0, "src")
 
 from steuerung3d.apps.yellow.engines.densi.param_ops import apply_densi_param_ops
 from steuerung3d.core.command_frame import ParamEditBeginOp, ParamWriteOp
@@ -13,8 +13,8 @@ def test_param_ops_begin_write_ends_session_and_applies_values():
     def norm_pos(vals):
         # simulate normalization: swap min/max if needed
         v = dict(vals)
-        if 'HardMin' in v and 'HardMax' in v and v['HardMin'] > v['HardMax']:
-            v['HardMin'], v['HardMax'] = v['HardMax'], v['HardMin']
+        if "HardMin" in v and "HardMax" in v and v["HardMin"] > v["HardMax"]:
+            v["HardMin"], v["HardMax"] = v["HardMax"], v["HardMin"]
         return v
 
     def norm_guider(vals):
@@ -23,16 +23,16 @@ def test_param_ops_begin_write_ends_session_and_applies_values():
     def enf_pos(vals):
         # simulate enforcement: clamp
         v = dict(vals)
-        if 'HardMax' in v:
-            v['HardMax'] = min(v['HardMax'], 10.0)
+        if "HardMax" in v:
+            v["HardMax"] = min(v["HardMax"], 10.0)
         return v
 
     def enf_guider(vals):
         return dict(vals)
 
     ops = [
-        ParamEditBeginOp(group='pos'),
-        ParamWriteOp(group='pos', values={'HardMin': 5.0, 'HardMax': 12.0}),
+        ParamEditBeginOp(group="pos"),
+        ParamWriteOp(group="pos", values={"HardMin": 5.0, "HardMax": 12.0}),
     ]
 
     res = apply_densi_param_ops(
@@ -46,21 +46,21 @@ def test_param_ops_begin_write_ends_session_and_applies_values():
     )
 
     assert st.param_edit_active is False
-    assert st.param_edit_group == ''
-    assert st.params['HardMin'] == 5.0
-    assert st.params['HardMax'] == 10.0
-    assert res.applied_values['HardMax'] == 10.0
+    assert st.param_edit_group == ""
+    assert st.params["HardMin"] == 5.0
+    assert st.params["HardMax"] == 10.0
+    assert res.applied_values["HardMax"] == 10.0
 
 
 def test_param_ops_rejects_mismatched_group_when_session_active():
-    st = MachineState(param_edit_active=True, param_edit_group='pos')
+    st = MachineState(param_edit_active=True, param_edit_group="pos")
 
     def ident(vals):
         return dict(vals)
 
     res = apply_densi_param_ops(
         state=st,
-        param_ops=[ParamWriteOp(group='guider', values={'PosMin': 1.0})],
+        param_ops=[ParamWriteOp(group="guider", values={"PosMin": 1.0})],
         allow=True,
         normalize_pos_chain=ident,
         normalize_guider_range=ident,
@@ -76,11 +76,11 @@ def test_param_ops_allow_false_ignores_everything():
     st = MachineState()
 
     def boom(vals):
-        raise AssertionError('should not be called')
+        raise AssertionError("should not be called")
 
     res = apply_densi_param_ops(
         state=st,
-        param_ops=[ParamWriteOp(group='pos', values={'HardMax': 2.0})],
+        param_ops=[ParamWriteOp(group="pos", values={"HardMax": 2.0})],
         allow=False,
         normalize_pos_chain=boom,
         normalize_guider_range=boom,

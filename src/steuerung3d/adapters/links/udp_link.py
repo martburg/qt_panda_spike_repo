@@ -14,6 +14,7 @@ class UdpLink:
     - target: remote (host, port) to send to PLC
     - poll(): non-blocking drain of available datagrams
     """
+
     bind: Tuple[str, int]
     target: Tuple[str, int]
     recv_buf: int = 65535

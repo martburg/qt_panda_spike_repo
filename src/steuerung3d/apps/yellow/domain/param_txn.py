@@ -75,7 +75,9 @@ class ParamEditTxnClient:
             now_ns = time.monotonic_ns()
         self.ignore_remote_until_ns = int(now_ns) + int(self.ignore_remote_after_end_ns)
 
-    def effective_remote_edit_state(self, *, remote_active: bool, remote_group: str, now_ns: int) -> tuple[bool, str]:
+    def effective_remote_edit_state(
+        self, *, remote_active: bool, remote_group: str, now_ns: int
+    ) -> tuple[bool, str]:
         """Compute the effective edit state to show in the UI."""
 
         if self.local_edit_active:
@@ -114,7 +116,9 @@ class ParamEditTxnClient:
             session_id=session_id,
         )
 
-    def make_write_intent(self, *, axis_id: str, group: str, values: Dict[str, float]) -> ParamWrite:
+    def make_write_intent(
+        self, *, axis_id: str, group: str, values: Dict[str, float]
+    ) -> ParamWrite:
         session_id = self.ensure_session(group)
         req_id = self._next_req_id()
         return ParamWrite(
@@ -194,13 +198,19 @@ class ParamEditTxnClient:
             itype = type(intent).__name__ if intent is not None else "<?>"
 
             if retries >= int(self.max_retries):
-                events.append(RetryEvent(req_id=rid, action="giveup", retries=retries, intent_type=itype))
+                events.append(
+                    RetryEvent(req_id=rid, action="giveup", retries=retries, intent_type=itype)
+                )
                 self._pending_txn.pop(rid, None)
                 continue
 
             info["retries"] = retries + 1
             info["sent_ns"] = int(now_ns)
-            events.append(RetryEvent(req_id=rid, action="resend", retries=int(info["retries"]), intent_type=itype))
+            events.append(
+                RetryEvent(
+                    req_id=rid, action="resend", retries=int(info["retries"]), intent_type=itype
+                )
+            )
             if intent is not None:
                 publish(intent)
 

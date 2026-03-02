@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import (
     QFrame,
@@ -21,7 +22,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-
 from ..domain.yellow_maps import PARAM_WIDGETS as _PARAM_WIDGETS
 from ..engines.hip.engine import (
     HipParamAction,
@@ -29,6 +29,16 @@ from ..engines.hip.engine import (
     HipViewModel,
 )
 from ..qtutil.modal_lock import ModalLock
+
+if TYPE_CHECKING:
+    from ..panels.hip.hip_banner_render import HipBannerBindings
+    from ..panels.hip.hip_cut_markers_render import HipCutMarkersBindings
+    from ..panels.hip.hip_drive_status_render import HipDriveStatusBindings
+    from ..panels.hip.hip_estop_render import HipEstopBindings
+    from ..panels.hip.hip_header_dots_render import HipHeaderDotsBindings
+    from ..panels.hip.hip_readouts_render import HipReadoutsBindings
+    from ..panels.hip.hip_sliders_render import HipSlidersBindings
+    from ..qtutil.param_ui_apply import ParamUiBindings
 
 from . import hip_qt_binder_apply_impl as _apply_impl, hip_qt_binder_init_impl as _init_impl
 

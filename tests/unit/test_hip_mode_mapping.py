@@ -14,7 +14,9 @@ class _StatusSink:
     def __init__(self) -> None:
         self.calls: list[dict] = []
 
-    def emit_every(self, *, level: str = "OK", summary: str = "", fields: dict | None = None) -> None:
+    def emit_every(
+        self, *, level: str = "OK", summary: str = "", fields: dict | None = None
+    ) -> None:
         self.calls.append({"level": level, "summary": summary, "fields": dict(fields or {})})
 
 

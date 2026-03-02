@@ -11,6 +11,7 @@ from steuerung3d.protocol.axis_router import AxisRouter
 @dataclass
 class _CmdSink:
     frames: List[CommandFrame]
+
     def publish_command_frame(self, frame: CommandFrame) -> None:
         self.frames.append(frame)
 
@@ -18,6 +19,7 @@ class _CmdSink:
 @dataclass
 class _TelemSink:
     snaps: List[TelemetrySnapshot]
+
     def publish_telemetry(self, snap: TelemetrySnapshot) -> None:
         self.snaps.append(snap)
 

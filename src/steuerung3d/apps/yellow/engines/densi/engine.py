@@ -146,8 +146,12 @@ class DenSiEngine:
             normalize_guider_range=normalize_guider_range,
             enforce_pos_chain=enforce_pos_chain,
             enforce_guider_minmax=enforce_guider_minmax,
-            lifetick_stale_after_ticks_active=int(lifetick_stale_after_ticks_active) if lifetick_stale_after_ticks_active is not None else 50,
-            lifetick_stale_after_ticks_idle=int(lifetick_stale_after_ticks_idle) if lifetick_stale_after_ticks_idle is not None else 500,
+            lifetick_stale_after_ticks_active=int(lifetick_stale_after_ticks_active)
+            if lifetick_stale_after_ticks_active is not None
+            else 50,
+            lifetick_stale_after_ticks_idle=int(lifetick_stale_after_ticks_idle)
+            if lifetick_stale_after_ticks_idle is not None
+            else 500,
         )
         eng.reset_to_fault_state()
         eng._seed_default_params()
@@ -193,10 +197,11 @@ class DenSiEngine:
         try:
             if self.taster_pressed_s is None:
                 return False
-            return (float(self.now_s()) - float(self.taster_pressed_s)) < float(self.brake_handoff_grace_s)
+            return (float(self.now_s()) - float(self.taster_pressed_s)) < float(
+                self.brake_handoff_grace_s
+            )
         except Exception:
             return False
-
 
     def _update_display_grace_tracking(self) -> None:
         """Update display-only brake grace tracking.
@@ -357,6 +362,7 @@ class DenSiEngine:
         )
         self.inj_estop_word = int(new_word)
         return bool(changed)
+
     def inject_estop_bit(self, key: str, checked: bool) -> None:
         """UI-driven diagnostic override for E-Stop bits."""
         bits = self._ensure_inj_bits()
@@ -449,7 +455,6 @@ class DenSiEngine:
     # legacy/diagnostic meta helpers
     # ---------------------------------------------------------------------
 
-
     def step_lifetick(self) -> None:
         """Update legacy device_tick/lifetick meta fields.
 
@@ -514,7 +519,11 @@ class DenSiEngine:
 
     def handle_estop_reset_cmd(self, reset_able: bool) -> None:
         cmd = self.ensure_last_cmd()
-        if self.l0_top == L0Top.CONNECTED and bool(getattr(cmd, "estop_reset", False)) and bool(reset_able):
+        if (
+            self.l0_top == L0Top.CONNECTED
+            and bool(getattr(cmd, "estop_reset", False))
+            and bool(reset_able)
+        ):
             self.l0_sub = L0Sub.RESETTING_ESTOP
 
         if self.l0_sub == L0Sub.RESETTING_ESTOP:
@@ -535,9 +544,7 @@ class DenSiEngine:
     def apply_param_ops(self, ready_for_sollvel: bool, moving: bool) -> dict[str, float]:
         cmd = self.ensure_last_cmd()
         allow_param_ops = (
-            self.l0_top == L0Top.CONNECTED
-            and (not bool(ready_for_sollvel))
-            and (not bool(moving))
+            self.l0_top == L0Top.CONNECTED and (not bool(ready_for_sollvel)) and (not bool(moving))
         )
 
         res = apply_densi_param_ops(

@@ -28,8 +28,8 @@ class L0Top(Enum):
     for now we accept any incoming connection.
     """
 
-    START = auto()       # no command frames seen yet
-    CONNECTED = auto()   # at least one command frame seen recently
+    START = auto()  # no command frames seen yet
+    CONNECTED = auto()  # at least one command frame seen recently
 
 
 class L0Sub(Enum):

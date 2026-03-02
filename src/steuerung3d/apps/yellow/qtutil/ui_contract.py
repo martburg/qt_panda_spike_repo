@@ -62,7 +62,9 @@ def log_missing_required(
     try:
         missing = missing_optional(cache, specs)
         if missing:
-            logger.warning("UI contract (%s): missing REQUIRED widgets: %s", context, ", ".join(missing))
+            logger.warning(
+                "UI contract (%s): missing REQUIRED widgets: %s", context, ", ".join(missing)
+            )
     except Exception:
         return
 
@@ -115,6 +117,8 @@ def log_missing_optional(
             if cache.get(cls, name) is None:
                 missing.append(str(name))
         if missing:
-            logger.debug("UI contract (%s): missing optional widgets: %s", context, ", ".join(missing))
+            logger.debug(
+                "UI contract (%s): missing optional widgets: %s", context, ", ".join(missing)
+            )
     except Exception:
         return

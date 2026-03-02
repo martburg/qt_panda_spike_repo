@@ -14,7 +14,7 @@ def make_tel(axis_id: str, *, own_pid_rx: str, enabled: bool) -> LegacyAxisTelem
         name=axis_id,
         own_pid_rx=own_pid_rx,
         lifetick_tx=0,
-        status_word=4356,          # "ready" heuristic
+        status_word=4356,  # "ready" heuristic
         guide_status_word=0,
         estop_status_dword=0,
         system_time="",
@@ -38,13 +38,13 @@ def main() -> None:
 
     # Create axis once, then configure it
     ax = st.ensure_axis(axis_id)
-    ax.kind = "legacy_twincat"                  # <-- critical
+    ax.kind = "legacy_twincat"  # <-- critical
     ax.meta["own_pid_tx"] = pid
 
-    st.ensure_axis_cmd(axis_id)                 # creates axis_cmd["X"]
+    st.ensure_axis_cmd(axis_id)  # creates axis_cmd["X"]
 
     # Make sure the FSM config will use the same pid (optional but cleaner)
-    st.controller_pid = pid                     # <-- recommended (if MachineState allows it)
+    st.controller_pid = pid  # <-- recommended (if MachineState allows it)
 
     # seed a "link ok + PID echo" telemetry blob so FSM can claim
     ax.tel = make_tel(axis_id, own_pid_rx=pid, enabled=False)
@@ -76,7 +76,9 @@ def main() -> None:
         cmd_enable = st.axis_cmd[axis_id].enable
         tel_enabled = getattr(ax.tel, "enabled", None)
         fsm_state = ax.meta.get("fsm_state", "?")
-        print(f"{st.tick:4d} | {fsm_state:12} | {str(cmd_enable):9} | {str(tel_enabled):11} | {str(ax.enabled):8}")
+        print(
+            f"{st.tick:4d} | {fsm_state:12} | {str(cmd_enable):9} | {str(tel_enabled):11} | {str(ax.enabled):8}"
+        )
 
 
 if __name__ == "__main__":

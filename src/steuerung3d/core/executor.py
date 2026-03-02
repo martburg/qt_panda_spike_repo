@@ -131,7 +131,6 @@ def _compute_param_ops_any(state: MachineState) -> list[ParamOp]:
     return ops
 
 
-
 def build_command_frame(state: MachineState) -> CommandFrame:
     axes: Dict[str, AxisSetpoint] = {}
     for axis_id, cmd in state.axis_cmd.items():

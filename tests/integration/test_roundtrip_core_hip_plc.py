@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SRC_DIR = REPO_ROOT / 'src'
+SRC_DIR = REPO_ROOT / "src"
 
 
 from steuerung3d.core.intents import EchoLifeTick
@@ -26,7 +26,9 @@ def _pick_free_udp_port() -> int:
         return int(s.getsockname()[1])
 
 
-def _start_core(*, axis: str, intent_port: int, ui_port: int, dev_telem_port: int, dev_cmd_port: int) -> subprocess.Popen:
+def _start_core(
+    *, axis: str, intent_port: int, ui_port: int, dev_telem_port: int, dev_cmd_port: int
+) -> subprocess.Popen:
     # NOTE: relies on core supporting --intent-in and --ui-telem-target.
     cmd = [
         sys.executable,
@@ -51,8 +53,11 @@ def _start_core(*, axis: str, intent_port: int, ui_port: int, dev_telem_port: in
     ]
     env = os.environ.copy()
     py_path = str(SRC_DIR)
-    env['PYTHONPATH'] = py_path + (os.pathsep + env['PYTHONPATH'] if env.get('PYTHONPATH') else '')
-    return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=str(REPO_ROOT), env=env)
+    env["PYTHONPATH"] = py_path + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+    return subprocess.Popen(
+        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=str(REPO_ROOT), env=env
+    )
+
 
 def _wait_for(condition, timeout_s: float = 3.5, sleep_s: float = 0.02) -> bool:
     t0 = time.time()
@@ -202,7 +207,9 @@ def test_core_hip_livetick_echo_roundtrip_plc():
             except Exception:
                 return False
 
-        assert _wait_for(_echo_seen, timeout_s=3.5), "Did not observe PLC downlink LifetickUIrx mirrored from EchoLifeTick"
+        assert _wait_for(_echo_seen, timeout_s=3.5), (
+            "Did not observe PLC downlink LifetickUIrx mirrored from EchoLifeTick"
+        )
 
     finally:
         try:

@@ -58,7 +58,9 @@ def decode_param_ops(payload: Any) -> List[ParamOp]:
             # ensure values is a dict[str,float]
             vals = dict(item.get("values", {}))
             cleaned = {str(k): float(v) for k, v in vals.items()}
-            out.append(ParamWriteOp(type="param_write", group=item.get("group", "pos"), values=cleaned))
+            out.append(
+                ParamWriteOp(type="param_write", group=item.get("group", "pos"), values=cleaned)
+            )
         elif t == "param_cancel":
             out.append(ParamCancelOp(**item))
         else:
@@ -97,7 +99,7 @@ def coerce_param_ops(ops: Any) -> List[ParamOp]:
 class CommandFrame:
     tick: int
     t_s: float
-    estop: bool          # legacy/unused for authority (keep for now)
+    estop: bool  # legacy/unused for authority (keep for now)
     fault: bool
     core_mode: str
     axes: Dict[str, AxisSetpoint]
@@ -110,7 +112,7 @@ class CommandFrame:
     # gui_not_halt: legacy GUI Not-Halt input (placeholder until verified)
     gui_not_halt: bool = False
 
-    estop_reset: bool  = False  # momentary request to clear device latch
+    estop_reset: bool = False  # momentary request to clear device latch
     # NEW: parameter editing/writing operations (axis-agnostic v0.1)
     param_ops: List[ParamOp] = field(default_factory=list)
 

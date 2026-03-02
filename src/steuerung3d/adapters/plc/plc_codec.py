@@ -14,6 +14,7 @@ Important semantic note:
   The canonical PLC telegrams are *per axis endpoint* (e.g. Anton/Burt/...).
   Therefore, this adapter currently supports exactly one axis_id per endpoint.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -39,7 +40,9 @@ class PlcCodec:
     spec: PlcWireSpec
 
     def _axis_name(self) -> str:
-        return require_single_axis_id(self.spec.axis_ids, context=f"Endpoint '{self.spec}'", exc_type=PlcValidationError)
+        return require_single_axis_id(
+            self.spec.axis_ids, context=f"Endpoint '{self.spec}'", exc_type=PlcValidationError
+        )
 
     # -----------------------
     # TX: core -> PLC

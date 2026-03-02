@@ -26,4 +26,6 @@ def test_no_archive_or_legacy_imports() -> None:
             # docs/legacy is fine (not imported as python); repo-root legacy is not.
             bad_paths.append(f"{name}: {file}")
 
-    assert not bad_paths, "Unexpected imports from archive/ or legacy/:\n" + "\n".join(sorted(bad_paths))
+    assert not bad_paths, "Unexpected imports from archive/ or legacy/:\n" + "\n".join(
+        sorted(bad_paths)
+    )

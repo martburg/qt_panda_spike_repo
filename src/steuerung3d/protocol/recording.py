@@ -37,40 +37,48 @@ class JsonlRecorder:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
     def record_intent(self, intent: Intent, tick: Optional[int]) -> None:
-        self.write_record({
-            "schema": LOG_SCHEMA,
-            "kind": "intent",
-            "wall_ns": monotonic_ns(),
-            "tick": tick,
-            "payload": encode_intent(intent),
-        })
+        self.write_record(
+            {
+                "schema": LOG_SCHEMA,
+                "kind": "intent",
+                "wall_ns": monotonic_ns(),
+                "tick": tick,
+                "payload": encode_intent(intent),
+            }
+        )
 
     def record_telemetry(self, snap: TelemetrySnapshot) -> None:
-        self.write_record({
-            "schema": LOG_SCHEMA,
-            "kind": "telemetry",
-            "wall_ns": monotonic_ns(),
-            "tick": snap.tick,
-            "payload": encode_telemetry(snap),
-        })
+        self.write_record(
+            {
+                "schema": LOG_SCHEMA,
+                "kind": "telemetry",
+                "wall_ns": monotonic_ns(),
+                "tick": snap.tick,
+                "payload": encode_telemetry(snap),
+            }
+        )
 
     def record_raw_controls(self, rc: RawControls, tick: Optional[int]) -> None:
-        self.write_record({
-            "schema": LOG_SCHEMA,
-            "kind": "raw_controls",
-            "wall_ns": monotonic_ns(),
-            "tick": tick,
-            "payload": encode_raw_controls(rc),
-        })
+        self.write_record(
+            {
+                "schema": LOG_SCHEMA,
+                "kind": "raw_controls",
+                "wall_ns": monotonic_ns(),
+                "tick": tick,
+                "payload": encode_raw_controls(rc),
+            }
+        )
 
     def record_command_frame(self, frame: CommandFrame) -> None:
-        self.write_record({
-            "schema": LOG_SCHEMA,
-            "kind": "command_frame",
-            "wall_ns": monotonic_ns(),
-            "tick": frame.tick,
-            "payload": encode_command_frame(frame),
-        })
+        self.write_record(
+            {
+                "schema": LOG_SCHEMA,
+                "kind": "command_frame",
+                "wall_ns": monotonic_ns(),
+                "tick": frame.tick,
+                "payload": encode_command_frame(frame),
+            }
+        )
 
 
 class JsonlReader:
@@ -119,6 +127,7 @@ class LoggedTransport(Transport):
     Intents are stamped with last seen telemetry tick (best-effort, but deterministic
     for our single-process dev stack).
     """
+
     inner: Transport
     recorder: JsonlRecorder
     last_tick: int = 0

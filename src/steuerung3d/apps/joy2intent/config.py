@@ -65,23 +65,19 @@ def load_joy2intent_config(path: Path) -> Joy2IntentConfig:
         intent_out=_hostport(io.get("intent_out", "127.0.0.1:51001")),
         tick_hz=float(io.get("tick_hz", 50)),
         stale_after_ms=int(io.get("stale_after_ms", 200)),
-
         winches=list(rig.get("winches", ["Anton", "Debby", "Cecil", "Burt"])),
         default_mode=str(mode.get("default", "setup_manual")),
-
         select_buttons=list(rig.get("select_buttons", [0, 1, 2, 3])),
-
         max_winch_mps=float(lim_m.get("max_winch_mps", 0.30)),
         fine_scale=float(lim_m.get("fine_scale", 0.20)),
-        manual_max_v=(float(lim_m["max_v"]) if "max_v" in lim_m and lim_m["max_v"] is not None else None),
+        manual_max_v=(
+            float(lim_m["max_v"]) if "max_v" in lim_m and lim_m["max_v"] is not None else None
+        ),
         sync_max_v=dict(lim_s.get("max_v", {"x": 0.60, "y": 0.60, "z": 0.40})),
-
         axes=dict((bindings.get("axes", {}) or {})),
         buttons=dict((bindings.get("buttons", {}) or {})),
-
         deadzone=float(f.get("deadzone", 0.08)),
         expo=float(f.get("expo", 0.25)),
         invert=dict(f.get("invert", {}) or {}),
-
         hip_id=str(ident.get("hip_id", "hip")),
     )

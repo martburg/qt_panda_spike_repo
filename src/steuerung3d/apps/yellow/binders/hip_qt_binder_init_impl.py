@@ -99,7 +99,7 @@ def post_init(self: "HipQtBinder") -> None:
     # --- Guider extras (discovered + logged; not wired into bindings yet)
     self._txtGuiderPosMin = self._wcache.line_edit("txtGPosMin_3")
     self._txtGuiderPosMax = self._wcache.line_edit("txtGPosMax_2")
-    self._txtGuiderPitch  = self._wcache.line_edit("txtPitch_2")
+    self._txtGuiderPitch = self._wcache.line_edit("txtPitch_2")
 
     # --- Sliders
     self._sld_vel_cmd: QAbstractSlider | None = self._wcache.slider("sldVelCmd")
@@ -134,7 +134,9 @@ def post_init(self: "HipQtBinder") -> None:
 
     # Modal lock helpers (best-effort)
     try:
-        modal_widgets = [w for w in self.win.findChildren(QWidget) if isinstance(w, (QPushButton, QLineEdit))]
+        modal_widgets = [
+            w for w in self.win.findChildren(QWidget) if isinstance(w, (QPushButton, QLineEdit))
+        ]
     except Exception:
         modal_widgets = []
     self._modal_lock = ModalLock(
@@ -164,7 +166,12 @@ def post_init(self: "HipQtBinder") -> None:
     _log_binder_missing(self)
 
     # Keep existing contract checks (optional)
-    log_missing_required_once(self.log, self._wcache, [(QComboBox, "cmbAxis"), (QLineEdit, "txtTick")], context="hi_p:required")
+    log_missing_required_once(
+        self.log,
+        self._wcache,
+        [(QComboBox, "cmbAxis"), (QLineEdit, "txtTick")],
+        context="hi_p:required",
+    )
 
     self._wire_signals()
 
@@ -213,7 +220,7 @@ def _build_bindings(self: "HipQtBinder") -> None:
         "hi_p: dbg bindings readouts txt_pos=%s txt_vel=%s",
         self._readouts_bindings.txt_pos if self._readouts_bindings else None,
         self._readouts_bindings.txt_vel if self._readouts_bindings else None,
-    )   
+    )
 
     # IMPORTANT: Only pass kwargs that HipSlidersBindings actually supports.
     self._sliders_bindings = HipSlidersBindings(
@@ -271,6 +278,7 @@ def _log_binder_missing(self: "HipQtBinder") -> None:
 # ------------------------------------------------------------------
 # Signal wiring / input capture
 # ------------------------------------------------------------------
+
 
 def wire_signals(self: "HipQtBinder") -> None:
     if self._cmbAxis is not None:
@@ -359,6 +367,8 @@ def clear_for_unattached(self: "HipQtBinder") -> None:
     ):
         safe_set_text(w, "")
 
-    neutralize_dots(self._set_dot, ("dotHdrOnline", "dotHdrReady", "dotHdrFbt", "dotHdrBrake1", "dotHdrBrake2"))
+    neutralize_dots(
+        self._set_dot, ("dotHdrOnline", "dotHdrReady", "dotHdrFbt", "dotHdrBrake1", "dotHdrBrake2")
+    )
     neutralize_dots(self._set_dot, [s.dot for s in ESTOP_SPECS.values() if s.dot])
     uncheck_checkboxes(getattr(self, "_estop_checks", {}).values())

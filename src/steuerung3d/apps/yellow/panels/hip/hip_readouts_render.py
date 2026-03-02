@@ -35,4 +35,3 @@ def apply_hip_readouts(bindings: HipReadoutsBindings, vm) -> None:
     set_text(bindings.txt_guider_range_max, ro.guider_max_text)
     set_text(bindings.txt_guider_range_val, ro.guider_val_text)
     set_text(bindings.txt_guider_speed, ro.guider_speed_text)
-

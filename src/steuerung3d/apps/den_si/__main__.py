@@ -17,11 +17,12 @@ from steuerung3d.util.app_bootstrap import bootstrap_logging
 log = logging.getLogger("den_si")
 
 
-
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--role", choices=("cfc",), default="cfc")
-    ap.add_argument("--axis", action="append", default=[], help="Axis id(s). Typically exactly one for DenSi.")
+    ap.add_argument(
+        "--axis", action="append", default=[], help="Axis id(s). Typically exactly one for DenSi."
+    )
     ap.add_argument("--dt", type=float, default=0.01)
     ap.add_argument(
         "--cmd-in",
@@ -49,7 +50,9 @@ def main() -> int:
     if not axis_ids:
         axis_ids = ["X"]
 
-    bootstrap_logging(role="den_si", axis=(axis_ids[0] if axis_ids else ""), log_level=args.log_level)
+    bootstrap_logging(
+        role="den_si", axis=(axis_ids[0] if axis_ids else ""), log_level=args.log_level
+    )
     log.info("log level = %s", str(args.log_level).upper())
 
     cmd_in_addr = parse_hostport(args.cmd_in)

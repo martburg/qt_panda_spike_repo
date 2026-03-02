@@ -31,5 +31,3 @@ BANNER_COLORS: dict[str, tuple[str, str]] = {
     "ARMED": ("#1B5E20", "#FFFFFF"),  # dark green
     "READY": ("#2E7D32", "#FFFFFF"),  # green
 }
-
-

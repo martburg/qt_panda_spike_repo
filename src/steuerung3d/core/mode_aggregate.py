@@ -11,9 +11,15 @@ KEY1 = "Key1"
 KEY2 = "Key2"
 
 TWINSAFE_KEYS = {
-    "g1_fb", "g1_com", "g1_out",
-    "g2_fb", "g2_com", "g2_out",
-    "g3_fb", "g3_com", "g3_out",
+    "g1_fb",
+    "g1_com",
+    "g1_out",
+    "g2_fb",
+    "g2_com",
+    "g2_out",
+    "g3_fb",
+    "g3_com",
+    "g3_out",
 }
 
 DYNAMIC_EXCLUDE = {
@@ -111,11 +117,7 @@ def _effective_estops(
     hard_keys = {k for k in ESTOP_CAUSE_KEYS if k not in ignored}
     hard_active = any(bool(bits.get(k, False)) for k in hard_keys)
 
-    ok_keys = {
-        k
-        for k in ESTOP_OK_KEYS
-        if (k not in DYNAMIC_EXCLUDE) and (k not in ignored)
-    }
+    ok_keys = {k for k in ESTOP_OK_KEYS if (k not in DYNAMIC_EXCLUDE) and (k not in ignored)}
     ok_fault = any(not bool(bits.get(k, True)) for k in ok_keys)
 
     other_fault_keys = {
@@ -154,7 +156,6 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
         if core_mode != CoreMode.LIVE:
             motion_allowed = False
 
-
         # LIVE may still be "blocked" from motion (e.g. no Select while moving),
         # but it must never be blocked by hard safety reasons once it reaches LIVE.
         if core_mode == CoreMode.LIVE:
@@ -163,7 +164,7 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
             if bad:
                 raise AssertionError(
                     "aggregate_core_mode contract violated: LIVE must not carry hard blocked_by reasons "
-                    f"(bad={[getattr(r,'code',None) for r in bad]})"
+                    f"(bad={[getattr(r, 'code', None) for r in bad]})"
                 )
 
         return AggregateResult(
@@ -223,9 +224,7 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
             has_missing_or_stale = True
 
     eligible_axes = [
-        axis
-        for axis in in_scope
-        if axis_gate.get(axis.axis_id, {}).get("key_mode") == KEY0
+        axis for axis in in_scope if axis_gate.get(axis.axis_id, {}).get("key_mode") == KEY0
     ]
 
     if not eligible_axes:
@@ -261,10 +260,20 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
     not_ready = [axis for axis in eligible_axes if not bool(axis.axis_ready)]
     if not_ready:
         blocked_by.extend([BlockedReason("NOT_READY", axis.axis_id, None) for axis in not_ready])
-        return _finish(core_mode=CoreMode.ARMED, blocked_by=blocked_by, axis_gate=axis_gate, motion_allowed=False)
+        return _finish(
+            core_mode=CoreMode.ARMED,
+            blocked_by=blocked_by,
+            axis_gate=axis_gate,
+            motion_allowed=False,
+        )
 
     if not inputs.joy_deadman:
-        return _finish(core_mode=CoreMode.READY, blocked_by=blocked_by, axis_gate=axis_gate, motion_allowed=False)
+        return _finish(
+            core_mode=CoreMode.READY,
+            blocked_by=blocked_by,
+            axis_gate=axis_gate,
+            motion_allowed=False,
+        )
 
     core_mode = CoreMode.LIVE
     motion_allowed = True
@@ -272,5 +281,9 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
         blocked_by.append(BlockedReason("NO_SELECT_FOR_MOTION", None, None))
         # In current system, NO_SELECT_FOR_MOTION blocks motion even if core_mode is LIVE
         motion_allowed = False
-    return _finish(core_mode=core_mode, blocked_by=blocked_by, axis_gate=axis_gate, motion_allowed=motion_allowed)
-
+    return _finish(
+        core_mode=core_mode,
+        blocked_by=blocked_by,
+        axis_gate=axis_gate,
+        motion_allowed=motion_allowed,
+    )

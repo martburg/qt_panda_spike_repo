@@ -13,6 +13,3 @@ from steuerung3d.protocol.banner_estate import (  # re-export
     BANNER_DYNAMIC_EXCLUDE,
     derive_banner_estate_from_word,
 )
-
-
-

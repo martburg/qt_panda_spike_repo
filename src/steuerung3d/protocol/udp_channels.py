@@ -82,7 +82,9 @@ class UdpRawControlsOut:
     tx: _UdpJsonTx[RawControls]
 
     @staticmethod
-    def connect(target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)) -> "UdpRawControlsOut":
+    def connect(
+        target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
+    ) -> "UdpRawControlsOut":
         link = UdpLink(bind=bind, target=target)
         return UdpRawControlsOut(tx=_UdpJsonTx(link=link, encode=encode_raw_controls))
 
@@ -109,7 +111,9 @@ class UdpIntentOut:
     tx: _UdpJsonTx[Intent]
 
     @staticmethod
-    def connect(target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)) -> "UdpIntentOut":
+    def connect(
+        target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
+    ) -> "UdpIntentOut":
         link = UdpLink(bind=bind, target=target)
         return UdpIntentOut(tx=_UdpJsonTx(link=link, encode=encode_intent))
 
@@ -135,7 +139,9 @@ class UdpTelemetryOut:
     tx: _UdpJsonTx[TelemetrySnapshot]
 
     @staticmethod
-    def connect(target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)) -> "UdpTelemetryOut":
+    def connect(
+        target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
+    ) -> "UdpTelemetryOut":
         link = UdpLink(bind=bind, target=target)
         return UdpTelemetryOut(tx=_UdpJsonTx(link=link, encode=encode_telemetry))
 
@@ -174,7 +180,9 @@ class UdpCommandOut:
     tx: _UdpJsonTx[CommandFrame]
 
     @staticmethod
-    def connect(target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)) -> "UdpCommandOut":
+    def connect(
+        target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
+    ) -> "UdpCommandOut":
         link = UdpLink(bind=bind, target=target)
         return UdpCommandOut(tx=_UdpJsonTx(link=link, encode=encode_command_frame))
 

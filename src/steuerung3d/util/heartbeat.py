@@ -58,7 +58,9 @@ class Heartbeat:
         now = _now_s() if now_s is None else float(now_s)
         return (now - float(self.last_emit_s)) >= float(self.interval_s)
 
-    def emit(self, log, *, level: str = "info", now_s: float | None = None, reset: bool = True) -> None:
+    def emit(
+        self, log, *, level: str = "info", now_s: float | None = None, reset: bool = True
+    ) -> None:
         """Emit a single summary line if due.
 
         The caller is responsible for choosing the logger. `level` is one of

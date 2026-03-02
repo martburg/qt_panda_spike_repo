@@ -15,6 +15,7 @@ class PlcWireSpec:
     axis_ids:
       - canonical axis order for per-axis fields (enable/vel, pos/vel/en/fault)
     """
+
     axis_ids: List[str]
 
     delimiter: str = ";"

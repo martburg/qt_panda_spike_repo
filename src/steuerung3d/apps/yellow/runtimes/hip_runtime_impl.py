@@ -242,9 +242,13 @@ class HipRuntime:
         txn_events = list(getattr(engine_result, "txn_events", []) or [])
         for ev in txn_events:
             if getattr(ev, "action", "") == "giveup":
-                self._log.error("txn give up: %s after %s retries (%s)", ev.req_id, ev.retries, ev.intent_type)
+                self._log.error(
+                    "txn give up: %s after %s retries (%s)", ev.req_id, ev.retries, ev.intent_type
+                )
             else:
-                self._log.warning("txn resend: %s retry=%s %s", ev.req_id, ev.retries, ev.intent_type)
+                self._log.warning(
+                    "txn resend: %s retry=%s %s", ev.req_id, ev.retries, ev.intent_type
+                )
 
         if getattr(engine_result, "resync_ignored", False):
             self._log.warning(
@@ -397,7 +401,9 @@ class HipRuntime:
             estop=bool(self._last_estop),
             fault=bool(self._last_fault),
         )
-        axis = str(getattr(self.engine.state, "selected_axis", "") or "") or (self._fixed_axis or "")
+        axis = str(getattr(self.engine.state, "selected_axis", "") or "") or (
+            self._fixed_axis or ""
+        )
         estate = str(self._last_estate or "")
         mode = str(self._last_mode or "")
         armed = bool(str(estate or "").upper() in ("ARMED", "READY"))

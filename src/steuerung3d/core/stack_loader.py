@@ -148,7 +148,9 @@ def load_stack_profile(
     rig_tbl = dict(data.get("rig", {}) or {})
     device_source = str(rig_tbl.get("device_source") or "sim").strip().lower()
     if device_source not in ("sim", "real"):
-        raise ValueError(f"Invalid [rig].device_source={device_source!r} (expected 'sim' or 'real')")
+        raise ValueError(
+            f"Invalid [rig].device_source={device_source!r} (expected 'sim' or 'real')"
+        )
 
     axes = list(rig_tbl.get("axes") or [])
     # In REAL mode the PLCs are already running; axes may be discovered at runtime.
@@ -173,7 +175,7 @@ def load_stack_profile(
         if module_s.endswith(".apps.den_si") or module_s.endswith(".den_si"):
             args2 = list(raw_args)
 
-            def _has_flag(flag: str,_args2=args2) -> bool:
+            def _has_flag(flag: str, _args2=args2) -> bool:
                 return any(str(a) == flag for a in _args2)
 
             if (not _has_flag("--axis")) and tbl.get("axis"):
@@ -231,7 +233,9 @@ def merge_overrides(base: StackSpec, override: StackSpec) -> StackSpec:
                 enabled=v.enabled,
                 module=v.module or cur.module,
                 mode=v.mode or cur.mode,
-                count=v.count if getattr(v, "count", None) is not None else getattr(cur, "count", None),
+                count=v.count
+                if getattr(v, "count", None) is not None
+                else getattr(cur, "count", None),
                 args=v.args or cur.args,
                 config=v.config if v.config is not None else cur.config,
                 env={**cur.env, **(v.env or {})},
@@ -243,4 +247,6 @@ def merge_overrides(base: StackSpec, override: StackSpec) -> StackSpec:
     name = override.name or base.name
     rig = dict(getattr(base, "rig", {}) or {})
     rig.update(getattr(override, "rig", {}) or {})
-    return StackSpec(name=name, base_dir=base.base_dir, axes=axes, rig=rig, net=net, services=services)
+    return StackSpec(
+        name=name, base_dir=base.base_dir, axes=axes, rig=rig, net=net, services=services
+    )

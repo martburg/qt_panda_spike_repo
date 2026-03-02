@@ -80,12 +80,16 @@ class DenSiController:
             if seed:
                 self.state.params.update(dict(seed))
         except Exception:
-            self._soft_errors["binder.seed_params_from_ui"] = int(self._soft_errors.get("binder.seed_params_from_ui", 0)) + 1
+            self._soft_errors["binder.seed_params_from_ui"] = (
+                int(self._soft_errors.get("binder.seed_params_from_ui", 0)) + 1
+            )
 
         try:
             self._binder.init_estop_checkboxes(estop_word=int(self.engine.inj_estop_word))
         except Exception:
-            self._soft_errors["binder.init_estop_checkboxes"] = int(self._soft_errors.get("binder.init_estop_checkboxes", 0)) + 1
+            self._soft_errors["binder.init_estop_checkboxes"] = (
+                int(self._soft_errors.get("binder.init_estop_checkboxes", 0)) + 1
+            )
 
     # ------------------------------------------------------------------
     # Initialization helpers
@@ -126,7 +130,9 @@ class DenSiController:
     # ------------------------------------------------------------------
 
     def start(self) -> None:
-        self._timer = start_poll_timer(self.win, period_ms=int(self.dt_s * 1000), callback=self.step_once)
+        self._timer = start_poll_timer(
+            self.win, period_ms=int(self.dt_s * 1000), callback=self.step_once
+        )
 
     def step_once(self) -> None:
         with self._wd.tick():
@@ -136,13 +142,17 @@ class DenSiController:
                 ui_inputs = self._binder.read_inputs()
                 inputs = replace(inputs, ui=ui_inputs.ui)
             except Exception:
-                self._soft_errors["binder.read_inputs"] = int(self._soft_errors.get("binder.read_inputs", 0)) + 1
+                self._soft_errors["binder.read_inputs"] = (
+                    int(self._soft_errors.get("binder.read_inputs", 0)) + 1
+                )
             runtime_res = self._runtime.tick(inputs=inputs)
 
             try:
                 self._binder.apply(runtime_res.view_model)
             except Exception:
-                self._soft_errors["binder.apply"] = int(self._soft_errors.get("binder.apply", 0)) + 1
+                self._soft_errors["binder.apply"] = (
+                    int(self._soft_errors.get("binder.apply", 0)) + 1
+                )
 
             self._emit_birdseye(runtime_res)
 

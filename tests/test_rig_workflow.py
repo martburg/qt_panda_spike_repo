@@ -21,7 +21,7 @@ try:
         SetDensiParticipating,
         SetRigMode,
     )
-    from steuerung3d.core.rig_logic import  note_densi_seen
+    from steuerung3d.core.rig_logic import note_densi_seen
     from steuerung3d.core.rig_types import RigMode
 except Exception as e:  # noqa: BLE001,F841
     pytest.skip(
@@ -40,16 +40,16 @@ def test_arm_sync_and_enter_sync() -> None:
     st.core_mode = CoreMode.LIVE
 
     # Two densis online
-    st.ensure_axis('A').pos = 1.0
-    st.ensure_axis('B').pos = 2.0
-    note_densi_seen(st, 'A')
-    note_densi_seen(st, 'B')
+    st.ensure_axis("A").pos = 1.0
+    st.ensure_axis("B").pos = 2.0
+    note_densi_seen(st, "A")
+    note_densi_seen(st, "B")
 
-    apply_intent(st, SetRigMode(rig_mode='SETUP_MANUAL'))
-    apply_intent(st, SetDensiParticipating(device_id='A', participating=True))
-    apply_intent(st, SetDensiParticipating(device_id='B', participating=True))
-    apply_intent(st, SetDensiAnchor(device_id='A', x=0, y=0, z=0))
-    apply_intent(st, SetDensiAnchor(device_id='B', x=1, y=0, z=0))
+    apply_intent(st, SetRigMode(rig_mode="SETUP_MANUAL"))
+    apply_intent(st, SetDensiParticipating(device_id="A", participating=True))
+    apply_intent(st, SetDensiParticipating(device_id="B", participating=True))
+    apply_intent(st, SetDensiAnchor(device_id="A", x=0, y=0, z=0))
+    apply_intent(st, SetDensiAnchor(device_id="B", x=1, y=0, z=0))
 
     apply_intent(st, ArmSync())
     assert st.rig_mode == RigMode.ARMED_SYNC

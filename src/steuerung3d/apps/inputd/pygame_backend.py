@@ -66,7 +66,9 @@ class PygameJoystick:
                 continue
         return out
 
-    def open(self, *, index: Optional[int] = None, name_contains: Optional[str] = None) -> Tuple[bool, str]:
+    def open(
+        self, *, index: Optional[int] = None, name_contains: Optional[str] = None
+    ) -> Tuple[bool, str]:
         """Try to open a joystick. Returns (ok, description)."""
         if self._pg is None:
             self.init()
@@ -83,7 +85,7 @@ class PygameJoystick:
             if 0 <= index < n:
                 chosen = index
             else:
-                return False, f"requested index {index} out of range (0..{n-1})"
+                return False, f"requested index {index} out of range (0..{n - 1})"
         elif name_contains:
             want = name_contains.lower()
             for i in range(n):
@@ -109,7 +111,9 @@ class PygameJoystick:
             self._joy = None
             return False, f"failed to open joystick {chosen}: {e}"
 
-    def ensure_open(self, *, index: Optional[int], name_contains: Optional[str], retry_every_s: float = 1.0) -> Tuple[bool, str]:
+    def ensure_open(
+        self, *, index: Optional[int], name_contains: Optional[str], retry_every_s: float = 1.0
+    ) -> Tuple[bool, str]:
         """Ensure we have an open joystick; if not, retry periodically."""
         if self._joy is not None:
             return True, "ok"
@@ -121,7 +125,13 @@ class PygameJoystick:
         self._last_open_attempt_s = now
         return self.open(index=index, name_contains=name_contains)
 
-    def read(self, *, max_axes: Optional[int] = None, max_buttons: Optional[int] = None, hat_as_buttons: bool = True) -> Tuple[bool, List[float], List[int]]:
+    def read(
+        self,
+        *,
+        max_axes: Optional[int] = None,
+        max_buttons: Optional[int] = None,
+        hat_as_buttons: bool = True,
+    ) -> Tuple[bool, List[float], List[int]]:
         """Read a sample. Returns (connected, axes, buttons)."""
         if self._pg is None:
             self.init()
@@ -150,12 +160,14 @@ class PygameJoystick:
                 for h in range(nh):
                     x, y = self._joy.get_hat(h)
                     # order: up, down, left, right
-                    buttons.extend([
-                        1 if y > 0 else 0,
-                        1 if y < 0 else 0,
-                        1 if x < 0 else 0,
-                        1 if x > 0 else 0,
-                    ])
+                    buttons.extend(
+                        [
+                            1 if y > 0 else 0,
+                            1 if y < 0 else 0,
+                            1 if x < 0 else 0,
+                            1 if x > 0 else 0,
+                        ]
+                    )
 
             return True, axes, buttons
         except Exception:

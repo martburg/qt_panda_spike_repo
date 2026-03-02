@@ -136,7 +136,9 @@ def parse_uplink(message: str) -> LegacyPlcUplink:
     return LegacyPlcUplink(fields=fields, tail=tail, raw=raw)
 
 
-def encode_uplink(fields: Dict[str, object] | None = None, tail: Dict[str, object] | None = None) -> str:
+def encode_uplink(
+    fields: Dict[str, object] | None = None, tail: Dict[str, object] | None = None
+) -> str:
     """Encode a PLC->controller uplink frame (semicolon-delimited ASCII).
 
     Notes:

@@ -15,8 +15,8 @@ def _ui(axis_id: str) -> HipUiInputs:
         axis_selection_changed=False,
         estop_reset_clicked=False,
         resync_clicked=False,
-            main_reset_clicked=False,
-            guider_reset_clicked=False,
+        main_reset_clicked=False,
+        guider_reset_clicked=False,
         param_actions=[],
         param_values={},
     )
@@ -152,7 +152,9 @@ def test_soll_speed_emits_jog_winch_when_deadman_held() -> None:
 
     res = eng.step(inputs)
     assert any(isinstance(i, EnableAxis) and i.axis_id == "Anton" and i.enable for i in res.intents)
-    assert any(isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate == 0.8 for i in res.intents)
+    assert any(
+        isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate == 0.8 for i in res.intents
+    )
 
 
 def test_soll_speed_negative_emits_jog_when_ready() -> None:
@@ -176,7 +178,9 @@ def test_soll_speed_negative_emits_jog_when_ready() -> None:
     )
 
     res = eng.step(inputs)
-    assert any(isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate == -1.0 for i in res.intents)
+    assert any(
+        isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate == -1.0 for i in res.intents
+    )
 
 
 def test_not_owner_blocks_jog() -> None:
@@ -316,4 +320,6 @@ def test_single_actionable_axis_fallback_selects_in_scope_axis() -> None:
 
     res = eng.step(inputs)
     assert any(isinstance(i, EnableAxis) and i.axis_id == "Anton" and i.enable for i in res.intents)
-    assert any(isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate == 1.0 for i in res.intents)
+    assert any(
+        isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate == 1.0 for i in res.intents
+    )

@@ -66,7 +66,10 @@ class St3DArgumentParser(argparse.ArgumentParser):
         if "--profile" in message:
             names = discover_stack_profiles()
             if names:
-                extra_lines = ["", "Available profiles (configs/profiles/*.toml; legacy configs/stacks):"]
+                extra_lines = [
+                    "",
+                    "Available profiles (configs/profiles/*.toml; legacy configs/stacks):",
+                ]
                 extra_lines += [f"  - {n}" for n in names]
                 extra_lines += ["", "Tip: python -m steuerung3d profiles"]
                 extra = "\n".join(extra_lines) + "\n"

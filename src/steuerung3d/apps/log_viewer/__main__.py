@@ -24,7 +24,9 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument("--from-tick", type=int, default=None, help="First tick to show (inclusive)")
     p.add_argument("--to-tick", type=int, default=None, help="Last tick to show (inclusive)")
-    p.add_argument("--every", type=int, default=None, help="Only show every Nth tick (after filtering)")
+    p.add_argument(
+        "--every", type=int, default=None, help="Only show every Nth tick (after filtering)"
+    )
     p.add_argument(
         "--axes",
         type=str,
@@ -101,9 +103,25 @@ def main() -> int:
     show_pos = bool(cfg.view.show_pos) and (not args.no_pos)
 
     if args.as_csv:
-        _print_csv(rows, axes, telem_by_tick, cmd_by_tick, intent_count_by_tick, show_pos, args.show_intents)
+        _print_csv(
+            rows,
+            axes,
+            telem_by_tick,
+            cmd_by_tick,
+            intent_count_by_tick,
+            show_pos,
+            args.show_intents,
+        )
     else:
-        _print_table(rows, axes, telem_by_tick, cmd_by_tick, intent_count_by_tick, show_pos, args.show_intents)
+        _print_table(
+            rows,
+            axes,
+            telem_by_tick,
+            cmd_by_tick,
+            intent_count_by_tick,
+            show_pos,
+            args.show_intents,
+        )
 
     return 0
 
@@ -220,6 +238,7 @@ def _print_table(
 
 def _stdout():
     import sys
+
     return sys.stdout
 
 

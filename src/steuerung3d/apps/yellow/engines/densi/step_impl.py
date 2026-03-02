@@ -5,19 +5,16 @@ No semantic changes intended; this is a mechanical extraction from `engine.py`.
 
 from __future__ import annotations
 
-
 from dataclasses import dataclass
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     # Only needed for type checking; avoids runtime import cycles.
     from .engine import DenSiEngine
 
-from steuerung3d.core.command_frame import  CommandFrame
+from steuerung3d.core.command_frame import CommandFrame
 
 from .drive_status import update_drive_status_words
-
 from .types import L0Sub, L0Top
 
 
@@ -46,6 +43,7 @@ class DenSiTickResult:
     # UI nicety: controller can choose whether to refresh estop checkboxes.
     # Legacy behavior refreshed checkboxes only when ResetAble toggled.
     reset_able_changed: bool = False
+
 
 def step(*, engine: "DenSiEngine", frames: list[CommandFrame], now_ns: int) -> DenSiTickResult:
     """Run one DenSi engine tick."""

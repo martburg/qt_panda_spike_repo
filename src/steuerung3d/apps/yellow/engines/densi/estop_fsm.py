@@ -52,7 +52,7 @@ def sync_reset_able_bit(
         )
     except Exception:
         estate = "ESTOP"
-    in_estop = (estate == "ESTOP")
+    in_estop = estate == "ESTOP"
 
     desired = (not trip_causes) and bool(in_estop)
     if bool(inj_bits.get("reset_able", False)) == bool(desired):
@@ -100,7 +100,7 @@ def apply_estop_state_machine(
     grace_s = float(brake_handoff_grace_s)
 
     if bool(estop_latched) or (not schuetz):
-        desired_brk_ok = (not taster)
+        desired_brk_ok = not taster
     else:
         if not taster:
             desired_brk_ok = True
@@ -127,7 +127,7 @@ def apply_estop_state_machine(
     if taster:
         brake_trip = (not brk_ok) and ((elapsed is None) or (elapsed >= grace_s))
     else:
-        brake_trip = (not brk_ok)
+        brake_trip = not brk_ok
 
     trip_active = trip_cause or ok_chain_fault or brake_trip or (not bool(safety_ok))
 
@@ -147,7 +147,7 @@ def apply_estop_state_machine(
         else:
             estate = EStopState.READY if brk_ok else EStopState.ARMED
 
-        desired_ready = (estate == EStopState.READY)
+        desired_ready = estate == EStopState.READY
         if "ready" in inj_bits and bool(inj_bits.get("ready", False)) != bool(desired_ready):
             inj_bits["ready"] = bool(desired_ready)
         drive_ready = bool(desired_ready)

@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SRC_DIR = REPO_ROOT / 'src'
+SRC_DIR = REPO_ROOT / "src"
 
 
 from steuerung3d.core.intents import ParamEditBegin, ParamWrite
@@ -27,7 +27,9 @@ def _pick_free_udp_port() -> int:
         return int(s.getsockname()[1])
 
 
-def _start_core(*, axis: str, intent_port: int, ui_port: int, dev_telem_port: int, dev_cmd_port: int) -> subprocess.Popen:
+def _start_core(
+    *, axis: str, intent_port: int, ui_port: int, dev_telem_port: int, dev_cmd_port: int
+) -> subprocess.Popen:
     # NOTE: relies on core supporting --intent-in (added by earlier patch).
     cmd = [
         sys.executable,
@@ -53,8 +55,11 @@ def _start_core(*, axis: str, intent_port: int, ui_port: int, dev_telem_port: in
     # Quiet logs to keep pytest output clean.
     env = os.environ.copy()
     py_path = str(SRC_DIR)
-    env['PYTHONPATH'] = py_path + (os.pathsep + env['PYTHONPATH'] if env.get('PYTHONPATH') else '')
-    return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=str(REPO_ROOT), env=env)
+    env["PYTHONPATH"] = py_path + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+    return subprocess.Popen(
+        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=str(REPO_ROOT), env=env
+    )
+
 
 def _wait_for(condition, timeout_s: float = 2.5, sleep_s: float = 0.02):
     t0 = time.time()
@@ -66,14 +71,15 @@ def _wait_for(condition, timeout_s: float = 2.5, sleep_s: float = 0.02):
 
 
 class _DenSiProbe(threading.Thread):
-    '''
+    """
     Headless DenSi PLC-wire probe:
 
     - Listens for core downlink telegrams on cmd_port.
     - Periodically emits uplink telegrams to telem_target_port.
     - If it observes a write telegram (Modus=='w'), it reflects the written params
       back in subsequent uplink frames.
-    '''
+    """
+
     def __init__(self, *, axis: str, cmd_port: int, telem_target_port: int):
         super().__init__(daemon=True)
         self.axis = axis
@@ -125,6 +131,7 @@ class _DenSiProbe(threading.Thread):
                                 return float(v)
                             except Exception:
                                 return cur
+
                         filt_p = _f("FilterP", filt_p)
                         filt_i = _f("FilterI", filt_i)
                         filt_d = _f("FilterD", filt_d)
@@ -160,7 +167,9 @@ class _DenSiProbe(threading.Thread):
                     },
                 )
                 try:
-                    self._tx.sendto(upl.encode("utf-8", errors="replace"), ("127.0.0.1", self.telem_target_port))
+                    self._tx.sendto(
+                        upl.encode("utf-8", errors="replace"), ("127.0.0.1", self.telem_target_port)
+                    )
                 except OSError:
                     break
                 next_tx = now + 0.02
@@ -170,14 +179,14 @@ class _DenSiProbe(threading.Thread):
 
 @pytest.mark.integration
 def test_core_densi_param_write_roundtrip_plc():
-    '''
+    """
     Start core and a headless DenSi PLC-wire probe.
 
     Send ParamEditBegin + ParamWrite intent to core and verify:
       - core emits a downlink Modus=='w' telegram (probe sees it)
       - probe reflects written filter params in uplink
       - core forwards them to UI telemetry (snap.params contains internal keys)
-    '''
+    """
     axis = "Anton"
     intent_port = _pick_free_udp_port()
     ui_port = _pick_free_udp_port()
@@ -204,21 +213,42 @@ def test_core_densi_param_write_roundtrip_plc():
             snaps = telem_in.drain_telemetry(limit=50)
             return any(axis in (s.axes or {}) for s in snaps)
 
-        assert _wait_for(_axis_seen, timeout_s=2.5), "Core did not publish UI telemetry for axis (probe uplink not received?)"
+        assert _wait_for(_axis_seen, timeout_s=2.5), (
+            "Core did not publish UI telemetry for axis (probe uplink not received?)"
+        )
 
         desired = {"P": 6.3, "I": 0.0, "D": 0.0, "IL": 0.0}
 
         # Mimic HiP workflow: begin edit, then write values.
-        intent_out.publish_intent(ParamEditBegin(axis_id=axis, hip_id="test", group="filter", req_id="req-edit-1", session_id="sess-test"))
+        intent_out.publish_intent(
+            ParamEditBegin(
+                axis_id=axis,
+                hip_id="test",
+                group="filter",
+                req_id="req-edit-1",
+                session_id="sess-test",
+            )
+        )
         time.sleep(0.05)
-        intent_out.publish_intent(ParamWrite(axis_id=axis, hip_id="test", group="filter", values=desired, req_id="req-write-1", session_id="sess-test"))
+        intent_out.publish_intent(
+            ParamWrite(
+                axis_id=axis,
+                hip_id="test",
+                group="filter",
+                values=desired,
+                req_id="req-write-1",
+                session_id="sess-test",
+            )
+        )
 
         # Wait for probe to observe a write telegram.
         def _saw_write():
             f = probe.last_seen_downlink or {}
             return str(f.get("Modus", "")) == "w"
 
-        assert _wait_for(_saw_write, timeout_s=2.5), "core did not emit Modus=='w' downlink for ParamWrite"
+        assert _wait_for(_saw_write, timeout_s=2.5), (
+            "core did not emit Modus=='w' downlink for ParamWrite"
+        )
 
         # Wait for UI telemetry to reflect the written filter P under internal key 'P'.
         got_p = {"v": None}
@@ -239,7 +269,9 @@ def test_core_densi_param_write_roundtrip_plc():
                     continue
             return False
 
-        assert _wait_for(_p_reflected, timeout_s=3.0), "UI telemetry did not reflect written filter P parameter"
+        assert _wait_for(_p_reflected, timeout_s=3.0), (
+            "UI telemetry did not reflect written filter P parameter"
+        )
 
     finally:
         probe.stop()

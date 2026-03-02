@@ -139,12 +139,16 @@ def compute_param_ui_state(
                     cancel_enabled=bool(not busy),
                 )
                 if busy:
-                    buttons = HipParamButtons(edit_enabled=False, write_enabled=False, cancel_enabled=False)
+                    buttons = HipParamButtons(
+                        edit_enabled=False, write_enabled=False, cancel_enabled=False
+                    )
                 state_groups[g] = HipParamGroup(fields_enabled=bool(not busy), buttons=buttons)
             else:
                 state_groups[g] = HipParamGroup(
                     fields_enabled=False,
-                    buttons=HipParamButtons(edit_enabled=False, write_enabled=False, cancel_enabled=False),
+                    buttons=HipParamButtons(
+                        edit_enabled=False, write_enabled=False, cancel_enabled=False
+                    ),
                 )
         return HipParamUiState(
             modal_lock_active=True,
@@ -206,7 +210,9 @@ def maybe_build_param_commit_dialog(
             w = want.get(k, "?")
             g = params.get(k, "<missing>")
             lines.append(f"- {k}: want {w}  got {g}")
-        dialog = HipParamCommitDialog(level="warning", title="Parameters not confirmed", message="\n".join(lines))
+        dialog = HipParamCommitDialog(
+            level="warning", title="Parameters not confirmed", message="\n".join(lines)
+        )
 
     state.pending_commit_req_id = ""
     state.pending_commit_group = ""

@@ -25,11 +25,16 @@ def log_periodic_heartbeat(*, log, now: float, t0: float, state, stats, last_see
         bool(getattr(state, "estop", False)),
         bool(getattr(state, "fault", False)),
         len(dict(getattr(state, "axis_claims", {}) or {})),
-        stats["intents_in"], "n/a" if age_int is None else f"{age_int:.2f}s",
-        stats["dev_telem_in"], "n/a" if age_dev is None else f"{age_dev:.2f}s",
-        stats["cmd_out"], "n/a" if age_cmd is None else f"{age_cmd:.2f}s",
-        stats["ui_telem_out"], "n/a" if age_ui is None else f"{age_ui:.2f}s",
-        stats["c2_telem_out"], "n/a" if age_c2 is None else f"{age_c2:.2f}s",
+        stats["intents_in"],
+        "n/a" if age_int is None else f"{age_int:.2f}s",
+        stats["dev_telem_in"],
+        "n/a" if age_dev is None else f"{age_dev:.2f}s",
+        stats["cmd_out"],
+        "n/a" if age_cmd is None else f"{age_cmd:.2f}s",
+        stats["ui_telem_out"],
+        "n/a" if age_ui is None else f"{age_ui:.2f}s",
+        stats["c2_telem_out"],
+        "n/a" if age_c2 is None else f"{age_c2:.2f}s",
     )
     return True
 
@@ -50,14 +55,22 @@ def emit_birds_eye_status(
     try:
         now = time.monotonic()
         age_int = None if last_seen["intent_ts"] is None else (now - float(last_seen["intent_ts"]))
-        age_dev = None if last_seen["dev_telem_ts"] is None else (now - float(last_seen["dev_telem_ts"]))
+        age_dev = (
+            None if last_seen["dev_telem_ts"] is None else (now - float(last_seen["dev_telem_ts"]))
+        )
         age_cmd = None if last_seen["cmd_ts"] is None else (now - float(last_seen["cmd_ts"]))
-        age_ui = None if last_seen["ui_telem_ts"] is None else (now - float(last_seen["ui_telem_ts"]))
-        age_c2 = None if last_seen["c2_telem_ts"] is None else (now - float(last_seen["c2_telem_ts"]))
+        age_ui = (
+            None if last_seen["ui_telem_ts"] is None else (now - float(last_seen["ui_telem_ts"]))
+        )
+        age_c2 = (
+            None if last_seen["c2_telem_ts"] is None else (now - float(last_seen["c2_telem_ts"]))
+        )
 
         estop_v = bool(getattr(snap, "estop", False))
         fault_v = bool(getattr(snap, "fault", False))
-        mode_v = core_mode_value(getattr(state, "core_mode", "")) or str(getattr(snap, "core_mode", ""))
+        mode_v = core_mode_value(getattr(state, "core_mode", "")) or str(
+            getattr(snap, "core_mode", "")
+        )
 
         # Simple policy: ERR on estop/fault; WARN on stale inputs; else OK.
         stale = False
@@ -101,12 +114,18 @@ def emit_birds_eye_status(
             axis_cmd = dict(getattr(state, "axis_cmd", {}) or {})
             axis_gate = dict(getattr(state, "core_axis_gate", {}) or {})
             for axis_id in axis_ids:
-                estop_word = int(router.last_dev_estop_word_by_axis.get(axis_id, int(getattr(snap, "estop_status_word", 0)) or 0))
+                estop_word = int(
+                    router.last_dev_estop_word_by_axis.get(
+                        axis_id, int(getattr(snap, "estop_status_word", 0)) or 0
+                    )
+                )
                 bits = {}
                 estate = ""
                 try:
                     bits = decode_estop_word(estop_word)
-                    estate = derive_banner_estate_from_word(estop_word, within_brake_grace=lambda: False)
+                    estate = derive_banner_estate_from_word(
+                        estop_word, within_brake_grace=lambda: False
+                    )
                 except Exception:
                     bits = {}
                     estate = ""
@@ -124,7 +143,13 @@ def emit_birds_eye_status(
                         cmd_vel = float(getattr(cmd_out, "vel", 0.0) or 0.0)
                     except Exception:
                         cmd_vel = 0.0
-                started = bool(cmd and (bool(getattr(cmd, "enable", False)) or abs(float(getattr(cmd, "vel", 0.0) or 0.0)) > 0.0))
+                started = bool(
+                    cmd
+                    and (
+                        bool(getattr(cmd, "enable", False))
+                        or abs(float(getattr(cmd, "vel", 0.0) or 0.0)) > 0.0
+                    )
+                )
 
                 owner = str(state.claim_owner(axis_id) or "")
                 if not owner:
@@ -147,8 +172,16 @@ def emit_birds_eye_status(
                 if gate_owner:
                     owner = str(gate_owner)
 
-                estop_axis = bool(gate_estop) if gate_estop is not None else bool(str(estate).upper() == "ESTOP")
-                fault_axis = bool(gate_fault) if gate_fault is not None else bool(getattr(state, "fault", False))
+                estop_axis = (
+                    bool(gate_estop)
+                    if gate_estop is not None
+                    else bool(str(estate).upper() == "ESTOP")
+                )
+                fault_axis = (
+                    bool(gate_fault)
+                    if gate_fault is not None
+                    else bool(getattr(state, "fault", False))
+                )
                 started = bool(started)
                 armed = bool(gate_armed) if gate_armed is not None else bool(armed)
                 ready = bool(gate_ready) if gate_ready is not None else bool(ready)

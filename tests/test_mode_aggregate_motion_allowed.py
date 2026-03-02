@@ -9,6 +9,7 @@ from steuerung3d.core.mode_aggregate import (
 def _bits(**updates: bool) -> dict[str, bool]:
     return dict(updates)
 
+
 def _axis(
     axis_id: str,
     *,
@@ -29,6 +30,7 @@ def _axis(
         axis_age_ms=axis_age_ms,
     )
 
+
 def test_motion_allowed_with_live_and_no_select() -> None:
     res = aggregate_core_mode(
         AggregateInputs(
@@ -43,6 +45,7 @@ def test_motion_allowed_with_live_and_no_select() -> None:
     assert any(r.code == "NO_SELECT_FOR_MOTION" for r in res.blocked_by)
     assert res.motion_allowed is False
 
+
 def test_motion_allowed_false_when_estop() -> None:
     res = aggregate_core_mode(
         AggregateInputs(
@@ -55,6 +58,7 @@ def test_motion_allowed_false_when_estop() -> None:
     )
     assert res.core_mode == CoreMode.ESTOP
     assert res.motion_allowed is False
+
 
 def test_motion_allowed_false_when_not_ready() -> None:
     res = aggregate_core_mode(
@@ -69,6 +73,7 @@ def test_motion_allowed_false_when_not_ready() -> None:
     assert res.core_mode == CoreMode.ARMED
     assert res.motion_allowed is False
 
+
 def test_motion_allowed_false_when_deadman_released() -> None:
     res = aggregate_core_mode(
         AggregateInputs(
@@ -81,6 +86,7 @@ def test_motion_allowed_false_when_deadman_released() -> None:
     )
     assert res.core_mode == CoreMode.READY
     assert res.motion_allowed is False
+
 
 def test_motion_allowed_true_when_live_and_select() -> None:
     res = aggregate_core_mode(

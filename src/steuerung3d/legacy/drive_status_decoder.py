@@ -33,6 +33,7 @@ class DriveStatusDecoded:
             return f"FAULT: {base}"
         return base
 
+
 # Legacy mapping from 'Zustand' to string. Ported from Decoder.py (3DSteuerung legacy).
 _STATE_MAP = {
     0: "Not Connected",
@@ -82,6 +83,7 @@ _FAULT_MAP = {
     14: "Safety circuit open",
 }
 
+
 def decode_drive_status(word: int) -> DriveStatusDecoded:
     """Decode legacy drive status word (Status / GuideStatus).
 
@@ -96,15 +98,35 @@ def decode_drive_status(word: int) -> DriveStatusDecoded:
     # Special legacy values
     if raw == 65535:
         return DriveStatusDecoded(
-            raw=raw, state_id=0, state_label="SIMUL", is_simul=True, is_no_conn=False,
-            output_powered=False, amp_ready=False, referenced=False, in_position=False,
-            brake_lifted=False, end_right=False, end_left=False, is_fault=False,
+            raw=raw,
+            state_id=0,
+            state_label="SIMUL",
+            is_simul=True,
+            is_no_conn=False,
+            output_powered=False,
+            amp_ready=False,
+            referenced=False,
+            in_position=False,
+            brake_lifted=False,
+            end_right=False,
+            end_left=False,
+            is_fault=False,
         )
     if raw == 0:
         return DriveStatusDecoded(
-            raw=raw, state_id=0, state_label="Not Connected", is_simul=False, is_no_conn=True,
-            output_powered=False, amp_ready=False, referenced=False, in_position=False,
-            brake_lifted=False, end_right=False, end_left=False, is_fault=False,
+            raw=raw,
+            state_id=0,
+            state_label="Not Connected",
+            is_simul=False,
+            is_no_conn=True,
+            output_powered=False,
+            amp_ready=False,
+            referenced=False,
+            in_position=False,
+            brake_lifted=False,
+            end_right=False,
+            end_left=False,
+            is_fault=False,
         )
 
     # Zustand is bits 0..4 (legacy)

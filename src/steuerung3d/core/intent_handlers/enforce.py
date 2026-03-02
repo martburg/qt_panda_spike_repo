@@ -12,7 +12,12 @@ def enforce_core_mode_actions(state: MachineState) -> None:
             cmd.enable = False
             cmd.vel = 0.0
         return
-    if core_mode in (CoreMode.FAULT.value, CoreMode.IDLE.value, CoreMode.ARMED.value, CoreMode.READY.value):
+    if core_mode in (
+        CoreMode.FAULT.value,
+        CoreMode.IDLE.value,
+        CoreMode.ARMED.value,
+        CoreMode.READY.value,
+    ):
         for cmd in state.axis_cmd.values():
             cmd.vel = 0.0
         return

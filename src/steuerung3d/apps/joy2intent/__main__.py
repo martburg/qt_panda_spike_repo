@@ -81,7 +81,11 @@ def main() -> int:
 
     log.info(
         "joy2intent started mode=%s raw_in=%s intent_out=%s tick_hz=%.1f stale_after_ms=%d",
-        st.mode, cfg.raw_in, cfg.intent_out, cfg.tick_hz, cfg.stale_after_ms,
+        st.mode,
+        cfg.raw_in,
+        cfg.intent_out,
+        cfg.tick_hz,
+        cfg.stale_after_ms,
     )
 
     while True:
@@ -146,7 +150,9 @@ def main() -> int:
                     if rig.winches and st.prev_active_winch_idxs:
                         for idx in sorted(st.prev_active_winch_idxs):
                             if 0 <= idx < len(rig.winches):
-                                intent_out.publish_intent(JogWinch(winch_id=rig.winches[idx], rate=0.0))
+                                intent_out.publish_intent(
+                                    JogWinch(winch_id=rig.winches[idx], rate=0.0)
+                                )
                         st.prev_active_winch_idxs.clear()
                     else:
                         # Fallback (legacy single-select)
@@ -161,7 +167,7 @@ def main() -> int:
             if last_rx_ns is not None:
                 age_ms_f = (now_ns - last_rx_ns) / 1_000_000.0
             stale = (age_ms_f is not None) and (age_ms_f > cfg.stale_after_ms)
-            level = 'WARN' if stale else 'OK'
+            level = "WARN" if stale else "OK"
             age_ms_i = int(age_ms_f) if age_ms_f is not None else None
             btns_s = "[" + ",".join(str(b) for b in last_buttons[:8]) + "]"
             axes_s = "[" + ",".join(f"{a:+.2f}" for a in last_axes[:6]) + "]"

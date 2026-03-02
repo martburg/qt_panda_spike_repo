@@ -21,14 +21,20 @@ from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot, apply_measured_snapshot
 
 
-def _snap_for_device_tick(axis_id: str, *, tick: int, t_s: float, device_tick: int) -> TelemetrySnapshot:
+def _snap_for_device_tick(
+    axis_id: str, *, tick: int, t_s: float, device_tick: int
+) -> TelemetrySnapshot:
     return TelemetrySnapshot(
         tick=tick,
         t_s=t_s,
         core_mode="LIVE",
         estop=False,
         fault=False,
-        axes={axis_id: AxisTelemetry(pos=0.0, vel=0.0, enabled=True, fault=False, device_tick=device_tick & 0xFFFF)},
+        axes={
+            axis_id: AxisTelemetry(
+                pos=0.0, vel=0.0, enabled=True, fault=False, device_tick=device_tick & 0xFFFF
+            )
+        },
         rig_mode="RigMode.DISCOVERY",
         densis={},
         estop_status_word=0,

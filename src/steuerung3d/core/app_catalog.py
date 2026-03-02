@@ -45,7 +45,6 @@ APPS: Dict[str, AppInfo] = {
         kind="supported",
         summary="Input daemon (keyboard/misc sources).",
     ),
-
     # Kept for compatibility / reference only
     "core_service": AppInfo(
         module="steuerung3d.apps.core_service",

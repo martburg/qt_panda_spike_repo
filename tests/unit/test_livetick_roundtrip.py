@@ -35,7 +35,10 @@ def test_livetick_roundtrip_densi_core_hip_core_densi_diff_is_step_ms() -> None:
         snap = TelemetrySnapshot.from_state(st)
 
         # --- hip echoes current tx back to core ---
-        apply_intent(st, EchoLifeTick(axis_id=axis_id, value=snap.axes[axis_id].device_tick, hip_id="hip-test"))
+        apply_intent(
+            st,
+            EchoLifeTick(axis_id=axis_id, value=snap.axes[axis_id].device_tick, hip_id="hip-test"),
+        )
 
         # --- next core frame (contains echo) ---
         st.tick += 1

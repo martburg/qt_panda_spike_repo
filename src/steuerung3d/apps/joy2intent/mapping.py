@@ -99,7 +99,7 @@ def _apply_deadzone_and_expo(x: float, deadzone: float, expo: float) -> float:
     y = (ax - deadzone) / (1.0 - deadzone)
     if expo <= 0:
         expo = 1.0
-    y = y ** expo
+    y = y**expo
     return y if x >= 0 else -y
 
 
@@ -111,7 +111,6 @@ def _apply_deadzone_only(x: float, deadzone: float) -> float:
     if abs(x) <= deadzone:
         return 0.0
     return x
-
 
 
 def _pressed_buttons(rc: Any) -> Set[int]:
@@ -203,8 +202,10 @@ def synthesize_intents(
 
     # Deadman released: disable any previously enabled winches.
     if not deadman:
-        prev_deadman = bool(getattr(st, 'prev_deadman', getattr(st, 'deadman_prev', False)))
-        prev_active = set(getattr(st, 'prev_active_winch_idxs', getattr(st, 'enabled_winch_ids', set())))
+        prev_deadman = bool(getattr(st, "prev_deadman", getattr(st, "deadman_prev", False)))
+        prev_active = set(
+            getattr(st, "prev_active_winch_idxs", getattr(st, "enabled_winch_ids", set()))
+        )
 
         active_ids: Set[str] = set()
         if prev_active and all(isinstance(x, int) for x in prev_active):
@@ -226,7 +227,9 @@ def synthesize_intents(
         return intents
 
     # Deadman pressed: enable selected winches and issue jogs.
-    current_active_raw = set(getattr(st, 'prev_active_winch_idxs', getattr(st, 'enabled_winch_ids', set())))
+    current_active_raw = set(
+        getattr(st, "prev_active_winch_idxs", getattr(st, "enabled_winch_ids", set()))
+    )
     if current_active_raw and all(isinstance(x, int) for x in current_active_raw):
         current_active = {rig_ids[i] for i in current_active_raw if 0 <= i < len(rig_ids)}
     else:
@@ -263,10 +266,10 @@ def synthesize_intents(
     if rate != 0.0:
         for wid in sorted(selected_set):
             intents.append(JogWinch(winch_id=wid, rate=rate, hip_id=hip_id))
-    if hasattr(st, 'prev_active_winch_idxs'):
+    if hasattr(st, "prev_active_winch_idxs"):
         # tests expect indices; derive from rig order
         st.prev_active_winch_idxs = {rig_ids.index(w) for w in selected_set if w in rig_ids}
-    elif hasattr(st, 'enabled_winch_ids'):
+    elif hasattr(st, "enabled_winch_ids"):
         st.enabled_winch_ids = set(selected_set)
 
     if hasattr(st, "prev_deadman"):

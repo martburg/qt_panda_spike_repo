@@ -31,6 +31,7 @@ def ensure_densi(state: MachineState, device_id: str) -> None:
     if device_id not in state.densi_registry:
         # state.densi_registry is a first-class field on MachineState
         from steuerung3d.core.rig_types import DensiRuntime
+
         state.densi_registry[device_id] = DensiRuntime(device_id=device_id)
 
 
@@ -66,7 +67,9 @@ def freeze_config(state: MachineState) -> None:
         d = reg[dev]
         if d.anchor_xyz is not None:
             anchors[dev] = tuple(float(x) for x in d.anchor_xyz)
-    state.rig_sync_config = RigSyncConfig(participating=tuple(sorted(participating)), anchors=anchors)
+    state.rig_sync_config = RigSyncConfig(
+        participating=tuple(sorted(participating)), anchors=anchors
+    )
 
 
 def unfreeze_config(state: MachineState) -> None:
@@ -102,7 +105,9 @@ def start_recover_to_last_good(state: MachineState) -> None:
     lengths = dict(lg.get("lengths", {}) or {})
     rp: RecoverPlan = state.rig_recover_plan
     rp.active = True
-    rp.target_lengths = {ax: float(lengths.get(ax, 0.0)) for ax in cfg.participating if ax in lengths}
+    rp.target_lengths = {
+        ax: float(lengths.get(ax, 0.0)) for ax in cfg.participating if ax in lengths
+    }
     rp.started_tick = int(state.tick)
     if rp.timeout_ticks <= 0:
         rp.timeout_ticks = int(state.rig_recover_timeout_ticks)
@@ -150,7 +155,11 @@ def enforce_rig_invariants(state: MachineState) -> None:
                 stop_recover(state)
                 return
 
-    if rm == RigMode.SYNC_ACTIVE and not bool(getattr(state, "estop", False)) and not bool(getattr(state, "fault", False)):
+    if (
+        rm == RigMode.SYNC_ACTIVE
+        and not bool(getattr(state, "estop", False))
+        and not bool(getattr(state, "fault", False))
+    ):
         # keep refreshing last_good
         capture_last_good(state)
 
@@ -195,7 +204,9 @@ def enforce_rig_invariants(state: MachineState) -> None:
         cmd.vel = v
 
     # optional timeout
-    if int(rp.timeout_ticks) > 0 and (int(state.tick) - int(rp.started_tick)) > int(rp.timeout_ticks):
+    if int(rp.timeout_ticks) > 0 and (int(state.tick) - int(rp.started_tick)) > int(
+        rp.timeout_ticks
+    ):
         stop_recover(state)
         state.rig_mode = RigMode.FAULT_SYNC
         return

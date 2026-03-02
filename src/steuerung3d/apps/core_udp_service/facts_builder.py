@@ -9,7 +9,9 @@ from steuerung3d.protocol.estop_bits import decode_estop_word
 
 
 def build_aggregate_inputs(*, state, router, axis_ids: List[str], dt: float) -> AggregateInputs:
-    stale_after_ms = int(float(getattr(state, "densi_offline_after_ticks", 200)) * float(dt) * 1000.0)
+    stale_after_ms = int(
+        float(getattr(state, "densi_offline_after_ticks", 200)) * float(dt) * 1000.0
+    )
     joy = getattr(state, "joy", None)
     jf = extract_joy_facts(joy)
 
@@ -20,7 +22,9 @@ def build_aggregate_inputs(*, state, router, axis_ids: List[str], dt: float) -> 
         estate = None
         if estop_word is not None:
             try:
-                estate = derive_banner_estate_from_word(int(estop_word), within_brake_grace=lambda: False)
+                estate = derive_banner_estate_from_word(
+                    int(estop_word), within_brake_grace=lambda: False
+                )
             except Exception:
                 estate = None
 

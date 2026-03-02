@@ -19,8 +19,8 @@ def _ui(axis_id: str) -> HipUiInputs:
         axis_selection_changed=False,
         estop_reset_clicked=False,
         resync_clicked=False,
-            main_reset_clicked=False,
-            guider_reset_clicked=False,
+        main_reset_clicked=False,
+        guider_reset_clicked=False,
         param_actions=[],
         param_values={},
     )
@@ -35,7 +35,9 @@ def _ready_estop_word() -> int:
     return encode_estop_word(bits)
 
 
-def _snap(axis_id: str, *, joy: JoyState, claimed_by: str, vel_max: float = 1.0) -> TelemetrySnapshot:
+def _snap(
+    axis_id: str, *, joy: JoyState, claimed_by: str, vel_max: float = 1.0
+) -> TelemetrySnapshot:
     return TelemetrySnapshot(
         tick=1,
         t_s=0.0,

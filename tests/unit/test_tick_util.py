@@ -7,7 +7,7 @@ def test_tick_delta_16_basic():
 
 def test_tick_delta_16_wrap():
     prev = 0xFFFA  # 65530
-    cur = 0x0005   # 5
+    cur = 0x0005  # 5
     assert tick_delta_16(cur, prev) == (cur - prev) & 0xFFFF
 
 

@@ -28,7 +28,9 @@ def compute_hip_estop_vm(
         specs=ESTOP_SPECS.values(),
         brake_ok_display=brake_ok_display,
     )
-    checkbox_states = {spec.key: bool(dict(logical).get(spec.key, False)) for spec in ESTOP_SPECS.values()}
+    checkbox_states = {
+        spec.key: bool(dict(logical).get(spec.key, False)) for spec in ESTOP_SPECS.values()
+    }
     reset_enabled = bool(dict(logical).get("reset_able", False)) if attached else False
 
     return HipEstopState(

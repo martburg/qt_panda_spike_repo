@@ -86,7 +86,9 @@ def cmd_profiles(args: argparse.Namespace) -> int:
 def cmd_up(args: argparse.Namespace) -> int:
     profile = default_profile_path(args.profile)
     spec = load_stack_profile(profile, overrides=args.override, sets=args.set)
-    rt = StackRuntime(spec, keep_last_sessions=args.keep_last_sessions, new_console=bool(args.new_console))
+    rt = StackRuntime(
+        spec, keep_last_sessions=args.keep_last_sessions, new_console=bool(args.new_console)
+    )
     session_dir = rt.start()
     print(f"[stack] started: {spec.name} (session {session_dir})")
     return rt.run_forever()

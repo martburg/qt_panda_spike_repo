@@ -58,6 +58,7 @@ def _order_processes(processes: List[ProcessSpec]) -> List[ProcessSpec]:
 
     Keep it stable and predictable. We prefer core before producers/consumers.
     """
+
     def rank(name: str) -> int:
         n = name.lower()
         if n.startswith("core"):
@@ -133,7 +134,11 @@ class StackRuntime:
             time.sleep(0.05)
 
         # --- Phase 2 (REAL): discover devices then start HiP pool ---
-        if device_source == "real" and self.spec.services.get("hip") and self.spec.services["hip"].enabled:
+        if (
+            device_source == "real"
+            and self.spec.services.get("hip")
+            and self.spec.services["hip"].enabled
+        ):
             self._start_hips_real()
 
         # Write initial metadata for status/log tooling
@@ -193,10 +198,16 @@ class StackRuntime:
         net_ctx = dict(self.spec.net)
 
         for i in range(n_hips):
-            name = f"hip-{i+1}"
-            ctx = make_context(stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=None, axis_index=None)
-            argv = [sys.executable, "-m", hip.module] + render_argv(_service_args_with_config(hip), ctx)
-            p = ProcessSpec(name=name, argv=argv, log_path=self.session_dir / f"{name}.log", env=dict(hip.env))
+            name = f"hip-{i + 1}"
+            ctx = make_context(
+                stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=None, axis_index=None
+            )
+            argv = [sys.executable, "-m", hip.module] + render_argv(
+                _service_args_with_config(hip), ctx
+            )
+            p = ProcessSpec(
+                name=name, argv=argv, log_path=self.session_dir / f"{name}.log", env=dict(hip.env)
+            )
             self._spawn(p)
             time.sleep(0.05)
 
@@ -206,7 +217,9 @@ class StackRuntime:
         meta = {
             "stack_name": self.spec.name,
             "session_dir": str(self.session_dir),
-            "profile_path": str(self.spec.profile_path) if getattr(self.spec, "profile_path", None) else "",
+            "profile_path": str(self.spec.profile_path)
+            if getattr(self.spec, "profile_path", None)
+            else "",
             "started_at_s": getattr(self, "_started_at_s", None) or time.time(),
             "stopped_at_s": stopped_at_s,
             "supervisor_pid": os.getpid(),
@@ -245,7 +258,9 @@ class StackRuntime:
         # Preserve per-process environment additions (ports, endpoints, etc.).
         env.update(p.env or {})
 
-        popen_kwargs = dict(stdout=log_f, stderr=subprocess.STDOUT, cwd=str(self.spec.base_dir), env=env)
+        popen_kwargs = dict(
+            stdout=log_f, stderr=subprocess.STDOUT, cwd=str(self.spec.base_dir), env=env
+        )
         if self.new_console and os.name == "nt":
             # Best-effort: create a new console window for each child.
             # (Used for debugging on Windows; no-op on other platforms.)
@@ -300,7 +315,9 @@ class StackRuntime:
                     if isinstance(sm, dict):
                         level = str(sm.get("level", ""))
                         summary = str(sm.get("summary", ""))
-                        fields = sm.get("fields", {}) if isinstance(sm.get("fields", {}), dict) else {}
+                        fields = (
+                            sm.get("fields", {}) if isinstance(sm.get("fields", {}), dict) else {}
+                        )
                     else:
                         level = str(getattr(sm, "level", ""))
                         summary = str(getattr(sm, "summary", ""))
@@ -321,7 +338,9 @@ class StackRuntime:
                     parts.append(f"{name}: {t.last_line[:120]}")
         has_frederik = any(str(p).startswith("Frederik") for p in parts)
         max_entries = max(6, len(parts)) if has_frederik else 6
-        return format_birds_eye(parts, multiline=birdseye_multiline_default(), max_entries=max_entries)
+        return format_birds_eye(
+            parts, multiline=birdseye_multiline_default(), max_entries=max_entries
+        )
 
     def _report_crash(self, rp: RunningProcess, rc: int):
         print(f"\n[stack] process exited: {rp.spec.name} pid={rp.popen.pid} rc={rc}")

@@ -34,7 +34,9 @@ def set_state_property(widget: "QWidget", state: Any, prop: str = "state") -> No
         return
 
 
-def set_state_by_object_name(root: "QWidget", object_name: str, state: Any, prop: str = "state") -> None:
+def set_state_by_object_name(
+    root: "QWidget", object_name: str, state: Any, prop: str = "state"
+) -> None:
     """Find a child widget under `root` by objectName and set its state property."""
     try:
         # Import only for runtime (keeps helper importable in headless/unit test contexts).

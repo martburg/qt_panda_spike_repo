@@ -25,7 +25,9 @@ class DenSiLimitsVM:
     texts: dict[str, str]
 
 
-def compute_densi_limits_vm(*, values: dict[str, float], limit_widgets: dict[str, str]) -> DenSiLimitsVM:
+def compute_densi_limits_vm(
+    *, values: dict[str, float], limit_widgets: dict[str, str]
+) -> DenSiLimitsVM:
     texts: dict[str, str] = {}
     for key, obj_name in dict(limit_widgets).items():
         if key not in values:

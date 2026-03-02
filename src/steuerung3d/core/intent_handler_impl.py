@@ -9,6 +9,7 @@ We now route intents through small domain modules under
 
 Semantics are preserved.
 """
+
 from __future__ import annotations
 
 import logging

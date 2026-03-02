@@ -37,6 +37,8 @@ __all__ = [
     "_expand_targets",
     "_expand_dev_cmd_targets",
 ]
+
+
 def run_core_udp_service(*, args, status) -> int:
     # --- UDP endpoints ---
     intent_in_bind = parse_hostport(args.intent_in)
@@ -45,9 +47,7 @@ def run_core_udp_service(*, args, status) -> int:
 
     # UI telemetry targets
     if args.ui_telem_disable and (
-        args.ui_telem_target
-        or args.ui_telem_base is not None
-        or int(args.ui_telem_count) > 0
+        args.ui_telem_target or args.ui_telem_base is not None or int(args.ui_telem_count) > 0
     ):
         return _fatal("UI telemetry disabled but UI targets were provided.")
 
@@ -82,11 +82,15 @@ def run_core_udp_service(*, args, status) -> int:
     if args.dev_cmd_base is not None and int(args.dev_cmd_count) > 0:
         base = int(str(args.dev_cmd_base).strip())
         dev_cmd_targets.extend(
-            _expand_dev_cmd_targets(str(args.dev_cmd_base), int(args.dev_cmd_count), args.dev_cmd_host)
+            _expand_dev_cmd_targets(
+                str(args.dev_cmd_base), int(args.dev_cmd_count), args.dev_cmd_host
+            )
         )
 
         # Guard against accidental port overlap (common on Windows).
-        if dev_telem_bind[0] == "127.0.0.1" and dev_telem_bind[1] in range(base, base + int(args.dev_cmd_count)):
+        if dev_telem_bind[0] == "127.0.0.1" and dev_telem_bind[1] in range(
+            base, base + int(args.dev_cmd_count)
+        ):
             return _fatal(
                 f"dev telemetry bind port {dev_telem_bind[1]} overlaps dev-cmd ports {base}..{base + int(args.dev_cmd_count) - 1}. "
                 f"Pick a different --dev-telem-in (e.g. 127.0.0.1:{base + 100}) or shift --dev-cmd-base."
@@ -174,7 +178,9 @@ def run_core_udp_service(*, args, status) -> int:
     if err:
         return _fatal(err)
 
-    axis_ui_outs = {axis_id: op_telem_outs[i] for i, axis_id in enumerate(axis_ids)} if op_telem_outs else {}
+    axis_ui_outs = (
+        {axis_id: op_telem_outs[i] for i, axis_id in enumerate(axis_ids)} if op_telem_outs else {}
+    )
     for a in axis_ids:
         st.ensure_axis(a)
 

@@ -35,7 +35,7 @@ class ModalLock:
             except RuntimeError:
                 continue
 
-        for w in (allow or []):
+        for w in allow or []:
             if isinstance(w, QLineEdit):
                 self.enable_line_edit(w, True)
             else:

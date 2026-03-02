@@ -9,9 +9,9 @@ from typing import Dict, Iterable, Optional
 class EstopBitSpec:
     key: str
     bit: int
-    invert: bool = False                 # True => raw bit means "bad", so logical = not raw
-    checkbox: Optional[str] = None       # Diagnostics tab QCheckBox objectName
-    dot: Optional[str] = None            # QFrame dot objectName (or header LED)
+    invert: bool = False  # True => raw bit means "bad", so logical = not raw
+    checkbox: Optional[str] = None  # Diagnostics tab QCheckBox objectName
+    dot: Optional[str] = None  # QFrame dot objectName (or header LED)
 
 
 # ---- Canonical mapping (legacy DecodeEStopStatus) ----
@@ -21,46 +21,47 @@ class EstopBitSpec:
 ESTOP_SPECS: Dict[str, EstopBitSpec] = {
     # --- Guider channel bits (INVERTED in legacy) ---
     # G3
-    "g3_fb":  EstopBitSpec("g3_fb",  0, invert=True, checkbox="chkEsG3Fb",  dot="dotG3Fb"),
+    "g3_fb": EstopBitSpec("g3_fb", 0, invert=True, checkbox="chkEsG3Fb", dot="dotG3Fb"),
     "g3_com": EstopBitSpec("g3_com", 1, invert=True, checkbox="chkEsG3Com", dot="dotG3Com"),
     "g3_out": EstopBitSpec("g3_out", 2, invert=True, checkbox="chkEsG3Out", dot="dotG3Out"),
     # G2
-    "g2_fb":  EstopBitSpec("g2_fb",  3, invert=True, checkbox="chkEsG2Fb",  dot="dotG2Fb"),
+    "g2_fb": EstopBitSpec("g2_fb", 3, invert=True, checkbox="chkEsG2Fb", dot="dotG2Fb"),
     "g2_com": EstopBitSpec("g2_com", 4, invert=True, checkbox="chkEsG2Com", dot="dotG2Com"),
     "g2_out": EstopBitSpec("g2_out", 5, invert=True, checkbox="chkEsG2Out", dot="dotG2Out"),
     # G1
-    "g1_fb":  EstopBitSpec("g1_fb",  6, invert=True, checkbox="chkEsG1Fb",  dot="dotG1Fb"),
+    "g1_fb": EstopBitSpec("g1_fb", 6, invert=True, checkbox="chkEsG1Fb", dot="dotG1Fb"),
     "g1_com": EstopBitSpec("g1_com", 7, invert=True, checkbox="chkEsG1Com", dot="dotG1Com"),
     "g1_out": EstopBitSpec("g1_out", 8, invert=True, checkbox="chkEsG1Out", dot="dotG1Out"),
-
     # --- Core / safety bits (not inverted) ---
-    "master":      EstopBitSpec("master",      9,  checkbox="chkEStopMaster",  dot="dotMaster"),
-    "guider":      EstopBitSpec("guider",      10, checkbox="chkEStopGuider",  dot="dotGuider"),   # legacy: EsSlave
-    "network":     EstopBitSpec("network",     11, checkbox="chkEStopNetwork", dot="dotNetwork"),
-    "reset_able":  EstopBitSpec("reset_able",  12, checkbox="chkEsResetAble",  dot=None),
-    "estop1":      EstopBitSpec("estop1",      13, checkbox="chkEStop1",       dot="dotEStop1"),
-    "estop2":      EstopBitSpec("estop2",      14, checkbox="chkEStop2",       dot="dotEStop2"),
-    "steuerwort":  EstopBitSpec("steuerwort",  15, checkbox="chkEsSteuerwort", dot=None),
-
-    "kw30_ok":     EstopBitSpec("kw30_ok",     16, checkbox="chkEs30kWOK",     dot="dot30kw"),
-    "kw05_ok":     EstopBitSpec("kw05_ok",     17, checkbox="chkEs05kWOK",     dot="dot05kw"),
-
-    "brk1_ok":     EstopBitSpec("brk1_ok",     18, checkbox="chkEsBRK1OK",     dot="dotBRK1"),
-    "brk2_ok":     EstopBitSpec("brk2_ok",     19, checkbox="chkEsBRK2OK",     dot="dotBRK2"),
-    "dcs_ok":      EstopBitSpec("dcs_ok",      20, checkbox="chkEsDCSOK",      dot="dotENC"),
-    "sps_ok":      EstopBitSpec("sps_ok",      21, checkbox="chkEsSPSOK",      dot="dotSPS"),
-    "brk2kb_ok":   EstopBitSpec("brk2kb_ok",   22, checkbox="chkEsBRK2KB",     dot="dotBRK2KB"),
-    "fbt_ok":      EstopBitSpec("fbt_ok",      23, checkbox="chkEsRed",        dot="dotRed"),      # legacy: EsFTBOK; QSS shows dotRed
-
-    "pos_win":     EstopBitSpec("pos_win",     24, checkbox="chkEsPosWin",     dot="dotPosWin"),
-    "vel_win":     EstopBitSpec("vel_win",     25, checkbox="chkEsVelWin",     dot="dotVelWin"),
-    "endlage":     EstopBitSpec("endlage",     26, checkbox="chkEsEndlage",    dot="dotEndlage"),
-
-    "taster":      EstopBitSpec("taster",      27, checkbox="chkEsTaster",     dot=None),
-    "schuetz":     EstopBitSpec("schuetz",     28, checkbox="chkEsSchuetz",    dot=None),
-    "ready":       EstopBitSpec("ready",       29, checkbox="chkEsReady",      dot=None),  # header LED objectName differs; see QSS
-    "schluessel1": EstopBitSpec("schluessel1", 30, checkbox="chkEsKey1",       dot=None),
-    "schluessel2": EstopBitSpec("schluessel2", 31, checkbox="chkEsKey2",       dot=None),
+    "master": EstopBitSpec("master", 9, checkbox="chkEStopMaster", dot="dotMaster"),
+    "guider": EstopBitSpec(
+        "guider", 10, checkbox="chkEStopGuider", dot="dotGuider"
+    ),  # legacy: EsSlave
+    "network": EstopBitSpec("network", 11, checkbox="chkEStopNetwork", dot="dotNetwork"),
+    "reset_able": EstopBitSpec("reset_able", 12, checkbox="chkEsResetAble", dot=None),
+    "estop1": EstopBitSpec("estop1", 13, checkbox="chkEStop1", dot="dotEStop1"),
+    "estop2": EstopBitSpec("estop2", 14, checkbox="chkEStop2", dot="dotEStop2"),
+    "steuerwort": EstopBitSpec("steuerwort", 15, checkbox="chkEsSteuerwort", dot=None),
+    "kw30_ok": EstopBitSpec("kw30_ok", 16, checkbox="chkEs30kWOK", dot="dot30kw"),
+    "kw05_ok": EstopBitSpec("kw05_ok", 17, checkbox="chkEs05kWOK", dot="dot05kw"),
+    "brk1_ok": EstopBitSpec("brk1_ok", 18, checkbox="chkEsBRK1OK", dot="dotBRK1"),
+    "brk2_ok": EstopBitSpec("brk2_ok", 19, checkbox="chkEsBRK2OK", dot="dotBRK2"),
+    "dcs_ok": EstopBitSpec("dcs_ok", 20, checkbox="chkEsDCSOK", dot="dotENC"),
+    "sps_ok": EstopBitSpec("sps_ok", 21, checkbox="chkEsSPSOK", dot="dotSPS"),
+    "brk2kb_ok": EstopBitSpec("brk2kb_ok", 22, checkbox="chkEsBRK2KB", dot="dotBRK2KB"),
+    "fbt_ok": EstopBitSpec(
+        "fbt_ok", 23, checkbox="chkEsRed", dot="dotRed"
+    ),  # legacy: EsFTBOK; QSS shows dotRed
+    "pos_win": EstopBitSpec("pos_win", 24, checkbox="chkEsPosWin", dot="dotPosWin"),
+    "vel_win": EstopBitSpec("vel_win", 25, checkbox="chkEsVelWin", dot="dotVelWin"),
+    "endlage": EstopBitSpec("endlage", 26, checkbox="chkEsEndlage", dot="dotEndlage"),
+    "taster": EstopBitSpec("taster", 27, checkbox="chkEsTaster", dot=None),
+    "schuetz": EstopBitSpec("schuetz", 28, checkbox="chkEsSchuetz", dot=None),
+    "ready": EstopBitSpec(
+        "ready", 29, checkbox="chkEsReady", dot=None
+    ),  # header LED objectName differs; see QSS
+    "schluessel1": EstopBitSpec("schluessel1", 30, checkbox="chkEsKey1", dot=None),
+    "schluessel2": EstopBitSpec("schluessel2", 31, checkbox="chkEsKey2", dot=None),
 }
 
 # Bits that mean "E-Stop is ACTIVE / cause present" (trip sources)
@@ -71,12 +72,12 @@ ESTOP_OK_KEYS = {
     k
     for k, spec in ESTOP_SPECS.items()
     if spec.invert
-       or k.endswith("_ok")
-       or k in {"pos_win", "vel_win", "reset_able", "steuerwort", "ready"}
+    or k.endswith("_ok")
+    or k in {"pos_win", "vel_win", "reset_able", "steuerwort", "ready"}
 }
 
 # Backwards-compatible: plain bit index map (some code already expects this)
-#ESTOP_BITS: Dict[str, int] = {k: spec.bit for k, spec in ESTOP_SPECS.items()}
+# ESTOP_BITS: Dict[str, int] = {k: spec.bit for k, spec in ESTOP_SPECS.items()}
 
 
 def iter_specs() -> Iterable[EstopBitSpec]:

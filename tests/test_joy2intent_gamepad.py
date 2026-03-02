@@ -130,10 +130,14 @@ def test_fine_button_scales_rate() -> None:
     # same stick, same selection, compare with/without fine
     rc_fast = _rc(axes=[0.0, 1.0], pressed=(5, 0))
     intents_fast = synthesize_intents(st, rc_fast, bind, rig, lim)
-    rate_fast = next(i.rate for i in intents_fast if isinstance(i, JogWinch) and i.winch_id == "Anton")
+    rate_fast = next(
+        i.rate for i in intents_fast if isinstance(i, JogWinch) and i.winch_id == "Anton"
+    )
 
     rc_fine = _rc(axes=[0.0, 1.0], pressed=(5, 0, 7))
     intents_fine = synthesize_intents(st, rc_fine, bind, rig, lim)
-    rate_fine = next(i.rate for i in intents_fine if isinstance(i, JogWinch) and i.winch_id == "Anton")
+    rate_fine = next(
+        i.rate for i in intents_fine if isinstance(i, JogWinch) and i.winch_id == "Anton"
+    )
 
     assert rate_fine == rate_fast * lim.fine_scale

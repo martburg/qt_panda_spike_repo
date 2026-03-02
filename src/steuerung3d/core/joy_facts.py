@@ -12,6 +12,7 @@ class JoyFacts:
     - select_hip: operator has explicitly selected/armed control (SEL gate).
     - soll_speed: commanded speed scalar (unitless policy input).
     """
+
     deadman: bool = False
     select_hip: bool = False
     soll_speed: float = 0.0

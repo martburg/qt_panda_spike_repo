@@ -35,14 +35,18 @@ def handle_request_estop_reset(state: MachineState, intent: RequestEstopReset) -
     allowed, _reason = axis_reset_allowed(state, axis_id, hip_id)
     if not allowed:
         key = axis_id or "<none>"
-        state.estop_reset_denied_count_by_axis[key] = int(state.estop_reset_denied_count_by_axis.get(key, 0)) + 1
+        state.estop_reset_denied_count_by_axis[key] = (
+            int(state.estop_reset_denied_count_by_axis.get(key, 0)) + 1
+        )
         return
 
     if axis_id:
         state.estop_reset_req_by_axis[axis_id] = True
     else:
         key = axis_id or "<none>"
-        state.estop_reset_denied_count_by_axis[key] = int(state.estop_reset_denied_count_by_axis.get(key, 0)) + 1
+        state.estop_reset_denied_count_by_axis[key] = (
+            int(state.estop_reset_denied_count_by_axis.get(key, 0)) + 1
+        )
         return
 
     enforce_core_mode_actions(state)

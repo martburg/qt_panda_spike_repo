@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
 from .qss_loader import load_base_qss
 
 # Role-specific canvas tint (ONLY centralwidget background)
-IP_BG  = "#E6F2FF"  # light sky blue
+IP_BG = "#E6F2FF"  # light sky blue
 CFC_BG = "#E8FFF1"  # light mint
 
 QSS_ROLE_IP = r"""
@@ -49,6 +49,7 @@ def parse_role(argv: list[str]) -> str:
     args, _rest = p.parse_known_args(argv[1:])
     return args.role
 
+
 def _refit_window_height_only(win: QWidget) -> None:
     w = win.window() or win
     cw = getattr(w, "centralWidget", None)
@@ -59,6 +60,7 @@ def _refit_window_height_only(win: QWidget) -> None:
 
     w.adjustSize()
     w.resize(w.width(), max(w.minimumSizeHint().height(), w.sizeHint().height()))
+
 
 def load_ui(path: Path):
     loader = QUiLoader()
@@ -163,6 +165,7 @@ def apply_tooltips(win: QWidget) -> None:
             # tool buttons, radio buttons, etc.
             w.setToolTip(f"Control: {pretty}.")
 
+
 def build_yellow_window(*, role: str, ui_path=None):
     """Build the Yellow window (view shell only).
 
@@ -188,7 +191,6 @@ def build_yellow_window(*, role: str, ui_path=None):
     # Title
     title = "HMI – Intent Producer (IP)" if role == "ip" else "SIM – CommandFrame Consumer (CFC)"
     win.setWindowTitle(title)
-
 
     # --- Setup toggle via button ---
     btn = win.findChild(QPushButton, "btnSetupToggle")
@@ -231,9 +233,8 @@ def build_yellow_window(*, role: str, ui_path=None):
     return win
 
 
-
 __all__ = [
-    'build_yellow_window',
-    'load_ui',
-    'apply_tooltips',
+    "build_yellow_window",
+    "load_ui",
+    "apply_tooltips",
 ]

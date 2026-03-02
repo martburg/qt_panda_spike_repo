@@ -26,7 +26,9 @@ class DenSiEstopCheckboxBindings:
     by_key: dict[str, QCheckBox]
 
 
-def discover_densi_estop_checkboxes(*, get_checkbox: Callable[[str], QCheckBox | None]) -> DenSiEstopCheckboxBindings:
+def discover_densi_estop_checkboxes(
+    *, get_checkbox: Callable[[str], QCheckBox | None]
+) -> DenSiEstopCheckboxBindings:
     """Discover checkboxes declared in ESTOP_SPECS.
 
     get_checkbox(object_name) should return a checkbox or None.
@@ -89,7 +91,9 @@ def sync_densi_estop_checkboxes(
             pass
 
 
-def wire_densi_estop_checkboxes(*, bindings: DenSiEstopCheckboxBindings, on_toggled: Callable[[str, bool], None]) -> None:
+def wire_densi_estop_checkboxes(
+    *, bindings: DenSiEstopCheckboxBindings, on_toggled: Callable[[str, bool], None]
+) -> None:
     """Connect checkbox toggles to a controller callback."""
 
     for key, cb in bindings.by_key.items():

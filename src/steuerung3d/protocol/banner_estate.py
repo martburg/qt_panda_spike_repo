@@ -53,9 +53,7 @@ def derive_banner_estate_from_word(
     trip_cause = any(bool(bits.get(k, False)) for k in ESTOP_CAUSE_KEYS)
 
     ok_keys = [
-        k
-        for k in ESTOP_OK_KEYS
-        if (k not in dynamic_exclude) and (k not in ("brk1_ok", "brk2_ok"))
+        k for k in ESTOP_OK_KEYS if (k not in dynamic_exclude) and (k not in ("brk1_ok", "brk2_ok"))
     ]
     ok_chain_fault = any(not bool(bits.get(k, True)) for k in ok_keys)
 

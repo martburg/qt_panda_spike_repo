@@ -37,14 +37,14 @@ def test_record_and_replay(tmp_path: Path):
     # inject some intents at known ticks
     hip_id = "hipA"
     tr.publish_intent(RequestAxisLease(axis_id="X", hip_id=hip_id, req_id="lease-1"))
-    eng.step_once()                           # tick=1
+    eng.step_once()  # tick=1
     tr.publish_intent(EnableAxis(axis_id="X", enable=True, hip_id=hip_id))  # stamped tick=1
-    tr.publish_intent(JogAxis(axis_id="X", vel=0.5, hip_id=hip_id))         # stamped tick=1
+    tr.publish_intent(JogAxis(axis_id="X", vel=0.5, hip_id=hip_id))  # stamped tick=1
 
-    for _ in range(20):                       # run a bit
+    for _ in range(20):  # run a bit
         eng.step_once()
 
-    tr.publish_intent(SetEstop(estop=True))   # stamped near end
+    tr.publish_intent(SetEstop(estop=True))  # stamped near end
     for _ in range(5):
         eng.step_once()
 

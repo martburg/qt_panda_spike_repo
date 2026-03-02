@@ -83,6 +83,8 @@ def test_observed_commit_timeout_pauses_when_tick_stalls() -> None:
     apply_measured_snapshot(st, _snap(tick=201, params={"P": 0.0}))
     apply_measured_snapshot(st, _snap(tick=202, params={"P": 0.0}))
     assert st.param_commit_status == "timeout"
+
+
 def test_core_engine_tick_does_not_advance_observed_param_commit_timeout() -> None:
     # CoreEngine should not mutate observed param-commit bookkeeping.
     # That logic is driven exclusively by applying measured telemetry snapshots.

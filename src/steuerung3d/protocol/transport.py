@@ -46,7 +46,9 @@ class CommandFrameChannel(Protocol):
     def drain_command_frames(self, limit: int = 1000) -> List[CommandFrame]: ...
 
 
-class TransportV2(CommandChannel, TelemetryChannel, RawControlsChannel, CommandFrameChannel, Protocol):
+class TransportV2(
+    CommandChannel, TelemetryChannel, RawControlsChannel, CommandFrameChannel, Protocol
+):
     """Combined channel interface for all runtime streams."""
 
 
@@ -60,6 +62,7 @@ class InMemTransport:
 
     Later we add UDP/ZMQ/WebSocket transports implementing the same interface.
     """
+
     _intent_q: Queue[Intent] = field(default_factory=Queue)
     _telemetry_q: Queue[TelemetrySnapshot] = field(default_factory=Queue)
 
@@ -100,6 +103,7 @@ class InMemTransportV2:
       - command_frames (core -> device adapters)
       - telemetry (core/device -> UI)
     """
+
     _raw_q: Queue[RawControls] = field(default_factory=Queue)
     _intent_q: Queue[Intent] = field(default_factory=Queue)
     _cmd_q: Queue[CommandFrame] = field(default_factory=Queue)

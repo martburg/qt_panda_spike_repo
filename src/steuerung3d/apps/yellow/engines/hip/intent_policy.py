@@ -35,7 +35,7 @@ def claim_allowed(
     *,
     min_interval_ns: int = 500_000_000,
 ) -> bool:
-    last = int(last_claim_attempt_ns_by_axis.get(axis_id, -10**18))
+    last = int(last_claim_attempt_ns_by_axis.get(axis_id, -(10**18)))
     if int(now_ns) - last < int(min_interval_ns):
         return False
     last_claim_attempt_ns_by_axis[axis_id] = int(now_ns)

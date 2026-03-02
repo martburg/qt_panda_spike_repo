@@ -40,7 +40,7 @@ def test_ramps_toward_positive_target():
         joystick_enabled=True,
         in_recover=False,
         allow_motion=True,
-        sld_axis_vel=1000,     # full forward => x ~ +setup_vel_max
+        sld_axis_vel=1000,  # full forward => x ~ +setup_vel_max
         setup_vel_max_mps=2.0,
     )
     out = ramp_step(inp, st)
@@ -77,7 +77,7 @@ def test_upper_endstop_clamps_speed():
         dt_s=0.01,
         pos_ist_m=9.9,
         pos_user_min_m=-10.0,
-        pos_user_max_m=10.0,   # only 0.1 m left
+        pos_user_max_m=10.0,  # only 0.1 m left
         acc_max_mps2=100.0,
         dcc_max_mps2=4.0,
         acc_tot_mps2=5.0,

@@ -56,7 +56,9 @@ class DeviceStepper:
 
     def __call__(self, state: MachineState, cmd_frame: Any, dt: float) -> None:
         # Per-axis command routing (no broadcast).
-        estop_reset_by_axis, param_ops_by_axis = self.compute_one_shots_by_axis(state, self.axis_ids)
+        estop_reset_by_axis, param_ops_by_axis = self.compute_one_shots_by_axis(
+            state, self.axis_ids
+        )
 
         sent = self.router.publish_command_frames(
             cmd_frame,
@@ -142,7 +144,13 @@ class SnapshotHandler:
                 or self.state_ch.changed("fault", fault_v)
                 or self.state_ch.changed("rig_mode", rig_v)
             ):
-                self.log.info("state: core_mode=%s estop=%s fault=%s rig_mode=%s", mode_v, estop_v, fault_v, rig_v)
+                self.log.info(
+                    "state: core_mode=%s estop=%s fault=%s rig_mode=%s",
+                    mode_v,
+                    estop_v,
+                    fault_v,
+                    rig_v,
+                )
 
             claims = tuple(sorted(dict(getattr(self.state, "axis_claims", {}) or {}).items()))
             if self.state_ch.changed("claims", claims):
@@ -173,14 +181,18 @@ class SnapshotHandler:
                 last_s = float(self.lt_last_ui_log_s_by_axis.get(axis_id, 0.0))
                 if dev_tick is not None and (now_s - last_s) >= 0.5:
                     self.lt_last_ui_log_s_by_axis[axis_id] = now_s
-                    self.log.debug("LIFETICK Core tx UI telem: axis=%s device_tick=%s", axis_id, int(dev_tick))
+                    self.log.debug(
+                        "LIFETICK Core tx UI telem: axis=%s device_tick=%s", axis_id, int(dev_tick)
+                    )
             except Exception:
                 pass
 
         if not self.args.ui_telem_disable:
             self.stats["ui_telem_out"] += max(1, len(self.axis_ids))
             self.last_seen["ui_telem_ts"] = time.monotonic()
-            self.log.debug("tx ui telem: tick=%s estop=%s fault=%s", snap.tick, snap.estop, snap.fault)
+            self.log.debug(
+                "tx ui telem: tick=%s estop=%s fault=%s", snap.tick, snap.estop, snap.fault
+            )
 
         # Structured heartbeat for supervisor birds-eye (PLC telemetry remains unchanged).
         emit_birds_eye_status(

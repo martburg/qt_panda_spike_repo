@@ -36,7 +36,7 @@ class DriveStatus:
 
     # derived
     zustand: int  # raw >> 8
-    label: str    # human-ish text
+    label: str  # human-ish text
     is_simul: bool = False
     is_noconn: bool = False
 

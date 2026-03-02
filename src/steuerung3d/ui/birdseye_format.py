@@ -120,8 +120,12 @@ def build_frederik_panel_lines(fields: Dict[str, object], *, max_blocked: int = 
 
     axes = fields.get("axes", [])
     if isinstance(axes, list) and axes:
-        lines.append("Frederik axes: axis in_scope estop fault started cmd_en cmd_vel taster_enabled armed ready owner age_ms")
-        axes_sorted = sorted(axes, key=lambda a: str(a.get("axis_id", "")) if isinstance(a, dict) else str(a))
+        lines.append(
+            "Frederik axes: axis in_scope estop fault started cmd_en cmd_vel taster_enabled armed ready owner age_ms"
+        )
+        axes_sorted = sorted(
+            axes, key=lambda a: str(a.get("axis_id", "")) if isinstance(a, dict) else str(a)
+        )
         for ax in axes_sorted:
             if not isinstance(ax, dict):
                 continue

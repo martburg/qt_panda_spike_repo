@@ -18,10 +18,10 @@ class RigMode(str, Enum):
 
     DISCOVERY = "DISCOVERY"
     SETUP_MANUAL = "SETUP_MANUAL"
-    ARMED_SYNC = "ARMED_SYNC"        # frozen config; no motion
-    SYNC_ACTIVE = "SYNC_ACTIVE"      # frozen config; kinematics active
-    SYNC_RECOVER = "SYNC_RECOVER"    # frozen config; recover/resync only
-    FAULT_SYNC = "FAULT_SYNC"        # frozen config; motion inhibited
+    ARMED_SYNC = "ARMED_SYNC"  # frozen config; no motion
+    SYNC_ACTIVE = "SYNC_ACTIVE"  # frozen config; kinematics active
+    SYNC_RECOVER = "SYNC_RECOVER"  # frozen config; recover/resync only
+    FAULT_SYNC = "FAULT_SYNC"  # frozen config; motion inhibited
 
 
 @dataclass

@@ -25,6 +25,7 @@ class PlcEndpoint:
       - send(): send full-state setpoints for owned axes
       - poll_latest(): drain RX and return latest valid telemetry snapshot
     """
+
     name: str
     axis_ids: list[str]
     link: Link

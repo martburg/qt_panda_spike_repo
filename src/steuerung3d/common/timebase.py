@@ -11,6 +11,7 @@ class Timebase:
     - dt_s is the *intended* fixed timestep.
     - monotonic timestamps are for diagnostics/logging only.
     """
+
     dt_s: float
 
     def now_ns(self) -> int:

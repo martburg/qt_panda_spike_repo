@@ -23,7 +23,9 @@ class PerfWatchdog:
     name: str
 
     warn_threshold_s: float = 0.060  # warn when a tick takes longer than this
-    debug_threshold_s: float = 0.030  # debug when tick takes longer than this (only if logger is DEBUG)
+    debug_threshold_s: float = (
+        0.030  # debug when tick takes longer than this (only if logger is DEBUG)
+    )
     min_log_interval_s: float = 2.0  # rate-limit logs
 
     _t0: float | None = None

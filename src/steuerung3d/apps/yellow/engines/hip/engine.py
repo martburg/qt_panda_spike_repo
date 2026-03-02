@@ -7,15 +7,19 @@ comparison before cutover.
 
 from __future__ import annotations
 
-from dataclasses import asdict
 import logging
+from dataclasses import asdict
 from typing import Any, Iterable
 
 from steuerung3d.core.intents import EchoLifeTick
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
 from ...domain.param_txn import ParamEditTxnClient
-from ...domain.taster_edge_state import TasterEdgeState, update_taster_edge_state, within_brake_grace
+from ...domain.taster_edge_state import (
+    TasterEdgeState,
+    update_taster_edge_state,
+    within_brake_grace,
+)
 from .attach_state import compute_attach_state
 from .intent_policy import gate_motion_intents, is_motion_intent
 from .presentation import compute_banner_estate
@@ -23,6 +27,7 @@ from .step_impl import step as _step
 from .types import (
     HipAttachInputs,
     HipBannerInputs,
+    HipParamAction,
     HipParamButtons,
     HipParamGroup,
     HipParamUiState,
@@ -30,11 +35,11 @@ from .types import (
     HipStepInputs,
     HipStepResult,
     HipUiInputs,
-    HipParamAction
 )
 from .viewmodel import HipViewModel
 
 log = logging.getLogger("hi_p")
+
 
 class HipEngine:
     """Minimal HipEngine surface (shadow-mode only)."""
@@ -75,9 +80,10 @@ class HipEngine:
     def step(self, inputs: HipStepInputs) -> HipStepResult:
         return _step(engine=self, inputs=inputs)
 
-
     @staticmethod
-    def normalize_intents(intents: Iterable[object]) -> list[tuple[str, tuple[tuple[str, Any], ...]]]:
+    def normalize_intents(
+        intents: Iterable[object],
+    ) -> list[tuple[str, tuple[tuple[str, Any], ...]]]:
         items: list[tuple[str, tuple[tuple[str, Any], ...]]] = []
         for intent in intents:
             name = type(intent).__name__
@@ -102,13 +108,16 @@ class HipEngine:
             if "age_ms" in norm:
                 norm["age_ms"] = None if norm["age_ms"] is None else int(norm["age_ms"])
             if "lifetick_age" in norm:
-                norm["lifetick_age"] = None if norm["lifetick_age"] is None else int(norm["lifetick_age"])
+                norm["lifetick_age"] = (
+                    None if norm["lifetick_age"] is None else int(norm["lifetick_age"])
+                )
         except Exception:
             pass
         return norm
 
-
-    def _compute_param_ui_state(self, *, edit_active: bool, edit_group: str, estate: str) -> HipParamUiState:
+    def _compute_param_ui_state(
+        self, *, edit_active: bool, edit_group: str, estate: str
+    ) -> HipParamUiState:
         groups = ("pos", "vel", "filter", "guider")
         state_groups: dict[str, HipParamGroup] = {}
         estate = str(estate or "").upper()
@@ -124,12 +133,16 @@ class HipEngine:
                         cancel_enabled=bool(not busy),
                     )
                     if busy:
-                        buttons = HipParamButtons(edit_enabled=False, write_enabled=False, cancel_enabled=False)
+                        buttons = HipParamButtons(
+                            edit_enabled=False, write_enabled=False, cancel_enabled=False
+                        )
                     state_groups[g] = HipParamGroup(fields_enabled=bool(not busy), buttons=buttons)
                 else:
                     state_groups[g] = HipParamGroup(
                         fields_enabled=False,
-                        buttons=HipParamButtons(edit_enabled=False, write_enabled=False, cancel_enabled=False),
+                        buttons=HipParamButtons(
+                            edit_enabled=False, write_enabled=False, cancel_enabled=False
+                        ),
                     )
             return HipParamUiState(
                 modal_lock_active=True,
@@ -140,7 +153,9 @@ class HipEngine:
         for g in groups:
             busy = self._param_txn.is_group_busy(g)
             if busy:
-                buttons = HipParamButtons(edit_enabled=False, write_enabled=False, cancel_enabled=False)
+                buttons = HipParamButtons(
+                    edit_enabled=False, write_enabled=False, cancel_enabled=False
+                )
             else:
                 buttons = HipParamButtons(
                     edit_enabled=bool(edits_allowed),
@@ -202,7 +217,9 @@ def _normalize_value(val: Any) -> Any:
     if isinstance(val, (int, str, bool)) or val is None:
         return val
     if isinstance(val, dict):
-        return {str(k): _normalize_value(v) for k, v in sorted(val.items(), key=lambda x: str(x[0]))}
+        return {
+            str(k): _normalize_value(v) for k, v in sorted(val.items(), key=lambda x: str(x[0]))
+        }
     if isinstance(val, set):
         return [_normalize_value(v) for v in sorted(val, key=lambda x: str(x))]
     if isinstance(val, (list, tuple)):

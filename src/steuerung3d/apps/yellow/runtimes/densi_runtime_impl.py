@@ -283,7 +283,9 @@ class DensiRuntime:
                 "core_mode": mode,
                 "online": bool(online),
                 "tick": int(getattr(self.engine.state, "tick", 0) or 0),
-                "last_cmd_rx_age_ms": (-1 if getattr(h, "age_ms", None) is None else float(getattr(h, "age_ms", 0.0))),
+                "last_cmd_rx_age_ms": (
+                    -1 if getattr(h, "age_ms", None) is None else float(getattr(h, "age_ms", 0.0))
+                ),
                 "cmd_core_mode": str(cmd_mode),
                 "cmd_intent": bool(cmd_intent),
                 "cmd_enable": bool(cmd_enable),
@@ -351,9 +353,15 @@ class DensiRuntime:
                 self._hb.set("rx", int(rx))
                 self._hb.set("diff", int(diff))
                 if self._last_cmd_ns is not None:
-                    self._hb.set("cmd_age_ms", int((int(now_ns) - int(self._last_cmd_ns)) / 1_000_000.0))
+                    self._hb.set(
+                        "cmd_age_ms", int((int(now_ns) - int(self._last_cmd_ns)) / 1_000_000.0)
+                    )
 
-            if self._axis_ids and _axis_id == self._axis_ids[0] and should_interval_log(now_s, self._lt_last_telem_log_s):
+            if (
+                self._axis_ids
+                and _axis_id == self._axis_ids[0]
+                and should_interval_log(now_s, self._lt_last_telem_log_s)
+            ):
                 self._lt_last_telem_log_s = now_s
                 self._log.debug(
                     "LIFETICK DenSi device: axis=%s tx=%d rx=%d diff=%d",
@@ -379,7 +387,9 @@ class DensiRuntime:
         if ui.estop_all_set_clicked:
             try:
                 self.engine.set_all_estop_bits()
-                self._log.info("inject: SET ALL bits (word=0x%08X)", int(self.engine.inj_estop_word))
+                self._log.info(
+                    "inject: SET ALL bits (word=0x%08X)", int(self.engine.inj_estop_word)
+                )
                 self._force_refresh_checkboxes = True
             except Exception:
                 pass
@@ -395,7 +405,12 @@ class DensiRuntime:
         for t in list(ui.estop_bit_toggles or []):
             try:
                 self.engine.inject_estop_bit(str(t.key), bool(t.checked))
-                self._log.info("inject estop %s=%s (word=0x%08X)", t.key, t.checked, int(self.engine.inj_estop_word))
+                self._log.info(
+                    "inject estop %s=%s (word=0x%08X)",
+                    t.key,
+                    t.checked,
+                    int(self.engine.inj_estop_word),
+                )
                 self._force_refresh_checkboxes = True
             except Exception:
                 pass
@@ -426,7 +441,9 @@ class DensiRuntime:
         )
 
         lifetick_vm = compute_densi_lifetick_vm(state=self.engine.state, axis_id=axis_id)
-        readouts_vm = compute_densi_readouts_vm(state=self.engine.state, axis_id=axis_id, last_cmd=last_cmd)
+        readouts_vm = compute_densi_readouts_vm(
+            state=self.engine.state, axis_id=axis_id, last_cmd=last_cmd
+        )
 
         # Cut markers: compute VM + apply effects (state.params + engine token)
         try:
@@ -439,8 +456,12 @@ class DensiRuntime:
             now_token=str(now_token),
             systemtime_tok=str(getattr(self.engine, "systemtime_tok", "") or "") or None,
             systemtime_param=str(self.engine.state.params.get("SystemTime", "") or "") or None,
-            cut_pos_m=float(getattr(self.engine, "cut_pos_m", 0.0) or 0.0) if bool(getattr(self.engine, "cut_valid", False)) else None,
-            cut_vel_mps=float(getattr(self.engine, "cut_vel_mps", 0.0) or 0.0) if bool(getattr(self.engine, "cut_valid", False)) else None,
+            cut_pos_m=float(getattr(self.engine, "cut_pos_m", 0.0) or 0.0)
+            if bool(getattr(self.engine, "cut_valid", False))
+            else None,
+            cut_vel_mps=float(getattr(self.engine, "cut_vel_mps", 0.0) or 0.0)
+            if bool(getattr(self.engine, "cut_valid", False))
+            else None,
             pos_m=float(readouts_vm.pos_m) if readouts_vm is not None else None,
         )
         if cut_vm.effects.systemtime_tok is not None:
@@ -459,7 +480,9 @@ class DensiRuntime:
 
         prev = bool(getattr(self.engine, "taster_prev_disp", taster))
         pressed_s = getattr(self.engine, "taster_pressed_s", None)
-        st0 = TasterEdgeState(prev=prev, pressed_s=pressed_s if pressed_s is None else float(pressed_s))
+        st0 = TasterEdgeState(
+            prev=prev, pressed_s=pressed_s if pressed_s is None else float(pressed_s)
+        )
         st1 = update_taster_edge_state(state=st0, taster=taster, now_s=float(time.monotonic()))
         self.engine.taster_prev_disp = bool(st1.prev)
         self.engine.taster_pressed_s = st1.pressed_s
@@ -470,7 +493,9 @@ class DensiRuntime:
             grace_s=float(getattr(self.engine, "brake_handoff_grace_s", 2.0)),
         )
 
-        banner_vm = compute_densi_banner_vm(estop_word=int(tick_result.estop_word), within_brake_grace=within_grace)
+        banner_vm = compute_densi_banner_vm(
+            estop_word=int(tick_result.estop_word), within_brake_grace=within_grace
+        )
         estop_dots_vm = compute_densi_estop_dots_vm(
             bits=bits,
             taster=taster,
@@ -486,6 +511,7 @@ class DensiRuntime:
             cut_markers=cut_vm,
             lifetick=lifetick_vm,
             estop_word=int(tick_result.estop_word),
-            refresh_checkboxes=bool(getattr(tick_result, "reset_able_changed", False)) or bool(self._force_refresh_checkboxes),
+            refresh_checkboxes=bool(getattr(tick_result, "reset_able_changed", False))
+            or bool(self._force_refresh_checkboxes),
             applied_param_values=dict(getattr(tick_result, "applied_param_values", {}) or {}),
         )

@@ -1,4 +1,3 @@
-
 def test_densi_engine_imports() -> None:
     # Smoke test: ensure engines package exports DenSiEngine and enums.
     from steuerung3d.apps.yellow.engines import (

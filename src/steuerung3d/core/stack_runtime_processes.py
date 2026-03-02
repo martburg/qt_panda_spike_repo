@@ -42,7 +42,9 @@ def expand_processes(spec: StackSpec, *, session_dir: Path) -> List[ProcessSpec]
 
         if svc.mode == "per_axis":
             for i, axis in enumerate(spec.axes):
-                ctx = make_context(stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=axis, axis_index=i)
+                ctx = make_context(
+                    stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=axis, axis_index=i
+                )
                 argv = [sys.executable, "-m", svc.module]
                 argv += render_argv(service_args_with_config(svc), ctx)
                 add_process(f"{svc_key}-{axis}", argv, dict(svc.env))
@@ -51,12 +53,16 @@ def expand_processes(spec: StackSpec, *, session_dir: Path) -> List[ProcessSpec]
             count = getattr(svc, "count", None)
             if isinstance(count, int) and count > 1:
                 for i in range(int(count)):
-                    ctx = make_context(stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=None, axis_index=None)
+                    ctx = make_context(
+                        stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=None, axis_index=None
+                    )
                     argv = [sys.executable, "-m", svc.module]
                     argv += render_argv(service_args_with_config(svc), ctx)
-                    add_process(f"{svc_key}-{i+1}", argv, dict(svc.env))
+                    add_process(f"{svc_key}-{i + 1}", argv, dict(svc.env))
             else:
-                ctx = make_context(stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=None, axis_index=None)
+                ctx = make_context(
+                    stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=None, axis_index=None
+                )
                 argv = [sys.executable, "-m", svc.module]
                 argv += render_argv(service_args_with_config(svc), ctx)
                 add_process(svc_key, argv, dict(svc.env))

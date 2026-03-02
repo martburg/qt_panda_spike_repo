@@ -11,7 +11,9 @@ class TasterEdgeState:
     pressed_s: float | None = None
 
 
-def update_taster_edge_state(*, state: TasterEdgeState, taster: bool, now_s: float) -> TasterEdgeState:
+def update_taster_edge_state(
+    *, state: TasterEdgeState, taster: bool, now_s: float
+) -> TasterEdgeState:
     prev = bool(state.prev)
     pressed_s = state.pressed_s
     if (not prev) and bool(taster):

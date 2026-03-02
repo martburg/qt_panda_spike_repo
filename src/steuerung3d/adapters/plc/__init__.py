@@ -6,4 +6,3 @@ PLC simulator app.
 The real Beckhoff/TwinCAT code sends semicolon-separated fields. The exact
 field order varies between installations, so we keep the codec configurable.
 """
-

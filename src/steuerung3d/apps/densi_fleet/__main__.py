@@ -18,7 +18,6 @@ def _is_windows() -> bool:
     return os.name == "nt"
 
 
-
 def _axes_from_joy2intent(path: Path) -> List[str]:
     cfg = tomllib.loads(path.read_text(encoding="utf-8"))
     sel = cfg.get("selection", {})
@@ -77,7 +76,9 @@ def main() -> int:
         default=None,
         help="Read axes from selection.winch_ids in a joy2intent TOML.",
     )
-    ap.add_argument("--cmd-base", type=int, default=52001, help="Base UDP port for DenSi CommandIn.")
+    ap.add_argument(
+        "--cmd-base", type=int, default=52001, help="Base UDP port for DenSi CommandIn."
+    )
     ap.add_argument(
         "--telem-out",
         default="127.0.0.1:52002",
@@ -160,7 +161,12 @@ def main() -> int:
                 core_cmd.extend(["--axis", a])
 
             children.append(
-                Child(kind="core", axis="", cmd=core_cmd, p=_popen(core_cmd, new_console=args.new_console))
+                Child(
+                    kind="core",
+                    axis="",
+                    cmd=core_cmd,
+                    p=_popen(core_cmd, new_console=args.new_console),
+                )
             )
             time.sleep(0.2)
 
@@ -183,7 +189,12 @@ def main() -> int:
                 args.log_level,
             ]
             children.append(
-                Child(kind="densi", axis=axis_id, cmd=densi_cmd, p=_popen(densi_cmd, new_console=args.new_console))
+                Child(
+                    kind="densi",
+                    axis=axis_id,
+                    cmd=densi_cmd,
+                    p=_popen(densi_cmd, new_console=args.new_console),
+                )
             )
             time.sleep(0.1)
 
@@ -193,7 +204,7 @@ def main() -> int:
             axis_map_lines.append(f"  {a}: 127.0.0.1:{args.cmd_base + i}")
 
         print(
-            f"DenSi fleet running for axes={axes}. Command ports {args.cmd_base}..{args.cmd_base+len(axes)-1}.\n"
+            f"DenSi fleet running for axes={axes}. Command ports {args.cmd_base}..{args.cmd_base + len(axes) - 1}.\n"
             f"TelemetryOut -> {telem_out[0]}:{telem_out[1]}\n"
             + "\n".join(axis_map_lines)
             + "\nCtrl+C to stop.",

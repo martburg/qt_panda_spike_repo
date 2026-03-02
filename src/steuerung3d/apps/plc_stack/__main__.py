@@ -59,7 +59,11 @@ def main() -> int:
                         f"tick={snap.tick:5d} t={snap.t_s:6.2f}s core_mode={snap.core_mode} "
                         f"estop={snap.estop} fault={snap.fault} "
                         f"rx_ticks={device.last_rx_tick_by_endpoint} "
-                        + (f"{axes[0]}(en={ax0.enabled}, vel={ax0.vel:5.2f}, pos={ax0.pos:8.3f})" if ax0 else "")
+                        + (
+                            f"{axes[0]}(en={ax0.enabled}, vel={ax0.vel:5.2f}, pos={ax0.pos:8.3f})"
+                            if ax0
+                            else ""
+                        )
                     )
 
             if 2.5 < (time.time() - t0) < 2.55:

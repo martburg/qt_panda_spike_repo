@@ -46,7 +46,9 @@ def eps_for_param(name: str, default: float = 1e-6) -> float:
     return float(spec.eps) if spec else float(default)
 
 
-def normalize_group_values(group: str, values: Dict[str, float]) -> Tuple[Dict[str, float], List[str]]:
+def normalize_group_values(
+    group: str, values: Dict[str, float]
+) -> Tuple[Dict[str, float], List[str]]:
     """Return (normalized_values, warnings).
 
     This is a safety net. HiP UI already enforces the same rules; the core repeats them

@@ -136,9 +136,15 @@ def step_plc_anton_vel_cmd(
         control_enabled = control_enabled and (not bool(state.estop)) and (not bool(state.fault))
 
         # Lifetick echo stale gate (tick-based).
-        echo_map = getattr(cmd, "lifetick_echo", {}) if isinstance(getattr(cmd, "lifetick_echo", {}), dict) else {}
+        echo_map = (
+            getattr(cmd, "lifetick_echo", {})
+            if isinstance(getattr(cmd, "lifetick_echo", {}), dict)
+            else {}
+        )
         lifetick_rx = int(echo_map.get(axis_id, int(getattr(cmd, "tick", 0)))) & 0xFFFF
-        stale_after = int(lifetick_stale_after_ticks_active if deadman_active else lifetick_stale_after_ticks_idle)
+        stale_after = int(
+            lifetick_stale_after_ticks_active if deadman_active else lifetick_stale_after_ticks_idle
+        )
         stale = _lifetick_is_stale(
             meta=ax.meta,
             lifetick_rx=lifetick_rx,
@@ -159,7 +165,9 @@ def step_plc_anton_vel_cmd(
         user_max = _f_any(params, ["UserMax", "PosMaxUserUI"], 1.0e9)
         user_min = _f_any(params, ["UserMin", "PosMinUserUI"], -1.0e9)
         dcc_max = _f_any(params, ["DccMax", "DccMaxUI"], 0.0)
-        desired = _soft_limit_cap(v=desired, pos=ax.pos, user_min=user_min, user_max=user_max, dcc_max=dcc_max)
+        desired = _soft_limit_cap(
+            v=desired, pos=ax.pos, user_min=user_min, user_max=user_max, dcc_max=dcc_max
+        )
 
         # Acceleration ramp.
         ramped = float(ax.meta.get("plc_ramped_speed", 0.0))
@@ -172,7 +180,11 @@ def step_plc_anton_vel_cmd(
         ax.meta["plc_ramped_speed"] = float(ramped)
 
         # Position-trim overlay.
-        pos_soll = float(getattr(sp, "pos", params.get("PosSoll", ax.pos))) if sp is not None else float(params.get("PosSoll", ax.pos))
+        pos_soll = (
+            float(getattr(sp, "pos", params.get("PosSoll", ax.pos)))
+            if sp is not None
+            else float(params.get("PosSoll", ax.pos))
+        )
         filt = _pid_trim(
             meta=ax.meta,
             pos_soll=pos_soll,
@@ -185,7 +197,9 @@ def step_plc_anton_vel_cmd(
         )
 
         final_speed = float(ramped + filt)
-        final_speed = _soft_limit_cap(v=final_speed, pos=ax.pos, user_min=user_min, user_max=user_max, dcc_max=dcc_max)
+        final_speed = _soft_limit_cap(
+            v=final_speed, pos=ax.pos, user_min=user_min, user_max=user_max, dcc_max=dcc_max
+        )
 
         ax.enabled = bool(control_enabled) and (not bool(stale))
         if not ax.enabled:
@@ -202,7 +216,9 @@ def step_plc_anton_vel_cmd(
         guide_speed = float(params.get("GuideSollSpeed", 0.0) or 0.0)
         if guide_control:
             params["GuideIstSpeed"] = float(guide_speed)
-            params["GuidePosIst"] = float(params.get("GuidePosIst", 0.0)) + float(guide_speed) * float(dt_s)
+            params["GuidePosIst"] = float(params.get("GuidePosIst", 0.0)) + float(
+                guide_speed
+            ) * float(dt_s)
         else:
             apply_densi_param_defaults(params, keys=("GuideIstSpeed", "GuidePosIst"))
 

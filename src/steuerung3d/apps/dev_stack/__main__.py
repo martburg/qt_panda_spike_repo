@@ -101,7 +101,6 @@ def main() -> int:
 
     axis_ids = _axis_ids_from_config(config_path)
 
-
     # Ensure all axes exist so snapshots have stable keys
     for aid in axis_ids:
         st.ensure_axis(aid)
@@ -145,7 +144,9 @@ def main() -> int:
                     for aid in axis_ids:
                         if aid in snap.axes:
                             a = snap.axes[aid]
-                            parts.append(f"{aid}(en={a.enabled}, vel={a.vel:5.2f}, pos={a.pos:8.3f})")
+                            parts.append(
+                                f"{aid}(en={a.enabled}, vel={a.vel:5.2f}, pos={a.pos:8.3f})"
+                            )
 
                     print(
                         f"tick={snap.tick:5d} t={snap.t_s:6.2f}s core_mode={snap.core_mode} estop={snap.estop} "

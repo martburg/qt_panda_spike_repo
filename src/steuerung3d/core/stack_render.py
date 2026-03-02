@@ -185,5 +185,9 @@ def render_argv(args: Iterable[Any], ctx: RenderContext) -> List[str]:
     return out
 
 
-def make_context(*, stack: dict, net: dict, rig: dict, axis: str | None, axis_index: int | None) -> RenderContext:
-    return RenderContext(stack=_ns(stack), net=_ns(net), rig=_ns(rig), axis=axis, axis_index=axis_index)
+def make_context(
+    *, stack: dict, net: dict, rig: dict, axis: str | None, axis_index: int | None
+) -> RenderContext:
+    return RenderContext(
+        stack=_ns(stack), net=_ns(net), rig=_ns(rig), axis=axis, axis_index=axis_index
+    )

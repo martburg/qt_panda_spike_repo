@@ -9,21 +9,23 @@ from .control_in import compute_control_in
 
 # States: keep them controller-side and semantic
 ST_DISCONNECTED = "disconnected"
-ST_IDLE         = "idle"         # linked, but not claiming / not enabled
-ST_CLAIMING     = "claiming"     # Intent=True, waiting for PLC to "ack" ownership (we can define ack later)
-ST_READY        = "ready"        # claimed, not enabled
-ST_ENABLING     = "enabling"     # requested enable, waiting enabled bit
-ST_ACTIVE       = "active"       # enabled; motion allowed (subject to request)
-ST_ESTOP        = "estop"        # safety not ok -> force safe outputs
-ST_RECOVER      = "recover"      # after estop cleared: resync + re-claim + re-enable
-ST_FAULT        = "fault"        # fault seen -> safe outputs until cleared
+ST_IDLE = "idle"  # linked, but not claiming / not enabled
+ST_CLAIMING = (
+    "claiming"  # Intent=True, waiting for PLC to "ack" ownership (we can define ack later)
+)
+ST_READY = "ready"  # claimed, not enabled
+ST_ENABLING = "enabling"  # requested enable, waiting enabled bit
+ST_ACTIVE = "active"  # enabled; motion allowed (subject to request)
+ST_ESTOP = "estop"  # safety not ok -> force safe outputs
+ST_RECOVER = "recover"  # after estop cleared: resync + re-claim + re-enable
+ST_FAULT = "fault"  # fault seen -> safe outputs until cleared
 
 
 @dataclass
 class AxisFsmConfig:
     controller_pid: str
     default_control_pid_tx: int = 0
-    safe_modus: str = "E"         # in your legacy, 'E' seems “normal”
+    safe_modus: str = "E"  # in your legacy, 'E' seems “normal”
     idle_modus: str = "E"
     write_modus: str = "w"
 
@@ -39,36 +41,47 @@ class AxisFSM:
     Output per tick:
       - AxisCommand (semantic), which adapter encodes into legacy downlink tokens.
     """
+
     def __init__(self, cfg: AxisFsmConfig):
         self.cfg = cfg
         self.machine = Machine(
             model=self,
-            states=[ST_DISCONNECTED, ST_IDLE, ST_CLAIMING, ST_READY, ST_ENABLING, ST_ACTIVE, ST_ESTOP, ST_RECOVER, ST_FAULT],
+            states=[
+                ST_DISCONNECTED,
+                ST_IDLE,
+                ST_CLAIMING,
+                ST_READY,
+                ST_ENABLING,
+                ST_ACTIVE,
+                ST_ESTOP,
+                ST_RECOVER,
+                ST_FAULT,
+            ],
             initial=ST_DISCONNECTED,
             auto_transitions=False,
         )
 
         # --- link transitions ---
-        self.machine.add_transition("on_link_up",   ST_DISCONNECTED, ST_IDLE)
-        self.machine.add_transition("on_link_down", "*",            ST_DISCONNECTED)
+        self.machine.add_transition("on_link_up", ST_DISCONNECTED, ST_IDLE)
+        self.machine.add_transition("on_link_down", "*", ST_DISCONNECTED)
 
         # --- safety / fault hard overrides ---
-        self.machine.add_transition("on_estop",     "*",            ST_ESTOP)
-        self.machine.add_transition("on_fault",     "*",            ST_FAULT)
+        self.machine.add_transition("on_estop", "*", ST_ESTOP)
+        self.machine.add_transition("on_fault", "*", ST_FAULT)
 
         # --- estop recovery path ---
-        self.machine.add_transition("on_estop_cleared", ST_ESTOP,   ST_RECOVER)
-        self.machine.add_transition("on_recovered",     ST_RECOVER, ST_CLAIMING)
+        self.machine.add_transition("on_estop_cleared", ST_ESTOP, ST_RECOVER)
+        self.machine.add_transition("on_recovered", ST_RECOVER, ST_CLAIMING)
 
         # --- claiming / ready / enable ---
-        self.machine.add_transition("start_claim",  ST_IDLE,        ST_CLAIMING)
-        self.machine.add_transition("claim_ok",     ST_CLAIMING,    ST_READY)
-        self.machine.add_transition("enable_req",   ST_READY,       ST_ENABLING)
-        self.machine.add_transition("enabled_ok",   ST_ENABLING,    ST_ACTIVE)
-        self.machine.add_transition("disable_req",  ST_ACTIVE,      ST_READY)
+        self.machine.add_transition("start_claim", ST_IDLE, ST_CLAIMING)
+        self.machine.add_transition("claim_ok", ST_CLAIMING, ST_READY)
+        self.machine.add_transition("enable_req", ST_READY, ST_ENABLING)
+        self.machine.add_transition("enabled_ok", ST_ENABLING, ST_ACTIVE)
+        self.machine.add_transition("disable_req", ST_ACTIVE, ST_READY)
 
         # --- fault recovery (placeholder) ---
-        self.machine.add_transition("fault_cleared", ST_FAULT,      ST_IDLE)
+        self.machine.add_transition("fault_cleared", ST_FAULT, ST_IDLE)
 
     # ---------- public tick ----------
     def step(self, tel: AxisTelemetry, req: AxisRequest) -> AxisCommand:
@@ -184,7 +197,14 @@ class AxisFSM:
             cmd_pos=0.0,
             write_params=False,
         )
-        return self._base(safe_req, modus=self.cfg.safe_modus, intent=intent, resync=resync, enable=False, motion=False)
+        return self._base(
+            safe_req,
+            modus=self.cfg.safe_modus,
+            intent=intent,
+            resync=resync,
+            enable=False,
+            motion=False,
+        )
 
     def _cmd_estop(self, req: AxisRequest) -> AxisCommand:
         # During estop, don't try to own/enable; only pass reset/resync signals.
@@ -199,7 +219,9 @@ class AxisFSM:
 
     def _cmd_enable(self, req: AxisRequest, intent: bool) -> AxisCommand:
         # Enabling = same setpoints, but you may set enable bit in control_in once mapped
-        return self._base(req, modus=self.cfg.idle_modus, intent=intent, resync=False, enable=True, motion=False)
+        return self._base(
+            req, modus=self.cfg.idle_modus, intent=intent, resync=False, enable=True, motion=False
+        )
 
     def _cmd_active(self, req: AxisRequest, intent: bool) -> AxisCommand:
         # Active = allow motion setpoints through (already ramped/clamped elsewhere)
@@ -214,4 +236,6 @@ class AxisFSM:
 
     def _cmd_recover(self, req: AxisRequest) -> AxisCommand:
         # Recover = claim + resync asserted (legacy uses ReSync==1 to clear EStoped)
-        return self._base(req, modus=self.cfg.idle_modus, intent=True, resync=True, enable=False, motion=False)
+        return self._base(
+            req, modus=self.cfg.idle_modus, intent=True, resync=True, enable=False, motion=False
+        )

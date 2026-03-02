@@ -80,7 +80,9 @@ class StatusEmitter:
             self._sock = s
         return self._sock
 
-    def emit(self, *, level: str = "OK", summary: str = "", fields: Optional[Dict[str, Any]] = None) -> None:
+    def emit(
+        self, *, level: str = "OK", summary: str = "", fields: Optional[Dict[str, Any]] = None
+    ) -> None:
         msg = {
             "v": 1,
             "stack": self.stack,
@@ -99,7 +101,9 @@ class StatusEmitter:
             # best-effort; never crash the process for status telemetry
             return
 
-    def emit_every(self, *, level: str = "OK", summary: str = "", fields: Optional[Dict[str, Any]] = None) -> None:
+    def emit_every(
+        self, *, level: str = "OK", summary: str = "", fields: Optional[Dict[str, Any]] = None
+    ) -> None:
         now = time.monotonic()
         if (now - self._last_emit_s) < float(self.min_period_s):
             return

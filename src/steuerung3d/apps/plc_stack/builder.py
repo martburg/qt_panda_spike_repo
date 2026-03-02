@@ -39,6 +39,7 @@ class CodecFactory(Protocol):
 # Runtime bundle
 # --------------------
 
+
 @dataclass
 class PlcStackRuntime:
     cfg: PlcStackConfig
@@ -51,6 +52,7 @@ class PlcStackRuntime:
 # --------------------
 # Helpers
 # --------------------
+
 
 def collect_axes(cfg: PlcStackConfig) -> list[str]:
     axes: list[str] = []
@@ -77,6 +79,7 @@ def build_transport(cfg: PlcStackConfig) -> tuple[InMemTransport, JsonlRecorder]
 # PLC device construction (importable + testable)
 # --------------------
 
+
 def build_plc_device(
     cfg: PlcStackConfig,
     *,
@@ -94,10 +97,12 @@ def build_plc_device(
       (device, endpoints)
     """
     if link_factory is None:
+
         def link_factory(*, bind, target):
             return UdpLink(bind=bind, target=target)
 
     if codec_factory is None:
+
         def codec_factory(*, spec):
             return PlcCodec(spec=spec)
 
@@ -112,7 +117,10 @@ def build_plc_device(
             false_token=ep_cfg.false_token,
         )
         codec = codec_factory(spec=spec)
-        link = link_factory(bind=(ep_cfg.bind_host, ep_cfg.bind_port), target=(ep_cfg.target_host, ep_cfg.target_port))
+        link = link_factory(
+            bind=(ep_cfg.bind_host, ep_cfg.bind_port),
+            target=(ep_cfg.target_host, ep_cfg.target_port),
+        )
 
         endpoints.append(
             PlcEndpoint(
@@ -131,7 +139,10 @@ def build_plc_device(
 # Core construction (real app wiring)
 # --------------------
 
-def build_core(cfg: PlcStackConfig, *, device_step: DeviceStep, enable_logging: bool = True) -> PlcStackRuntime:
+
+def build_core(
+    cfg: PlcStackConfig, *, device_step: DeviceStep, enable_logging: bool = True
+) -> PlcStackRuntime:
     """Build the core runtime using the real plc_stack wiring.
 
     - axes come from cfg.plc_endpoints[*].axis_ids

@@ -71,7 +71,9 @@ class UdpPlcTelemetryOut:
     link: UdpLink
 
     @staticmethod
-    def connect(target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)) -> "UdpPlcTelemetryOut":
+    def connect(
+        target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
+    ) -> "UdpPlcTelemetryOut":
         return UdpPlcTelemetryOut(link=UdpLink(bind=bind, target=target))
 
     def publish_line(self, line: str) -> None:
@@ -105,54 +107,25 @@ class UdpPlcTelemetryOut:
         # Snapshot-like: use the existing conservative encoder.
         try:
             from steuerung3d.protocol.plc_wire import encode_plc_telemetry
+
             line = encode_plc_telemetry(payload)
             self.publish_line(line)
         except Exception:
             self.publish_line(str(payload))
 
 
-
-@dataclass
-class UdpPlcCommandIn:
-    link: UdpLink
-    axis_id: Optional[str] = None
-
-    @staticmethod
-    def bind(addr: Tuple[str, int], axis_id: Optional[str] = None) -> "UdpPlcCommandIn":
-        return UdpPlcCommandIn(link=UdpLink(bind=addr, target=addr), axis_id=axis_id)
-
-    def drain_lines(self, limit: int = 1000) -> List[str]:
-        return [_from_bytes(b) for b in self.link.poll(limit=limit)]
-
-    def drain_command_frames(self, limit: int = 100) -> List[Any]:
-        """Drain and decode PLC downlink telegrams into CommandFrame objects.
-
-        The PLC downlink does not contain the axis name; we therefore bind the
-        channel to a specific axis via ``axis_id`` (DenSi is usually single-axis).
-
-        ST semantics:
-        - Modus == 'w' means the write-extension fields are present (parameter write).
-        - Intent is a boolean *string* in the ST ('True'/'False', case-sensitive compare in ST)
-          and is *not* used for param edit ops.
-        """
-        out: List[Any] = []
-        try:
-            from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamWriteOp
-            from steuerung3d.protocol.plc_codec import _PARAM_KEYMAP, decode_downlink
-        except Exception:
-            return out
-
-        axis_id = (self.axis_id or "X").strip() or "X"
-
 def _to_int(x: object, default: int = 0) -> int:
-    # Accept "1", "1.0", etc. (legacy tolerant)
+    """Tolerant int conversion for PLC tokens (accepts '1', '1.0', etc.)."""
     try:
         return int(float(str(x).strip()))
     except Exception:
         return int(default)
 
+
 def _to_float(x: object, default: float = 0.0) -> float:
+    """Tolerant float conversion for PLC tokens."""
     return float(parse_float(x, default=default))
+
 
 def _to_bool_token(x: object, default: bool = False) -> bool:
     """Parse legacy PLC-ish booleans.
@@ -161,8 +134,10 @@ def _to_bool_token(x: object, default: bool = False) -> bool:
       - `Intent` is compared against the *string* 'True' (case-sensitive).
       - Other on-wire flags are typically numeric (WORD/INT/DWORD) where non-zero means true.
 
-    We preserve a quirk of the previous implementation:
-      - empty token => False (even if default=True)
+    Policy here:
+      - empty token => False (even if default=True) (matches previous behavior)
+      - accept a broad token set (true/false/on/off/1/0/...) via :func:`parse_bool`
+      - accept numeric-ish tokens as well (e.g. DWORD bitfields): non-zero => True
     """
     try:
         s = str(x).strip()
@@ -188,9 +163,43 @@ def _to_bool_token(x: object, default: bool = False) -> bool:
             return bool(default)
 
 
-        group_defaults = {
-            "pos":    ["HardMax", "UserMax", "UserMin", "HardMin", "PosWin"],
-            "vel":    ["VelMax", "VelWin", "AccMax", "AccMove", "DccMax", "MaxAmp", "VelMaxMot"],
+@dataclass
+class UdpPlcCommandIn:
+    link: UdpLink
+    axis_id: Optional[str] = None
+
+    @staticmethod
+    def bind(addr: Tuple[str, int], axis_id: Optional[str] = None) -> "UdpPlcCommandIn":
+        return UdpPlcCommandIn(link=UdpLink(bind=addr, target=addr), axis_id=axis_id)
+
+    def drain_lines(self, limit: int = 1000) -> List[str]:
+        return [_from_bytes(b) for b in self.link.poll(limit=limit)]
+
+    def drain_command_frames(self, limit: int = 100) -> List[Any]:
+        """Drain and decode PLC downlink telegrams into CommandFrame objects.
+
+        The PLC downlink does not contain the axis name; we therefore bind the
+        channel to a specific axis via ``axis_id`` (DenSi is usually single-axis).
+
+        ST semantics:
+        - Modus == 'w' means the write-extension fields are present (parameter write).
+        - Intent, EStopReset, ReSync, GUINotHaltIN are boolean *string* tokens in ST ('True'/'False')
+          and the ST often compares case-sensitively against 'True'.
+        - ControlIN is effectively a numeric enable/bitfield; we accept tolerant boolean parsing.
+        """
+        out: List[Any] = []
+        try:
+            from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamWriteOp
+            from steuerung3d.protocol.plc_codec import _PARAM_KEYMAP, decode_downlink
+        except Exception:
+            return out
+
+        axis_id = (self.axis_id or "X").strip() or "X"
+
+        # Default groups for parameter writes on the PLC wire.
+        group_defaults: Dict[str, List[str]] = {
+            "pos": ["HardMax", "UserMax", "UserMin", "HardMin", "PosWin"],
+            "vel": ["VelMax", "VelWin", "AccMax", "AccMove", "DccMax", "MaxAmp", "VelMaxMot"],
             "filter": ["P", "I", "D", "IL", "RampForm"],
             "guider": ["PosMax", "PosMin", "Pitch"],
         }
@@ -200,20 +209,23 @@ def _to_bool_token(x: object, default: bool = False) -> bool:
                 dec = decode_downlink(raw)
                 if dec is None:
                     continue
-                f = dec.fields
+                f = dec.fields or {}
+                if not isinstance(f, dict):
+                    continue
 
                 tick_ui_rx = _to_int(f.get("LifetickUIrx", "0"), 0)
                 vel = _to_float(f.get("SpeedSollIN", "0"), 0.0)
+
                 enable = _to_bool_token(f.get("ControlIN", "False"), False)
                 intent = _to_bool_token(f.get("Intent", "True"), True)
                 resync = _to_bool_token(f.get("ReSync", "False"), False)
                 gui_not_halt = _to_bool_token(f.get("GUINotHaltIN", "False"), False)
 
-                param_ops = []
+                param_ops: List[Any] = []
                 modus = str(f.get("Modus", "") or "").strip().lower()
                 if modus == "w":
                     for grp, keys in group_defaults.items():
-                        values = {}
+                        values: Dict[str, float] = {}
                         for k in keys:
                             plc_k = _PARAM_KEYMAP.get(k)
                             if not plc_k:
@@ -243,13 +255,15 @@ def _to_bool_token(x: object, default: bool = False) -> bool:
 
         return out
 
+
 @dataclass
 class UdpPlcCommandOut:
-
     link: UdpLink
 
     @staticmethod
-    def connect(target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)) -> "UdpPlcCommandOut":
+    def connect(
+        target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
+    ) -> "UdpPlcCommandOut":
         return UdpPlcCommandOut(link=UdpLink(bind=bind, target=target))
 
     def publish_line(self, line: str) -> None:

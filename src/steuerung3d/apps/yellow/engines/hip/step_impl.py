@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     # Only needed for type checking; avoids runtime import cycles.
     from .engine import HipEngine
@@ -21,7 +22,7 @@ from steuerung3d.core.intents import (
     RequestResync,
 )
 from steuerung3d.core.joy_state import JoyState
-from steuerung3d.protocol.estop_bits import  decode_estop_word
+from steuerung3d.protocol.estop_bits import decode_estop_word
 
 from ...domain.joy_motion_map import map_soll_speed_to_jog_winch
 from ...domain.ui_estop import age_to_online_state, infer_estop_profile
@@ -50,7 +51,6 @@ from .types import (
     HipPresentationData,
     HipStepInputs,
     HipStepResult,
-
 )
 from .viewmodel import HipCutMarkersState, HipDriveStatusState
 

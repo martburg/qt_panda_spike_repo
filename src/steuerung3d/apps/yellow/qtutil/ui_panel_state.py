@@ -17,7 +17,9 @@ from PySide6.QtWidgets import QCheckBox, QLineEdit, QWidget
 from .ui_update import set_checked, set_enabled, set_text
 
 
-def clear_line_edits(root: QWidget, *, keep: Optional[Iterable[QLineEdit]] = None, text: str = "") -> None:
+def clear_line_edits(
+    root: QWidget, *, keep: Optional[Iterable[QLineEdit]] = None, text: str = ""
+) -> None:
     """Set text on all QLineEdit descendants of root, except those in `keep`."""
     try:
         keep_set = set(keep or [])

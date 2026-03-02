@@ -22,25 +22,25 @@ class RampInputs:
     acc_tot_mps2: float
 
     # UI / mode
-    deadman_pressed: bool              # App.Yellow.EsTaster
-    joystick_enabled: bool             # (buttons & 32 and buttons & 1) OR recover driving
+    deadman_pressed: bool  # App.Yellow.EsTaster
+    joystick_enabled: bool  # (buttons & 32 and buttons & 1) OR recover driving
     in_recover: bool
 
     # status gating (legacy: only allow velocity when TechOpt and some buttons)
     allow_motion: bool
 
     # slider input from UI (0..1000, centered 500)
-    sld_axis_vel: int                  # self.sldAxisVel.GetValue()
+    sld_axis_vel: int  # self.sldAxisVel.GetValue()
 
     # setup vel max as used by legacy (SetupVelMax)
-    setup_vel_max_mps: float           # already resolved (e.g. SpeedMax/10 clamped >=1)
+    setup_vel_max_mps: float  # already resolved (e.g. SpeedMax/10 clamped >=1)
 
 
 @dataclass(frozen=True)
 class RampState:
-    pos0_m: float          # legacy Pos0
-    vx_mps: float          # legacy VX
-    fahrbefehl_old: int    # legacy FahrbefehlOld (1 means previously not pressed)
+    pos0_m: float  # legacy Pos0
+    vx_mps: float  # legacy VX
+    fahrbefehl_old: int  # legacy FahrbefehlOld (1 means previously not pressed)
 
 
 @dataclass(frozen=True)

@@ -31,12 +31,14 @@ def test_banner_estate_word_zero_is_estop() -> None:
 
 def test_banner_estate_idle_armed_ready() -> None:
     bits = _healthy_bits()
-    bits.update({
-        "schuetz": True,
-        "taster": False,
-        "brk1_ok": True,
-        "brk2_ok": True,
-    })
+    bits.update(
+        {
+            "schuetz": True,
+            "taster": False,
+            "brk1_ok": True,
+            "brk2_ok": True,
+        }
+    )
     w = encode_estop_word(bits)
     assert derive_banner_estate_from_word(w, within_brake_grace=lambda: False) == "IDLE"
 

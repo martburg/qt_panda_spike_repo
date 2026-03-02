@@ -24,15 +24,12 @@ class AxisTelemetry:
     vel_cmd: float = 0.0
     enable_cmd: bool = False
 
-
     # legacy/layer-0 diagnostics (optional on the wire)
-    device_tick: int = 0          # PLC/device lifetick (legacy LifetickUItx)
-    lifetick_rx: int = 0          # echoed tick seen at device (legacy LifetickUIrx), if available
-    lifetick_age: int = 0         # (device_tick - lifetick_rx) mod 65536, if available
-    status_word: int = 0          # legacy Status (drive/main amp)
-    guide_status_word: int = 0    # legacy GuideStatus (slave/guider amp)
-
-
+    device_tick: int = 0  # PLC/device lifetick (legacy LifetickUItx)
+    lifetick_rx: int = 0  # echoed tick seen at device (legacy LifetickUIrx), if available
+    lifetick_age: int = 0  # (device_tick - lifetick_rx) mod 65536, if available
+    status_word: int = 0  # legacy Status (drive/main amp)
+    guide_status_word: int = 0  # legacy GuideStatus (slave/guider amp)
 
 
 @dataclass(frozen=True)
@@ -43,6 +40,7 @@ class DensiTelemetry:
     participating: bool = False
     anchor_xyz: tuple[float, float, float] | None = None
     last_seen_age_ticks: int = 0
+
 
 @dataclass(frozen=True)
 class TelemetrySnapshot:
@@ -74,7 +72,7 @@ class TelemetrySnapshot:
 
     # Raw PLC uplink payload (so HiP can decide what to use without changing decode again)
     plc_uplink_fields: Dict[str, str] = field(default_factory=dict)  # base fields (pre-EOD)
-    plc_uplink_tail: Dict[str, str] = field(default_factory=dict)    # tail fields (post-EOD)
+    plc_uplink_tail: Dict[str, str] = field(default_factory=dict)  # tail fields (post-EOD)
 
     # HIP<->Core transactional acks (one-shot)
     core_acks: list[str] = field(default_factory=list)
@@ -97,13 +95,13 @@ class TelemetrySnapshot:
                 vel=float(ax.vel),
                 enabled=bool(ax.enabled),
                 fault=bool(ax.fault),
-                vel_cmd=float(getattr(state.axis_cmd.get(axis_id, None), 'vel', 0.0)),
-                enable_cmd=bool(getattr(state.axis_cmd.get(axis_id, None), 'enable', False)),
-                device_tick=int(getattr(ax, 'meta', {}).get('device_tick', 0)) & 0xFFFF,
-                lifetick_rx=int(getattr(ax, 'meta', {}).get('lifetick_rx', 0)) & 0xFFFF,
-                lifetick_age=int(getattr(ax, 'meta', {}).get('lifetick_age', 0)) & 0xFFFF,
-                status_word=int(getattr(ax, 'meta', {}).get('status_word', 0)),
-                guide_status_word=int(getattr(ax, 'meta', {}).get('guide_status_word', 0)),
+                vel_cmd=float(getattr(state.axis_cmd.get(axis_id, None), "vel", 0.0)),
+                enable_cmd=bool(getattr(state.axis_cmd.get(axis_id, None), "enable", False)),
+                device_tick=int(getattr(ax, "meta", {}).get("device_tick", 0)) & 0xFFFF,
+                lifetick_rx=int(getattr(ax, "meta", {}).get("lifetick_rx", 0)) & 0xFFFF,
+                lifetick_age=int(getattr(ax, "meta", {}).get("lifetick_age", 0)) & 0xFFFF,
+                status_word=int(getattr(ax, "meta", {}).get("status_word", 0)),
+                guide_status_word=int(getattr(ax, "meta", {}).get("guide_status_word", 0)),
             )
             for axis_id, ax in state.axes.items()
         }
@@ -175,7 +173,11 @@ class TelemetrySnapshot:
             param_commit_req_id=str(getattr(state, "param_commit_req_id", "")),
             param_commit_group=str(getattr(state, "param_commit_group", "")),
             param_commit_status=str(getattr(state, "param_commit_status", "idle")),
-            param_commit_age_ticks=int(getattr(state, "param_commit_observed_ticks", 0) if str(getattr(state, "param_commit_status", "idle")) in ("pending", "timeout") else 0),
+            param_commit_age_ticks=int(
+                getattr(state, "param_commit_observed_ticks", 0)
+                if str(getattr(state, "param_commit_status", "idle")) in ("pending", "timeout")
+                else 0
+            ),
             param_commit_unmatched=list(getattr(state, "param_commit_unmatched", [])),
             joy=getattr(state, "joy", JoyState()),
         )
@@ -228,7 +230,9 @@ def _update_param_commit_observation(state: MachineState, device_tick: int) -> N
     else:
         state.param_commit_match_streak = 0
 
-    if int(getattr(state, "param_commit_observed_ticks", 0)) >= int(getattr(state, "param_commit_timeout_ticks", 40)):
+    if int(getattr(state, "param_commit_observed_ticks", 0)) >= int(
+        getattr(state, "param_commit_timeout_ticks", 40)
+    ):
         state.param_commit_status = "timeout"
 
 
@@ -273,4 +277,3 @@ def apply_measured_snapshot(state: MachineState, snap: TelemetrySnapshot) -> Non
         ax.meta["lifetick_age"] = int(getattr(ax_t, "lifetick_age", 0)) & 0xFFFF
         ax.meta["status_word"] = int(getattr(ax_t, "status_word", 0))
         ax.meta["guide_status_word"] = int(getattr(ax_t, "guide_status_word", 0))
-

@@ -19,6 +19,7 @@ class AxisState:
     fault: bool = False
     meta: Dict[str, Any] = field(default_factory=dict)
 
+
 @dataclass
 class AxisCommandState:
     # --- commanded (core wants) ---
@@ -45,6 +46,7 @@ class MachineState:
     """
     Single source of truth.
     """
+
     tick: int = 0
     t_s: float = 0.0
 
@@ -96,7 +98,7 @@ class MachineState:
     main_reset_req_by_axis: Dict[str, bool] = field(default_factory=dict)
     guider_reset_req_by_axis: Dict[str, bool] = field(default_factory=dict)
 
-    estop_status_word: int = 0   # NEW: measured bitfield
+    estop_status_word: int = 0  # NEW: measured bitfield
 
     # --- parameters (axis-agnostic v0.1) ---
     # Measured/confirmed by device (via telemetry):
@@ -108,7 +110,6 @@ class MachineState:
     pending_param_ops: list[ParamOp] = field(default_factory=list)  # legacy/global
     # NEW: per-axis pending ops (preferred for multi-axis)
     pending_param_ops_by_axis: Dict[str, list[ParamOp]] = field(default_factory=dict)
-
 
     # --- HIP<->Core transactional acks (axis-agnostic parameter ops) ---
     # One-shot ack list emitted in TelemetrySnapshot, then cleared after publish.
@@ -179,7 +180,6 @@ class MachineState:
 
         self.clear_one_shots()
         self.core_acks.clear()
-
 
     def ensure_axis(self, axis_id: str) -> AxisState:
         axis_id = normalize_axis_id(axis_id)

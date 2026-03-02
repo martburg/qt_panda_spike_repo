@@ -13,7 +13,7 @@ from steuerung3d.apps.yellow.ui_shell import build_yellow_window
 from steuerung3d.config.toml_loader import load_toml
 from steuerung3d.core.net import parse_hostport
 
-#from steuerung3d.protocol.transport import InMemTransport
+# from steuerung3d.protocol.transport import InMemTransport
 from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn
 from steuerung3d.util.app_bootstrap import bootstrap_logging
 
@@ -27,6 +27,7 @@ def _load_config(path: str | None) -> dict:
         return dict(load_toml(Path(path)))
     except Exception:
         return {}
+
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -58,7 +59,6 @@ def main() -> int:
 
     log.info("HI-P target IntentOut=%s  bind TelemetryIn=%s", intent_out_addr, telem_in_addr)
 
-
     app = QApplication(sys.argv)
     win = build_yellow_window(role="ip")
 
@@ -71,7 +71,7 @@ def main() -> int:
         telemetry_in=telemetry_in,
         shadow_mode=shadow_mode,
     )
-    axis_label = (str(args.axis).strip() or "*")
+    axis_label = str(args.axis).strip() or "*"
     if str(args.axis).strip():
         ctl.set_fixed_axis(str(args.axis).strip(), lock_combo=True)
     # Make the window self-identifying (axis + ports) to reduce integration confusion.

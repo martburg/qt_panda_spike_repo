@@ -89,7 +89,9 @@ class HiPController:
         try:
             self._binder.apply_startup_state()
         except Exception:
-            self._soft_errors["binder.apply_startup_state"] = int(self._soft_errors.get("binder.apply_startup_state", 0)) + 1
+            self._soft_errors["binder.apply_startup_state"] = (
+                int(self._soft_errors.get("binder.apply_startup_state", 0)) + 1
+            )
 
     # -------------------------------------------------------------------------
     # Initialization helpers
@@ -274,23 +276,31 @@ class HiPController:
                     try:
                         ui_inputs = self._binder.read_inputs()
                     except Exception:
-                        self._soft_errors["binder.read_inputs"] = int(self._soft_errors.get("binder.read_inputs", 0)) + 1
+                        self._soft_errors["binder.read_inputs"] = (
+                            int(self._soft_errors.get("binder.read_inputs", 0)) + 1
+                        )
 
-                rt_inputs = self._hip_runtime.collect_inputs(snaps=snaps, now_ns=now_ns, ui=ui_inputs)
+                rt_inputs = self._hip_runtime.collect_inputs(
+                    snaps=snaps, now_ns=now_ns, ui=ui_inputs
+                )
                 rt_result = self._hip_runtime.tick(inputs=rt_inputs)
 
                 log.info(
                     "hi_p: ui axis=%r changed=%s attached=%s intents=%d",
                     ui_inputs.axis_selected,
                     ui_inputs.axis_selection_changed,
-                    getattr(rt_result.view_model.attach_state, "attached", None) if rt_result.view_model else None,
+                    getattr(rt_result.view_model.attach_state, "attached", None)
+                    if rt_result.view_model
+                    else None,
                     len(rt_result.intents) if hasattr(rt_result, "intents") else -1,
                 )
 
                 vm = rt_result.view_model
                 if vm is not None and not getattr(self, "_dbg_vm_keys_once", False):
                     self._dbg_vm_keys_once = True
-                    log.info("hi_p: dbg vm_type=%s keys=%s", type(vm).__name__, sorted(vars(vm).keys()))
+                    log.info(
+                        "hi_p: dbg vm_type=%s keys=%s", type(vm).__name__, sorted(vars(vm).keys())
+                    )
 
                 now_s = time.time()
                 if now_s >= getattr(self, "_dbg_next_s", 0.0):
@@ -317,7 +327,9 @@ class HiPController:
                         try:
                             self._binder.apply_startup_state()
                         except Exception:
-                            self._soft_errors["binder.apply_startup_state"] = int(self._soft_errors.get("binder.apply_startup_state", 0)) + 1
+                            self._soft_errors["binder.apply_startup_state"] = (
+                                int(self._soft_errors.get("binder.apply_startup_state", 0)) + 1
+                            )
                     return
 
                 if rt_result.view_model is None:
@@ -327,7 +339,9 @@ class HiPController:
                     try:
                         self._binder.apply(rt_result.view_model)
                     except Exception:
-                        self._soft_errors["binder.apply"] = int(self._soft_errors.get("binder.apply", 0)) + 1
+                        self._soft_errors["binder.apply"] = (
+                            int(self._soft_errors.get("binder.apply", 0)) + 1
+                        )
                         now_s = time.time()
                         last = getattr(self, "_binder_apply_err_last_s", 0.0)
                         if now_s - last > 1.0:  # rate-limit so logs don't explode
@@ -339,7 +353,10 @@ class HiPController:
                 if rt_result.snap is not None:
                     estate = ""
                     try:
-                        estate = str(getattr(getattr(rt_result.view_model, "banner", None), "estate", "") or "")
+                        estate = str(
+                            getattr(getattr(rt_result.view_model, "banner", None), "estate", "")
+                            or ""
+                        )
                     except Exception:
                         estate = ""
                     self._emit_birdseye_motion(

@@ -69,7 +69,7 @@ def summarize_json(obj: Any, max_items: int = 12) -> str:
     axes = obj.get("axes")
     if isinstance(axes, list):
         shown = " ".join(_fmt_float(v) for v in axes[:max_items])
-        tail = "" if len(axes) <= max_items else f" …(+{len(axes)-max_items})"
+        tail = "" if len(axes) <= max_items else f" …(+{len(axes) - max_items})"
         parts.append(f"axes[{len(axes)}]: {shown}{tail}")
 
     buttons = obj.get("buttons")
@@ -77,7 +77,9 @@ def summarize_json(obj: Any, max_items: int = 12) -> str:
         # show indices of pressed buttons (value truthy)
         pressed = [str(i) for i, v in enumerate(buttons) if v]
         if pressed:
-            parts.append(f"btn: {','.join(pressed[:max_items])}" + ("" if len(pressed) <= max_items else "…"))
+            parts.append(
+                f"btn: {','.join(pressed[:max_items])}" + ("" if len(pressed) <= max_items else "…")
+            )
         else:
             parts.append("btn: -")
 
@@ -122,14 +124,24 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1)")
     p.add_argument("--port", type=int, default=50100, help="UDP port to bind (default: 50100)")
     p.add_argument("--max", type=int, default=0, help="Stop after N packets (0 = infinite)")
-    p.add_argument("--timeout", type=float, default=0.0, help="Socket timeout in seconds (0 = none)")
+    p.add_argument(
+        "--timeout", type=float, default=0.0, help="Socket timeout in seconds (0 = none)"
+    )
     p.add_argument("--encoding", default="utf-8", help="Payload decoding (default: utf-8)")
 
     # output modes
-    p.add_argument("--pretty", action="store_true", help="Pretty-print JSON payloads (scrolling mode)")
-    p.add_argument("--compact", action="store_true", help="Compact one-line output (scrolling mode)")
-    p.add_argument("--live", action="store_true", help="Live one-line output (overwrite previous line)")
-    p.add_argument("--rate", type=float, default=30.0, help="Max live refresh rate in Hz (default: 30)")
+    p.add_argument(
+        "--pretty", action="store_true", help="Pretty-print JSON payloads (scrolling mode)"
+    )
+    p.add_argument(
+        "--compact", action="store_true", help="Compact one-line output (scrolling mode)"
+    )
+    p.add_argument(
+        "--live", action="store_true", help="Live one-line output (overwrite previous line)"
+    )
+    p.add_argument(
+        "--rate", type=float, default=30.0, help="Max live refresh rate in Hz (default: 30)"
+    )
 
     args = p.parse_args(argv)
 

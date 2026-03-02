@@ -20,6 +20,7 @@ class CoreRunner:
     stop:
       - stop() sets an event; thread exits cleanly after current tick.
     """
+
     engine: CoreEngine
     realtime: bool = True
 

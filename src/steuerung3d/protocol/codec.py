@@ -55,7 +55,7 @@ _INTENT_TYPE_MAP = {
     "request_axis_lease": RequestAxisLease,
     "release_axis_lease": ReleaseAxisLease,
     "set_estop": SetEstop,
-    "estop_reset": RequestEstopReset,   # NEW
+    "estop_reset": RequestEstopReset,  # NEW
     "resync": RequestResync,
     "clear_fault": ClearFault,
     # parameters (axis-agnostic)
@@ -101,6 +101,7 @@ def decode_intent(payload: Dict[str, Any]) -> Intent:
 # Telemetry
 # ---------------------------
 
+
 def encode_telemetry(snap: TelemetrySnapshot) -> Dict[str, Any]:
     return asdict(snap)
 
@@ -109,7 +110,8 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
     # Axes
     axes_in = payload.get("axes", {})
     axes_out = {
-        str(axis_id): AxisTelemetry(**ax) for axis_id, ax in dict(axes_in).items()
+        str(axis_id): AxisTelemetry(**ax)
+        for axis_id, ax in dict(axes_in).items()
         if isinstance(ax, dict)
     }
 
@@ -169,8 +171,12 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
         param_edit_active=bool(payload.get("param_edit_active", False)),
         param_edit_group=str(payload.get("param_edit_group", "")),
         params={k: float(v) for k, v in dict(payload.get("params", {})).items()},
-        plc_uplink_fields={str(k): str(v) for k, v in dict(payload.get("plc_uplink_fields", {})).items()},
-        plc_uplink_tail={str(k): str(v) for k, v in dict(payload.get("plc_uplink_tail", {})).items()},
+        plc_uplink_fields={
+            str(k): str(v) for k, v in dict(payload.get("plc_uplink_fields", {})).items()
+        },
+        plc_uplink_tail={
+            str(k): str(v) for k, v in dict(payload.get("plc_uplink_tail", {})).items()
+        },
         core_acks=[str(x) for x in list(payload.get("core_acks", []))],
         # observed param commit status (optional)
         param_commit_req_id=str(payload.get("param_commit_req_id", "")),
@@ -185,6 +191,7 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
 # ---------------------------
 # RawControls (human input seam)
 # ---------------------------
+
 
 def encode_raw_controls(rc: RawControls) -> Dict[str, Any]:
     return asdict(rc)
@@ -202,9 +209,11 @@ def decode_raw_controls(payload: Dict[str, Any]) -> RawControls:
         buttons=[int(x) for x in list(buttons_in)],
     )
 
+
 # ---------------------------
 # CommandFrame
 # ---------------------------
+
 
 def encode_command_frame(frame: CommandFrame) -> Dict[str, Any]:
     # Custom encode to keep regression hashes stable when new optional fields

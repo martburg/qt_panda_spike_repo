@@ -124,18 +124,35 @@ class AxisRouter:
 
                 self.last_dev_estop_word_by_axis[k] = int(getattr(s, "estop_status_word", 0))
                 self.last_dev_params_by_axis[k] = dict(getattr(s, "params", {}) or {})
-                self.last_dev_param_edit_active_by_axis[k] = bool(getattr(s, "param_edit_active", False))
+                self.last_dev_param_edit_active_by_axis[k] = bool(
+                    getattr(s, "param_edit_active", False)
+                )
                 self.last_dev_param_edit_group_by_axis[k] = str(getattr(s, "param_edit_group", ""))
 
                 # Raw PLC uplink payload (pre/post EOD). Keep as strings.
-                self.last_dev_plc_uplink_fields_by_axis[k] = {str(a): str(b) for a, b in dict(getattr(s, "plc_uplink_fields", {}) or {}).items()}
-                self.last_dev_plc_uplink_tail_by_axis[k] = {str(a): str(b) for a, b in dict(getattr(s, "plc_uplink_tail", {}) or {}).items()}
+                self.last_dev_plc_uplink_fields_by_axis[k] = {
+                    str(a): str(b)
+                    for a, b in dict(getattr(s, "plc_uplink_fields", {}) or {}).items()
+                }
+                self.last_dev_plc_uplink_tail_by_axis[k] = {
+                    str(a): str(b) for a, b in dict(getattr(s, "plc_uplink_tail", {}) or {}).items()
+                }
 
-                self.last_dev_param_commit_req_id_by_axis[k] = str(getattr(s, "param_commit_req_id", ""))
-                self.last_dev_param_commit_group_by_axis[k] = str(getattr(s, "param_commit_group", ""))
-                self.last_dev_param_commit_status_by_axis[k] = str(getattr(s, "param_commit_status", "idle"))
-                self.last_dev_param_commit_age_ticks_by_axis[k] = int(getattr(s, "param_commit_age_ticks", 0))
-                self.last_dev_param_commit_unmatched_by_axis[k] = list(getattr(s, "param_commit_unmatched", []) or [])
+                self.last_dev_param_commit_req_id_by_axis[k] = str(
+                    getattr(s, "param_commit_req_id", "")
+                )
+                self.last_dev_param_commit_group_by_axis[k] = str(
+                    getattr(s, "param_commit_group", "")
+                )
+                self.last_dev_param_commit_status_by_axis[k] = str(
+                    getattr(s, "param_commit_status", "idle")
+                )
+                self.last_dev_param_commit_age_ticks_by_axis[k] = int(
+                    getattr(s, "param_commit_age_ticks", 0)
+                )
+                self.last_dev_param_commit_unmatched_by_axis[k] = list(
+                    getattr(s, "param_commit_unmatched", []) or []
+                )
             except Exception:
                 continue
 
@@ -163,18 +180,60 @@ class AxisRouter:
             densis=densis_one,
             lease_rig=str(getattr(snap, "lease_rig", "")),
             lease_axis=lease_one,
-            estop_status_word=int(self.last_dev_estop_word_by_axis.get(axis_id, int(getattr(snap, "estop_status_word", 0)))),
-            param_edit_active=bool(self.last_dev_param_edit_active_by_axis.get(axis_id, bool(getattr(snap, "param_edit_active", False)))),
-            param_edit_group=str(self.last_dev_param_edit_group_by_axis.get(axis_id, str(getattr(snap, "param_edit_group", "")))),
-            params=dict(self.last_dev_params_by_axis.get(axis_id, dict(getattr(snap, "params", {})) or {})),
-            plc_uplink_fields=dict(self.last_dev_plc_uplink_fields_by_axis.get(axis_id, dict(getattr(snap, "plc_uplink_fields", {})) or {})),
-            plc_uplink_tail=dict(self.last_dev_plc_uplink_tail_by_axis.get(axis_id, dict(getattr(snap, "plc_uplink_tail", {})) or {})),
+            estop_status_word=int(
+                self.last_dev_estop_word_by_axis.get(
+                    axis_id, int(getattr(snap, "estop_status_word", 0))
+                )
+            ),
+            param_edit_active=bool(
+                self.last_dev_param_edit_active_by_axis.get(
+                    axis_id, bool(getattr(snap, "param_edit_active", False))
+                )
+            ),
+            param_edit_group=str(
+                self.last_dev_param_edit_group_by_axis.get(
+                    axis_id, str(getattr(snap, "param_edit_group", ""))
+                )
+            ),
+            params=dict(
+                self.last_dev_params_by_axis.get(axis_id, dict(getattr(snap, "params", {})) or {})
+            ),
+            plc_uplink_fields=dict(
+                self.last_dev_plc_uplink_fields_by_axis.get(
+                    axis_id, dict(getattr(snap, "plc_uplink_fields", {})) or {}
+                )
+            ),
+            plc_uplink_tail=dict(
+                self.last_dev_plc_uplink_tail_by_axis.get(
+                    axis_id, dict(getattr(snap, "plc_uplink_tail", {})) or {}
+                )
+            ),
             core_acks=list(getattr(snap, "core_acks", [])),
-            param_commit_req_id=str(self.last_dev_param_commit_req_id_by_axis.get(axis_id, str(getattr(snap, "param_commit_req_id", "")))),
-            param_commit_group=str(self.last_dev_param_commit_group_by_axis.get(axis_id, str(getattr(snap, "param_commit_group", "")))),
-            param_commit_status=str(self.last_dev_param_commit_status_by_axis.get(axis_id, str(getattr(snap, "param_commit_status", "idle")))),
-            param_commit_age_ticks=int(self.last_dev_param_commit_age_ticks_by_axis.get(axis_id, int(getattr(snap, "param_commit_age_ticks", 0)))),
-            param_commit_unmatched=list(self.last_dev_param_commit_unmatched_by_axis.get(axis_id, list(getattr(snap, "param_commit_unmatched", [])) or [])),
+            param_commit_req_id=str(
+                self.last_dev_param_commit_req_id_by_axis.get(
+                    axis_id, str(getattr(snap, "param_commit_req_id", ""))
+                )
+            ),
+            param_commit_group=str(
+                self.last_dev_param_commit_group_by_axis.get(
+                    axis_id, str(getattr(snap, "param_commit_group", ""))
+                )
+            ),
+            param_commit_status=str(
+                self.last_dev_param_commit_status_by_axis.get(
+                    axis_id, str(getattr(snap, "param_commit_status", "idle"))
+                )
+            ),
+            param_commit_age_ticks=int(
+                self.last_dev_param_commit_age_ticks_by_axis.get(
+                    axis_id, int(getattr(snap, "param_commit_age_ticks", 0))
+                )
+            ),
+            param_commit_unmatched=list(
+                self.last_dev_param_commit_unmatched_by_axis.get(
+                    axis_id, list(getattr(snap, "param_commit_unmatched", [])) or []
+                )
+            ),
             joy=getattr(snap, "joy", JoyState()),
         )
 

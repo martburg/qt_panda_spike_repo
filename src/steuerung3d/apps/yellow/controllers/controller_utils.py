@@ -18,7 +18,11 @@ def init_observability(
 ) -> tuple[Heartbeat, ChangeTracker, object | None, RateLimiter | None]:
     hb = Heartbeat(str(service_name or ""), interval_s=1.0)
     ch = ChangeTracker()
-    status = status_emitter_cls.from_env(default_service=status_default_service) if status_emitter_cls else None
+    status = (
+        status_emitter_cls.from_env(default_service=status_default_service)
+        if status_emitter_cls
+        else None
+    )
     dbg_rl = RateLimiter(float(dbg_rl_interval_s)) if dbg_rl_interval_s is not None else None
     return hb, ch, status, dbg_rl
 

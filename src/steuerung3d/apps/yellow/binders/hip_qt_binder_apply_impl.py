@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-
 from ..engines.hip.attach_state import NOT_ATTACHED
 from ..panels.hip.hip_banner_render import apply_hip_banner
 from ..panels.hip.hip_cut_markers_render import apply_hip_cut_markers
@@ -23,6 +22,7 @@ from ..ui.joy_style import JOY_DEADMAN_PROP, JOY_SELECT_HIP_PROP
 if TYPE_CHECKING:
     from ..engines.hip.engine import HipViewModel
 
+
 def apply(b, vm: HipViewModel) -> None:
     # Always-visible UI
     b.apply_tick_text(vm.tick_text)
@@ -40,7 +40,9 @@ def apply(b, vm: HipViewModel) -> None:
     b._apply_joy_speed(float(vm.joy_soll_speed))
 
     # Axis-dependent sections: only show/update when attached
-    attached = bool(getattr(vm.attach_state, "attached", False)) if vm.attach_state is not None else False
+    attached = (
+        bool(getattr(vm.attach_state, "attached", False)) if vm.attach_state is not None else False
+    )
     if not attached:
         # Optionally clear/hide axis-specific fields here (drive/readouts/params),
         # but do NOT return early before rendering global widgets.
@@ -128,6 +130,7 @@ def _apply_joy_speed(b, soll_speed: float) -> None:
 # Apply helpers
 # ------------------------------------------------------------------
 
+
 def _apply_attach_combo(b, vm: HipViewModel) -> None:
     if vm.attach_combo is None or b._cmbAxis is None:
         return
@@ -181,7 +184,9 @@ def _apply_attach_state(b, vm: HipViewModel) -> None:
     if btnMainReset is not None:
         set_enabled(btnMainReset, bool(vm.attach_state.main_amp_reset_enabled))
     if btnGuiderReset is not None:
-        set_enabled(btnGuiderReset, bool(getattr(vm.attach_state, "guider_amp_reset_enabled", False)))
+        set_enabled(
+            btnGuiderReset, bool(getattr(vm.attach_state, "guider_amp_reset_enabled", False))
+        )
     if btn_rec is not None:
         set_enabled(btn_rec, False)
 
@@ -228,7 +233,9 @@ def _apply_readouts(b, vm: HipViewModel) -> None:
         log.info(
             "hi_p: dbg apply_readouts ro=%s bind=%s txtPos=%s",
             type(ro).__name__ if ro is not None else None,
-            type(getattr(b, "_readouts_bindings", None)).__name__ if getattr(b, "_readouts_bindings", None) is not None else None,
+            type(getattr(b, "_readouts_bindings", None)).__name__
+            if getattr(b, "_readouts_bindings", None) is not None
+            else None,
             getattr(getattr(b, "_readouts_bindings", None), "txt_pos", None),
         )
     apply_hip_readouts(b._readouts_bindings, vm)
@@ -250,6 +257,7 @@ def _apply_params(b, vm: HipViewModel) -> None:
     if b._param_ui_bindings is None:
         return
     apply_param_ui(b._param_ui_bindings, vm)
+
 
 # ------------------------------------------------------------------
 # UI helpers

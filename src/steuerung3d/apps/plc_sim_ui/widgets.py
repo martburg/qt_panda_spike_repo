@@ -17,7 +17,9 @@ class LedColors:
 class LedIndicator(QWidget):
     """Round LED + label, purely visual."""
 
-    def __init__(self, text: str, colors: LedColors, checked: bool = False, parent: QWidget | None = None):
+    def __init__(
+        self, text: str, colors: LedColors, checked: bool = False, parent: QWidget | None = None
+    ):
         super().__init__(parent)
         self._text = text
         self._colors = colors

@@ -26,6 +26,7 @@ class MultiPlcDevice:
         (Safe: any PLC estop trips global)
       - core_mode is core-owned: we do NOT overwrite state.core_mode from PLC telemetry.
     """
+
     endpoints: list[PlcEndpoint]
 
     # diagnostics

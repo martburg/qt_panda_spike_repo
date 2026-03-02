@@ -8,7 +8,9 @@ from steuerung3d.protocol.axis_router import AxisRouter
 from .facts_builder import build_aggregate_inputs
 
 
-def compute_one_shots_by_axis(state: MachineState, axis_ids: list[str]) -> tuple[dict[str, bool], dict[str, list]]:
+def compute_one_shots_by_axis(
+    state: MachineState, axis_ids: list[str]
+) -> tuple[dict[str, bool], dict[str, list]]:
     """Compute per-axis one-shot signals for strict device routing.
 
     Returns:
@@ -33,13 +35,17 @@ def compute_one_shots_by_axis(state: MachineState, axis_ids: list[str]) -> tuple
             or getattr(state, "estop_reset_req", False)
         )
     }
-    per_axis_ops = coerce_param_ops(dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).get(axis0, []))
+    per_axis_ops = coerce_param_ops(
+        dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).get(axis0, [])
+    )
     global_ops = coerce_param_ops(getattr(state, "pending_param_ops", []) or [])
     param_ops_by_axis = {axis0: (per_axis_ops + global_ops)}
     return estop_reset_by_axis, param_ops_by_axis
 
 
-def apply_mode_aggregation(state: MachineState, *, router: AxisRouter, axis_ids: list[str], dt: float) -> None:
+def apply_mode_aggregation(
+    state: MachineState, *, router: AxisRouter, axis_ids: list[str], dt: float
+) -> None:
     """Compute and apply core mode aggregation (aggregator remains pure)."""
     inputs = build_aggregate_inputs(state=state, router=router, axis_ids=axis_ids, dt=dt)
     result = aggregate_core_mode(inputs)

@@ -124,7 +124,9 @@ def _set_param_group_enabled(
         set_enabled_repolish(le, bool(enabled))
 
 
-def _set_param_button_state(group: str, buttons, find_button: Callable[[str], QPushButton | None]) -> None:
+def _set_param_button_state(
+    group: str, buttons, find_button: Callable[[str], QPushButton | None]
+) -> None:
     wiring = {
         "pos": ("btnPosEdit", "btnPosWrite", "btnPosCancel"),
         "vel": ("btnVelEdit", "btnVelWrite", "btnVelCancel"),

@@ -264,7 +264,9 @@ def compute_cut_markers_state(
     try:
         word = parse_estop_word_from_snapshot(snap)
         bits = decode_estop_word(int(word))
-        in_estop = any(bool(bits.get(k, False)) for k in ("master", "slave", "network", "estop1", "estop2"))
+        in_estop = any(
+            bool(bits.get(k, False)) for k in ("master", "slave", "network", "estop1", "estop2")
+        )
     except Exception:
         pass
     if not in_estop and str(estate or "").upper() == "ESTOP":

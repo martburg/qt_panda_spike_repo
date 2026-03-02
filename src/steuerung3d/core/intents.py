@@ -26,6 +26,7 @@ class JogAxis:
 @dataclass(frozen=True)
 class ClaimAxis:
     """Claim exclusive control of an axis (auto-claimed by HiP on selection)."""
+
     type: Literal["claim_axis"] = "claim_axis"
     axis_id: str = ""
     hip_id: str = ""
@@ -36,6 +37,7 @@ class ClaimAxis:
 @dataclass(frozen=True)
 class ReleaseAxis:
     """Release a previously claimed axis."""
+
     type: Literal["release_axis"] = "release_axis"
     axis_id: str = ""
     hip_id: str = ""
@@ -45,6 +47,7 @@ class ReleaseAxis:
 @dataclass(frozen=True)
 class RequestRigLease:
     """Request exclusive rig/world lease."""
+
     type: Literal["request_rig_lease"] = "request_rig_lease"
     hip_id: str = ""
     req_id: str = ""
@@ -53,6 +56,7 @@ class RequestRigLease:
 @dataclass(frozen=True)
 class ReleaseRigLease:
     """Release rig/world lease."""
+
     type: Literal["release_rig_lease"] = "release_rig_lease"
     hip_id: str = ""
     req_id: str = ""
@@ -61,6 +65,7 @@ class ReleaseRigLease:
 @dataclass(frozen=True)
 class RequestAxisLease:
     """Request axis lease (set-valued holders per axis)."""
+
     type: Literal["request_axis_lease"] = "request_axis_lease"
     axis_id: str = ""
     hip_id: str = ""
@@ -70,6 +75,7 @@ class RequestAxisLease:
 @dataclass(frozen=True)
 class ReleaseAxisLease:
     """Release axis lease for a holder."""
+
     type: Literal["release_axis_lease"] = "release_axis_lease"
     axis_id: str = ""
     hip_id: str = ""
@@ -80,6 +86,7 @@ class ReleaseAxisLease:
 class SetEstop:
     type: Literal["set_estop"] = "set_estop"
     estop: bool = True
+
 
 @dataclass(frozen=True)
 class RequestEstopReset:
@@ -115,9 +122,7 @@ class RequestMainReset:
 
 @dataclass(frozen=True)
 class RequestGuiderReset:
-    """Request reset pulse for the *guider* amplifier (legacy GuideControlUI bit2).
-
-    """
+    """Request reset pulse for the *guider* amplifier (legacy GuideControlUI bit2)."""
 
     type: Literal["guider_reset"] = "guider_reset"
     axis_id: str = ""
@@ -208,6 +213,7 @@ ParamGroup = Literal["pos", "vel", "filter"]
 @dataclass(frozen=True)
 class ParamEditBegin:
     """Prime the device to accept parameter writes for a parameter group."""
+
     type: Literal["param_edit_begin"] = "param_edit_begin"
     axis_id: str = ""
     hip_id: str = ""
@@ -220,6 +226,7 @@ class ParamEditBegin:
 @dataclass(frozen=True)
 class ParamWrite:
     """Write one or more parameters (key->float) within a group."""
+
     type: Literal["param_write"] = "param_write"
     axis_id: str = ""
     hip_id: str = ""
@@ -233,6 +240,7 @@ class ParamWrite:
 @dataclass(frozen=True)
 class ParamCancel:
     """Cancel an in-progress edit session for a parameter group."""
+
     type: Literal["param_cancel"] = "param_cancel"
     axis_id: str = ""
     hip_id: str = ""
@@ -260,7 +268,6 @@ class EchoLifeTick:
     hip_id: str = ""
 
 
-    
 Intent = Union[
     EnableAxis,
     JogAxis,

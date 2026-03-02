@@ -30,7 +30,6 @@ SUBPAGE_NAMES = [
 ]
 
 
-
 def _find_widget_by_name(root: ET.Element, name: str) -> ET.Element | None:
     for w in root.iter("widget"):
         if w.get("name") == name:
@@ -107,7 +106,6 @@ def main() -> int:
         for prop in list(page_w.findall("property")):
             if prop.get("name") == "whatsThis":
                 page_w.remove(prop)
-
 
     # Merge diagnostics sub-pages if present in shell/parts
     for page in SUBPAGE_NAMES:
