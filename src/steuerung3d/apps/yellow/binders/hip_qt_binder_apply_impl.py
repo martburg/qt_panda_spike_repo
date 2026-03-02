@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtWidgets import QWidget
 
 from ..engines.hip.attach_state import NOT_ATTACHED
 from ..panels.hip.hip_banner_render import apply_hip_banner
@@ -14,7 +13,6 @@ from ..panels.hip.hip_readouts_render import apply_hip_readouts
 from ..panels.hip.hip_sliders_render import apply_hip_sliders
 from ..qtutil.binder_helpers import block_signals, safe_set_text
 from ..qtutil.param_ui_apply import apply_param_ui
-from ..qtutil.ui_format import fmt_f_unit_de
 from ..qtutil.ui_update import (
     set_enabled,
     set_state_property,

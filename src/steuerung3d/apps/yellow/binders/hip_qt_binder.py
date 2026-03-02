@@ -54,8 +54,6 @@ from ..qtutil.ui_update import (
     set_state_property,
     update_slider,
 )
-from ..qtutil.widget_cache import WidgetCache
-from ..ui.joy_style import JOY_DEADMAN_PROP, JOY_SELECT_HIP_PROP
 from . import hip_qt_binder_apply_impl as _apply_impl, hip_qt_binder_init_impl as _init_impl
 
 
