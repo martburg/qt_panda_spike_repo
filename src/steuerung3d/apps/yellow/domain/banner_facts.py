@@ -13,3 +13,10 @@ from steuerung3d.protocol.banner_estate import (  # re-export
     BANNER_DYNAMIC_EXCLUDE,
     derive_banner_estate_from_word,
 )
+
+# NOTE: This module intentionally re-exports protocol helpers for the Yellow app.
+# Ruff/Pyflakes consider re-exports "unused" unless they are part of __all__.
+__all__ = [
+    "BANNER_DYNAMIC_EXCLUDE",
+    "derive_banner_estate_from_word",
+]

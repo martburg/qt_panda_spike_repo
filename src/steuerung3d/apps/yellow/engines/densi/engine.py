@@ -17,14 +17,14 @@ The engine owns:
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable
 
 from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
 from steuerung3d.adapters.sim.device import SimDevice
 from steuerung3d.common.timebase import Timebase
-from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
+from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.state import MachineState
 from steuerung3d.protocol.estop_bits import ESTOP_SPECS
 
@@ -38,7 +38,6 @@ from .cut_markers import (
     clear_cut_markers as _clear_cut_markers,
     maybe_latch_cut_markers as _maybe_latch_cut_markers,
 )
-from .drive_status import update_drive_status_words
 from .engine_types import DenSiTickResult
 from .estop_fsm import (
     apply_estop_state_machine,

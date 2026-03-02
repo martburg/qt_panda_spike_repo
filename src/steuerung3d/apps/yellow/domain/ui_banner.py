@@ -21,10 +21,19 @@ Callers provide `within_brake_grace()` to encode that policy.
 
 from __future__ import annotations
 
+# Re-export banner estate helpers for UI call sites.
+# Keep this module as the stable import surface for "banner-ish" UI code.
 from .banner_facts import BANNER_DYNAMIC_EXCLUDE, derive_banner_estate_from_word
 
 # --- UI styling ---------------------------------------------------------------
 
+# Explicit re-export list (keeps ruff/pyflakes happy for intentional re-exports).
+# NOTE: BANNER_COLORS is defined below in this module.
+__all__ = [
+    "BANNER_COLORS",
+    "BANNER_DYNAMIC_EXCLUDE",
+    "derive_banner_estate_from_word",
+]
 BANNER_COLORS: dict[str, tuple[str, str]] = {
     "ESTOP": ("#F9E547", "#000000"),  # yellow
     "IDLE": ("#FFB300", "#000000"),  # amber

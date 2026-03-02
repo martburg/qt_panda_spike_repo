@@ -40,6 +40,20 @@ from .viewmodel import HipViewModel
 
 log = logging.getLogger("hi_p")
 
+# Public surface: keep these names importable from this module for call sites
+# that treat engine.py as the stable seam. (Used by Qt binder & shadow-mode wiring.)
+__all__ = [
+    "HipEngine",
+    "HipViewModel",
+    "HipAttachInputs",
+    "HipBannerInputs",
+    "HipParamAction",
+    "HipUiInputs",
+    "HipState",
+    "HipStepInputs",
+    "HipStepResult",
+]
+
 
 class HipEngine:
     """Minimal HipEngine surface (shadow-mode only)."""

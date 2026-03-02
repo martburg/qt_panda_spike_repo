@@ -88,26 +88,6 @@ known-first-party = ["steuerung3d"]
 combine-as-imports = true
 
 [tool.ruff.lint.per-file-ignores]
-"src/steuerung3d/apps/yellow/domain/banner_facts.py" = [
-  "F401",   # allow unused imports in engine.py (e.g. for telemetry)
-  "E402",   # allow non-top imports in engine.py (e.g. for telemetry)
-  "F811",   # allow redefinition of unused imports in engine.py (e.g. for telemetry)
-]
-"src/steuerung3d/apps/yellow/domain/ui_banner.py" = [
-  "F401",   # allow unused imports in engine.py (e.g. for telemetry)
-  "E402",   # allow non-top imports in engine.py (e.g. for telemetry)
-  "F811",   # allow redefinition of unused imports in engine.py (e.g. for telemetry)
-]
-"src/steuerung3d/apps/yellow/engines/densi/engine.py" = [
-  "F401",   # allow unused imports in engine.py (e.g. for telemetry)
-  "E402",   # allow non-top imports in engine.py (e.g. for telemetry)
-  "F811",   # allow redefinition of unused imports in engine.py (e.g. for telemetry)
-]
-#"src/steuerung3d/apps/yellow/engines/hip/engine.py" = [
-#  "F401",   # allow unused imports in engine.py (e.g. for telemetry)
-#  "E402",   # allow non-top imports in engine.py (e.g. for telemetry)
-#  "F811",   # allow redefinition of unused imports in engine.py (e.g. for telemetry)
-#]
 # Tests often use patterns that are fine (fixtures, inline imports, etc.).
 "tests/**" = [
   "ARG001", # unused function args (pytest fixtures)
