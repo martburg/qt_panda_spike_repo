@@ -106,9 +106,13 @@ class DenSiEngine:
     systemtime_tok: str = ""
     prev_estop_state: bool = False
 
+    # After HiP ReSync, CutPos/CutVel follow actual pos/vel until an E-Stop cause hits.
+    cut_follow_live: bool = False
+
     # Cut markers should latch on "cause became active" (trip bits / OK-chain fault),
     # not on state.estop edge alone (state.estop can be true during startup / not-armed).
     prev_cause_active: bool = False
+    cause_active: bool = False
     cause_edge: bool = False
 
     # stop metrics (coastdown distance after E-Stop edge)
@@ -294,8 +298,8 @@ class DenSiEngine:
         self.brake_override_b1 = False
         self.brake_override_b2 = False
 
-        # Cut markers (latched on E-Stop entry)
-        self.cut_valid = False
+        # Cut markers baseline (visible in IDLE/ESTOP; starts at 0 until HiP ReSync arms live tracking)
+        self.cut_valid = True
         self.cut_pos_m = 0.0
         self.cut_vel_mps = 0.0
         self.cut_time_s = 0.0
@@ -487,6 +491,80 @@ class DenSiEngine:
         self.prev_cause_active = False
         self.cause_edge = False
 
+    def arm_cut_follow_live(self) -> None:
+        """Arm live cut baseline tracking (HiP ReSync).
+
+        Policy:
+        - CutPos/CutVel start tracking the actual axis pos/vel every tick.
+        - When an E-Stop *cause* becomes active, the cut markers freeze at that moment.
+        - Stop metrics are cleared.
+        """
+        axis_id = self.axis_ids[0] if self.axis_ids else ""
+        ax0 = self.state.axes.get(axis_id) if axis_id else None
+        pos = float(getattr(ax0, "pos", 0.0) or 0.0) if ax0 is not None else 0.0
+        vel = float(getattr(ax0, "vel", 0.0) or 0.0) if ax0 is not None else 0.0
+
+        self.cut_follow_live = True
+        self.cut_valid = True
+        self.cut_pos_m = pos
+        self.cut_vel_mps = vel
+        self.cut_time_s = float(getattr(self.state, "t_s", 0.0) or 0.0)
+        self.systemtime_tok = self._now_token()
+
+        # Clear stop metrics on ReSync.
+        self.stop_valid = False
+        self.stop_pos_m = 0.0
+        self.stop_time_s = 0.0
+        self.posdiff_stop_m = 0.0
+
+        # Reset cause-edge detector so the next real cause edge will freeze markers.
+        self.prev_cause_active = False
+        self.cause_edge = False
+
+        try:
+            self.state.params["SystemTime"] = self.systemtime_tok
+            self.state.params["CutPos"] = float(self.cut_pos_m)
+            self.state.params["CutVel"] = float(self.cut_vel_mps)
+            self.state.params["CutTime"] = float(self.cut_time_s)
+            # PosDiffFor is reserved for CutMarker diff (pos - CutPos).
+            self.state.params["PosDiffFor"] = 0.0
+            self.state.params["PosDiffStop"] = 0.0
+        except Exception:
+            pass
+
+
+    def update_cut_follow_live(self) -> None:
+        """If armed, keep CutPos/CutVel tracking actual axis pos/vel.
+
+        Stops updating automatically once an E-Stop *cause* becomes active.
+        """
+        if not bool(self.cut_follow_live):
+            return
+        if bool(getattr(self, "cause_active", False)):
+            # Freeze at the moment a cause hits.
+            self.cut_follow_live = False
+            return
+
+        axis_id = self.axis_ids[0] if self.axis_ids else ""
+        ax0 = self.state.axes.get(axis_id) if axis_id else None
+        if ax0 is None:
+            return
+
+        self.cut_valid = True
+        self.cut_pos_m = float(getattr(ax0, "pos", 0.0) or 0.0)
+        self.cut_vel_mps = float(getattr(ax0, "vel", 0.0) or 0.0)
+        self.cut_time_s = float(getattr(self.state, "t_s", 0.0) or 0.0)
+        self.systemtime_tok = self._now_token()
+
+        try:
+            self.state.params["SystemTime"] = self.systemtime_tok
+            self.state.params["CutPos"] = float(self.cut_pos_m)
+            self.state.params["CutVel"] = float(self.cut_vel_mps)
+            self.state.params["CutTime"] = float(self.cut_time_s)
+        except Exception:
+            pass
+
+
     # ---------------------------------------------------------------------
     # legacy/diagnostic meta helpers
     # ---------------------------------------------------------------------
@@ -575,6 +653,7 @@ class DenSiEngine:
             cmd=cmd,
             l0_top=self.l0_top,
             clear_cut_markers=lambda reset_prev: self.clear_cut_markers(reset_prev=reset_prev),
+            arm_cut_follow_live=self.arm_cut_follow_live,
         )
 
     def apply_param_ops(self, ready_for_sollvel: bool, moving: bool) -> dict[str, float]:
@@ -610,7 +689,13 @@ class DenSiEngine:
         # - any required OK bit unset
         # We use the *edge* of this to latch CutPos/CutVel, because state.estop can be
         # true for non-cause reasons (e.g., startup / schuetz off).
-        cause_active = any(bool(bits.get(k, False)) for k in estop_cause_keys())
+        # Include OK-chain faults as a cause: losing a required OK bit must latch
+        # CutPos/CutVel/CutTime just like trip bits do.
+        trip_cause = any(bool(bits.get(k, False)) for k in estop_cause_keys())
+        ok_keys = [k for k in estop_ok_keys() if k not in ("brk1_ok", "brk2_ok")]
+        ok_chain_fault = any(not bool(bits.get(k, True)) for k in ok_keys)
+        cause_active = bool(trip_cause) or bool(ok_chain_fault)
+
         self.cause_edge = bool(cause_active) and (not bool(self.prev_cause_active))
         self.prev_cause_active = bool(cause_active)
         return word, bits, changed

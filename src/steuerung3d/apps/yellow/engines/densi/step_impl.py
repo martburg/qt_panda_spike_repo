@@ -15,34 +15,10 @@ if TYPE_CHECKING:
 from steuerung3d.core.command_frame import CommandFrame
 
 from .drive_status import update_drive_status_words
-from .types import L0Sub, L0Top
+from .types import L0Top
 
 
-@dataclass
-class DenSiTickResult:
-    """Result of one DenSi engine tick."""
-
-    cmd_rx_count: int
-    last_cmd: CommandFrame
-    last_cmd_ns: int | None
-
-    l0_top: L0Top
-    l0_sub: L0Sub
-
-    reset_able: bool
-    ready_for_sollvel: bool
-    moving: bool
-    motion_ready: bool
-
-    estop_word: int
-    estop_bits: dict[str, bool]
-    estop_edge: bool
-
-    applied_param_values: dict[str, float]
-
-    # UI nicety: controller can choose whether to refresh estop checkboxes.
-    # Legacy behavior refreshed checkboxes only when ResetAble toggled.
-    reset_able_changed: bool = False
+from .engine_types import DenSiTickResult
 
 
 def step(*, engine: "DenSiEngine", frames: list[CommandFrame], now_ns: int) -> DenSiTickResult:
@@ -64,6 +40,9 @@ def step(*, engine: "DenSiEngine", frames: list[CommandFrame], now_ns: int) -> D
 
     estop_word, bits, reset_able_changed = self.apply_safety_and_refresh_estop()
     estop_edge = self.compute_estop_edge_and_update_state(estop_word)
+
+    # If ReSync armed live baseline tracking, update CutPos/CutVel in IDLE.
+    self.update_cut_follow_live()
 
     # Latch cut markers at the moment an E-Stop *cause* first becomes active
     # (trip bits / OK-chain fault). This is more robust than latching on the

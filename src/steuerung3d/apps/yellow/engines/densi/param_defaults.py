@@ -39,6 +39,7 @@ DENSI_PARAM_DEFAULTS: dict[str, Any] = {
     "CutVel": 0.0,
     "CutTime": 0.0,
     "PosDiffFor": 0.0,
+    "PosDiffSoll": 0.0,
     "PosDiffStop": 0.0,
 }
 

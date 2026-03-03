@@ -1,0 +1,30 @@
+diff --git a/src/steuerung3d/apps/yellow/engines/densi/engine.py b/src/steuerung3d/apps/yellow/engines/densi/engine.py
+index 1111111..2222222 100644
+--- a/src/steuerung3d/apps/yellow/engines/densi/engine.py
++++ b/src/steuerung3d/apps/yellow/engines/densi/engine.py
+@@ -608,7 +608,13 @@ class DenSiEngine:
+         # - any required OK bit unset
+         # We use the *edge* of this to latch CutPos/CutVel, because state.estop can be
+         # true for non-cause reasons (e.g., startup / schuetz off).
+-        cause_active = any(bool(bits.get(k, False)) for k in estop_cause_keys())
++        # Include OK-chain faults as a cause: losing a required OK bit must latch
++        # CutPos/CutVel/CutTime just like trip bits do.
++        trip_cause = any(bool(bits.get(k, False)) for k in estop_cause_keys())
++        ok_keys = [k for k in estop_ok_keys() if k not in ("brk1_ok", "brk2_ok")]
++        ok_chain_fault = any(not bool(bits.get(k, True)) for k in ok_keys)
++        cause_active = bool(trip_cause) or bool(ok_chain_fault)
+         self.cause_edge = bool(cause_active) and (not bool(self.prev_cause_active))
+         self.prev_cause_active = bool(cause_active)
+         return word, bits, changed
+diff --git a/SEMANTIC_LEDGER.md b/SEMANTIC_LEDGER.md
+index 3333333..4444444 100644
+--- a/SEMANTIC_LEDGER.md
++++ b/SEMANTIC_LEDGER.md
+@@ -103,6 +103,8 @@
+ - Cut marker latch trigger tightened: latch on **cause-edge** (trip bits / OK-chain fault became active),
+   not merely on the `state.estop` edge. This avoids false-zero latches when the device is already in
+   a non-ready ESTOP-like state at startup.
++  - Fix follow-up: include **OK-chain faults** (required OK bit goes false) in the cause-edge detector,
++    so losing OK bits latches `CutPos/CutVel/CutTime` just like trip bits.
+ - New parameter `PosDiffStop` is published once the axis stops (and `PosDiffFor` is aligned to the same value for UI compatibility):
+   - `PosDiffStop = pos_stop - CutPos`

@@ -232,7 +232,7 @@ def step_plc_anton_vel_cmd(
             ax.pos += ax.vel * float(dt_s)
 
         # Keep diagnostics for UI/PLC uplink fields.
-        params["PosDiffFor"] = float(pos_soll) - float(ax.pos)
+        params["PosDiffSoll"] = float(pos_soll) - float(ax.pos)
 
         # Guide fields: keep minimal, deterministic echo.
         guide_control = int(params.get("GuideControl", 0) or 0)

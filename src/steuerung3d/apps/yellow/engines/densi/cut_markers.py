@@ -45,7 +45,7 @@ def maybe_latch_cut_markers(
     cut_time_s: float,
     systemtime_tok: str,
 ) -> tuple[bool, float, float, float, str]:
-    if bool(estop_edge) and (not bool(cut_valid)):
+    if bool(estop_edge):
         axis_id = axis_ids[0] if axis_ids else ""
         ax0 = state.axes.get(axis_id) if axis_id else None
         if ax0 is not None:

@@ -250,6 +250,7 @@ def compute_cut_markers_state(
     snap: TelemetrySnapshot,
     params: dict,
     estate: str,
+    mode: str,
 ) -> HipCutMarkersState:
     try:
         cut_pos = float(params.get("CutPos", 0.0) or 0.0)
@@ -271,8 +272,11 @@ def compute_cut_markers_state(
         pass
     if not in_estop and str(estate or "").upper() == "ESTOP":
         in_estop = True
+    mode_u = str(mode or "").upper()
+    in_sync = mode_u.startswith("SYNC")
 
-    if not in_estop:
+    # Show cut markers in IDLE and ESTOP, but hide them while in SYNC_* modes.
+    if in_sync:
         cut_pos_text = "--"
         cut_vel_text = "--"
         posdiff_text = "--"

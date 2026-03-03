@@ -322,6 +322,7 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
             snap=snap,
             params=params,
             estate=estate,
+            mode=str(mode_now),
         )
 
     # --- UI actions -> intents (param ops, estop reset, resync) ---
@@ -336,13 +337,11 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     resync_ignored = False
     resync_reason = ""
     if ui.resync_clicked:
-        if (str(mode_now).upper() != "IDLE") or (str(estate).upper() != "IDLE"):
+        if (str(mode_now).upper() != "IDLE"):
             resync_ignored = True
             resync_reason = f"mode={str(mode_now)} estate={str(estate)}"
         else:
             intents.append(RequestResync(axis_id=str(axis_id or ""), hip_id=hip_id))
-            if readouts is not None:
-                cut_markers = HipCutMarkersState("--", "--", "--", "--")
 
     param_result = run_param_txn(
         txn=self._param_txn,

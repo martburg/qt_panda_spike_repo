@@ -119,3 +119,31 @@ This file records *declared* semantic changes (RefOS Lane 2) made during stabili
 - `src/steuerung3d/apps/yellow/engines/densi/motion_clamp.py`
 - `src/steuerung3d/apps/yellow/engines/densi/cut_markers.py`
 - `src/steuerung3d/apps/yellow/engines/densi/param_defaults.py`
+
+## 2026-03-03 — ReSync arms live Cut baseline; show cut markers in IDLE/ESTOP (hide in SYNC)
+
+**Lane:** 2 (Declared Semantic Fix)
+
+### Change
+- `btnDiagResync` (HiP) now enables whenever attached, not modal-locked, and `last_mode == IDLE` (no longer depends on banner `estate`).
+- DenSi `ReSync` no longer clears Cut markers to `0`. Instead it **arms live baseline tracking**:
+  - while armed, DenSi updates `CutPos/CutVel/CutTime` to the current actual position/velocity every tick
+  - when an E-Stop *cause* becomes active (trip bit set or OK-chain fault), the Cut markers **freeze** at that moment
+- `PosDiffFor` is reserved for the Cut-marker distance (`pos - CutPos`) and is no longer overwritten by the PLC-faithful loop.
+  The setpoint-based diagnostic is now published as `PosDiffSoll`.
+- HiP Cut markers are now **visible in IDLE and ESTOP**, but hidden while in `SYNC_*` modes.
+
+### Motivation
+- Match operator workflow: baseline starts at 0 on boot, Resync “follows” until the next E-Stop, then freezes so coastdown distance is meaningful.
+- Avoid “PosDiff == Pos” artifacts caused by `CutPos` staying at 0 and by `PosDiffFor` being clobbered by unrelated diagnostics.
+
+### Files
+- `src/steuerung3d/apps/yellow/engines/hip/attach_state.py`
+- `src/steuerung3d/apps/yellow/engines/hip/step_impl.py`
+- `src/steuerung3d/apps/yellow/engines/hip/presentation.py`
+- `src/steuerung3d/apps/yellow/engines/densi/engine.py`
+- `src/steuerung3d/apps/yellow/engines/densi/step_impl.py`
+- `src/steuerung3d/apps/yellow/engines/densi/resync.py`
+- `src/steuerung3d/apps/yellow/engines/densi/cut_markers.py`
+- `src/steuerung3d/apps/yellow/engines/densi/plc_anton_vel_cmd.py`
+- `src/steuerung3d/apps/yellow/engines/densi/param_defaults.py`
