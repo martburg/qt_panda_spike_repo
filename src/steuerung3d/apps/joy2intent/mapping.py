@@ -45,7 +45,7 @@ class JoyLimits:
     """
 
     max_winch_mps: float
-    fine_scale: float = 0.2
+    fine_scale: float
 
     def max_speed(self) -> float:
         return float(self.max_winch_mps)

@@ -79,12 +79,18 @@ def main() -> int:
     ch = ChangeTracker()
 
     log.info(
-        "joy2intent started mode=%s raw_in=%s intent_out=%s tick_hz=%.1f stale_after_ms=%d",
+        "joy2intent started mode=%s raw_in=%s intent_out=%s tick_hz=%.1f stale_after_ms=%d "
+        "max_winch_mps=%.3f fine_scale=%.3f deadzone=%.3f expo=%.3f hip_id=%s",
         st.mode,
         cfg.raw_in,
         cfg.intent_out,
         cfg.tick_hz,
         cfg.stale_after_ms,
+        cfg.max_winch_mps,
+        cfg.fine_scale,
+        cfg.deadzone,
+        cfg.expo,
+        cfg.hip_id,
     )
 
     while True:

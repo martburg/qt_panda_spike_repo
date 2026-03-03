@@ -38,12 +38,6 @@ class Joy2IntentConfig:
     deadzone: float
     expo: float
     invert: Dict[str, bool]
-
-    # --- optional / defaults (must come after all non-default fields) ---
-    # Buttons that select winches by position (0..N-1). If omitted, defaults to [0,1,2,3].
-    select_buttons: List[int] = field(default_factory=lambda: [0, 1, 2, 3])
-
-    # Sync/cartesian limits (currently not used by joy2intent mapping, kept for config completeness).
     sync_max_v: Dict[str, float] = field(default_factory=dict)
 
     # Identity stamped into motion intents. Must match the claim owner (HiP).
@@ -63,21 +57,29 @@ def load_joy2intent_config(path: Path) -> Joy2IntentConfig:
     bindings = raw.get("bindings", {}) or {}
     f = raw.get("filters", {}) or {}
 
+    # Tightened config: avoid silent fallbacks. Fail fast on missing keys.
+    # Basic sanity: require at least one winch and at least one select button.
+    if not (rig.get("winches") or []):
+        raise ValueError("Missing or empty config key 'rig.winches' in joy2intent config")
+    if not (rig.get("select_buttons") or []):
+        raise ValueError("Missing or empty config key 'rig.select_buttons' in joy2intent config")
+
     return Joy2IntentConfig(
-        raw_in=_hostport(io.get("raw_in", "127.0.0.1:50100")),
-        intent_out=_hostport(io.get("intent_out", "127.0.0.1:51001")),
-        tick_hz=float(io.get("tick_hz", 50)),
-        stale_after_ms=int(io.get("stale_after_ms", 200)),
-        winches=list(rig.get("winches", ["Anton", "Debby", "Cecil", "Burt"])),
-        default_mode=str(mode.get("default", "setup_manual")),
-        select_buttons=list(rig.get("select_buttons", [0, 1, 2, 3])),
+        raw_in=_hostport(str(_require(io, "raw_in", ctx="io"))),
+        intent_out=_hostport(str(_require(io, "intent_out", ctx="io"))),
+        tick_hz=float(_require(io, "tick_hz", ctx="io")),
+        stale_after_ms=int(_require(io, "stale_after_ms", ctx="io")),
+        winches=list(_require(rig, "winches", ctx="rig")),
+        default_mode=str(_require(mode, "default", ctx="mode")),
+        select_buttons=list(_require(rig, "select_buttons", ctx="rig")),
         max_winch_mps=float(_require(lim_m, "max_winch_mps", ctx="limits.manual")),
-        fine_scale=float(lim_m.get("fine_scale", 0.20)),
-        sync_max_v=dict(lim_s.get("max_v", {"x": 0.60, "y": 0.60, "z": 0.40})),
-        axes=dict((bindings.get("axes", {}) or {})),
-        buttons=dict((bindings.get("buttons", {}) or {})),
-        deadzone=float(f.get("deadzone", 0.08)),
-        expo=float(f.get("expo", 0.25)),
-        invert=dict(f.get("invert", {}) or {}),
-        hip_id=str(ident.get("hip_id", "hip")),
+        fine_scale=float(_require(lim_m, "fine_scale", ctx="limits.manual")),
+        sync_max_v=dict((lim_s.get("max_v") or {})),
+        axes=dict(_require(bindings, "axes", ctx="bindings")),
+        buttons=dict(_require(bindings, "buttons", ctx="bindings")),
+        deadzone=float(_require(f, "deadzone", ctx="filters")),
+        expo=float(_require(f, "expo", ctx="filters")),
+        invert=dict((f.get("invert") or {})),
+        hip_id=str(_require(ident, "hip_id", ctx="identity")),
     )
+

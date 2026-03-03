@@ -58,6 +58,7 @@ def _lim_from_config(tmp_path: Path) -> JoyLimits:
 
     # Sanity check that we really used the overridden value.
     assert abs(cfg.max_winch_mps - 1.234) < 1e-12
+    assert cfg.fine_scale > 0.0
 
     return JoyLimits(
         max_winch_mps=float(cfg.max_winch_mps),
