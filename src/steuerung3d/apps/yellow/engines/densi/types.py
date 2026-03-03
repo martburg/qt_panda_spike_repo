@@ -15,6 +15,7 @@ class EStopState(Enum):
     """Device-local Safety/EStop ladder state."""
 
     ESTOP = auto()
+    STOPPING = auto()
     IDLE = auto()
     ARMED = auto()
     READY = auto()

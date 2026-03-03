@@ -1,0 +1,325 @@
+diff --git a/SEMANTIC_LEDGER.md b/SEMANTIC_LEDGER.md
+index 89d3d7a..d9adbc8 100644
+--- a/SEMANTIC_LEDGER.md
++++ b/SEMANTIC_LEDGER.md
+@@ -86,3 +86,32 @@ This file records *declared* semantic changes (RefOS Lane 2) made during stabili
+ **Why:** Cartesian motion is defined as “rig/kinematics active” only during SYNC_ACTIVE; this prevents accidental cartesian motion during manual setup modes.
+ 
+ **Tests:** `tests/test_jog_cartesian_gate.py`
++
++
++## 2026-03-03 — DenSi E-Stop adds STOPPING state and records coastdown distance
++
++**Lane:** 2 (Declared Semantic Fix)
++
++### Change
++- DenSi E-Stop ladder now includes an explicit `EStopState.STOPPING` state.
++  - On trip/OK-chain fault, if the axis is still moving, the ladder enters `STOPPING`.
++  - Once the simulated axis speed falls below a small epsilon, the ladder transitions to `ESTOP` (fully stopped).
++- During E-Stop, commanded speed is still dropped to `0` immediately, but the DenSi sim no longer hard-zeros the *actual* speed.
++  Instead, the plant ramps down with `DccMax` so we can compute a realistic stop distance.
++- Cut markers now latch **before** the deceleration step so `CutVel` reflects the actual speed at the moment E-Stop is entered.
++- New parameter `PosDiffStop` is published once the axis stops:
++  - `PosDiffStop = pos_stop - CutPos`
++
++### Motivation
++- Match real-world “commanded=0, actual decelerates with Dcc” behavior.
++- Provide a deterministic, inspectable “distance traveled after E-Stop” metric for diagnostics.
++
++### Files
++- `src/steuerung3d/apps/yellow/engines/densi/types.py`
++- `src/steuerung3d/apps/yellow/engines/densi/estop_fsm.py`
++- `src/steuerung3d/apps/yellow/engines/densi/engine.py`
++- `src/steuerung3d/apps/yellow/engines/densi/step_impl.py`
++- `src/steuerung3d/apps/yellow/engines/densi/plc_anton_vel_cmd.py`
++- `src/steuerung3d/apps/yellow/engines/densi/motion_clamp.py`
++- `src/steuerung3d/apps/yellow/engines/densi/cut_markers.py`
++- `src/steuerung3d/apps/yellow/engines/densi/param_defaults.py`
+diff --git a/src/steuerung3d/apps/yellow/engines/densi/cut_markers.py b/src/steuerung3d/apps/yellow/engines/densi/cut_markers.py
+index dbd86ab..937cd09 100644
+--- a/src/steuerung3d/apps/yellow/engines/densi/cut_markers.py
++++ b/src/steuerung3d/apps/yellow/engines/densi/cut_markers.py
+@@ -26,6 +26,7 @@ def clear_cut_markers(
+         state.params["CutVel"] = 0.0
+         state.params["CutTime"] = 0.0
+         state.params["PosDiffFor"] = 0.0
++        state.params["PosDiffStop"] = 0.0
+     except Exception:
+         pass
+ 
+@@ -64,6 +65,7 @@ def maybe_latch_cut_markers(
+                 state.params["CutVel"] = float(cut_vel_mps)
+                 state.params["CutTime"] = float(cut_time_s)
+                 state.params["PosDiffFor"] = 0.0
++                state.params["PosDiffStop"] = 0.0
+             except Exception:
+                 pass
+ 
+diff --git a/src/steuerung3d/apps/yellow/engines/densi/engine.py b/src/steuerung3d/apps/yellow/engines/densi/engine.py
+index 911a5cc..5665298 100644
+--- a/src/steuerung3d/apps/yellow/engines/densi/engine.py
++++ b/src/steuerung3d/apps/yellow/engines/densi/engine.py
+@@ -106,6 +106,12 @@ class DenSiEngine:
+     systemtime_tok: str = ""
+     prev_estop_state: bool = False
+ 
++    # stop metrics (coastdown distance after E-Stop edge)
++    stop_valid: bool = False
++    stop_pos_m: float = 0.0
++    stop_time_s: float = 0.0
++    posdiff_stop_m: float = 0.0
++
+     # param ops hooks (controller supplies: keep semantics)
+     normalize_pos_chain: Callable[[dict[str, float]], dict[str, float]] | None = None
+     normalize_guider_range: Callable[[dict[str, float]], dict[str, float]] | None = None
+@@ -291,6 +297,12 @@ class DenSiEngine:
+         self.systemtime_tok = ""
+         self.prev_estop_state = bool(getattr(self.state, "estop", False))
+ 
++        # Stop metrics (latched when coastdown reaches v~=0)
++        self.stop_valid = False
++        self.stop_pos_m = 0.0
++        self.stop_time_s = 0.0
++        self.posdiff_stop_m = 0.0
++
+         # Derived/latches
+         self.estop_latched = False
+         self.safety_ok = True
+@@ -410,6 +422,12 @@ class DenSiEngine:
+     def apply_estop_state_machine(self) -> None:
+         """Authoritative ESTOP/IDLE/ARMED/READY ladder + brake timing."""
+         bits = self._ensure_inj_bits()
++
++        # For STOPPING -> ESTOP transition we need the current (actual) speed.
++        axis_id = self.axis_ids[0] if self.axis_ids else ""
++        ax0 = self.state.axes.get(axis_id) if axis_id else None
++        speed_abs_mps = abs(float(getattr(ax0, "vel", 0.0) or 0.0)) if ax0 is not None else 0.0
++        stop_eps_mps = 1e-3
+         (
+             self.inj_estop_word,
+             self.taster_prev,
+@@ -428,6 +446,8 @@ class DenSiEngine:
+             taster_rise_t_s=self.taster_rise_t_s,
+             drive_ready=bool(self.drive_ready),
+             estate=self.estate,
++            speed_abs_mps=float(speed_abs_mps),
++            stop_eps_mps=float(stop_eps_mps),
+             brake_override_b1=bool(self.brake_override_b1),
+             brake_override_b2=bool(self.brake_override_b2),
+         )
+@@ -450,6 +470,12 @@ class DenSiEngine:
+             prev_estop_state=bool(self.prev_estop_state),
+         )
+ 
++        # Stop metrics are cleared on ReSync together with the cut markers.
++        self.stop_valid = False
++        self.stop_pos_m = 0.0
++        self.stop_time_s = 0.0
++        self.posdiff_stop_m = 0.0
++
+     # ---------------------------------------------------------------------
+     # legacy/diagnostic meta helpers
+     # ---------------------------------------------------------------------
+@@ -624,6 +650,39 @@ class DenSiEngine:
+             systemtime_tok=str(self.systemtime_tok or ""),
+         )
+ 
++    def maybe_latch_stop_metrics(self) -> None:
++        """Latch stop distance once the coastdown reaches v~=0.
++
++        Semantic intent (Lane 2): When an E-Stop trip occurs, commanded speed is
++        dropped to zero immediately, while the simulated plant decelerates with
++        Dcc. We record CutPos/CutVel at the moment the E-Stop is entered and
++        then compute PosDiffStop = (pos_stop - CutPos) once the axis stops.
++        """
++
++        if (not bool(self.cut_valid)) or bool(self.stop_valid):
++            return
++        if self.estate != EStopState.STOPPING:
++            return
++
++        axis_id = self.axis_ids[0] if self.axis_ids else ""
++        ax0 = self.state.axes.get(axis_id) if axis_id else None
++        if ax0 is None:
++            return
++
++        v = float(getattr(ax0, "vel", 0.0) or 0.0)
++        if abs(v) > 1e-3:
++            return
++
++        self.stop_valid = True
++        self.stop_pos_m = float(getattr(ax0, "pos", 0.0) or 0.0)
++        self.stop_time_s = float(getattr(self.state, "t_s", 0.0) or 0.0)
++        self.posdiff_stop_m = float(self.stop_pos_m) - float(self.cut_pos_m)
++
++        try:
++            self.state.params["PosDiffStop"] = float(self.posdiff_stop_m)
++        except Exception:
++            pass
++
+     def apply_estop_clamp_to_state(self) -> None:
+         apply_estop_clamp_to_state(state=self.state)
+ 
+diff --git a/src/steuerung3d/apps/yellow/engines/densi/estop_fsm.py b/src/steuerung3d/apps/yellow/engines/densi/estop_fsm.py
+index 11ed8af..a61e9f0 100644
+--- a/src/steuerung3d/apps/yellow/engines/densi/estop_fsm.py
++++ b/src/steuerung3d/apps/yellow/engines/densi/estop_fsm.py
+@@ -75,6 +75,8 @@ def apply_estop_state_machine(
+     taster_rise_t_s: float | None,
+     drive_ready: bool,
+     estate: EStopState,
++    speed_abs_mps: float,
++    stop_eps_mps: float,
+     brake_override_b1: bool,
+     brake_override_b2: bool,
+ ) -> tuple[int, bool, float | None, bool, EStopState, bool]:
+@@ -131,6 +133,12 @@ def apply_estop_state_machine(
+ 
+     trip_active = trip_cause or ok_chain_fault or brake_trip or (not bool(safety_ok))
+ 
++    # Treat STOPPING + ESTOP as "E-Stop active" (latched). STOPPING is the
++    # deceleration phase: commanded speed drops to zero immediately, while the
++    # actual plant ramps down with Dcc.
++    stop_eps_mps = abs(float(stop_eps_mps))
++    speed_abs_mps = abs(float(speed_abs_mps))
++
+     if trip_active:
+         estop_latched = True
+         if bool(inj_bits.get("ready", False)):
+@@ -138,7 +146,14 @@ def apply_estop_state_machine(
+         if bool(inj_bits.get("schuetz", False)):
+             inj_bits["schuetz"] = False
+         drive_ready = False
+-        estate = EStopState.ESTOP
++
++        # If we are still moving when the trip becomes active, enter STOPPING.
++        # Once the actual speed settles below the stop epsilon, transition to
++        # the fully-stopped ESTOP state.
++        if estate == EStopState.STOPPING:
++            estate = EStopState.ESTOP if (speed_abs_mps <= stop_eps_mps) else EStopState.STOPPING
++        else:
++            estate = EStopState.STOPPING if (speed_abs_mps > stop_eps_mps) else EStopState.ESTOP
+     else:
+         if not schuetz:
+             estate = EStopState.ESTOP
+@@ -163,6 +178,6 @@ def compute_estop_edge_and_update_state(
+     estop_word: int,
+     state,
+ ) -> bool:
+-    state.estop = bool(estate == EStopState.ESTOP)
++    state.estop = bool(estate in (EStopState.STOPPING, EStopState.ESTOP))
+     state.estop_status_word = int(estop_word)
+     return bool(state.estop) and (not bool(prev_estop_state))
+diff --git a/src/steuerung3d/apps/yellow/engines/densi/motion_clamp.py b/src/steuerung3d/apps/yellow/engines/densi/motion_clamp.py
+index 37d8975..714de25 100644
+--- a/src/steuerung3d/apps/yellow/engines/densi/motion_clamp.py
++++ b/src/steuerung3d/apps/yellow/engines/densi/motion_clamp.py
+@@ -42,4 +42,6 @@ def apply_estop_clamp_to_state(*, state: MachineState) -> None:
+     if bool(state.estop):
+         for ax in state.axes.values():
+             ax.enabled = False
+-            ax.vel = 0.0
++            # Do not hard-zero velocity here.
++            # During E-Stop, DenSi sim models a Dcc-limited ramp-down of the
++            # *actual* speed so we can compute the coastdown distance.
+diff --git a/src/steuerung3d/apps/yellow/engines/densi/param_defaults.py b/src/steuerung3d/apps/yellow/engines/densi/param_defaults.py
+index 3a1e5b9..84f5c24 100644
+--- a/src/steuerung3d/apps/yellow/engines/densi/param_defaults.py
++++ b/src/steuerung3d/apps/yellow/engines/densi/param_defaults.py
+@@ -39,6 +39,7 @@ DENSI_PARAM_DEFAULTS: dict[str, Any] = {
+     "CutVel": 0.0,
+     "CutTime": 0.0,
+     "PosDiffFor": 0.0,
++    "PosDiffStop": 0.0,
+ }
+ 
+ 
+diff --git a/src/steuerung3d/apps/yellow/engines/densi/plc_anton_vel_cmd.py b/src/steuerung3d/apps/yellow/engines/densi/plc_anton_vel_cmd.py
+index 6b6d319..43c6a61 100644
+--- a/src/steuerung3d/apps/yellow/engines/densi/plc_anton_vel_cmd.py
++++ b/src/steuerung3d/apps/yellow/engines/densi/plc_anton_vel_cmd.py
+@@ -46,6 +46,18 @@ def _clamp(v: float, lo: float, hi: float) -> float:
+     return max(lo, min(hi, v))
+ 
+ 
++def _move_towards(v: float, target: float, dv_max: float) -> float:
++    """Move *v* toward *target* by at most *dv_max* (>=0)."""
++    dv_max = abs(float(dv_max))
++    v = float(v)
++    target = float(target)
++    if v < target:
++        return min(target, v + dv_max)
++    if v > target:
++        return max(target, v - dv_max)
++    return v
++
++
+ def _soft_limit_cap(
+     *,
+     v: float,
+@@ -203,7 +215,18 @@ def step_plc_anton_vel_cmd(
+ 
+         ax.enabled = bool(control_enabled) and (not bool(stale))
+         if not ax.enabled:
+-            ax.vel = 0.0
++            # During E-Stop, commanded speed drops to zero immediately, but the
++            # *actual* axis speed ramps down with Dcc so we can compute
++            # coastdown distance.
++            if bool(getattr(state, "estop", False)):
++                dv = abs(float(dcc_max)) * float(dt_s)
++                if dv <= 0.0:
++                    ax.vel = 0.0
++                else:
++                    ax.vel = float(_move_towards(float(ax.vel), 0.0, dv))
++                ax.pos += ax.vel * float(dt_s)
++            else:
++                ax.vel = 0.0
+         else:
+             ax.vel = float(final_speed)
+             ax.pos += ax.vel * float(dt_s)
+diff --git a/src/steuerung3d/apps/yellow/engines/densi/step_impl.py b/src/steuerung3d/apps/yellow/engines/densi/step_impl.py
+index 0209a06..51e532d 100644
+--- a/src/steuerung3d/apps/yellow/engines/densi/step_impl.py
++++ b/src/steuerung3d/apps/yellow/engines/densi/step_impl.py
+@@ -65,8 +65,15 @@ def step(*, engine: "DenSiEngine", frames: list[CommandFrame], now_ns: int) -> D
+     estop_word, bits, reset_able_changed = self.apply_safety_and_refresh_estop()
+     estop_edge = self.compute_estop_edge_and_update_state(estop_word)
+ 
+-    self.step_plant_with_clamp()
++    # Latch cut markers at the moment we *enter* E-Stop (before the plant
++    # deceleration model updates the actual velocity).
+     self.maybe_latch_cut_markers(estop_edge)
++
++    # Step the plant: during E-Stop this models a Dcc-limited ramp-down.
++    self.step_plant_with_clamp()
++
++    # Once the axis stops (v~=0), latch the coastdown distance.
++    self.maybe_latch_stop_metrics()
+     self.apply_estop_clamp_to_state()
+     self.advance_tick()
+ 
+diff --git a/src/steuerung3d/apps/yellow/engines/densi/types.py b/src/steuerung3d/apps/yellow/engines/densi/types.py
+index c58a77a..9cc4b8b 100644
+--- a/src/steuerung3d/apps/yellow/engines/densi/types.py
++++ b/src/steuerung3d/apps/yellow/engines/densi/types.py
+@@ -15,6 +15,7 @@ class EStopState(Enum):
+     """Device-local Safety/EStop ladder state."""
+ 
+     ESTOP = auto()
++    STOPPING = auto()
+     IDLE = auto()
+     ARMED = auto()
+     READY = auto()
+diff --git a/tests/unit/test_densi_motion_clamp.py b/tests/unit/test_densi_motion_clamp.py
+index 9f8b052..b19dacc 100644
+--- a/tests/unit/test_densi_motion_clamp.py
++++ b/tests/unit/test_densi_motion_clamp.py
+@@ -29,6 +29,6 @@ def test_apply_estop_clamp_to_state_disables_axes() -> None:
+     apply_estop_clamp_to_state(state=st)
+ 
+     assert st.axes["A"].enabled is False
+-    assert st.axes["A"].vel == 0.0
++    assert st.axes["A"].vel == 1.0
+     assert st.axes["B"].enabled is False
+-    assert st.axes["B"].vel == 0.0
++    assert st.axes["B"].vel == -1.0

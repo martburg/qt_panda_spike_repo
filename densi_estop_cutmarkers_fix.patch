@@ -1,0 +1,110 @@
+From 1020d294fc45fa1951faf1d81a48b1f43371410f Mon Sep 17 00:00:00 2001
+From: a <a@b>
+Date: Tue, 3 Mar 2026 17:35:16 +0000
+Subject: [PATCH] densi cut markers latch on cause edge
+
+---
+ SEMANTIC_LEDGER.md                            |  6 ++++-
+ .../apps/yellow/engines/densi/engine.py       | 22 +++++++++++++++++++
+ .../apps/yellow/engines/densi/step_impl.py    |  7 +++---
+ 3 files changed, 31 insertions(+), 4 deletions(-)
+
+diff --git a/SEMANTIC_LEDGER.md b/SEMANTIC_LEDGER.md
+index d9adbc8..4949c3a 100644
+--- a/SEMANTIC_LEDGER.md
++++ b/SEMANTIC_LEDGER.md
+@@ -99,7 +99,11 @@ This file records *declared* semantic changes (RefOS Lane 2) made during stabili
+ - During E-Stop, commanded speed is still dropped to `0` immediately, but the DenSi sim no longer hard-zeros the *actual* speed.
+   Instead, the plant ramps down with `DccMax` so we can compute a realistic stop distance.
+ - Cut markers now latch **before** the deceleration step so `CutVel` reflects the actual speed at the moment E-Stop is entered.
+-- New parameter `PosDiffStop` is published once the axis stops:
++- Cut markers now latch **before** the deceleration step so `CutVel` reflects the actual speed at the moment E-Stop is entered.
++- Cut marker latch trigger tightened: latch on **cause-edge** (trip bits / OK-chain fault became active),
++  not merely on the `state.estop` edge. This avoids false-zero latches when the device is already in
++  a non-ready ESTOP-like state at startup.
++- New parameter `PosDiffStop` is published once the axis stops (and `PosDiffFor` is aligned to the same value for UI compatibility):
+   - `PosDiffStop = pos_stop - CutPos`
+ 
+ ### Motivation
+diff --git a/src/steuerung3d/apps/yellow/engines/densi/engine.py b/src/steuerung3d/apps/yellow/engines/densi/engine.py
+index 5665298..cf6427a 100644
+--- a/src/steuerung3d/apps/yellow/engines/densi/engine.py
++++ b/src/steuerung3d/apps/yellow/engines/densi/engine.py
+@@ -106,6 +106,11 @@ class DenSiEngine:
+     systemtime_tok: str = ""
+     prev_estop_state: bool = False
+ 
++    # Cut markers should latch on "cause became active" (trip bits / OK-chain fault),
++    # not on state.estop edge alone (state.estop can be true during startup / not-armed).
++    prev_cause_active: bool = False
++    cause_edge: bool = False
++
+     # stop metrics (coastdown distance after E-Stop edge)
+     stop_valid: bool = False
+     stop_pos_m: float = 0.0
+@@ -296,6 +301,8 @@ class DenSiEngine:
+         self.cut_time_s = 0.0
+         self.systemtime_tok = ""
+         self.prev_estop_state = bool(getattr(self.state, "estop", False))
++        self.prev_cause_active = False
++        self.cause_edge = False
+ 
+         # Stop metrics (latched when coastdown reaches v~=0)
+         self.stop_valid = False
+@@ -476,6 +483,10 @@ class DenSiEngine:
+         self.stop_time_s = 0.0
+         self.posdiff_stop_m = 0.0
+ 
++        # ReSync / clear also resets the cause edge detector.
++        self.prev_cause_active = False
++        self.cause_edge = False
++
+     # ---------------------------------------------------------------------
+     # legacy/diagnostic meta helpers
+     # ---------------------------------------------------------------------
+@@ -593,6 +604,15 @@ class DenSiEngine:
+         changed = bool(self.sync_reset_able_bit())
+         word = int(self.inj_estop_word)
+         bits = decode_estop_word(int(word))
++
++        # "Cause active" matches the operator mental model:
++        # - any trip bit set OR
++        # - any required OK bit unset
++        # We use the *edge* of this to latch CutPos/CutVel, because state.estop can be
++        # true for non-cause reasons (e.g., startup / schuetz off).
++        cause_active = any(bool(bits.get(k, False)) for k in estop_cause_keys())
++        self.cause_edge = bool(cause_active) and (not bool(self.prev_cause_active))
++        self.prev_cause_active = bool(cause_active)
+         return word, bits, changed
+ 
+     def compute_estop_edge_and_update_state(self, estop_word: int) -> bool:
+@@ -680,6 +700,8 @@ class DenSiEngine:
+ 
+         try:
+             self.state.params["PosDiffStop"] = float(self.posdiff_stop_m)
++            # Keep Hip/legacy panels consistent: PosDiffFor is what they display.
++            self.state.params["PosDiffFor"] = float(self.posdiff_stop_m)
+         except Exception:
+             pass
+ 
+diff --git a/src/steuerung3d/apps/yellow/engines/densi/step_impl.py b/src/steuerung3d/apps/yellow/engines/densi/step_impl.py
+index 51e532d..ad9b8fd 100644
+--- a/src/steuerung3d/apps/yellow/engines/densi/step_impl.py
++++ b/src/steuerung3d/apps/yellow/engines/densi/step_impl.py
+@@ -65,9 +65,10 @@ def step(*, engine: "DenSiEngine", frames: list[CommandFrame], now_ns: int) -> D
+     estop_word, bits, reset_able_changed = self.apply_safety_and_refresh_estop()
+     estop_edge = self.compute_estop_edge_and_update_state(estop_word)
+ 
+-    # Latch cut markers at the moment we *enter* E-Stop (before the plant
+-    # deceleration model updates the actual velocity).
+-    self.maybe_latch_cut_markers(estop_edge)
++    # Latch cut markers at the moment an E-Stop *cause* first becomes active
++    # (trip bits / OK-chain fault). This is more robust than latching on the
++    # state.estop edge alone, because state.estop can be true at startup.
++    self.maybe_latch_cut_markers(bool(getattr(self, "cause_edge", False)))
+ 
+     # Step the plant: during E-Stop this models a Dcc-limited ramp-down.
+     self.step_plant_with_clamp()
+-- 
+2.39.5
+

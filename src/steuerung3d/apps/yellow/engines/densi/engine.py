@@ -106,6 +106,17 @@ class DenSiEngine:
     systemtime_tok: str = ""
     prev_estop_state: bool = False
 
+    # Cut markers should latch on "cause became active" (trip bits / OK-chain fault),
+    # not on state.estop edge alone (state.estop can be true during startup / not-armed).
+    prev_cause_active: bool = False
+    cause_edge: bool = False
+
+    # stop metrics (coastdown distance after E-Stop edge)
+    stop_valid: bool = False
+    stop_pos_m: float = 0.0
+    stop_time_s: float = 0.0
+    posdiff_stop_m: float = 0.0
+
     # param ops hooks (controller supplies: keep semantics)
     normalize_pos_chain: Callable[[dict[str, float]], dict[str, float]] | None = None
     normalize_guider_range: Callable[[dict[str, float]], dict[str, float]] | None = None
@@ -290,6 +301,14 @@ class DenSiEngine:
         self.cut_time_s = 0.0
         self.systemtime_tok = ""
         self.prev_estop_state = bool(getattr(self.state, "estop", False))
+        self.prev_cause_active = False
+        self.cause_edge = False
+
+        # Stop metrics (latched when coastdown reaches v~=0)
+        self.stop_valid = False
+        self.stop_pos_m = 0.0
+        self.stop_time_s = 0.0
+        self.posdiff_stop_m = 0.0
 
         # Derived/latches
         self.estop_latched = False
@@ -410,6 +429,12 @@ class DenSiEngine:
     def apply_estop_state_machine(self) -> None:
         """Authoritative ESTOP/IDLE/ARMED/READY ladder + brake timing."""
         bits = self._ensure_inj_bits()
+
+        # For STOPPING -> ESTOP transition we need the current (actual) speed.
+        axis_id = self.axis_ids[0] if self.axis_ids else ""
+        ax0 = self.state.axes.get(axis_id) if axis_id else None
+        speed_abs_mps = abs(float(getattr(ax0, "vel", 0.0) or 0.0)) if ax0 is not None else 0.0
+        stop_eps_mps = 1e-3
         (
             self.inj_estop_word,
             self.taster_prev,
@@ -428,6 +453,8 @@ class DenSiEngine:
             taster_rise_t_s=self.taster_rise_t_s,
             drive_ready=bool(self.drive_ready),
             estate=self.estate,
+            speed_abs_mps=float(speed_abs_mps),
+            stop_eps_mps=float(stop_eps_mps),
             brake_override_b1=bool(self.brake_override_b1),
             brake_override_b2=bool(self.brake_override_b2),
         )
@@ -449,6 +476,16 @@ class DenSiEngine:
             reset_prev=bool(reset_prev),
             prev_estop_state=bool(self.prev_estop_state),
         )
+
+        # Stop metrics are cleared on ReSync together with the cut markers.
+        self.stop_valid = False
+        self.stop_pos_m = 0.0
+        self.stop_time_s = 0.0
+        self.posdiff_stop_m = 0.0
+
+        # ReSync / clear also resets the cause edge detector.
+        self.prev_cause_active = False
+        self.cause_edge = False
 
     # ---------------------------------------------------------------------
     # legacy/diagnostic meta helpers
@@ -567,6 +604,15 @@ class DenSiEngine:
         changed = bool(self.sync_reset_able_bit())
         word = int(self.inj_estop_word)
         bits = decode_estop_word(int(word))
+
+        # "Cause active" matches the operator mental model:
+        # - any trip bit set OR
+        # - any required OK bit unset
+        # We use the *edge* of this to latch CutPos/CutVel, because state.estop can be
+        # true for non-cause reasons (e.g., startup / schuetz off).
+        cause_active = any(bool(bits.get(k, False)) for k in estop_cause_keys())
+        self.cause_edge = bool(cause_active) and (not bool(self.prev_cause_active))
+        self.prev_cause_active = bool(cause_active)
         return word, bits, changed
 
     def compute_estop_edge_and_update_state(self, estop_word: int) -> bool:
@@ -623,6 +669,41 @@ class DenSiEngine:
             cut_time_s=float(self.cut_time_s),
             systemtime_tok=str(self.systemtime_tok or ""),
         )
+
+    def maybe_latch_stop_metrics(self) -> None:
+        """Latch stop distance once the coastdown reaches v~=0.
+
+        Semantic intent (Lane 2): When an E-Stop trip occurs, commanded speed is
+        dropped to zero immediately, while the simulated plant decelerates with
+        Dcc. We record CutPos/CutVel at the moment the E-Stop is entered and
+        then compute PosDiffStop = (pos_stop - CutPos) once the axis stops.
+        """
+
+        if (not bool(self.cut_valid)) or bool(self.stop_valid):
+            return
+        if self.estate != EStopState.STOPPING:
+            return
+
+        axis_id = self.axis_ids[0] if self.axis_ids else ""
+        ax0 = self.state.axes.get(axis_id) if axis_id else None
+        if ax0 is None:
+            return
+
+        v = float(getattr(ax0, "vel", 0.0) or 0.0)
+        if abs(v) > 1e-3:
+            return
+
+        self.stop_valid = True
+        self.stop_pos_m = float(getattr(ax0, "pos", 0.0) or 0.0)
+        self.stop_time_s = float(getattr(self.state, "t_s", 0.0) or 0.0)
+        self.posdiff_stop_m = float(self.stop_pos_m) - float(self.cut_pos_m)
+
+        try:
+            self.state.params["PosDiffStop"] = float(self.posdiff_stop_m)
+            # Keep Hip/legacy panels consistent: PosDiffFor is what they display.
+            self.state.params["PosDiffFor"] = float(self.posdiff_stop_m)
+        except Exception:
+            pass
 
     def apply_estop_clamp_to_state(self) -> None:
         apply_estop_clamp_to_state(state=self.state)

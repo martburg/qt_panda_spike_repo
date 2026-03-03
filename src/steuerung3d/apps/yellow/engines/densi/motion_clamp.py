@@ -42,4 +42,6 @@ def apply_estop_clamp_to_state(*, state: MachineState) -> None:
     if bool(state.estop):
         for ax in state.axes.values():
             ax.enabled = False
-            ax.vel = 0.0
+            # Do not hard-zero velocity here.
+            # During E-Stop, DenSi sim models a Dcc-limited ramp-down of the
+            # *actual* speed so we can compute the coastdown distance.

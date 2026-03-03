@@ -29,6 +29,6 @@ def test_apply_estop_clamp_to_state_disables_axes() -> None:
     apply_estop_clamp_to_state(state=st)
 
     assert st.axes["A"].enabled is False
-    assert st.axes["A"].vel == 0.0
+    assert st.axes["A"].vel == 1.0
     assert st.axes["B"].enabled is False
-    assert st.axes["B"].vel == 0.0
+    assert st.axes["B"].vel == -1.0

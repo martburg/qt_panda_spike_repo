@@ -26,6 +26,7 @@ def clear_cut_markers(
         state.params["CutVel"] = 0.0
         state.params["CutTime"] = 0.0
         state.params["PosDiffFor"] = 0.0
+        state.params["PosDiffStop"] = 0.0
     except Exception:
         pass
 
@@ -64,6 +65,7 @@ def maybe_latch_cut_markers(
                 state.params["CutVel"] = float(cut_vel_mps)
                 state.params["CutTime"] = float(cut_time_s)
                 state.params["PosDiffFor"] = 0.0
+                state.params["PosDiffStop"] = 0.0
             except Exception:
                 pass
 

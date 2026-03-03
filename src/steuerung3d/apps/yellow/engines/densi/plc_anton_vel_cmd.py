@@ -46,6 +46,18 @@ def _clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
 
 
+def _move_towards(v: float, target: float, dv_max: float) -> float:
+    """Move *v* toward *target* by at most *dv_max* (>=0)."""
+    dv_max = abs(float(dv_max))
+    v = float(v)
+    target = float(target)
+    if v < target:
+        return min(target, v + dv_max)
+    if v > target:
+        return max(target, v - dv_max)
+    return v
+
+
 def _soft_limit_cap(
     *,
     v: float,
@@ -203,7 +215,18 @@ def step_plc_anton_vel_cmd(
 
         ax.enabled = bool(control_enabled) and (not bool(stale))
         if not ax.enabled:
-            ax.vel = 0.0
+            # During E-Stop, commanded speed drops to zero immediately, but the
+            # *actual* axis speed ramps down with Dcc so we can compute
+            # coastdown distance.
+            if bool(getattr(state, "estop", False)):
+                dv = abs(float(dcc_max)) * float(dt_s)
+                if dv <= 0.0:
+                    ax.vel = 0.0
+                else:
+                    ax.vel = float(_move_towards(float(ax.vel), 0.0, dv))
+                ax.pos += ax.vel * float(dt_s)
+            else:
+                ax.vel = 0.0
         else:
             ax.vel = float(final_speed)
             ax.pos += ax.vel * float(dt_s)

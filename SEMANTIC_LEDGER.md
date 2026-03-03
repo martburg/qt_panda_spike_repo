@@ -86,3 +86,36 @@ This file records *declared* semantic changes (RefOS Lane 2) made during stabili
 **Why:** Cartesian motion is defined as “rig/kinematics active” only during SYNC_ACTIVE; this prevents accidental cartesian motion during manual setup modes.
 
 **Tests:** `tests/test_jog_cartesian_gate.py`
+
+
+## 2026-03-03 — DenSi E-Stop adds STOPPING state and records coastdown distance
+
+**Lane:** 2 (Declared Semantic Fix)
+
+### Change
+- DenSi E-Stop ladder now includes an explicit `EStopState.STOPPING` state.
+  - On trip/OK-chain fault, if the axis is still moving, the ladder enters `STOPPING`.
+  - Once the simulated axis speed falls below a small epsilon, the ladder transitions to `ESTOP` (fully stopped).
+- During E-Stop, commanded speed is still dropped to `0` immediately, but the DenSi sim no longer hard-zeros the *actual* speed.
+  Instead, the plant ramps down with `DccMax` so we can compute a realistic stop distance.
+- Cut markers now latch **before** the deceleration step so `CutVel` reflects the actual speed at the moment E-Stop is entered.
+- Cut markers now latch **before** the deceleration step so `CutVel` reflects the actual speed at the moment E-Stop is entered.
+- Cut marker latch trigger tightened: latch on **cause-edge** (trip bits / OK-chain fault became active),
+  not merely on the `state.estop` edge. This avoids false-zero latches when the device is already in
+  a non-ready ESTOP-like state at startup.
+- New parameter `PosDiffStop` is published once the axis stops (and `PosDiffFor` is aligned to the same value for UI compatibility):
+  - `PosDiffStop = pos_stop - CutPos`
+
+### Motivation
+- Match real-world “commanded=0, actual decelerates with Dcc” behavior.
+- Provide a deterministic, inspectable “distance traveled after E-Stop” metric for diagnostics.
+
+### Files
+- `src/steuerung3d/apps/yellow/engines/densi/types.py`
+- `src/steuerung3d/apps/yellow/engines/densi/estop_fsm.py`
+- `src/steuerung3d/apps/yellow/engines/densi/engine.py`
+- `src/steuerung3d/apps/yellow/engines/densi/step_impl.py`
+- `src/steuerung3d/apps/yellow/engines/densi/plc_anton_vel_cmd.py`
+- `src/steuerung3d/apps/yellow/engines/densi/motion_clamp.py`
+- `src/steuerung3d/apps/yellow/engines/densi/cut_markers.py`
+- `src/steuerung3d/apps/yellow/engines/densi/param_defaults.py`

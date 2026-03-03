@@ -75,6 +75,8 @@ def apply_estop_state_machine(
     taster_rise_t_s: float | None,
     drive_ready: bool,
     estate: EStopState,
+    speed_abs_mps: float,
+    stop_eps_mps: float,
     brake_override_b1: bool,
     brake_override_b2: bool,
 ) -> tuple[int, bool, float | None, bool, EStopState, bool]:
@@ -131,6 +133,12 @@ def apply_estop_state_machine(
 
     trip_active = trip_cause or ok_chain_fault or brake_trip or (not bool(safety_ok))
 
+    # Treat STOPPING + ESTOP as "E-Stop active" (latched). STOPPING is the
+    # deceleration phase: commanded speed drops to zero immediately, while the
+    # actual plant ramps down with Dcc.
+    stop_eps_mps = abs(float(stop_eps_mps))
+    speed_abs_mps = abs(float(speed_abs_mps))
+
     if trip_active:
         estop_latched = True
         if bool(inj_bits.get("ready", False)):
@@ -138,7 +146,14 @@ def apply_estop_state_machine(
         if bool(inj_bits.get("schuetz", False)):
             inj_bits["schuetz"] = False
         drive_ready = False
-        estate = EStopState.ESTOP
+
+        # If we are still moving when the trip becomes active, enter STOPPING.
+        # Once the actual speed settles below the stop epsilon, transition to
+        # the fully-stopped ESTOP state.
+        if estate == EStopState.STOPPING:
+            estate = EStopState.ESTOP if (speed_abs_mps <= stop_eps_mps) else EStopState.STOPPING
+        else:
+            estate = EStopState.STOPPING if (speed_abs_mps > stop_eps_mps) else EStopState.ESTOP
     else:
         if not schuetz:
             estate = EStopState.ESTOP
@@ -163,6 +178,6 @@ def compute_estop_edge_and_update_state(
     estop_word: int,
     state,
 ) -> bool:
-    state.estop = bool(estate == EStopState.ESTOP)
+    state.estop = bool(estate in (EStopState.STOPPING, EStopState.ESTOP))
     state.estop_status_word = int(estop_word)
     return bool(state.estop) and (not bool(prev_estop_state))

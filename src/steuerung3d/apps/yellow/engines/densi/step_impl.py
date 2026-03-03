@@ -65,8 +65,16 @@ def step(*, engine: "DenSiEngine", frames: list[CommandFrame], now_ns: int) -> D
     estop_word, bits, reset_able_changed = self.apply_safety_and_refresh_estop()
     estop_edge = self.compute_estop_edge_and_update_state(estop_word)
 
+    # Latch cut markers at the moment an E-Stop *cause* first becomes active
+    # (trip bits / OK-chain fault). This is more robust than latching on the
+    # state.estop edge alone, because state.estop can be true at startup.
+    self.maybe_latch_cut_markers(bool(getattr(self, "cause_edge", False)))
+
+    # Step the plant: during E-Stop this models a Dcc-limited ramp-down.
     self.step_plant_with_clamp()
-    self.maybe_latch_cut_markers(estop_edge)
+
+    # Once the axis stops (v~=0), latch the coastdown distance.
+    self.maybe_latch_stop_metrics()
     self.apply_estop_clamp_to_state()
     self.advance_tick()
 
