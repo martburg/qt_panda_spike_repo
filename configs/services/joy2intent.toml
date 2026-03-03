@@ -29,7 +29,7 @@ default = "setup_manual"
 
 [limits.manual]
 # Max jog speed for a single winch (m/s or your chosen axis units)
-max_winch_mps = 0.30
+max_winch_mps = 6
 # Fine mode multiplier (when fine button held)
 fine_scale = 0.20
 
