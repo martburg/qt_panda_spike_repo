@@ -1,0 +1,14 @@
+--- a/src/steuerung3d/apps/joy2intent/config.py
++++ b/src/steuerung3d/apps/joy2intent/config.py
+@@ -38,10 +38,10 @@
+     deadzone: float
+     expo: float
+     invert: Dict[str, bool]
++    hip_id: str = "hip"
+     sync_max_v: Dict[str, float] = field(default_factory=dict)
+ 
+     # Identity stamped into motion intents. Must match the claim owner (HiP).
+-    hip_id: str = "hip"
+ 
+ 
+ def load_joy2intent_config(path: Path) -> Joy2IntentConfig:

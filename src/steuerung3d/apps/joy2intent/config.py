@@ -27,6 +27,8 @@ class Joy2IntentConfig:
     stale_after_ms: int
 
     winches: List[str]
+    # Physical button indices (0..N-1) used to select winches by position.
+    select_buttons: List[int]
     default_mode: str
 
     max_winch_mps: float
@@ -38,10 +40,10 @@ class Joy2IntentConfig:
     deadzone: float
     expo: float
     invert: Dict[str, bool]
+    hip_id: str
     sync_max_v: Dict[str, float] = field(default_factory=dict)
 
     # Identity stamped into motion intents. Must match the claim owner (HiP).
-    hip_id: str = "hip"
 
 
 def load_joy2intent_config(path: Path) -> Joy2IntentConfig:
@@ -82,4 +84,3 @@ def load_joy2intent_config(path: Path) -> Joy2IntentConfig:
         invert=dict((f.get("invert") or {})),
         hip_id=str(_require(ident, "hip_id", ctx="identity")),
     )
-
