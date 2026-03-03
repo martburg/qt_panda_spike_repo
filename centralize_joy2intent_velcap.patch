@@ -1,0 +1,281 @@
+--- a/configs/profiles/1dev_sim.toml
++++ b/configs/profiles/1dev_sim.toml
+@@ -61,7 +61,7 @@
+ enabled = true
+ module = "steuerung3d.apps.joy2intent"
+ mode = "single"
+-config = "configs/joy2intent_bindings_gamepad.toml"
++config = "configs/services/joy2intent.toml"
+ args = [
+   "--raw-in", "{net.raw_in}",
+   "--intent-out", "{net.intent}",
+--- a/configs/profiles/1dev_sim_remote.toml
++++ b/configs/profiles/1dev_sim_remote.toml
+@@ -61,7 +61,7 @@
+ enabled = false
+ module = "steuerung3d.apps.joy2intent"
+ mode = "single"
+-config = "configs/joy2intent_bindings_gamepad.toml"
++config = "configs/services/joy2intent.toml"
+ args = [
+   "--raw-in", "{net.raw_in}",
+   "--intent-out", "{net.intent}",
+--- a/configs/profiles/1dev_sim_remote_joy.toml
++++ b/configs/profiles/1dev_sim_remote_joy.toml
+@@ -65,7 +65,7 @@
+ enabled = false
+ module = "steuerung3d.apps.joy2intent"
+ mode = "single"
+-config = "configs/joy2intent_bindings_gamepad.toml"
++config = "configs/services/joy2intent.toml"
+ args = [
+   "--raw-in", "{net.raw_in}",
+   "--intent-out", "{net.intent}",
+--- a/configs/profiles/dev_real.toml
++++ b/configs/profiles/dev_real.toml
+@@ -62,7 +62,7 @@
+ enabled = true
+ module = "steuerung3d.apps.joy2intent"
+ mode = "single"
+-config = "configs/joy2intent_bindings_gamepad.toml"
++config = "configs/services/joy2intent.toml"
+ args = [
+   "--raw-in", "{net.raw_in}",
+   "--intent-out", "{net.intent}",
+--- a/configs/profiles/dev_sim.toml
++++ b/configs/profiles/dev_sim.toml
+@@ -61,7 +61,7 @@
+ enabled = true
+ module = "steuerung3d.apps.joy2intent"
+ mode = "single"
+-config = "configs/joy2intent_bindings_gamepad.toml"
++config = "configs/services/joy2intent.toml"
+ args = [
+   "--raw-in", "{net.raw_in}",
+   "--intent-out", "{net.intent}",
+--- a/configs/profiles/dev_sim_c2.toml
++++ b/configs/profiles/dev_sim_c2.toml
+@@ -78,7 +78,7 @@
+ enabled = true
+ module = "steuerung3d.apps.joy2intent"
+ mode = "single"
+-config = "configs/joy2intent_bindings_gamepad.toml"
++config = "configs/services/joy2intent.toml"
+ args = [
+   "--raw-in", "{net.raw_in}",
+   "--intent-out", "{net.intent}",
+--- a/configs/profiles/dev_sim_c2_only.toml
++++ b/configs/profiles/dev_sim_c2_only.toml
+@@ -76,7 +76,7 @@
+ enabled = true
+ module = "steuerung3d.apps.joy2intent"
+ mode = "single"
+-config = "configs/joy2intent_bindings_gamepad.toml"
++config = "configs/services/joy2intent.toml"
+ args = [
+   "--raw-in", "{net.raw_in}",
+   "--intent-out", "{net.intent}",
+--- a/configs/profiles/joy_local_to_remote_core.toml
++++ b/configs/profiles/joy_local_to_remote_core.toml
+@@ -21,7 +21,7 @@
+ enabled = true
+ argv = [
+   "python", "-m", "steuerung3d.apps.joy2intent",
+-  "--config", "configs/joy2intent_bindings_gamepad.toml",
++  "--config", "configs/services/joy2intent.toml",
+   "--raw-in", "{net.raw_controls}",
+   "--intent-out", "{net.remote_intent}",
+   "--winches", "Anton",
+--- /dev/null
++++ b/configs/services/joy2intent.toml
+@@ -0,0 +1,55 @@
++# Canonical joy2intent service configuration
++# Used by profiles and distributed deployments.
++
++[mode]
++# Joystick control sub-mode (not the core safety Mode)
++default = "setup_manual"
++
++[limits.manual]
++# Max jog speed for a single winch (m/s or your chosen axis units)
++max_winch_mps = 0.30
++# Fine mode multiplier (when fine button held)
++fine_scale = 0.20
++
++[limits.sync]
++# Max cartesian jog speeds (placeholder until kinematics layer exists)
++max_v = { x = 0.60, y = 0.60, z = 0.40 }
++
++[bindings.axes]
++# Axis indices as reported by your joystick.
++# Use:  python -m steuerung3d.apps.inputd --list
++# and/or python -m steuerung3d.apps.inputd --dump
++manual_jog = 1
++soll_speed = 1
++x = 0
++y = 1
++z = 2
++
++[bindings.buttons]
++# Button indices as reported by your joystick.
++# Typical Xbox layout: A=0, B=1, X=2, Y=3, LB=4, RB=5, Back=6, Start=7
++# Adjust as needed.
++deadman = 5
++# setup_manual: momentary multi-select winches (hold to select)
++select_0 = 0
++select_1 = 1
++select_2 = 2
++select_3 = 3
++
++# select_hip (held) to request ClaimAxis in HiP
++select_hip = 3
++
++# fine mode (user muscle memory)
++fine = 7
++
++# optional extras (uncomment + adjust if you want them)
++# mode_toggle = 6
++# smooth_stop = 7
++
++[filters]
++# Deadzone and expo are applied after reading axes.
++deadzone = 0.08
++expo = 0.25
++# Optional per-logical-axis inversion.
++# Keys: manual_jog, x, y, z
++invert = { manual_jog = true, y = true }
+--- a/src/steuerung3d/apps/joy2intent/__main__.py
++++ b/src/steuerung3d/apps/joy2intent/__main__.py
+@@ -23,7 +23,7 @@
+ 
+ def main() -> int:
+     ap = argparse.ArgumentParser(prog="steuerung3d.apps.joy2intent")
+-    ap.add_argument("--config", default="configs/joy2intent_gamepad.toml")
++    ap.add_argument("--config", default="configs/services/joy2intent.toml")
+     ap.add_argument("--raw-in", default=None, help="Override RawControls UDP bind host:port")
+     ap.add_argument("--intent-out", default=None, help="Override Intent UDP target host:port")
+     ap.add_argument(
+--- a/tests/test_joy2intent_gamepad.py
++++ b/tests/test_joy2intent_gamepad.py
+@@ -1,7 +1,11 @@
+ from __future__ import annotations
++
++import re
++from pathlib import Path
+ 
+ from typing import Iterable
+ 
++from steuerung3d.apps.joy2intent.config import load_joy2intent_config
+ from steuerung3d.apps.joy2intent.mapping import JoyBindings, JoyLimits, JoyRig, synthesize_intents
+ from steuerung3d.apps.joy2intent.state import JoyState
+ from steuerung3d.core.intents import EnableAxis, JogWinch
+@@ -32,11 +36,37 @@
+     return JoyRig(winches=["Anton", "Debby", "Cecil", "Burt"])
+ 
+ 
+-def _lim() -> JoyLimits:
+-    return JoyLimits(max_winch_mps=0.3, fine_scale=0.2)
++def _lim_from_config(tmp_path: Path) -> JoyLimits:
++    """Load the canonical joy2intent service config and override max_winch_mps.
+ 
++    This test deliberately forces a non-default value so we can detect accidental
++    fallback to hard-coded defaults.
++    """
++    src = Path("configs/services/joy2intent.toml")
++    raw_text = src.read_text(encoding="utf-8")
+ 
+-def test_single_winch_select_hip_fallback_emits_enable_and_jog() -> None:
++    # Force an obviously-non-default limit.
++    raw_text = re.sub(
++        r"(?m)^max_winch_mps\s*=\s*[0-9.]+\s*$",
++        "max_winch_mps = 1.234",
++        raw_text,
++    )
++
++    cfg_path = tmp_path / "joy2intent.test.toml"
++    cfg_path.write_text(raw_text, encoding="utf-8")
++
++    cfg = load_joy2intent_config(cfg_path)
++
++    # Sanity check that we really used the overridden value.
++    assert abs(cfg.max_winch_mps - 1.234) < 1e-12
++
++    return JoyLimits(
++        max_winch_mps=float(cfg.max_winch_mps),
++        fine_scale=float(cfg.fine_scale),
++        max_v=float(cfg.manual_max_v) if cfg.manual_max_v is not None else None,
++    )
++
++def test_single_winch_select_hip_fallback_emits_enable_and_jog(tmp_path: Path) -> None:
+     st = JoyState()
+     bind = JoyBindings(
+         axes={"manual_jog": 1},
+@@ -47,7 +77,7 @@
+         expo=1.5,
+     )
+     rig = JoyRig(winches=["Anton"])
+-    lim = _lim()
++    lim = _lim_from_config(tmp_path)
+ 
+     rc = _rc(axes=[0.0, 0.8], pressed=(5, 3))
+     intents = synthesize_intents(st, rc, bind, rig, lim)
+@@ -56,11 +86,11 @@
+     assert any(isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate > 0.0 for i in intents)
+ 
+ 
+-def test_setup_manual_multi_select_targets_single_lowest_index() -> None:
++def test_setup_manual_multi_select_targets_single_lowest_index(tmp_path: Path) -> None:
+     st = JoyState()
+     bind = _bind()
+     rig = _rig()
+-    lim = _lim()
++    lim = _lim_from_config(tmp_path)
+ 
+     # deadman + select 0 & 2, manual_jog axis positive
+     rc = _rc(axes=[0.0, 0.6], pressed=(5, 0, 2))
+@@ -80,11 +110,11 @@
+         assert j.rate <= lim.max_winch_mps
+ 
+ 
+-def test_deadman_release_disables_previously_enabled_winches() -> None:
++def test_deadman_release_disables_previously_enabled_winches(tmp_path: Path) -> None:
+     st = JoyState()
+     bind = _bind()
+     rig = _rig()
+-    lim = _lim()
++    lim = _lim_from_config(tmp_path)
+ 
+     # First tick: enable Anton (select 0) with deadman
+     rc1 = _rc(axes=[0.0, 0.3], pressed=(5, 0))
+@@ -99,7 +129,7 @@
+     assert {d.axis_id for d in disables} == {"Anton"}
+ 
+ 
+-def test_deadman_hold_repeats_enable_keepalive() -> None:
++def test_deadman_hold_repeats_enable_keepalive(tmp_path: Path) -> None:
+     """EnableAxis(True) must be re-emitted while deadman is held.
+ 
+     This acts as a keepalive so that if the first EnableAxis was dropped by
+@@ -110,7 +140,7 @@
+     st = JoyState()
+     bind = _bind()
+     rig = _rig()
+-    lim = _lim()
++    lim = _lim_from_config(tmp_path)
+ 
+     rc = _rc(axes=[0.0, 0.3], pressed=(5, 0))
+     intents1 = synthesize_intents(st, rc, bind, rig, lim)
+@@ -121,11 +151,11 @@
+     assert any(isinstance(i, EnableAxis) and i.axis_id == "Anton" and i.enable for i in intents2)
+ 
+ 
+-def test_fine_button_scales_rate() -> None:
++def test_fine_button_scales_rate(tmp_path: Path) -> None:
+     st = JoyState()
+     bind = _bind()
+     rig = _rig()
+-    lim = _lim()
++    lim = _lim_from_config(tmp_path)
+ 
+     # same stick, same selection, compare with/without fine
+     rc_fast = _rc(axes=[0.0, 1.0], pressed=(5, 0))

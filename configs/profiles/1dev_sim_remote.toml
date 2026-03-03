@@ -61,7 +61,7 @@ config = "configs/inputd_gamepad.toml"
 enabled = false
 module = "steuerung3d.apps.joy2intent"
 mode = "single"
-config = "configs/joy2intent_bindings_gamepad.toml"
+config = "configs/services/joy2intent.toml"
 args = [
   "--raw-in", "{net.raw_in}",
   "--intent-out", "{net.intent}",

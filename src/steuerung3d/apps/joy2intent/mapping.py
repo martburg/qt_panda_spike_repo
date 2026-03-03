@@ -39,14 +39,16 @@ class JoyBindings:
 
 @dataclass(frozen=True)
 class JoyLimits:
-    # Canonical limit used by tests
-    max_winch_mps: float = 0.3
+    """Operational limits for joy2intent mapping.
+
+    These limits should come from `configs/services/joy2intent.toml`.
+    """
+
+    max_winch_mps: float
     fine_scale: float = 0.2
-    # Backwards-compat alias (optional). If set, overrides max_winch_mps.
-    max_v: float | None = None
 
     def max_speed(self) -> float:
-        return float(self.max_winch_mps if self.max_v is None else self.max_v)
+        return float(self.max_winch_mps)
 
 
 @dataclass(frozen=True)

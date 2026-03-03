@@ -1,0 +1,407 @@
+diff --git a/configs/README.md b/configs/README.md
+index e35673a..9c629d0 100644
+--- a/configs/README.md
++++ b/configs/README.md
+@@ -8,8 +8,6 @@ Package-level defaults / embedded example configs shipped with the library.
+ 
+ - `dev_plc.toml`
+ - `inputd_gamepad.toml`
+-- `joy2intent_bindings_gamepad.toml`
+-- `joy2intent_gamepad.toml`
+ - `log_viewer.toml`
+ - `plc_stack.toml`
+ 
+diff --git a/configs/joy2intent_bindings_gamepad.toml b/configs/joy2intent_bindings_gamepad.toml
+deleted file mode 100644
+index fe08493..0000000
+--- a/configs/joy2intent_bindings_gamepad.toml
++++ /dev/null
+@@ -1,52 +0,0 @@
+-[mode]
+-# Joystick control sub-mode (not the core safety Mode)
+-default = "setup_manual"
+-
+-[limits.manual]
+-# Max jog speed for a single winch (m/s or your chosen axis units)
+-max_winch_mps = 0.30
+-# Fine mode multiplier (when fine button held)
+-fine_scale = 0.20
+-
+-[limits.sync]
+-# Max cartesian jog speeds (placeholder until kinematics layer exists)
+-max_v = { x = 0.60, y = 0.60, z = 0.40 }
+-
+-[bindings.axes]
+-# Axis indices as reported by your joystick.
+-# Use:  python -m steuerung3d.apps.inputd --list
+-# and/or python -m steuerung3d.apps.inputd --dump
+-manual_jog = 1
+-soll_speed = 1
+-x = 0
+-y = 1
+-z = 2
+-
+-[bindings.buttons]
+-# Button indices as reported by your joystick.
+-# Typical Xbox layout: A=0, B=1, X=2, Y=3, LB=4, RB=5, Back=6, Start=7
+-# Adjust as needed.
+-deadman = 5
+-# setup_manual: momentary multi-select winches (hold to select)
+-select_0 = 0
+-select_1 = 1
+-select_2 = 2
+-select_3 = 3
+-
+-# select_hip (held) to request ClaimAxis in HiP
+-select_hip = 3
+-
+-# fine mode (user muscle memory)
+-fine = 7
+-
+-# optional extras (uncomment + adjust if you want them)
+-# mode_toggle = 6
+-# smooth_stop = 7
+-
+-[filters]
+-# Deadzone and expo are applied after reading axes.
+-deadzone = 0.08
+-expo = 0.25
+-# Optional per-logical-axis inversion.
+-# Keys: manual_jog, x, y, z
+-invert = { manual_jog = true, y = true }
+diff --git a/configs/joy2intent_gamepad.toml b/configs/joy2intent_gamepad.toml
+deleted file mode 100644
+index e96c1d2..0000000
+--- a/configs/joy2intent_gamepad.toml
++++ /dev/null
+@@ -1,66 +0,0 @@
+-[io]
+-# UDP source for RawControls samples (from inputd)
+-raw_in = "127.0.0.1:50100"
+-# UDP sink for operator intents (to core_udp_service)
+-intent_out = "127.0.0.1:51001"
+-# Mapping tick rate (Hz)
+-tick_hz = 50
+-# If we haven't seen RawControls for this long, treat input as stale
+-stale_after_ms = 200
+-
+-[rig]
+-# Winch/axis ids as used by the core/device layer
+-winches = ["Anton", "Debby", "Cecil", "Burt"]
+-
+-[mode]
+-# Joystick control sub-mode (not the core safety Mode)
+-default = "setup_manual"
+-
+-[limits.manual]
+-# Max jog speed for a single winch (m/s or your chosen axis units)
+-max_winch_mps = 0.30
+-# Fine mode multiplier (when fine button held)
+-fine_scale = 0.20
+-
+-[limits.sync]
+-# Max cartesian jog speeds (placeholder until kinematics layer exists)
+-max_v = { x = 0.60, y = 0.60, z = 0.40 }
+-
+-[bindings.axes]
+-# Axis indices as reported by your joystick.
+-# Use:  python -m steuerung3d.apps.inputd --list
+-# and/or python -m steuerung3d.apps.inputd --dump
+-manual_jog = 1
+-soll_speed = 1
+-x = 0
+-y = 1
+-z = 2
+-
+-[bindings.buttons]
+-# Button indices as reported by your joystick.
+-# Typical Xbox layout: A=0, B=1, X=2, Y=3, LB=4, RB=5, Back=6, Start=7
+-# Adjust as needed.
+-deadman = 5
+-# setup_manual: momentary multi-select winches (hold to select)
+-select_0 = 0
+-select_1 = 1
+-select_2 = 2
+-select_3 = 3
+-
+-# select_hip (held) to request ClaimAxis in HiP
+-select_hip = 3
+-
+-# fine mode (user muscle memory)
+-fine = 7
+-
+-# optional extras (uncomment + adjust if you want them)
+-# mode_toggle = 6
+-# smooth_stop = 7
+-
+-[filters]
+-# Deadzone and expo are applied after reading axes.
+-deadzone = 0.08
+-expo = 0.25
+-# Optional per-logical-axis inversion.
+-# Keys: manual_jog, x, y, z
+-invert = { manual_jog = true, y = true }
+diff --git a/configs/stacks/1dev_sim.toml b/configs/stacks/1dev_sim.toml
+index 8946a8e..02e7c3f 100644
+--- a/configs/stacks/1dev_sim.toml
++++ b/configs/stacks/1dev_sim.toml
+@@ -61,7 +61,7 @@ config = "configs/inputd_gamepad.toml"
+ enabled = true
+ module = "steuerung3d.apps.joy2intent"
+ mode = "single"
+-config = "configs/joy2intent_bindings_gamepad.toml"
++config = "configs/services/joy2intent.toml"
+ args = [
+   "--raw-in", "{net.raw_in}",
+   "--intent-out", "{net.intent}",
+diff --git a/configs/stacks/1dev_sim_remote.toml b/configs/stacks/1dev_sim_remote.toml
+index a5b47af..12cd0d3 100644
+--- a/configs/stacks/1dev_sim_remote.toml
++++ b/configs/stacks/1dev_sim_remote.toml
+@@ -61,7 +61,7 @@ config = "configs/inputd_gamepad.toml"
+ enabled = false
+ module = "steuerung3d.apps.joy2intent"
+ mode = "single"
+-config = "configs/joy2intent_bindings_gamepad.toml"
++config = "configs/services/joy2intent.toml"
+ args = [
+   "--raw-in", "{net.raw_in}",
+   "--intent-out", "{net.intent}",
+diff --git a/configs/stacks/1dev_sim_remote_joy.toml b/configs/stacks/1dev_sim_remote_joy.toml
+index 741d245..3f8b9b4 100644
+--- a/configs/stacks/1dev_sim_remote_joy.toml
++++ b/configs/stacks/1dev_sim_remote_joy.toml
+@@ -65,7 +65,7 @@ config = "configs/inputd_gamepad.toml"
+ enabled = false
+ module = "steuerung3d.apps.joy2intent"
+ mode = "single"
+-config = "configs/joy2intent_bindings_gamepad.toml"
++config = "configs/services/joy2intent.toml"
+ args = [
+   "--raw-in", "{net.raw_in}",
+   "--intent-out", "{net.intent}",
+diff --git a/configs/stacks/dev_real.toml b/configs/stacks/dev_real.toml
+index dc7b9e9..bb914e4 100644
+--- a/configs/stacks/dev_real.toml
++++ b/configs/stacks/dev_real.toml
+@@ -62,7 +62,7 @@ config = "configs/inputd_gamepad.toml"
+ enabled = true
+ module = "steuerung3d.apps.joy2intent"
+ mode = "single"
+-config = "configs/joy2intent_bindings_gamepad.toml"
++config = "configs/services/joy2intent.toml"
+ args = [
+   "--raw-in", "{net.raw_in}",
+   "--intent-out", "{net.intent}",
+diff --git a/configs/stacks/dev_sim.toml b/configs/stacks/dev_sim.toml
+index 48ae3ac..3f98e9d 100644
+--- a/configs/stacks/dev_sim.toml
++++ b/configs/stacks/dev_sim.toml
+@@ -61,7 +61,7 @@ config = "configs/inputd_gamepad.toml"
+ enabled = true
+ module = "steuerung3d.apps.joy2intent"
+ mode = "single"
+-config = "configs/joy2intent_bindings_gamepad.toml"
++config = "configs/services/joy2intent.toml"
+ args = [
+   "--raw-in", "{net.raw_in}",
+   "--intent-out", "{net.intent}",
+diff --git a/configs/stacks/dev_sim_c2.toml b/configs/stacks/dev_sim_c2.toml
+index 2f973d5..74ecd99 100644
+--- a/configs/stacks/dev_sim_c2.toml
++++ b/configs/stacks/dev_sim_c2.toml
+@@ -78,7 +78,7 @@ config = "configs/inputd_gamepad.toml"
+ enabled = true
+ module = "steuerung3d.apps.joy2intent"
+ mode = "single"
+-config = "configs/joy2intent_bindings_gamepad.toml"
++config = "configs/services/joy2intent.toml"
+ args = [
+   "--raw-in", "{net.raw_in}",
+   "--intent-out", "{net.intent}",
+diff --git a/configs/stacks/dev_sim_c2_only.toml b/configs/stacks/dev_sim_c2_only.toml
+index f5906ab..93ffcb2 100644
+--- a/configs/stacks/dev_sim_c2_only.toml
++++ b/configs/stacks/dev_sim_c2_only.toml
+@@ -76,7 +76,7 @@ config = "configs/inputd_gamepad.toml"
+ enabled = true
+ module = "steuerung3d.apps.joy2intent"
+ mode = "single"
+-config = "configs/joy2intent_bindings_gamepad.toml"
++config = "configs/services/joy2intent.toml"
+ args = [
+   "--raw-in", "{net.raw_in}",
+   "--intent-out", "{net.intent}",
+diff --git a/configs/stacks/joy_local_to_remote_core.toml b/configs/stacks/joy_local_to_remote_core.toml
+index e7f3dd6..4a49d88 100644
+--- a/configs/stacks/joy_local_to_remote_core.toml
++++ b/configs/stacks/joy_local_to_remote_core.toml
+@@ -21,7 +21,7 @@ argv = [
+ enabled = true
+ argv = [
+   "python", "-m", "steuerung3d.apps.joy2intent",
+-  "--config", "configs/joy2intent_bindings_gamepad.toml",
++  "--config", "configs/services/joy2intent.toml",
+   "--raw-in", "{net.raw_controls}",
+   "--intent-out", "{net.remote_intent}",
+   "--winches", "Anton",
+diff --git a/docs/STACK_BOOT_STATUS.md b/docs/STACK_BOOT_STATUS.md
+index 96038f9..1491a97 100644
+--- a/docs/STACK_BOOT_STATUS.md
++++ b/docs/STACK_BOOT_STATUS.md
+@@ -98,7 +98,7 @@ status_in = "127.0.0.1:51200"
+ ```
+ 
+ Joy2intent config is now bindings-only (axes live in the stack profile):
+-- `configs/joy2intent_bindings_gamepad.toml`
++- `configs/services/joy2intent.toml`
+ 
+ ---
+ 
+diff --git a/docs/config.md b/docs/config.md
+index f659fed..eeaaccb 100644
+--- a/docs/config.md
++++ b/docs/config.md
+@@ -73,14 +73,14 @@ python -m steuerung3d.apps.plc_stack --config configs\plc_stack.toml
+ 
+ Configs:
+ 
+-- `configs/joy2intent_gamepad.toml`
+-- `configs/joy2intent_bindings_gamepad.toml`
++- `configs/services/joy2intent.toml`
++- `configs/services/joy2intent.toml`
+ - `configs/inputd_gamepad.toml`
+ 
+ Run (example):
+ 
+ ```powershell
+-python -m steuerung3d.apps.joy2intent --config configs\joy2intent_gamepad.toml
++python -m steuerung3d.apps.joy2intent --config configs\services\joy2intent.toml
+ python -m steuerung3d.apps.inputd    --config configs\inputd_gamepad.toml
+ ```
+ 
+diff --git a/docs/milestones.md b/docs/milestones.md
+index 4d19b52..c3041b7 100644
+--- a/docs/milestones.md
++++ b/docs/milestones.md
+@@ -34,7 +34,7 @@ This is a living checklist of what we’ve already achieved and what comes next.
+ Completed:
+ 
+ - `inputd` gamepad listener (pygame) with compact console output
+-- `joy2intent_gamepad.toml` mapping for **setup jogging** (deadman, select winch buttons, fine, left-y)
++- `services/joy2intent.toml` mapping for **setup jogging** (deadman, select winch buttons, fine, left-y)
+ - Profile-driven `up --profile ...` launches the stack (Core + DenSi + HiP + optional inputd/joy2intent).
+ - Strict per-axis device command routing (no broadcast) + port overlap guards
+ - Per-axis UI telemetry slicing (HiPs no longer “pick up” other DenSis)
+diff --git a/src/steuerung3d/apps/densi_fleet/README.md b/src/steuerung3d/apps/densi_fleet/README.md
+index 917c53c..bb767bd 100644
+--- a/src/steuerung3d/apps/densi_fleet/README.md
++++ b/src/steuerung3d/apps/densi_fleet/README.md
+@@ -9,7 +9,7 @@ and the easiest way to make this visible in the simulator is to run multiple Den
+ 
+ ### Launch from your gamepad mapping
+ 
+-If your `configs/joy2intent_gamepad.toml` contains:
++If your `configs/services/joy2intent.toml` contains:
+ 
+ ```toml
+ [selection]
+@@ -19,7 +19,7 @@ winch_ids = ["Anton", "Debby", "Cecil", "Burt"]
+ Run:
+ 
+ ```bash
+-python -m steuerung3d.apps.densi_fleet --from-joy2intent configs/joy2intent_gamepad.toml --also-core
++python -m steuerung3d.apps.densi_fleet --from-joy2intent configs/services/joy2intent.toml --also-core
+ ```
+ 
+ This will:
+diff --git a/src/steuerung3d/apps/joy2intent/__main__.py b/src/steuerung3d/apps/joy2intent/__main__.py
+index 56ed2cb..ad2e651 100644
+--- a/src/steuerung3d/apps/joy2intent/__main__.py
++++ b/src/steuerung3d/apps/joy2intent/__main__.py
+@@ -66,7 +66,6 @@ def main() -> int:
+     lim = JoyLimits(
+         max_winch_mps=cfg.max_winch_mps,
+         fine_scale=cfg.fine_scale,
+-        max_v=cfg.manual_max_v,
+     )
+ 
+     dt = 1.0 / max(1.0, cfg.tick_hz)
+diff --git a/src/steuerung3d/apps/joy2intent/config.py b/src/steuerung3d/apps/joy2intent/config.py
+index 4ce7b45..f44501b 100644
+--- a/src/steuerung3d/apps/joy2intent/config.py
++++ b/src/steuerung3d/apps/joy2intent/config.py
+@@ -12,6 +12,12 @@ def _hostport(s: str) -> Tuple[str, int]:
+     return host.strip(), int(port)
+ 
+ 
++def _require(mapping: dict, key: str, *, ctx: str) -> object:
++    if key not in mapping or mapping[key] is None:
++        raise ValueError(f"Missing required config key '{ctx}.{key}' in joy2intent config")
++    return mapping[key]
++
++
+ @dataclass(frozen=True)
+ class Joy2IntentConfig:
+     # --- required ---
+@@ -37,9 +43,6 @@ class Joy2IntentConfig:
+     # Buttons that select winches by position (0..N-1). If omitted, defaults to [0,1,2,3].
+     select_buttons: List[int] = field(default_factory=lambda: [0, 1, 2, 3])
+ 
+-    # Optional legacy alias (float). If present, overrides max_winch_mps.
+-    manual_max_v: float | None = None
+-
+     # Sync/cartesian limits (currently not used by joy2intent mapping, kept for config completeness).
+     sync_max_v: Dict[str, float] = field(default_factory=dict)
+ 
+@@ -68,11 +71,8 @@ def load_joy2intent_config(path: Path) -> Joy2IntentConfig:
+         winches=list(rig.get("winches", ["Anton", "Debby", "Cecil", "Burt"])),
+         default_mode=str(mode.get("default", "setup_manual")),
+         select_buttons=list(rig.get("select_buttons", [0, 1, 2, 3])),
+-        max_winch_mps=float(lim_m.get("max_winch_mps", 0.30)),
++        max_winch_mps=float(_require(lim_m, 'max_winch_mps', ctx='limits.manual')),
+         fine_scale=float(lim_m.get("fine_scale", 0.20)),
+-        manual_max_v=(
+-            float(lim_m["max_v"]) if "max_v" in lim_m and lim_m["max_v"] is not None else None
+-        ),
+         sync_max_v=dict(lim_s.get("max_v", {"x": 0.60, "y": 0.60, "z": 0.40})),
+         axes=dict((bindings.get("axes", {}) or {})),
+         buttons=dict((bindings.get("buttons", {}) or {})),
+diff --git a/src/steuerung3d/apps/joy2intent/mapping.py b/src/steuerung3d/apps/joy2intent/mapping.py
+index 1f445f2..87bd6d7 100644
+--- a/src/steuerung3d/apps/joy2intent/mapping.py
++++ b/src/steuerung3d/apps/joy2intent/mapping.py
+@@ -39,14 +39,16 @@ class JoyBindings:
+ 
+ @dataclass(frozen=True)
+ class JoyLimits:
+-    # Canonical limit used by tests
+-    max_winch_mps: float = 0.3
++    """Operational limits for joy2intent mapping.
++
++    These limits should come from `configs/services/joy2intent.toml`.
++    """
++
++    max_winch_mps: float
+     fine_scale: float = 0.2
+-    # Backwards-compat alias (optional). If set, overrides max_winch_mps.
+-    max_v: float | None = None
+ 
+     def max_speed(self) -> float:
+-        return float(self.max_winch_mps if self.max_v is None else self.max_v)
++        return float(self.max_winch_mps)
+ 
+ 
+ @dataclass(frozen=True)
+diff --git a/tests/test_joy2intent_gamepad.py b/tests/test_joy2intent_gamepad.py
+index 91047f0..fbb576e 100644
+--- a/tests/test_joy2intent_gamepad.py
++++ b/tests/test_joy2intent_gamepad.py
+@@ -63,7 +63,6 @@ def _lim_from_config(tmp_path: Path) -> JoyLimits:
+     return JoyLimits(
+         max_winch_mps=float(cfg.max_winch_mps),
+         fine_scale=float(cfg.fine_scale),
+-        max_v=float(cfg.manual_max_v) if cfg.manual_max_v is not None else None,
+     )
+ 
+ def test_single_winch_select_hip_fallback_emits_enable_and_jog(tmp_path: Path) -> None:

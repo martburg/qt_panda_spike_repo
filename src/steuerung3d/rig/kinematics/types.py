@@ -38,5 +38,4 @@ class RigKinematics(Protocol):
         participating: Tuple[str, ...],
         anchors: Dict[str, Tuple[float, float, float]],
         cmd: CartesianCommand,
-    ) -> Dict[str, AxisCommand]:
-        ...
+    ) -> Dict[str, AxisCommand]: ...

@@ -5,6 +5,11 @@ This repo currently supports **two** configuration “surfaces”:
 1) **Profile-driven stacks (recommended)** — `python -m steuerung3d up --profile …`  
 2) **Single-process demo runners** — `python -m steuerung3d.apps.<app> --config …`
 
+3) **Deployments (distributed setups)** — `python -m steuerung3d up --deployment …`
+
+Deployments are the recommended configuration surface once services are intentionally run across multiple machines.
+See: `docs/deployments.md`
+
 The goal is to make local development easy *without* coupling core logic to any particular IO mechanism.
 
 ---
@@ -73,14 +78,14 @@ python -m steuerung3d.apps.plc_stack --config configs\plc_stack.toml
 
 Configs:
 
-- `configs/joy2intent_gamepad.toml`
-- `configs/joy2intent_bindings_gamepad.toml`
+- `configs/services/joy2intent.toml`
+- `configs/services/joy2intent.toml`
 - `configs/inputd_gamepad.toml`
 
 Run (example):
 
 ```powershell
-python -m steuerung3d.apps.joy2intent --config configs\joy2intent_gamepad.toml
+python -m steuerung3d.apps.joy2intent --config configs\services\joy2intent.toml
 python -m steuerung3d.apps.inputd    --config configs\inputd_gamepad.toml
 ```
 

@@ -12,6 +12,12 @@ def _hostport(s: str) -> Tuple[str, int]:
     return host.strip(), int(port)
 
 
+def _require(mapping: dict, key: str, *, ctx: str) -> object:
+    if key not in mapping or mapping[key] is None:
+        raise ValueError(f"Missing required config key '{ctx}.{key}' in joy2intent config")
+    return mapping[key]
+
+
 @dataclass(frozen=True)
 class Joy2IntentConfig:
     # --- required ---
@@ -36,9 +42,6 @@ class Joy2IntentConfig:
     # --- optional / defaults (must come after all non-default fields) ---
     # Buttons that select winches by position (0..N-1). If omitted, defaults to [0,1,2,3].
     select_buttons: List[int] = field(default_factory=lambda: [0, 1, 2, 3])
-
-    # Optional legacy alias (float). If present, overrides max_winch_mps.
-    manual_max_v: float | None = None
 
     # Sync/cartesian limits (currently not used by joy2intent mapping, kept for config completeness).
     sync_max_v: Dict[str, float] = field(default_factory=dict)
@@ -68,11 +71,8 @@ def load_joy2intent_config(path: Path) -> Joy2IntentConfig:
         winches=list(rig.get("winches", ["Anton", "Debby", "Cecil", "Burt"])),
         default_mode=str(mode.get("default", "setup_manual")),
         select_buttons=list(rig.get("select_buttons", [0, 1, 2, 3])),
-        max_winch_mps=float(lim_m.get("max_winch_mps", 0.30)),
+        max_winch_mps=float(_require(lim_m, "max_winch_mps", ctx="limits.manual")),
         fine_scale=float(lim_m.get("fine_scale", 0.20)),
-        manual_max_v=(
-            float(lim_m["max_v"]) if "max_v" in lim_m and lim_m["max_v"] is not None else None
-        ),
         sync_max_v=dict(lim_s.get("max_v", {"x": 0.60, "y": 0.60, "z": 0.40})),
         axes=dict((bindings.get("axes", {}) or {})),
         buttons=dict((bindings.get("buttons", {}) or {})),

@@ -9,7 +9,7 @@ and the easiest way to make this visible in the simulator is to run multiple Den
 
 ### Launch from your gamepad mapping
 
-If your `configs/joy2intent_gamepad.toml` contains:
+If your `configs/services/joy2intent.toml` contains:
 
 ```toml
 [selection]
@@ -19,7 +19,7 @@ winch_ids = ["Anton", "Debby", "Cecil", "Burt"]
 Run:
 
 ```bash
-python -m steuerung3d.apps.densi_fleet --from-joy2intent configs/joy2intent_gamepad.toml --also-core
+python -m steuerung3d.apps.densi_fleet --from-joy2intent configs/services/joy2intent.toml --also-core
 ```
 
 This will:

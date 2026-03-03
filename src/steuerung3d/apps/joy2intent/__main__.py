@@ -23,7 +23,7 @@ log = logging.getLogger("joy2intent")
 
 def main() -> int:
     ap = argparse.ArgumentParser(prog="steuerung3d.apps.joy2intent")
-    ap.add_argument("--config", default="configs/joy2intent_gamepad.toml")
+    ap.add_argument("--config", default="configs/services/joy2intent.toml")
     ap.add_argument("--raw-in", default=None, help="Override RawControls UDP bind host:port")
     ap.add_argument("--intent-out", default=None, help="Override Intent UDP target host:port")
     ap.add_argument(
@@ -66,7 +66,6 @@ def main() -> int:
     lim = JoyLimits(
         max_winch_mps=cfg.max_winch_mps,
         fine_scale=cfg.fine_scale,
-        max_v=cfg.manual_max_v,
     )
 
     dt = 1.0 / max(1.0, cfg.tick_hz)

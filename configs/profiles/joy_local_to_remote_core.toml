@@ -21,7 +21,7 @@ argv = [
 enabled = true
 argv = [
   "python", "-m", "steuerung3d.apps.joy2intent",
-  "--config", "configs/joy2intent_bindings_gamepad.toml",
+  "--config", "configs/services/joy2intent.toml",
   "--raw-in", "{net.raw_controls}",
   "--intent-out", "{net.remote_intent}",
   "--winches", "Anton",

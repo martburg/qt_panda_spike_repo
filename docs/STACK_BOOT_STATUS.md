@@ -98,7 +98,7 @@ status_in = "127.0.0.1:51200"
 ```
 
 Joy2intent config is now bindings-only (axes live in the stack profile):
-- `configs/joy2intent_bindings_gamepad.toml`
+- `configs/services/joy2intent.toml`
 
 ---
 
