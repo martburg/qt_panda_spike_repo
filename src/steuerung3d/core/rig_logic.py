@@ -4,6 +4,7 @@ from dataclasses import asdict
 from typing import Dict, Tuple
 
 from steuerung3d.common.staleness import is_stale
+from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.core_mode import CoreMode, core_mode_value
 from steuerung3d.core.rig_types import RecoverPlan, RigMode, RigSyncConfig
 from steuerung3d.core.state import MachineState
@@ -28,6 +29,7 @@ def _normalize_rig_mode(value) -> RigMode:
 
 
 def ensure_densi(state: MachineState, device_id: str) -> None:
+    device_id = normalize_axis_id(device_id)
     if device_id not in state.densi_registry:
         # state.densi_registry is a first-class field on MachineState
         from steuerung3d.core.rig_types import DensiRuntime
@@ -37,6 +39,7 @@ def ensure_densi(state: MachineState, device_id: str) -> None:
 
 def note_densi_seen(state: MachineState, device_id: str, *, device_tick: int | None = None) -> None:
     """Mark device as seen this core tick."""
+    device_id = normalize_axis_id(device_id)
     ensure_densi(state, device_id)
     d = state.densi_registry[device_id]
     d.last_seen_core_tick = int(state.tick)
@@ -45,6 +48,7 @@ def note_densi_seen(state: MachineState, device_id: str, *, device_tick: int | N
 
 
 def densi_online(state: MachineState, device_id: str) -> bool:
+    device_id = normalize_axis_id(device_id)
     ensure_densi(state, device_id)
     d = state.densi_registry[device_id]
     timeout = int(state.densi_offline_after_ticks)

@@ -78,3 +78,11 @@ This file records *declared* semantic changes (RefOS Lane 2) made during stabili
 
 ### Tests
 - Updated `tests/unit/test_hip_runtime.py` fixture to include `TelemetrySnapshot.densis` so Hip runtime unit tests continue to model discovery.
+
+## 2026-03-03 — JogCartesian gated by RigMode.SYNC_ACTIVE
+
+**Change:** `JogCartesian` is now accepted only when the rig workflow is in `RigMode.SYNC_ACTIVE` (in addition to the existing requirements: LIVE core_mode, no ESTOP/FAULT, and matching rig lease).
+
+**Why:** Cartesian motion is defined as “rig/kinematics active” only during SYNC_ACTIVE; this prevents accidental cartesian motion during manual setup modes.
+
+**Tests:** `tests/test_jog_cartesian_gate.py`

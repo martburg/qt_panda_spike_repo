@@ -3,6 +3,7 @@ from __future__ import annotations
 from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.intent_handlers.lease import axis_lease_allows as _axis_lease_allows
 from steuerung3d.core.intents import EnableAxis, JogAxis, JogCartesian, JogWinch
+from steuerung3d.core.rig_types import RigMode
 from steuerung3d.core.state import MachineState
 
 
@@ -69,6 +70,11 @@ def handle_jog_cartesian(state: MachineState, intent: JogCartesian) -> None:
     lease_rig = str(getattr(state, "lease_rig", "") or "")
     if not lease_rig or (hip_id and lease_rig != hip_id):
         state.lease_last_denial_reason = "rig_lease_required"
+        return
+
+    rm = getattr(state, "rig_mode", RigMode.DISCOVERY)
+    if str(rm) != str(RigMode.SYNC_ACTIVE):
+        state.lease_last_denial_reason = "rig_mode_required:SYNC_ACTIVE"
         return
 
     vx = float(getattr(intent, "vx", 0.0))
