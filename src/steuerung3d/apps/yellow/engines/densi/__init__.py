@@ -20,7 +20,8 @@ def __getattr__(name: str):
     if name not in __all__:
         raise AttributeError(name)
 
-    from .engine import DenSiEngine, DenSiTickResult  # type: ignore
+    from .engine import DenSiEngine  # type: ignore
+    from .engine_types import DenSiTickResult  # type: ignore
     from .inputs import DensiEstopToggle, DensiInputs, DensiUiInputs  # type: ignore
     from .types import EStopState, L0Sub, L0Top  # type: ignore
     from .viewmodel import DensiViewModel, normalize_densi_view_model  # type: ignore

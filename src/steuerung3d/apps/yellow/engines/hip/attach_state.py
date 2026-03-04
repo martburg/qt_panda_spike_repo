@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from steuerung3d.core.axis_ids import normalize_axis_id
+
 from .types import HipAttachCombo, HipAttachInputs, HipAttachState
 
 NOT_ATTACHED = "NotAttached"
@@ -45,18 +47,25 @@ def build_attach_combo(
     fixed_applied: bool,
     lock_axis_combo: bool,
 ) -> tuple[HipAttachCombo, str, bool]:
+    # Normalize only for comparisons; keep canonical axis ids from `axis_ids`
+    # for downstream dict keys.
+    axis_norm_to_canon = {normalize_axis_id(a): a for a in (axis_ids or []) if a}
+    ui_axis_norm = normalize_axis_id(ui_axis)
+    fixed_axis_norm = normalize_axis_id(fixed_axis)
+    prev_selected_norm = normalize_axis_id(prev_selected)
+
     items = [NOT_ATTACHED] + list(axis_ids)
     combo_enabled = True
     combo_current = NOT_ATTACHED
 
-    if fixed_axis and fixed_axis in axis_ids:
-        selected_axis = fixed_axis
-        combo_current = fixed_axis
+    if fixed_axis_norm and fixed_axis_norm in axis_norm_to_canon:
+        selected_axis = axis_norm_to_canon[fixed_axis_norm]
+        combo_current = selected_axis
         fixed_applied = True
         combo_enabled = not (bool(lock_axis_combo) and fixed_applied)
     else:
-        if ui_axis in axis_ids:
-            selected_axis = ui_axis
+        if ui_axis_norm and ui_axis_norm in axis_norm_to_canon:
+            selected_axis = axis_norm_to_canon[ui_axis_norm]
         elif ui_axis == NOT_ATTACHED or not ui_axis:
             selected_axis = ""
         else:
@@ -64,8 +73,8 @@ def build_attach_combo(
 
         if ui_axis in items:
             combo_current = ui_axis
-        elif prev_selected in axis_ids:
-            combo_current = prev_selected
+        elif prev_selected_norm and prev_selected_norm in axis_norm_to_canon:
+            combo_current = axis_norm_to_canon[prev_selected_norm]
         else:
             combo_current = NOT_ATTACHED
 

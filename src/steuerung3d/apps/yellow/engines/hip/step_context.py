@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     # Only needed for type checking; avoids runtime import cycles.
     from .engine import HipEngine
 
+from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.intents import ClaimAxis, ReleaseAxis
 from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
 
@@ -51,27 +52,33 @@ def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepCon
     axis_ids = sorted(
         [str(dev_id) for dev_id, d in densis.items() if bool(getattr(d, "online", False))]
     )
+    axis_norm_to_canon = {normalize_axis_id(a): a for a in (axis_ids or []) if a}
 
     ui_axis = str(ui.axis_selected or "").strip()
+    ui_axis_norm = normalize_axis_id(ui_axis)
     if ui.axis_selection_changed:
         # Trust explicit user action.
         self.state.last_ui_axis_selected = ui_axis
     elif self.state.last_ui_axis_selected:
         # Sticky selection within a session (but not on cold boot).
         ui_axis = self.state.last_ui_axis_selected
+        ui_axis_norm = normalize_axis_id(ui_axis)
     else:
         # Cold boot: start unattached. Some Qt UIs may have a default combobox
         # selection (e.g. "Anton") even before the operator touches it.
         # Exception: when the joystick explicitly requests selection (select_hip),
         # we treat the provided axis as intentional.
-        if not (self.state.joy.select_hip and ui_axis and (ui_axis in axis_ids)):
+        if not (
+            self.state.joy.select_hip and ui_axis_norm and (ui_axis_norm in axis_norm_to_canon)
+        ):
             ui_axis = ""
+            ui_axis_norm = ""
 
-    fixed_axis = str(inputs.fixed_axis or "").strip()
-    prev_selected = str(self.state.selected_axis or "").strip()
+    fixed_axis = normalize_axis_id(inputs.fixed_axis)
+    prev_selected = normalize_axis_id(self.state.selected_axis)
     # If we were already attached to an axis that just went offline, keep it
     # visible in the picker so the operator can intentionally release it.
-    if prev_selected and prev_selected not in axis_ids:
+    if prev_selected and prev_selected not in axis_norm_to_canon:
         axis_ids = list(axis_ids) + [prev_selected]
     # Normalize/dedupe while keeping deterministic ordering.
     axis_ids = sorted({str(x) for x in axis_ids if str(x).strip()})

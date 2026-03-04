@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.intents import ParamEditBegin
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.telemetry import TelemetrySnapshot
@@ -101,7 +102,7 @@ class HipRuntime:
         self._lock_axis_combo: bool = False
 
     def set_fixed_axis(self, axis_id: str, *, lock_combo: bool = True) -> None:
-        self._fixed_axis = (axis_id or "").strip()
+        self._fixed_axis = normalize_axis_id(axis_id)
         self._lock_axis_combo = bool(lock_combo)
 
     def collect_inputs(

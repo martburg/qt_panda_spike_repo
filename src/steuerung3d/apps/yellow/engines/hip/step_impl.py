@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     # Only needed for type checking; avoids runtime import cycles.
     from .engine import HipEngine
 
+from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.intents import (
     ClaimAxis,
     EnableAxis,
@@ -76,9 +77,9 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     fixed_applied = ctx.fixed_applied
     intents: list[object] = list(ctx.intents)
 
-    fixed_axis = str(inputs.fixed_axis or "").strip()
-    axis_id = str(selected_axis or fixed_axis or "").strip()
-    attached = bool(selected_axis or fixed_axis)
+    fixed_axis = normalize_axis_id(inputs.fixed_axis)
+    axis_id = normalize_axis_id(selected_axis or fixed_axis)
+    attached = bool(selected_axis) or bool(fixed_axis)
     mode_now = str(getattr(snap, "core_mode", "") or "")
 
     motion_axis_id = axis_id

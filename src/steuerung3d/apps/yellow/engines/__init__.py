@@ -11,7 +11,8 @@ from typing import TYPE_CHECKING
 from .densi.types import EStopState, L0Sub, L0Top
 
 if TYPE_CHECKING:
-    from .densi.engine import DenSiEngine, DenSiTickResult
+    from .densi.engine import DenSiEngine
+    from .densi.engine_types import DenSiTickResult
     from .hip.engine import (
         HipAttachInputs,
         HipAttachState,
@@ -47,7 +48,8 @@ def __getattr__(name: str):
         raise AttributeError(name)
 
     if name in ("DenSiEngine", "DenSiTickResult"):
-        from .densi.engine import DenSiEngine, DenSiTickResult  # type: ignore
+        from .densi.engine import DenSiEngine  # type: ignore
+        from .densi.engine_types import DenSiTickResult  # type: ignore
 
         if name == "DenSiEngine":
             return DenSiEngine
