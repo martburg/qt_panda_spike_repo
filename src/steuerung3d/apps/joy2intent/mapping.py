@@ -16,7 +16,7 @@ JoyRig(winch_ids=[...]); we accept both for backward compatibility.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Protocol, Sequence, Set
+from typing import Any, Dict, List, Protocol, Sequence, Set
 
 from steuerung3d.core.intents import ClaimAxis, EnableAxis, JogWinch, JoyStateUpdate
 from steuerung3d.core.joy_state import clamp_soll_speed

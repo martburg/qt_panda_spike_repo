@@ -31,7 +31,9 @@ DeviceStep = Callable[[MachineState, CommandFrame, float], None]
 
 
 class LinkFactory(Protocol):
-    def __call__(self, *, bind: tuple[str, int], target: tuple[str, int]) -> Link: ...  # pragma: no cover
+    def __call__(
+        self, *, bind: tuple[str, int], target: tuple[str, int]
+    ) -> Link: ...  # pragma: no cover
 
 
 class CodecFactory(Protocol):

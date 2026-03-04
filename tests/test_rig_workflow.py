@@ -20,11 +20,11 @@ try:
     from steuerung3d.core.rig_logic import note_densi_seen
     from steuerung3d.core.rig_types import RigMode
 
-    ArmSync = getattr(_intents, "ArmSync")
-    EnterSync = getattr(_intents, "EnterSync")
-    SetDensiAnchor = getattr(_intents, "SetDensiAnchor")
-    SetDensiParticipating = getattr(_intents, "SetDensiParticipating")
-    SetRigMode = getattr(_intents, "SetRigMode")
+    ArmSync = _intents.ArmSync
+    EnterSync = _intents.EnterSync
+    SetDensiAnchor = _intents.SetDensiAnchor
+    SetDensiParticipating = _intents.SetDensiParticipating
+    SetRigMode = _intents.SetRigMode
 except Exception:  # noqa: BLE001
     pytest.skip(
         "Rig workflow not available in this milestone (deferred). "

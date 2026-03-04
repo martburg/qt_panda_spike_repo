@@ -17,6 +17,7 @@ This module does not touch Qt.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable, Mapping, Sequence
 
 from steuerung3d.core.state import MachineState
 
@@ -29,12 +30,14 @@ class DenSiParamOpsResult:
 def apply_densi_param_ops(
     *,
     state: MachineState,
-    param_ops: object,
+    # Accept both canonical ParamOp objects and legacy JSON-like dicts.
+    # coerce_param_ops performs the tolerance/cleaning.
+    param_ops: Sequence[object] | None,
     allow: bool,
-    normalize_pos_chain,
-    normalize_guider_range,
-    enforce_pos_chain,
-    enforce_guider_minmax,
+    normalize_pos_chain: Callable[[Mapping[str, float]], dict[str, float]],
+    normalize_guider_range: Callable[[Mapping[str, float]], dict[str, float]],
+    enforce_pos_chain: Callable[[Mapping[str, float]], dict[str, float]],
+    enforce_guider_minmax: Callable[[Mapping[str, float]], dict[str, float]],
 ) -> DenSiParamOpsResult:
     """Apply parameter ops to state.
 
@@ -51,7 +54,7 @@ def apply_densi_param_ops(
         coerce_param_ops,
     )
 
-    for op in coerce_param_ops(param_ops or []):
+    for op in coerce_param_ops(list(param_ops or [])):
         if not allow:
             continue
 
