@@ -11,7 +11,6 @@ def compute_attach_state(inputs: HipAttachInputs) -> HipAttachState:
     attached = bool(inputs.attached)
     modal_locked = bool(inputs.modal_locked)
     last_mode = str(inputs.last_mode or "").upper()
-    last_estate = str(inputs.last_estate or "").upper()
 
     if attached and modal_locked:
         tabs_enabled: bool | None = None

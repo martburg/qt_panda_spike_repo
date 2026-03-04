@@ -532,16 +532,18 @@ class DenSiEngine:
         except Exception:
             pass
 
-
     def update_cut_follow_live(self) -> None:
         """If armed, keep CutPos/CutVel tracking actual axis pos/vel.
 
-        Stops updating automatically once an E-Stop *cause* becomes active.
+        Stops updating automatically once we enter E-Stop.
+
+        Rationale: cut markers must freeze for the entire E-Stop episode
+        (CutPos/CutVel/CutTime form the baseline for PosDiff/stop metrics).
         """
         if not bool(self.cut_follow_live):
             return
-        if bool(getattr(self, "cause_active", False)):
-            # Freeze at the moment a cause hits.
+        if bool(getattr(self.state, "estop", False)):
+            # Freeze immediately on entry into E-Stop (and remain frozen).
             self.cut_follow_live = False
             return
 
@@ -563,7 +565,6 @@ class DenSiEngine:
             self.state.params["CutTime"] = float(self.cut_time_s)
         except Exception:
             pass
-
 
     # ---------------------------------------------------------------------
     # legacy/diagnostic meta helpers

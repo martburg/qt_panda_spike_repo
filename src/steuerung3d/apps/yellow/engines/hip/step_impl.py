@@ -52,7 +52,7 @@ from .types import (
     HipStepInputs,
     HipStepResult,
 )
-from .viewmodel import HipCutMarkersState, HipDriveStatusState
+from .viewmodel import HipDriveStatusState
 
 log = logging.getLogger("hi_p")
 
@@ -337,7 +337,7 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     resync_ignored = False
     resync_reason = ""
     if ui.resync_clicked:
-        if (str(mode_now).upper() != "IDLE"):
+        if str(mode_now).upper() != "IDLE":
             resync_ignored = True
             resync_reason = f"mode={str(mode_now)} estate={str(estate)}"
         else:

@@ -5,7 +5,6 @@ No semantic changes intended; this is a mechanical extraction from `engine.py`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -15,10 +14,8 @@ if TYPE_CHECKING:
 from steuerung3d.core.command_frame import CommandFrame
 
 from .drive_status import update_drive_status_words
-from .types import L0Top
-
-
 from .engine_types import DenSiTickResult
+from .types import L0Top
 
 
 def step(*, engine: "DenSiEngine", frames: list[CommandFrame], now_ns: int) -> DenSiTickResult:
@@ -44,10 +41,12 @@ def step(*, engine: "DenSiEngine", frames: list[CommandFrame], now_ns: int) -> D
     # If ReSync armed live baseline tracking, update CutPos/CutVel in IDLE.
     self.update_cut_follow_live()
 
-    # Latch cut markers at the moment an E-Stop *cause* first becomes active
-    # (trip bits / OK-chain fault). This is more robust than latching on the
-    # state.estop edge alone, because state.estop can be true at startup.
-    self.maybe_latch_cut_markers(bool(getattr(self, "cause_edge", False)))
+    # Latch cut markers on the transition into E-Stop.
+    #
+    # Contract: CutPos/CutVel/CutTime must freeze whenever we enter E-Stop.
+    # We therefore use the authoritative `estop_edge` computed from the
+    # ESTOP state machine rather than any "cause" detector.
+    self.maybe_latch_cut_markers(bool(estop_edge))
 
     # Step the plant: during E-Stop this models a Dcc-limited ramp-down.
     self.step_plant_with_clamp()
