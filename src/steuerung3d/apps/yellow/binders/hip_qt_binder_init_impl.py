@@ -6,10 +6,8 @@ from PySide6.QtWidgets import (
     QAbstractSlider,
     QCheckBox,
     QComboBox,
-    QFrame,
     QLineEdit,
     QPushButton,
-    QTabWidget,
     QWidget,
 )
 
@@ -38,6 +36,7 @@ from ..qtutil.ui_update import (
     set_state_property,
 )
 from ..qtutil.widget_cache import WidgetCache
+from .hip_qt_widgets import HipQtWidgets
 
 if TYPE_CHECKING:
     from .hip_qt_binder import HipQtBinder
@@ -45,6 +44,9 @@ if TYPE_CHECKING:
 
 def post_init(self: "HipQtBinder") -> None:
     self._wcache = WidgetCache(self.win)
+
+    # Central widget bundle (refactor seam)
+    self._widgets = HipQtWidgets.from_cache(self._wcache)
 
     # Param binder (Parameter tab)
     self._param_binder = ParamWidgetBinder(
@@ -55,15 +57,15 @@ def post_init(self: "HipQtBinder") -> None:
         cache=self._wcache,
     )
 
-    # --- Core widgets
-    self._tabs_main: QTabWidget | None = self._wcache.get(QTabWidget, "tabsMain")
-    self._cmbAxis: QComboBox | None = self._wcache.combo_box("cmbAxis")
+    # --- Core widgets (legacy attributes kept for compatibility)
+    self._tabs_main = self._widgets.tabs_main
+    self._cmbAxis = self._widgets.cmb_axis
     # Footer frame (exists in yellow3_merged.ui as name="frameFooter")
-    self._frame_footer: QFrame | None = self._wcache.get(QFrame, "frameFooter")
-    self._frame_header: QFrame | None = self._wcache.get(QFrame, "frameHeader")
+    self._frame_footer = self._widgets.frame_footer
+    self._frame_header = self._widgets.frame_header
 
     # Header + tick
-    self._txtTick: QLineEdit | None = self._wcache.line_edit("txtTick")
+    self._txtTick = self._widgets.txt_tick
     self._txt_hdr_banner_left: QLineEdit | None = self._wcache.line_edit("txtHdrBannerLeft")
     self._txt_hdr_banner_right: QLineEdit | None = self._wcache.line_edit("txtHdrBannerRight")
 
@@ -102,14 +104,14 @@ def post_init(self: "HipQtBinder") -> None:
     self._txtGuiderPitch = self._wcache.line_edit("txtPitch_2")
 
     # --- Sliders
-    self._sld_vel_cmd: QAbstractSlider | None = self._wcache.slider("sldVelCmd")
+    self._sld_vel_cmd = self._widgets.sld_vel_cmd
     self._sld_limit_range: QAbstractSlider | None = self._wcache.slider("sldLimitRange")
     self._sld_guider_range: QAbstractSlider | None = self._wcache.slider("sldGuiderRange")
     self._sld_guider_speed: QAbstractSlider | None = self._wcache.slider("sldGuiderSpeed")
 
     # Buttons
-    self._btn_estop_reset: QPushButton | None = self._wcache.button("btnEStopReset")
-    self._btn_diag_resync: QPushButton | None = self._wcache.button("btnDiagResync")
+    self._btn_estop_reset = self._widgets.btn_estop_reset
+    self._btn_diag_resync = self._widgets.btn_diag_resync
     self._btn_main_reset: QPushButton | None = self._wcache.button("btnMainReset")
     self._btn_guider_reset: QPushButton | None = self._wcache.button("btnGuiderReset")
 

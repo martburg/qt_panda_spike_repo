@@ -24,7 +24,7 @@ from steuerung3d.util.ratelimit import rl_log_exc
 # Optional structured status heartbeat (used by stack supervisor birds-eye)
 try:
     from steuerung3d.core.status import StatusEmitter  # type: ignore
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     StatusEmitter = None  # type: ignore
 
 from steuerung3d.core.axis_ids import normalize_axis_id

@@ -78,9 +78,7 @@ class DenSiPipelineMixin:
     def apply_param_ops(self, ready_for_sollvel: bool, moving: bool) -> dict[str, float]:
         cmd = self.ensure_last_cmd()
         allow_param_ops = (
-            self.l0_top == L0Top.CONNECTED
-            and (not bool(ready_for_sollvel))
-            and (not bool(moving))
+            self.l0_top == L0Top.CONNECTED and (not bool(ready_for_sollvel)) and (not bool(moving))
         )
 
         res = apply_densi_param_ops(

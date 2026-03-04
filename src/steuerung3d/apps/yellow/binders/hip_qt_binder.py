@@ -29,6 +29,7 @@ from ..engines.hip.engine import (
     HipViewModel,
 )
 from ..qtutil.modal_lock import ModalLock
+from .hip_qt_widgets import HipQtWidgets
 
 if TYPE_CHECKING:
     from ..panels.hip.hip_banner_render import HipBannerBindings
@@ -67,6 +68,7 @@ class HipQtBinder:
     _param_ui_bindings: ParamUiBindings | None = None
     _frame_footer: QFrame | None = None
     _frame_header: QFrame | None = None
+    _widgets: HipQtWidgets | None = None
 
     def __post_init__(self) -> None:
         _init_impl.post_init(self)

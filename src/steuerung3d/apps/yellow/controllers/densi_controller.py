@@ -20,7 +20,7 @@ from PySide6.QtWidgets import QWidget
 # Optional structured status heartbeat (used by stack supervisor birds-eye)
 try:
     from steuerung3d.core.status import StatusEmitter  # type: ignore
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     StatusEmitter = None  # type: ignore
 
 from ..binders.densi_qt_binder import DenSiQtBinder

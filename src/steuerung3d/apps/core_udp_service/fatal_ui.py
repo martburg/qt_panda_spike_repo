@@ -14,17 +14,22 @@ def show_fatal_modal(msg: str, *, title: str = "Steuerung3D – Core") -> None:
     try:
         import tkinter as _tk
         from tkinter import messagebox as _mb
+    except ImportError:
+        _tk = None  # type: ignore[assignment]
+        _mb = None  # type: ignore[assignment]
 
-        r = _tk.Tk()
-        r.withdraw()
-        _mb.showerror(title, msg)
+    if _tk is not None and _mb is not None:
         try:
-            r.destroy()
+            r = _tk.Tk()
+            r.withdraw()
+            _mb.showerror(title, msg)
+            try:
+                r.destroy()
+            except Exception:
+                pass
         except Exception:
+            # Headless (TclError) or other UI failure: ignore.
             pass
-    except Exception:
-        # Headless or tkinter unavailable
-        pass
 
     try:
         import sys as _sys

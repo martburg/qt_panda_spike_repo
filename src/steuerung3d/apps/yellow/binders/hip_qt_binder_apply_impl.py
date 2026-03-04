@@ -63,7 +63,8 @@ def apply_startup_state(b) -> None:
 
 
 def apply_tick_text(b, text: str) -> None:
-    safe_set_text(b._txtTick, text)
+    w = getattr(b, "_widgets", None)
+    safe_set_text(getattr(w, "txt_tick", None) if w is not None else b._txtTick, text)
 
 
 def apply_online_state(b, state: str | None) -> None:
@@ -74,15 +75,19 @@ def apply_online_state(b, state: str | None) -> None:
 
 def _set_joy_properties(b, deadman: bool, select_hip: bool) -> None:
     # Joy UI reflection: QSS uses joy_deadman/joy_select_hip dynamic properties.
-    if b._frame_footer is not None:
+    w = getattr(b, "_widgets", None)
+    frame_footer = getattr(w, "frame_footer", None) if w is not None else b._frame_footer
+    frame_header = getattr(w, "frame_header", None) if w is not None else b._frame_header
+
+    if frame_footer is not None:
         set_state_property(
-            b._frame_footer,
+            frame_footer,
             bool(deadman),
             prop=JOY_DEADMAN_PROP,
         )
-    if b._frame_header is not None:
+    if frame_header is not None:
         set_state_property(
-            b._frame_header,
+            frame_header,
             bool(select_hip),
             prop=JOY_SELECT_HIP_PROP,
         )
@@ -90,7 +95,9 @@ def _set_joy_properties(b, deadman: bool, select_hip: bool) -> None:
 
 def _apply_joy_speed(b, soll_speed: float) -> None:
     # sldVelCmd is display-only; updates are programmatic with signals blocked.
-    if b._sld_vel_cmd is None:
+    w = getattr(b, "_widgets", None)
+    sld = getattr(w, "sld_vel_cmd", None) if w is not None else b._sld_vel_cmd
+    if sld is None:
         return
     try:
         v = float(soll_speed or 0.0)
@@ -102,8 +109,8 @@ def _apply_joy_speed(b, soll_speed: float) -> None:
         v = 1.0
 
     try:
-        min_v = int(b._sld_vel_cmd.minimum())
-        max_v = int(b._sld_vel_cmd.maximum())
+        min_v = int(sld.minimum())
+        max_v = int(sld.maximum())
     except Exception:
         min_v = 0
         max_v = 0
@@ -112,7 +119,7 @@ def _apply_joy_speed(b, soll_speed: float) -> None:
         scale = max(abs(min_v), abs(max_v), 1000)
         min_v = -scale
         max_v = scale
-        update_slider(b._sld_vel_cmd, minimum=min_v, maximum=max_v)
+        update_slider(sld, minimum=min_v, maximum=max_v)
     else:
         scale = max(abs(min_v), abs(max_v))
         if scale <= 0:
@@ -123,7 +130,7 @@ def _apply_joy_speed(b, soll_speed: float) -> None:
         value = min_v
     elif value > max_v:
         value = max_v
-    update_slider(b._sld_vel_cmd, value=value)
+    update_slider(sld, value=value)
 
 
 # ------------------------------------------------------------------
@@ -132,7 +139,9 @@ def _apply_joy_speed(b, soll_speed: float) -> None:
 
 
 def _apply_attach_combo(b, vm: HipViewModel) -> None:
-    if vm.attach_combo is None or b._cmbAxis is None:
+    w = getattr(b, "_widgets", None)
+    cmb = getattr(w, "cmb_axis", None) if w is not None else b._cmbAxis
+    if vm.attach_combo is None or cmb is None:
         return
 
     # Items come from the engine (Qt-free) and already include the NOT_ATTACHED sentinel.
@@ -152,20 +161,20 @@ def _apply_attach_combo(b, vm: HipViewModel) -> None:
     if desired not in items:
         desired = NOT_ATTACHED
 
-    existing = [b._cmbAxis.itemText(i) for i in range(b._cmbAxis.count())]
-    need_rebuild = (existing != items) or (b._cmbAxis.currentText().strip() != desired)
+    existing = [cmb.itemText(i) for i in range(cmb.count())]
+    need_rebuild = (existing != items) or (cmb.currentText().strip() != desired)
 
     if need_rebuild:
         b._suppress_axis_signal = True
         try:
-            with block_signals(b._cmbAxis):
-                b._cmbAxis.clear()
-                b._cmbAxis.addItems(items)
-                b._cmbAxis.setCurrentText(desired)
+            with block_signals(cmb):
+                cmb.clear()
+                cmb.addItems(items)
+                cmb.setCurrentText(desired)
         finally:
             b._suppress_axis_signal = False
 
-    set_enabled(b._cmbAxis, bool(vm.attach_combo.enabled))
+    set_enabled(cmb, bool(vm.attach_combo.enabled))
 
 
 def _apply_attach_state(b, vm: HipViewModel) -> None:
