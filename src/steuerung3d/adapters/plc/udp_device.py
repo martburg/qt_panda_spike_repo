@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import socket
 from dataclasses import dataclass, field
-from typing import Optional, Tuple
+from typing import Optional, Protocol, Tuple
 
 from steuerung3d.adapters.plc.line_codec import PlcLineCodec, decode_tx_line
 from steuerung3d.core.command_frame import CommandFrame
@@ -26,9 +26,19 @@ class UdpPlcDevice:
     remote: Tuple[str, int] = ("127.0.0.1", 55001)
     timeout_s: float = 0.02
     codec: PlcLineCodec = field(default_factory=lambda: PlcLineCodec())
-    _sock: Optional[socket.socket] = None
 
-    def _ensure_sock(self) -> socket.socket:
+    class _SockLike(Protocol):
+        def settimeout(self, value: float) -> None: ...  # pragma: no cover
+
+        def sendto(self, data: bytes, addr: Tuple[str, int]) -> int: ...  # pragma: no cover
+
+        def recvfrom(self, bufsize: int) -> tuple[bytes, tuple[str, int]]: ...  # pragma: no cover
+
+        def close(self) -> None: ...  # pragma: no cover
+
+    _sock: Optional[_SockLike] = None
+
+    def _ensure_sock(self) -> _SockLike:
         if self._sock is None:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.settimeout(self.timeout_s)

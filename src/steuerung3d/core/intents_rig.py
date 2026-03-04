@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Literal
 
-ParamGroup = Literal["pos", "vel", "filter"]
+ParamGroup = Literal["pos", "vel", "filter", "guider"]
 
 
 @dataclass(frozen=True)

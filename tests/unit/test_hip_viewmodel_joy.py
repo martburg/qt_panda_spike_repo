@@ -67,6 +67,7 @@ def test_hip_viewmodel_joy_defaults() -> None:
 
     res = rt.tick(inputs=HipRuntimeInputs(snaps=[snap], now_ns=0, ui=_ui(axis_id)))
     vm = res.view_model
+    assert vm is not None
     assert vm.joy_deadman is False
     assert vm.joy_select_hip is False
     assert vm.joy_soll_speed == 0.0
@@ -80,6 +81,7 @@ def test_hip_viewmodel_joy_values_passthrough() -> None:
 
     res = rt.tick(inputs=HipRuntimeInputs(snaps=[snap], now_ns=0, ui=_ui(axis_id)))
     vm = res.view_model
+    assert vm is not None
     assert vm.joy_deadman is True
     assert vm.joy_select_hip is True
     assert vm.joy_soll_speed == -0.75

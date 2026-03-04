@@ -75,9 +75,9 @@ class HipCutMarkersState:
 @dataclass(frozen=True)
 class HipViewModel:
     tick_text: str
-    age_ms: int | None
+    age_ms: int | float | None
     stale: bool
-    lifetick_age: int | None
+    lifetick_age: int | float | None
     online_state: str | None
     estop: bool
     fault: bool

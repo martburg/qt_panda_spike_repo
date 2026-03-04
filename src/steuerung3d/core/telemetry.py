@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Mapping
 
 from steuerung3d.common.staleness import age_ticks, is_stale
 from steuerung3d.core.core_mode import core_mode_value
@@ -49,17 +49,17 @@ class TelemetrySnapshot:
     core_mode: str
     estop: bool
     fault: bool
-    axes: Dict[str, AxisTelemetry]
+    axes: Mapping[str, AxisTelemetry]
 
     # Rig workflow
     rig_mode: str = "DISCOVERY"
-    densis: Dict[str, DensiTelemetry] = field(default_factory=dict)
+    densis: Mapping[str, DensiTelemetry] = field(default_factory=dict)
 
     # Leases (Core-owned authority surface)
     lease_rig: str = ""
-    lease_axis: Dict[str, list[str]] = field(default_factory=dict)
+    lease_axis: Mapping[str, list[str]] = field(default_factory=dict)
     lease_rig_holder: str = ""
-    lease_axis_holders: Dict[str, list[str]] = field(default_factory=dict)
+    lease_axis_holders: Mapping[str, list[str]] = field(default_factory=dict)
     lease_denial_reason: str = ""
 
     # NEW
@@ -68,11 +68,11 @@ class TelemetrySnapshot:
     # Parameters (axis-agnostic v0.1)
     param_edit_active: bool = False
     param_edit_group: str = ""
-    params: Dict[str, float] = field(default_factory=dict)
+    params: Mapping[str, float] = field(default_factory=dict)
 
     # Raw PLC uplink payload (so HiP can decide what to use without changing decode again)
-    plc_uplink_fields: Dict[str, str] = field(default_factory=dict)  # base fields (pre-EOD)
-    plc_uplink_tail: Dict[str, str] = field(default_factory=dict)  # tail fields (post-EOD)
+    plc_uplink_fields: Mapping[str, str] = field(default_factory=dict)  # base fields (pre-EOD)
+    plc_uplink_tail: Mapping[str, str] = field(default_factory=dict)  # tail fields (post-EOD)
 
     # HIP<->Core transactional acks (one-shot)
     core_acks: list[str] = field(default_factory=list)

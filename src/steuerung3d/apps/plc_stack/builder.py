@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional, Protocol
 
+from steuerung3d.adapters.links.base import Link
 from steuerung3d.adapters.links.udp_link import UdpLink
 from steuerung3d.adapters.plc.multi_plc_device import MultiPlcDevice
 from steuerung3d.adapters.plc.plc_codec import PlcCodec
@@ -12,6 +13,7 @@ from steuerung3d.adapters.plc.plc_endpoint import PlcEndpoint
 from steuerung3d.adapters.plc.validate import validate_endpoints
 from steuerung3d.common.timebase import Timebase
 from steuerung3d.config.plc_stack_config import PlcStackConfig
+from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.state import MachineState
@@ -22,17 +24,18 @@ from steuerung3d.protocol.transport import InMemTransport
 # Types
 # --------------------
 
-DeviceStep = Callable[[MachineState, object, float], None]
+DeviceStep = Callable[[MachineState, CommandFrame, float], None]
 # Note: device_step signature in the current engine is (state, command_frame, dt).
-# We intentionally type 'command_frame' as 'object' here to keep the app boundary light.
+# We keep the app boundary lightweight elsewhere, but this typing avoids
+# contravariance issues in tests (a Callable expecting CommandFrame should be accepted).
 
 
 class LinkFactory(Protocol):
-    def __call__(self, *, bind: tuple[str, int], target: tuple[str, int]): ...  # pragma: no cover
+    def __call__(self, *, bind: tuple[str, int], target: tuple[str, int]) -> Link: ...  # pragma: no cover
 
 
 class CodecFactory(Protocol):
-    def __call__(self, *, spec: PlcWireSpec): ...  # pragma: no cover
+    def __call__(self, *, spec: PlcWireSpec) -> PlcCodec: ...  # pragma: no cover
 
 
 # --------------------

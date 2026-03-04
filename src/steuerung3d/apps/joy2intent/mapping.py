@@ -16,7 +16,7 @@ JoyRig(winch_ids=[...]); we accept both for backward compatibility.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Sequence, Set
+from typing import Any, Dict, Iterable, List, Protocol, Sequence, Set
 
 from steuerung3d.core.intents import ClaimAxis, EnableAxis, JogWinch, JoyStateUpdate
 from steuerung3d.core.joy_state import clamp_soll_speed
@@ -68,22 +68,30 @@ class JoyRig:
         return self.winches if self.winches else self.winch_ids
 
 
-@dataclass
-class JoyState:
-    # Previously enabled winches while deadman was held
-    enabled_winch_ids: Set[str] = field(default_factory=set)
-    deadman_prev: bool = False
+class JoyStateLike(Protocol):
+    """Structural contract for joy2intent policy state.
+
+    There are (at least) two JoyState dataclasses in this repo:
+      - steuerung3d.apps.joy2intent.state.JoyState (policy state used by app/tests)
+      - (legacy) a small JoyState shape used in earlier mapping iterations
+
+    Runtime code uses getattr to stay compatible; this Protocol gives Pyright a
+    stable surface so tests can pass their JoyState without nominal-type clashes.
+    """
+
+    prev_deadman: bool
+    prev_active_winch_idxs: Set[int]
 
 
-@dataclass(frozen=True)
-class JoyReport:
-    # Raw controller report used by tests
-    axes: List[float]
-    pressed: Set[int] = field(default_factory=set)
+class JoyReportLike(Protocol):
+    """Structural contract for raw controller input.
 
-    @classmethod
-    def from_parts(cls, axes: Sequence[float], pressed: Iterable[int] = ()) -> "JoyReport":
-        return cls(list(axes), set(pressed))
+    Tests pass RawControls (axes: list[float], buttons: list[int]).
+    Some call sites may pass a JoyReport-like object with .pressed.
+    """
+
+    axes: Sequence[float]
+    buttons: Sequence[int]
 
 
 def _apply_deadzone_and_expo(x: float, deadzone: float, expo: float) -> float:
@@ -140,8 +148,8 @@ def _axes(rc: Any) -> List[float]:
 
 
 def synthesize_intents(
-    st: JoyState,
-    rc: JoyReport,
+    st: JoyStateLike,
+    rc: JoyReportLike,
     bind: JoyBindings,
     rig: JoyRig,
     lim: JoyLimits,

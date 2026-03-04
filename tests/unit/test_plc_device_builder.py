@@ -17,10 +17,24 @@ class FakeUdpLink:
     def close(self) -> None:
         self.closed = True
 
+    # Minimal Link protocol surface (not used by this test, but keeps type-checkers happy)
+    def send(self, payload: bytes) -> None:  # pragma: no cover
+        return None
+
+    def poll(self, limit: int = 100) -> list[bytes]:  # pragma: no cover
+        return []
+
 
 class FakeCodec:
     def __init__(self, *, spec):
         self.spec = spec
+
+    # Minimal PlcCodec surface (not used by this test)
+    def encode_command_frame(self, _cmd) -> bytes:  # pragma: no cover
+        return b""
+
+    def try_decode_telemetry(self, _payload: bytes):  # pragma: no cover
+        return None
 
 
 def test_build_plc_device_constructs_endpoints_without_opening_sockets(tmp_path: Path) -> None:

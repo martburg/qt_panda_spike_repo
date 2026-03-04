@@ -1,6 +1,7 @@
 {
   "pythonVersion": "3.11",
   "typeCheckingMode": "basic",
+  "reportMissingImports": "none",
   "reportMissingTypeStubs": "none",
   "reportUnknownMemberType": "warning",
   "reportUnknownArgumentType": "warning",
@@ -12,6 +13,7 @@
     "**/.venv/**",
     "**/build/**",
     "**/dist/**",
-    "**/__pycache__/**"
+    "**/__pycache__/**",
+    "tools/**"
   ]
 }

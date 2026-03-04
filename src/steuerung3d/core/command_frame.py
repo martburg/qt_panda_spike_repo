@@ -12,7 +12,7 @@ class AxisSetpoint:
 
 # -------- Parameters (axis-agnostic, v0.1) --------
 
-ParamGroup = Literal["pos", "vel", "filter"]
+ParamGroup = Literal["pos", "vel", "filter", "guider"]
 
 
 @dataclass(frozen=True)
