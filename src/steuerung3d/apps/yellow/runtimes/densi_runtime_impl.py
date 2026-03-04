@@ -29,18 +29,12 @@ try:
 except Exception:  # pragma: no cover
     StatusEmitter = None  # type: ignore
 
-from ..domain.taster_edge_state import TasterEdgeState, update_taster_edge_state, within_brake_grace
 from ..engines.densi.engine import DenSiEngine
 from ..engines.densi.engine_types import DenSiTickResult
 from ..engines.densi.inputs import DensiInputs
 from ..engines.densi.viewmodel import DensiViewModel
-from ..panels.densi.densi_banner_vm import compute_densi_banner_vm
-from ..panels.densi.densi_cut_markers_vm import compute_densi_cut_markers_vm
-from ..panels.densi.densi_estop_dots_vm import compute_densi_estop_dots_vm
-from ..panels.densi.densi_header_online_vm import compute_densi_header_online_vm
-from ..panels.densi.densi_lifetick_vm import compute_densi_lifetick_vm
-from ..panels.densi.densi_readouts_vm import compute_densi_readouts_vm
 from .densi_runtime_types import DensiRuntimeResult
+from .densi_runtime_viewmodel import compute_densi_view_model
 
 
 class DensiRuntime:
@@ -431,87 +425,14 @@ class DensiRuntime:
         last_cmd_ns: int | None,
         seen_first_cmd: bool,
     ) -> DensiViewModel:
-        axis_id = self._axis_ids[0] if self._axis_ids else ""
-
-        header_online = compute_densi_header_online_vm(
-            seen_first_cmd=bool(seen_first_cmd),
+        return compute_densi_view_model(
+            engine=self.engine,
+            axis_ids=list(self._axis_ids or []),
+            force_refresh_checkboxes=bool(self._force_refresh_checkboxes),
             now_ns=int(now_ns),
+            tick_result=tick_result,
+            snap=snap,
+            last_cmd=last_cmd,
             last_cmd_ns=last_cmd_ns,
-            good_max_s=1.0,
-        )
-
-        lifetick_vm = compute_densi_lifetick_vm(state=self.engine.state, axis_id=axis_id)
-        readouts_vm = compute_densi_readouts_vm(
-            state=self.engine.state, axis_id=axis_id, last_cmd=last_cmd
-        )
-
-        # Cut markers: compute VM + apply effects (state.params + engine token)
-        try:
-            now_token = self.engine._now_token()  # pylint: disable=protected-access
-        except Exception:
-            now_token = ""
-        cut_vm = compute_densi_cut_markers_vm(
-            cut_valid=bool(getattr(self.engine, "cut_valid", False)),
-            estop_now=bool(getattr(self.engine.state, "estop", False)),
-            now_token=str(now_token),
-            systemtime_tok=str(getattr(self.engine, "systemtime_tok", "") or "") or None,
-            systemtime_param=str(self.engine.state.params.get("SystemTime", "") or "") or None,
-            cut_pos_m=float(getattr(self.engine, "cut_pos_m", 0.0) or 0.0)
-            if bool(getattr(self.engine, "cut_valid", False))
-            else None,
-            cut_vel_mps=float(getattr(self.engine, "cut_vel_mps", 0.0) or 0.0)
-            if bool(getattr(self.engine, "cut_valid", False))
-            else None,
-            pos_m=float(readouts_vm.pos_m) if readouts_vm is not None else None,
-        )
-        if cut_vm.effects.systemtime_tok is not None:
-            self.engine.systemtime_tok = cut_vm.effects.systemtime_tok
-            self.engine.state.params["SystemTime"] = cut_vm.effects.systemtime_tok
-        if cut_vm.effects.posdiff_for is not None:
-            try:
-                self.engine.state.params["PosDiffFor"] = float(cut_vm.effects.posdiff_for)
-            except Exception:
-                pass
-
-        # Estop dots + banner (display grace tracking)
-        bits = dict(getattr(tick_result, "estop_bits", {}) or {})
-        taster = bool(bits.get("taster", False))
-        ready = bool(bits.get("ready", False))
-
-        prev = bool(getattr(self.engine, "taster_prev_disp", taster))
-        pressed_s = getattr(self.engine, "taster_pressed_s", None)
-        st0 = TasterEdgeState(
-            prev=prev, pressed_s=pressed_s if pressed_s is None else float(pressed_s)
-        )
-        st1 = update_taster_edge_state(state=st0, taster=taster, now_s=float(time.monotonic()))
-        self.engine.taster_prev_disp = bool(st1.prev)
-        self.engine.taster_pressed_s = st1.pressed_s
-
-        within_grace = within_brake_grace(
-            state=st1,
-            now_s=float(time.monotonic()),
-            grace_s=float(getattr(self.engine, "brake_handoff_grace_s", 2.0)),
-        )
-
-        banner_vm = compute_densi_banner_vm(
-            estop_word=int(tick_result.estop_word), within_brake_grace=within_grace
-        )
-        estop_dots_vm = compute_densi_estop_dots_vm(
-            bits=bits,
-            taster=taster,
-            ready=ready,
-            within_brake_grace=within_grace,
-        )
-
-        return DensiViewModel(
-            header_online=header_online,
-            banner=banner_vm,
-            estop_dots=estop_dots_vm,
-            readouts=readouts_vm,
-            cut_markers=cut_vm,
-            lifetick=lifetick_vm,
-            estop_word=int(tick_result.estop_word),
-            refresh_checkboxes=bool(getattr(tick_result, "reset_able_changed", False))
-            or bool(self._force_refresh_checkboxes),
-            applied_param_values=dict(getattr(tick_result, "applied_param_values", {}) or {}),
+            seen_first_cmd=bool(seen_first_cmd),
         )
