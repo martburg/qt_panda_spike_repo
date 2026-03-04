@@ -1,14 +1,13 @@
-from __future__ import annotations
-
 """Rig/parameter intents.
 
 Split out of core/intents.py to reduce merge conflicts and keep intent families
 cohesive. The public surface remains re-exported from core/intents.py.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Dict, Literal
-
 
 ParamGroup = Literal["pos", "vel", "filter"]
 

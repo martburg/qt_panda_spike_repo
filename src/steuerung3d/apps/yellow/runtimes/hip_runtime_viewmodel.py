@@ -5,12 +5,12 @@ Split out of hip_runtime_impl.py to keep the runtime orchestrator readable.
 
 from __future__ import annotations
 
+from ..domain.ui_estop import infer_estop_profile
 from ..engines.hip.types import HipPresentationData
 from ..engines.hip.viewmodel import HipViewModel
 from ..panels.hip.hip_banner_vm import compute_hip_banner_vm
 from ..panels.hip.hip_estop_vm import compute_hip_estop_vm
 from ..panels.hip.hip_header_dots_vm import compute_hip_header_dots_vm
-from ..domain.ui_estop import infer_estop_profile
 
 
 def assemble_legacy_view_model(pres: HipPresentationData) -> HipViewModel:

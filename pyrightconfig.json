@@ -1,8 +1,17 @@
 {
-  "include": ["src"],
-  "exclude": ["**/__pycache__", ".run"],
   "pythonVersion": "3.11",
   "typeCheckingMode": "basic",
-  "reportMissingImports": "warning",
-  "reportMissingTypeStubs": "none"
+  "reportMissingTypeStubs": "none",
+  "reportUnknownMemberType": "warning",
+  "reportUnknownArgumentType": "warning",
+  "reportUnknownVariableType": "warning",
+  "reportUntypedFunctionDecorator": "none",
+  "reportPrivateUsage": "none",
+  "exclude": [
+    "**/.run/**",
+    "**/.venv/**",
+    "**/build/**",
+    "**/dist/**",
+    "**/__pycache__/**"
+  ]
 }

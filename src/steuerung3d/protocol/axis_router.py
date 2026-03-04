@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Mapping, Optional, Protocol
 
+from steuerung3d.core.axis_id import normalize_axis_id
 from steuerung3d.core.command_frame import CommandFrame, ParamOp, coerce_param_ops
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.telemetry import TelemetrySnapshot
@@ -51,6 +52,24 @@ class AxisRouter:
     last_dev_param_commit_status_by_axis: Dict[str, str] = field(default_factory=dict)
     last_dev_param_commit_age_ticks_by_axis: Dict[str, int] = field(default_factory=dict)
     last_dev_param_commit_unmatched_by_axis: Dict[str, List[str]] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # Canonicalize axis ids at the boundary so downstream dict keys stay stable.
+        self.axis_ids = [
+            normalize_axis_id(a) for a in (self.axis_ids or []) if normalize_axis_id(a)
+        ]
+
+        # Keep routing dicts aligned to the canonical ids.
+        self.dev_cmd_out_by_axis = {
+            normalize_axis_id(k): v
+            for k, v in dict(self.dev_cmd_out_by_axis or {}).items()
+            if normalize_axis_id(k)
+        }
+        self.ui_telem_out_by_axis = {
+            normalize_axis_id(k): v
+            for k, v in dict(self.ui_telem_out_by_axis or {}).items()
+            if normalize_axis_id(k)
+        }
 
     # --------------------
     # Command routing
@@ -116,7 +135,7 @@ class AxisRouter:
                 k: Optional[str] = None
                 axes_keys = list(getattr(s, "axes", {}).keys())
                 if len(axes_keys) == 1:
-                    k = str(axes_keys[0])
+                    k = normalize_axis_id(axes_keys[0])
                 else:
                     k = None
                 if not k:

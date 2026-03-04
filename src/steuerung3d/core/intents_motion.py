@@ -1,14 +1,13 @@
-from __future__ import annotations
-
 """Operator motion intents.
 
 Split out of core/intents.py to reduce merge conflicts and keep intent families
 cohesive. The public surface remains re-exported from core/intents.py.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Literal
-
 
 # Keep "type" as an explicit discriminant: easy for codecs + pattern matching.
 

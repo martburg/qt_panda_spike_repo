@@ -154,3 +154,44 @@ def test_router_slices_ui_snapshot_and_pins_device_scoped_fields():
     assert sy.estop_status_word == 0
     assert sy.param_edit_active is False
     assert sy.params == {}
+
+
+def test_axis_router_normalizes_axis_ids_and_ingest_keys() -> None:
+    # Router should canonicalize axis ids so mixed-case inputs do not create
+    # duplicate dict keys across the pipeline.
+    axis_ids = [" ANton "]
+    a_out = _CmdSink([])
+    t_a = _TelemSink([])
+
+    router = AxisRouter(
+        axis_ids=axis_ids,
+        dev_cmd_out_by_axis={"anton": a_out},
+        ui_telem_out_by_axis={"ANTON": t_a},
+    )
+
+    assert router.axis_ids == ["Anton"]
+    assert list(router.dev_cmd_out_by_axis.keys()) == ["Anton"]
+    assert list(router.ui_telem_out_by_axis.keys()) == ["Anton"]
+
+    dev_snap = TelemetrySnapshot(
+        tick=1,
+        t_s=0.0,
+        core_mode="LIVE",
+        estop=False,
+        fault=False,
+        axes={"aNToN": AxisTelemetry(pos=0.0, vel=0.0, enabled=True, fault=False)},
+        rig_mode="DISCOVERY",
+        densis={},
+        estop_status_word=1,
+        param_edit_active=False,
+        param_edit_group="",
+        params={"p": 1.0},
+        core_acks=[],
+        param_commit_req_id="",
+        param_commit_group="",
+        param_commit_status="idle",
+        param_commit_age_ticks=0,
+        param_commit_unmatched=[],
+    )
+    router.ingest_device_telemetry([dev_snap])
+    assert router.last_dev_estop_word_by_axis.get("Anton") == 1
