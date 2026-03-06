@@ -38,8 +38,8 @@ class JoyState:
     selected_axes: Tuple[str, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, 'soll_speed', clamp_soll_speed(self.soll_speed))
-        object.__setattr__(self, 'selected_axes', _coerce_selected_axes(self.selected_axes))
+        object.__setattr__(self, "soll_speed", clamp_soll_speed(self.soll_speed))
+        object.__setattr__(self, "selected_axes", _coerce_selected_axes(self.selected_axes))
 
     def selected_for_axis(self, axis_id: object) -> bool:
         axis_norm = normalize_axis_id(axis_id)

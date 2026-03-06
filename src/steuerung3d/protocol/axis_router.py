@@ -258,7 +258,6 @@ class AxisRouter:
             joy=getattr(snap, "joy", JoyState()),
         )
 
-
     def _project_joy_for_axis(self, snap: TelemetrySnapshot, axis_id: str) -> JoyState:
         joy = getattr(snap, "joy", JoyState())
         if not isinstance(joy, JoyState):
@@ -291,17 +290,48 @@ class AxisRouter:
             params=dict(getattr(snap, "params", {}) or {}),
             plc_uplink_fields=dict(getattr(snap, "plc_uplink_fields", {}) or {}),
             plc_uplink_tail=dict(getattr(snap, "plc_uplink_tail", {}) or {}),
-            axis_estop_status_word={str(k): int(v) for k, v in dict(self.last_dev_estop_word_by_axis or {}).items()},
-            axis_param_edit_active={str(k): bool(v) for k, v in dict(self.last_dev_param_edit_active_by_axis or {}).items()},
-            axis_param_edit_group={str(k): str(v) for k, v in dict(self.last_dev_param_edit_group_by_axis or {}).items()},
-            axis_params={str(k): dict(v or {}) for k, v in dict(self.last_dev_params_by_axis or {}).items()},
-            axis_plc_uplink_fields={str(k): dict(v or {}) for k, v in dict(self.last_dev_plc_uplink_fields_by_axis or {}).items()},
-            axis_plc_uplink_tail={str(k): dict(v or {}) for k, v in dict(self.last_dev_plc_uplink_tail_by_axis or {}).items()},
-            axis_param_commit_req_id={str(k): str(v) for k, v in dict(self.last_dev_param_commit_req_id_by_axis or {}).items()},
-            axis_param_commit_group={str(k): str(v) for k, v in dict(self.last_dev_param_commit_group_by_axis or {}).items()},
-            axis_param_commit_status={str(k): str(v) for k, v in dict(self.last_dev_param_commit_status_by_axis or {}).items()},
-            axis_param_commit_age_ticks={str(k): int(v) for k, v in dict(self.last_dev_param_commit_age_ticks_by_axis or {}).items()},
-            axis_param_commit_unmatched={str(k): list(v or []) for k, v in dict(self.last_dev_param_commit_unmatched_by_axis or {}).items()},
+            axis_estop_status_word={
+                str(k): int(v) for k, v in dict(self.last_dev_estop_word_by_axis or {}).items()
+            },
+            axis_param_edit_active={
+                str(k): bool(v)
+                for k, v in dict(self.last_dev_param_edit_active_by_axis or {}).items()
+            },
+            axis_param_edit_group={
+                str(k): str(v)
+                for k, v in dict(self.last_dev_param_edit_group_by_axis or {}).items()
+            },
+            axis_params={
+                str(k): dict(v or {}) for k, v in dict(self.last_dev_params_by_axis or {}).items()
+            },
+            axis_plc_uplink_fields={
+                str(k): dict(v or {})
+                for k, v in dict(self.last_dev_plc_uplink_fields_by_axis or {}).items()
+            },
+            axis_plc_uplink_tail={
+                str(k): dict(v or {})
+                for k, v in dict(self.last_dev_plc_uplink_tail_by_axis or {}).items()
+            },
+            axis_param_commit_req_id={
+                str(k): str(v)
+                for k, v in dict(self.last_dev_param_commit_req_id_by_axis or {}).items()
+            },
+            axis_param_commit_group={
+                str(k): str(v)
+                for k, v in dict(self.last_dev_param_commit_group_by_axis or {}).items()
+            },
+            axis_param_commit_status={
+                str(k): str(v)
+                for k, v in dict(self.last_dev_param_commit_status_by_axis or {}).items()
+            },
+            axis_param_commit_age_ticks={
+                str(k): int(v)
+                for k, v in dict(self.last_dev_param_commit_age_ticks_by_axis or {}).items()
+            },
+            axis_param_commit_unmatched={
+                str(k): list(v or [])
+                for k, v in dict(self.last_dev_param_commit_unmatched_by_axis or {}).items()
+            },
             core_acks=list(getattr(snap, "core_acks", [])),
             param_commit_req_id=str(getattr(snap, "param_commit_req_id", "")),
             param_commit_group=str(getattr(snap, "param_commit_group", "")),

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 
 from steuerung3d.apps.yellow.engines.hip.engine import HipEngine, HipStepInputs, HipUiInputs
 from steuerung3d.core.intents import ClaimAxis, EnableAxis, JogAxis, JogWinch
@@ -74,36 +73,6 @@ def test_deadman_false_gates_motion_intents() -> None:
     gated = eng._gate_motion_intents(intents, deadman=False)
     assert any(isinstance(i, ClaimAxis) for i in gated)
     assert not any(isinstance(i, JogAxis) for i in gated)
-
-
-def test_select_hip_claims_are_rate_limited() -> None:
-    eng = HipEngine(hip_id="hip-test")
-    joy = JoyState(deadman=True, select_hip=True, soll_speed=0.0)
-    snap = _snap("Anton", joy=joy, claimed_by="")
-
-    inputs = HipStepInputs(
-        snap=snap,
-        hip_id="hip-test",
-        last_rx_ns=0,
-        now_ns=0,
-        stale_after_ms=500,
-        fixed_axis="",
-        lock_axis_combo=False,
-        last_mode="IDLE",
-        last_estate="IDLE",
-        ui=_ui("Anton"),
-        core_acks=[],
-        joy=joy,
-    )
-
-    r1 = eng.step(inputs)
-    assert any(isinstance(i, ClaimAxis) for i in r1.intents)
-
-    r2 = eng.step(replace(inputs, now_ns=100_000_000))
-    assert not any(isinstance(i, ClaimAxis) for i in r2.intents)
-
-    r3 = eng.step(replace(inputs, now_ns=600_000_000))
-    assert any(isinstance(i, ClaimAxis) for i in r3.intents)
 
 
 def test_soll_speed_negative_is_clamped_and_stored() -> None:

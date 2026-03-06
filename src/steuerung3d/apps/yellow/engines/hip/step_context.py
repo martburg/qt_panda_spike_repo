@@ -10,8 +10,9 @@ if TYPE_CHECKING:
 from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.intents import ClaimAxis, ReleaseAxis
 from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
+from steuerung3d.core.telemetry import DensiTelemetry
 
-from .attach_state import build_attach_combo
+from .attach_state import NOT_ATTACHED, build_attach_combo
 from .types import HipAttachCombo, HipStepInputs
 
 
@@ -27,6 +28,58 @@ class StepContext:
     intents: list[object]
 
 
+def _claim_owner_by_axis(*, densis: dict[str, DensiTelemetry], axis_id: str) -> str:
+    d = densis.get(str(axis_id or ""))
+    if d is None:
+        return ""
+    return str(getattr(d, "claimed_by_hip", "") or "")
+
+
+def _visible_axis_ids_for_hip(
+    *, densis: dict[str, DensiTelemetry], hip_id: str, prev_selected: str
+) -> list[str]:
+    visible: list[str] = []
+    hip_id = str(hip_id or "")
+    prev_selected = str(prev_selected or "")
+
+    for dev_id, d in densis.items():
+        axis_id = str(dev_id or "").strip()
+        if not axis_id:
+            continue
+
+        owner = str(getattr(d, "claimed_by_hip", "") or "")
+        online = bool(getattr(d, "online", False))
+
+        if online and owner in ("", hip_id):
+            visible.append(axis_id)
+            continue
+
+        if axis_id == prev_selected and owner == hip_id:
+            visible.append(axis_id)
+
+    return sorted({x for x in visible if x.strip()})
+
+
+def _authoritative_selected_axis(
+    *, densis: dict[str, DensiTelemetry], hip_id: str, selected_axis: str, prev_selected: str
+) -> str:
+    hip_id = str(hip_id or "")
+    selected_axis = str(selected_axis or "")
+    prev_selected = str(prev_selected or "")
+
+    if selected_axis:
+        owner = _claim_owner_by_axis(densis=densis, axis_id=selected_axis)
+        if owner == hip_id:
+            return selected_axis
+
+    if prev_selected:
+        owner = _claim_owner_by_axis(densis=densis, axis_id=prev_selected)
+        if owner == hip_id:
+            return prev_selected
+
+    return ""
+
+
 def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepContext:
     """Normalize HiP step inputs into a small, testable context object."""
     self = engine
@@ -40,35 +93,29 @@ def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepCon
         deadman=bool(getattr(joy_in, "deadman", False)),
         select_hip=bool(getattr(joy_in, "select_hip", False)),
         soll_speed=clamp_soll_speed(getattr(joy_in, "soll_speed", 0.0)),
-        selected_axes=tuple(getattr(joy_in, "selected_axes", ()) or ()),
     )
     if getattr(self._param_txn, "hip_id", "") != hip_id:
         self._param_txn.hip_id = hip_id
 
-    # Axis picker should present *live* DenSi devices only.
-    # TelemetrySnapshot.densis is Core's discovery registry ("seen recently"),
-    # whereas snap.axes may include configured axes even when no DenSi is running.
-    densis = getattr(snap, "densis", None)
-    densis = densis if isinstance(densis, dict) else {}
-    axis_ids = sorted(
-        [str(dev_id) for dev_id, d in densis.items() if bool(getattr(d, "online", False))]
+    densis_raw = getattr(snap, "densis", None)
+    densis = densis_raw if isinstance(densis_raw, dict) else {}
+
+    prev_selected = str(self.state.selected_axis or "")
+    axis_ids = _visible_axis_ids_for_hip(
+        densis=densis,
+        hip_id=hip_id,
+        prev_selected=prev_selected,
     )
     axis_norm_to_canon = {normalize_axis_id(a): a for a in (axis_ids or []) if a}
 
     ui_axis = str(ui.axis_selected or "").strip()
     ui_axis_norm = normalize_axis_id(ui_axis)
     if ui.axis_selection_changed:
-        # Trust explicit user action.
         self.state.last_ui_axis_selected = ui_axis
     elif self.state.last_ui_axis_selected:
-        # Sticky selection within a session (but not on cold boot).
         ui_axis = self.state.last_ui_axis_selected
         ui_axis_norm = normalize_axis_id(ui_axis)
     else:
-        # Cold boot: start unattached. Some Qt UIs may have a default combobox
-        # selection (e.g. "Anton") even before the operator touches it.
-        # Exception: when the joystick explicitly requests selection (select_hip),
-        # we treat the provided axis as intentional.
         if not (
             self.state.joy.select_hip and ui_axis_norm and (ui_axis_norm in axis_norm_to_canon)
         ):
@@ -76,13 +123,6 @@ def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepCon
             ui_axis_norm = ""
 
     fixed_axis = normalize_axis_id(inputs.fixed_axis)
-    prev_selected = normalize_axis_id(self.state.selected_axis)
-    # If we were already attached to an axis that just went offline, keep it
-    # visible in the picker so the operator can intentionally release it.
-    if prev_selected and prev_selected not in axis_norm_to_canon:
-        axis_ids = list(axis_ids) + [prev_selected]
-    # Normalize/dedupe while keeping deterministic ordering.
-    axis_ids = sorted({str(x) for x in axis_ids if str(x).strip()})
     fixed_applied = bool(self.state.fixed_axis_applied)
 
     attach_combo, selected_axis, fixed_applied = build_attach_combo(
@@ -93,6 +133,35 @@ def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepCon
         fixed_applied=bool(fixed_applied),
         lock_axis_combo=bool(inputs.lock_axis_combo),
     )
+
+    authoritative_axis = _authoritative_selected_axis(
+        densis=densis,
+        hip_id=hip_id,
+        selected_axis=selected_axis,
+        prev_selected=prev_selected,
+    )
+
+    if ui.axis_selection_changed:
+        requested = str(ui.axis_selected or "").strip()
+        illegal_foreign_request = bool(
+            requested and requested != NOT_ATTACHED and requested not in axis_ids
+        )
+        if illegal_foreign_request:
+            selected_axis = authoritative_axis
+            attach_combo = HipAttachCombo(
+                items=list(attach_combo.items),
+                current=str(selected_axis or NOT_ATTACHED),
+                enabled=bool(attach_combo.enabled),
+                fixed_axis_applied=bool(attach_combo.fixed_axis_applied),
+            )
+    else:
+        selected_axis = authoritative_axis
+        attach_combo = HipAttachCombo(
+            items=list(attach_combo.items),
+            current=str(selected_axis or NOT_ATTACHED),
+            enabled=bool(attach_combo.enabled),
+            fixed_axis_applied=bool(attach_combo.fixed_axis_applied),
+        )
 
     intents: list[object] = []
     if ui.axis_selection_changed:

@@ -129,7 +129,9 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
     joy_in = payload.get("joy", {})
     joy = JoyState()
     if isinstance(joy_in, dict):
-        selected_axes = tuple(str(x) for x in list(joy_in.get("selected_axes", ())) if str(x).strip())
+        selected_axes = tuple(
+            str(x) for x in list(joy_in.get("selected_axes", ())) if str(x).strip()
+        )
         joy = JoyState(
             deadman=bool(joy_in.get("deadman", False)),
             select_hip=bool(joy_in.get("select_hip", False)) or bool(selected_axes),
@@ -179,17 +181,47 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
         plc_uplink_tail={
             str(k): str(v) for k, v in dict(payload.get("plc_uplink_tail", {})).items()
         },
-        axis_estop_status_word={str(k): int(v) for k, v in dict(payload.get("axis_estop_status_word", {})).items()},
-        axis_param_edit_active={str(k): bool(v) for k, v in dict(payload.get("axis_param_edit_active", {})).items()},
-        axis_param_edit_group={str(k): str(v) for k, v in dict(payload.get("axis_param_edit_group", {})).items()},
-        axis_params={str(k): {str(pk): float(pv) for pk, pv in dict(v).items()} for k, v in dict(payload.get("axis_params", {})).items() if isinstance(v, dict)},
-        axis_plc_uplink_fields={str(k): {str(pk): str(pv) for pk, pv in dict(v).items()} for k, v in dict(payload.get("axis_plc_uplink_fields", {})).items() if isinstance(v, dict)},
-        axis_plc_uplink_tail={str(k): {str(pk): str(pv) for pk, pv in dict(v).items()} for k, v in dict(payload.get("axis_plc_uplink_tail", {})).items() if isinstance(v, dict)},
-        axis_param_commit_req_id={str(k): str(v) for k, v in dict(payload.get("axis_param_commit_req_id", {})).items()},
-        axis_param_commit_group={str(k): str(v) for k, v in dict(payload.get("axis_param_commit_group", {})).items()},
-        axis_param_commit_status={str(k): str(v) for k, v in dict(payload.get("axis_param_commit_status", {})).items()},
-        axis_param_commit_age_ticks={str(k): int(v) for k, v in dict(payload.get("axis_param_commit_age_ticks", {})).items()},
-        axis_param_commit_unmatched={str(k): [str(x) for x in list(v)] for k, v in dict(payload.get("axis_param_commit_unmatched", {})).items() if isinstance(v, (list, tuple))},
+        axis_estop_status_word={
+            str(k): int(v) for k, v in dict(payload.get("axis_estop_status_word", {})).items()
+        },
+        axis_param_edit_active={
+            str(k): bool(v) for k, v in dict(payload.get("axis_param_edit_active", {})).items()
+        },
+        axis_param_edit_group={
+            str(k): str(v) for k, v in dict(payload.get("axis_param_edit_group", {})).items()
+        },
+        axis_params={
+            str(k): {str(pk): float(pv) for pk, pv in dict(v).items()}
+            for k, v in dict(payload.get("axis_params", {})).items()
+            if isinstance(v, dict)
+        },
+        axis_plc_uplink_fields={
+            str(k): {str(pk): str(pv) for pk, pv in dict(v).items()}
+            for k, v in dict(payload.get("axis_plc_uplink_fields", {})).items()
+            if isinstance(v, dict)
+        },
+        axis_plc_uplink_tail={
+            str(k): {str(pk): str(pv) for pk, pv in dict(v).items()}
+            for k, v in dict(payload.get("axis_plc_uplink_tail", {})).items()
+            if isinstance(v, dict)
+        },
+        axis_param_commit_req_id={
+            str(k): str(v) for k, v in dict(payload.get("axis_param_commit_req_id", {})).items()
+        },
+        axis_param_commit_group={
+            str(k): str(v) for k, v in dict(payload.get("axis_param_commit_group", {})).items()
+        },
+        axis_param_commit_status={
+            str(k): str(v) for k, v in dict(payload.get("axis_param_commit_status", {})).items()
+        },
+        axis_param_commit_age_ticks={
+            str(k): int(v) for k, v in dict(payload.get("axis_param_commit_age_ticks", {})).items()
+        },
+        axis_param_commit_unmatched={
+            str(k): [str(x) for x in list(v)]
+            for k, v in dict(payload.get("axis_param_commit_unmatched", {})).items()
+            if isinstance(v, (list, tuple))
+        },
         core_acks=[str(x) for x in list(payload.get("core_acks", []))],
         # observed param commit status (optional)
         param_commit_req_id=str(payload.get("param_commit_req_id", "")),

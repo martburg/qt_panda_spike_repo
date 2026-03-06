@@ -148,32 +148,21 @@ This file records *declared* semantic changes (RefOS Lane 2) made during stabili
 - `src/steuerung3d/apps/yellow/engines/densi/plc_anton_vel_cmd.py`
 - `src/steuerung3d/apps/yellow/engines/densi/param_defaults.py`
 
-
-## 2026-03-06 — Global deadman + multi-lane joystick selection foundation
+## 2026-03-06 — Stable HiP device telemetry projection in multi-HiP fanout
 
 **Lane:** 2 (Declared Semantic Fix)
 
 ### Change
-- Keep HiP↔DenSi attachment as the structural ownership model.
-- Keep joystick deadman as a **global** signal.
-- Extend `JoyState` / `JoyStateUpdate` with `selected_axes` so the console can select
-  multiple attached lanes at once.
-- Preserve legacy `select_hip` as the aggregate “any lane selected” compatibility flag.
-- `joy2intent` no longer collapses multi-select to a single lowest-index target.
-- `AxisRouter` projects per-axis selected state into sliced HiP telemetry while preserving
-  optional full-snapshot fanout support.
+- In fanout mode, shared pool telemetry continues to be broadcast to all HiPs, but the top-level device-scoped surface (`params`, PLC uplink fields/tail, estop word, param commit state) is now projected per HiP from its attached axis only.
+- If a HiP is unattached, the device-scoped top-level telemetry surface is cleared instead of drifting between whichever DenSi updated last.
+- HiP presentation and parameter/session UI now consume the axis-scoped view rather than the raw shared fanout snapshot.
 
 ### Motivation
-- The real console controls the whole system, not one private HiP.
-- Deadman applies globally, while select buttons choose which attached lanes receive live motion.
-- HiP UI must continue to show deadman and selected state, but selected state must now reflect
-  whether the attached lane is among the currently selected console lanes.
+- Fix manual smoke-test bug where HiP readouts switched unpredictably between DenSis, including while unattached.
+- Keep shared discovery/global pool visibility while making the main device panel stable and authoritative per HiP.
 
 ### Files
-- `src/steuerung3d/core/joy_state.py`
-- `src/steuerung3d/core/intents_meta.py`
-- `src/steuerung3d/core/intent_routes/control.py`
-- `src/steuerung3d/protocol/codec.py`
-- `src/steuerung3d/protocol/axis_router.py`
-- `src/steuerung3d/apps/joy2intent/mapping.py`
-- `src/steuerung3d/apps/yellow/engines/hip/step_context.py`
+- `src/steuerung3d/core/telemetry_axis_view.py`
+- `src/steuerung3d/apps/yellow/engines/hip/step_impl.py`
+- `tests/test_telemetry_axis_view.py`
+- `tests/test_hip_fanout_presentation.py`

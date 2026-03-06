@@ -104,7 +104,8 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
             # Single-axis bring-up: avoid ambiguous selection mapping.
             motion_axis_id = actionable[0]
 
-    snap_view = axis_scoped_snapshot(snap, axis_id or motion_axis_id)
+    presentation_axis_id = axis_id if attached else ""
+    snap_view = axis_scoped_snapshot(snap, presentation_axis_id)
     params = getattr(snap_view, "params", {}) or {}
 
     now_s = float(inputs.now_ns) / 1e9
@@ -280,7 +281,7 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
         prev_device_tick=prev_device_tick,
     )
 
-    lifetick_age = get_lifetick_age(snap=snap_view, axis_id=axis_id)
+    lifetick_age = get_lifetick_age(snap=snap, axis_id=axis_id)
     online_state = None
     if lifetick_age is not None:
         online_state = age_to_online_state(age=float(lifetick_age), good_max=30.0, warn_max=500.0)
@@ -292,7 +293,7 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
         age_ms = int((int(inputs.now_ns) - int(inputs.last_rx_ns)) / 1_000_000.0)
     stale = (age_ms is None) or (age_ms >= int(inputs.stale_after_ms))
 
-    main_text, slave_text = compute_drive_status_texts(snap=snap_view, axis_id=axis_id)
+    main_text, slave_text = compute_drive_status_texts(snap=snap, axis_id=axis_id)
     drive_status_summary = f"{main_text}|{slave_text}" if (main_text or slave_text) else ""
     drive_status = HipDriveStatusState(main_text=str(main_text), slave_text=str(slave_text))
 
