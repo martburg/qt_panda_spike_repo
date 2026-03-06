@@ -166,3 +166,8 @@ This file records *declared* semantic changes (RefOS Lane 2) made during stabili
 - `src/steuerung3d/apps/yellow/engines/hip/step_impl.py`
 - `tests/test_telemetry_axis_view.py`
 - `tests/test_hip_fanout_presentation.py`
+
+- 2026-03-06 Lane 2: separate attachment from live console lane selection. JoyState/JoyStateUpdate now carry selected_axes; joy2intent emits global lane selection only (no auto-claim/direct jog). HiP motion resolves through current HiP↔DenSi attachment, deselect/deadman force zero velocity, and birds-eye reports attached lanes, selected lanes, deadman, and resolved moving targets.
+
+
+- Lane 2 compat refinement: command-frame motion resolution keeps new lane semantics for explicit `selected_axes` + deadman, but preserves legacy `select_hip=True` pass-through for older tests/stacks that do not yet emit explicit lane selections.

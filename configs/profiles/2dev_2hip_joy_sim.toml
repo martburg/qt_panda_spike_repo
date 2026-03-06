@@ -1,0 +1,80 @@
+[stack]
+name = "2dev_2hip_joy_sim"
+
+[rig]
+# Two simulated devices, two pooled HiPs, one global joystick/console.
+axes = ["Anton", "Debby"]
+device_source = "sim"
+
+[net]
+bind_host = "127.0.0.1"
+
+cmd_base = 52001
+ui_telem_base = 51002
+dev_telem_in = "127.0.0.1:52020"
+
+status_in = "127.0.0.1:51200"
+
+# Core intent ingress
+intent = "127.0.0.1:51001"
+
+# Raw joystick/control samples from inputd to joy2intent
+raw_in = "127.0.0.1:50100"
+
+[services.core]
+enabled = true
+module = "steuerung3d.apps.core_udp_service"
+mode = "single"
+args = [
+  "--intent-in", "{net.intent}",
+  "--dev-telem-in", "{net.dev_telem_in}",
+  "--dev-cmd-base", "{net.cmd_base}",
+  "--dev-cmd-count", "{len(rig.axes)}",
+
+  # Shared pool to all HiPs; HiP side projects local presentation.
+  "--ui-telem-mode", "fanout",
+  "--ui-telem-base", "{net.ui_telem_base}",
+  "--ui-telem-count", "2",
+
+  "{repeat('--axis', rig.axes)}",
+]
+
+[services.densi]
+enabled = true
+module = "steuerung3d.apps.den_si"
+mode = "per_axis"
+config = "configs/services/densi.toml"
+args = [
+  "--axis", "{axis}",
+  "--cmd-in", "{net.bind_host}:{net.cmd_base + axis_index}",
+  "--telem-out", "{net.dev_telem_in}",
+]
+
+[services.hip]
+enabled = true
+module = "steuerung3d.apps.hi_p"
+mode = "single"
+count = 2
+config = "configs/services/hip.toml"
+args = [
+  "--telem-in", "{net.bind_host}:{net.ui_telem_base + instance_index}",
+  "--intent-out", "{net.intent}",
+  "--hip-id", "hip-{instance_ordinal}",
+]
+
+[services.inputd]
+enabled = true
+module = "steuerung3d.apps.inputd"
+mode = "single"
+config = "configs/inputd_gamepad.toml"
+
+[services.joy2intent]
+enabled = true
+module = "steuerung3d.apps.joy2intent"
+mode = "single"
+config = "configs/services/joy2intent.toml"
+args = [
+  "--raw-in", "{net.raw_in}",
+  "--intent-out", "{net.intent}",
+  "--winches", "{csv(rig.axes)}",
+]

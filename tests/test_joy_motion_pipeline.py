@@ -112,7 +112,9 @@ def test_joy_motion_end_to_end_gating_and_sign() -> None:
 
     st = MachineState()
     st.core_mode = CoreMode.LIVE
-    st.joy = JoyState(select_hip=True)
+    st.joy = JoyState(deadman=True, select_hip=True, selected_axes=(axis_id,))
+    st.set_axis_claim(axis_id, hip_id)
+    st.densi_registry[axis_id].last_seen_core_tick = st.tick
     apply_intent(st, RequestAxisLease(axis_id=axis_id, hip_id=hip_id, req_id="lease-anton"))
     apply_intent(st, EnableAxis(axis_id=axis_id, enable=True, hip_id=hip_id))
     _apply_intents(st, intents)
@@ -167,9 +169,80 @@ def test_core_select_allows_speed_when_selected() -> None:
     st.ensure_axis(axis_id)
     st.core_mode = CoreMode.LIVE
     apply_intent(st, RequestAxisLease(axis_id=axis_id, hip_id=hip_id, req_id="lease-sel-1"))
+    st.set_axis_claim(axis_id, hip_id)
+    st.densi_registry[axis_id].last_seen_core_tick = st.tick
     apply_intent(st, EnableAxis(axis_id=axis_id, enable=True, hip_id=hip_id))
     apply_intent(st, JogWinch(winch_id=axis_id, rate=-0.4, hip_id=hip_id))
-    apply_intent(st, JoyStateUpdate(deadman=True, select_hip=True, soll_speed=-0.4))
+    apply_intent(st, JoyStateUpdate(deadman=True, select_hip=True, soll_speed=-0.4, selected_axes=(axis_id,)))
 
     cmd = build_command_frame(st)
     assert cmd.axes[axis_id].vel == -0.4
+
+
+
+def test_core_resolves_selected_lanes_through_claims() -> None:
+    st = MachineState()
+    st.core_mode = CoreMode.LIVE
+    for axis_id in ("Anton", "Debby"):
+        st.ensure_axis(axis_id)
+        if axis_id == "Anton":
+            apply_intent(st, RequestAxisLease(axis_id=axis_id, hip_id="hip-a", req_id=f"lease-{axis_id}"))
+            apply_intent(st, EnableAxis(axis_id=axis_id, enable=True, hip_id="hip-a"))
+        else:
+            # Debby deliberately remains unattached/unclaimed and not leased
+            st.ensure_axis(axis_id)
+    st.set_axis_claim("Anton", "hip-a")
+    st.densi_registry["Anton"].last_seen_core_tick = st.tick
+    apply_intent(st, JogWinch(winch_id="Anton", rate=0.5, hip_id="hip-a"))
+    apply_intent(st, JogWinch(winch_id="Debby", rate=0.5, hip_id="hip-test"))
+    apply_intent(
+        st,
+        JoyStateUpdate(
+            deadman=True,
+            select_hip=True,
+            soll_speed=0.5,
+            selected_axes=("Anton", "Debby"),
+        ),
+    )
+
+    cmd = build_command_frame(st)
+    assert cmd.axes["Anton"].vel == 0.5
+    assert cmd.axes["Debby"].vel == 0.0
+
+
+def test_core_deadman_release_zeroes_all_selected_lanes() -> None:
+    axis_id = "Anton"
+    st = MachineState()
+    st.core_mode = CoreMode.LIVE
+    st.ensure_axis(axis_id)
+    apply_intent(st, RequestAxisLease(axis_id=axis_id, hip_id="hip-test", req_id="lease-dm"))
+    st.set_axis_claim(axis_id, "hip-test")
+    st.densi_registry[axis_id].last_seen_core_tick = st.tick
+    apply_intent(st, EnableAxis(axis_id=axis_id, enable=True, hip_id="hip-test"))
+    apply_intent(st, JogWinch(winch_id=axis_id, rate=0.9, hip_id="hip-test"))
+    apply_intent(
+        st,
+        JoyStateUpdate(deadman=False, select_hip=True, soll_speed=0.9, selected_axes=(axis_id,)),
+    )
+
+    cmd = build_command_frame(st)
+    assert cmd.axes[axis_id].vel == 0.0
+
+
+def test_core_lane_deselect_zeroes_cmd_vel() -> None:
+    axis_id = "Anton"
+    st = MachineState()
+    st.core_mode = CoreMode.LIVE
+    st.ensure_axis(axis_id)
+    apply_intent(st, RequestAxisLease(axis_id=axis_id, hip_id="hip-test", req_id="lease-desel"))
+    st.set_axis_claim(axis_id, "hip-test")
+    st.densi_registry[axis_id].last_seen_core_tick = st.tick
+    apply_intent(st, EnableAxis(axis_id=axis_id, enable=True, hip_id="hip-test"))
+    apply_intent(st, JogWinch(winch_id=axis_id, rate=0.7, hip_id="hip-test"))
+    apply_intent(
+        st,
+        JoyStateUpdate(deadman=True, select_hip=False, soll_speed=0.7, selected_axes=()),
+    )
+
+    cmd = build_command_frame(st)
+    assert cmd.axes[axis_id].vel == 0.0

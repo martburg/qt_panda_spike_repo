@@ -9,6 +9,7 @@ from typing import Dict, Optional
 from steuerung3d.config.lifetick_config import LifetickTraceConfig, load_lifetick_config
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamOp, coerce_param_ops
 from steuerung3d.core.core_mode import CoreMode, core_mode_value
+from steuerung3d.core.joy_state import canonicalize_selected_axes
 from steuerung3d.core.intent_handlers.lease import axis_lease_allows_any
 from steuerung3d.core.rig_logic import densi_online
 from steuerung3d.core.state import MachineState
@@ -175,14 +176,31 @@ def build_command_frame(state: MachineState) -> CommandFrame:
 
     core_mode = core_mode_value(getattr(state, "core_mode", ""))
     joy = getattr(state, "joy", None)
-    joy_select = bool(getattr(joy, "select_hip", False)) if joy is not None else False
+    joy_deadman = bool(getattr(joy, "deadman", False)) if joy is not None else False
+    selected_axes = (
+        set(canonicalize_selected_axes(getattr(joy, "selected_axes", ()))) if joy is not None else set()
+    )
+    joy_select = bool(selected_axes) or (
+        bool(getattr(joy, "select_hip", False)) if joy is not None else False
+    )
+
+    # Motion-resolution policy:
+    # - New lane semantics use explicit selected_axes + deadman. Only those axes may move.
+    # - Legacy paths (older stacks and lower-level tests) may only set select_hip=True.
+    #   In that compatibility mode, already-commanded leased/claimed axes remain active.
+    # - Without any live-selection signal, commanded velocity is suppressed.
     if core_mode != CoreMode.LIVE.value:
-        for axis_id, sp in axes.items():
+        active_axes: set[str] = set()
+    elif selected_axes:
+        active_axes = set(selected_axes) if joy_deadman else set()
+    elif joy_select:
+        active_axes = set(axes.keys())
+    else:
+        active_axes = set()
+
+    for axis_id, sp in axes.items():
+        if (axis_id not in active_axes) and abs(float(sp.vel)) > 1e-6:
             axes[axis_id] = AxisSetpoint(enable=bool(sp.enable), vel=0.0)
-    elif not joy_select:
-        for axis_id, sp in axes.items():
-            if abs(float(sp.vel)) > 1e-6:
-                axes[axis_id] = AxisSetpoint(enable=bool(sp.enable), vel=0.0)
 
     return CommandFrame(
         tick=state.tick,

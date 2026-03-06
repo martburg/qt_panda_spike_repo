@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Iterable, Tuple
-
-from steuerung3d.core.axis_ids import normalize_axis_id
+from typing import Iterable
 
 
 def clamp_soll_speed(value: float) -> float:
@@ -11,22 +9,24 @@ def clamp_soll_speed(value: float) -> float:
         v = float(value)
     except Exception:
         return 0.0
-    if v < -1.0:
-        return -1.0
     if v > 1.0:
         return 1.0
+    if v < -1.0:
+        return -1.0
     return v
 
 
-def _coerce_selected_axes(values: Iterable[object] | None) -> Tuple[str, ...]:
-    out: list[str] = []
+def canonicalize_selected_axes(selected_axes: Iterable[str] | None) -> tuple[str, ...]:
     seen: set[str] = set()
-    for value in list(values or []):
-        axis_id = normalize_axis_id(value)
-        if (not axis_id) or (axis_id in seen):
+    out: list[str] = []
+    if not selected_axes:
+        return ()
+    for raw in selected_axes:
+        axis = str(raw or "").strip()
+        if not axis or axis in seen:
             continue
-        seen.add(axis_id)
-        out.append(axis_id)
+        seen.add(axis)
+        out.append(axis)
     return tuple(out)
 
 
@@ -35,16 +35,14 @@ class JoyState:
     deadman: bool = False
     select_hip: bool = False
     soll_speed: float = 0.0
-    selected_axes: Tuple[str, ...] = field(default_factory=tuple)
+    selected_axes: tuple[str, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "deadman", bool(self.deadman))
+        object.__setattr__(self, "select_hip", bool(self.select_hip))
         object.__setattr__(self, "soll_speed", clamp_soll_speed(self.soll_speed))
-        object.__setattr__(self, "selected_axes", _coerce_selected_axes(self.selected_axes))
-
-    def selected_for_axis(self, axis_id: object) -> bool:
-        axis_norm = normalize_axis_id(axis_id)
-        if not axis_norm:
-            return False
-        if self.selected_axes:
-            return axis_norm in self.selected_axes
-        return bool(self.select_hip)
+        object.__setattr__(
+            self,
+            "selected_axes",
+            canonicalize_selected_axes(self.selected_axes),
+        )

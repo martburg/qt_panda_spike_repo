@@ -297,15 +297,29 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     drive_status_summary = f"{main_text}|{slave_text}" if (main_text or slave_text) else ""
     drive_status = HipDriveStatusState(main_text=str(main_text), slave_text=str(slave_text))
 
+    
     def _brake_ok_display(raw: bool) -> bool:
-        if bool(taster) and bool(within_brake):
-            return True
-        return bool(raw)
+            if bool(taster) and bool(within_brake):
+                return True
+            return bool(raw)
 
     joy = getattr(snap, "joy", None) or JoyState()
+
     joy_deadman = bool(getattr(joy, "deadman", False))
-    joy_select_hip = bool(getattr(joy, "select_hip", False))
-    joy_soll_speed = float(getattr(joy, "soll_speed", 0.0) or 0.0)
+    raw_soll_speed = float(getattr(joy, "soll_speed", 0.0) or 0.0)
+
+    selected_axes = tuple(getattr(joy, "selected_axes", ()) or ())
+    selected_axis_set = {str(x).strip() for x in selected_axes if str(x).strip()}
+
+    if selected_axis_set:
+        local_selected = bool(axis_id) and axis_id in selected_axis_set
+    else:
+        # Legacy fallback: aggregate select flag only applies when this HiP
+        # currently presents a valid axis.
+        local_selected = bool(axis_id) and bool(getattr(joy, "select_hip", False))
+
+    joy_select_hip = bool(local_selected)
+    joy_soll_speed = float(raw_soll_speed if local_selected else 0.0)
 
     readouts = None
     cut_markers = None
@@ -328,7 +342,6 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
             estate=estate,
             mode=str(mode_now),
         )
-
     # --- UI actions -> intents (param ops, estop reset, resync) ---
     if ui.estop_reset_clicked and axis_id:
         intents.append(RequestEstopReset(axis_id=axis_id, hip_id=hip_id))
