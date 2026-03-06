@@ -228,6 +228,18 @@ class MachineState:
         owner = self.claim_owner(axis_id)
         return bool(owner) and (owner == hip_id)
 
+    def _sync_densi_claim_surface(self, axis_id: str, hip_id: str) -> None:
+        """Mirror claim ownership onto the DenSi runtime registry."""
+
+        axis_id = normalize_axis_id(axis_id)
+        if not axis_id:
+            return
+        d = self.densi_registry.get(axis_id)
+        if d is None:
+            d = DensiRuntime(device_id=axis_id)
+            self.densi_registry[axis_id] = d
+        d.claimed_by_hip = str(hip_id or "")
+
     def set_axis_claim(self, axis_id: str, hip_id: str) -> None:
         """Set exclusive control claim for *axis_id*.
 
@@ -236,6 +248,8 @@ class MachineState:
 
         Notes:
         - Ensures the axis exists (so downstream logic can rely on ``ensure_axis``).
+        - Mirrors ownership into ``densi_registry`` so HiP discovery/UI can use a
+          single authoritative surface for attachability.
         - Does not perform policy checks; callers are responsible (e.g. ClaimAxis handler).
         """
         axis_id = normalize_axis_id(axis_id)
@@ -244,6 +258,7 @@ class MachineState:
             return
         self.ensure_axis(axis_id)
         self.axis_claims[axis_id] = hip_id
+        self._sync_densi_claim_surface(axis_id, hip_id)
 
     def clear_axis_claim(self, axis_id: str, *, hip_id: str | None = None) -> None:
         """Clear exclusive control claim for *axis_id*.
@@ -259,3 +274,15 @@ class MachineState:
             if hip_id and self.claim_owner(axis_id) != hip_id:
                 return
         self.axis_claims.pop(axis_id, None)
+        self._sync_densi_claim_surface(axis_id, "")
+
+    def clear_claims_for_hip(self, hip_id: str) -> list[str]:
+        """Release all claims currently owned by *hip_id* and return them."""
+
+        hip_id = str(hip_id or "")
+        if not hip_id:
+            return []
+        released = [axis_id for axis_id, owner in dict(self.axis_claims).items() if owner == hip_id]
+        for axis_id in released:
+            self.clear_axis_claim(axis_id, hip_id=hip_id)
+        return sorted(released)

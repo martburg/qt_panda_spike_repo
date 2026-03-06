@@ -7,17 +7,23 @@ cohesive. The public surface remains re-exported from core/intents.py.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Tuple
 
 
 @dataclass(frozen=True)
 class JoyStateUpdate:
-    """Atomic joystick state sample."""
+    """Atomic joystick state sample.
+
+    `select_hip` is kept for backward compatibility and remains the aggregate
+    "any lane selected" indicator. `selected_axes` carries the new multi-lane
+    selection surface used to project per-HiP selected state.
+    """
 
     type: Literal["joy_state_update"] = "joy_state_update"
     deadman: bool = False
     select_hip: bool = False
     soll_speed: float = 0.0
+    selected_axes: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

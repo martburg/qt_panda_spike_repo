@@ -23,6 +23,7 @@ from steuerung3d.core.intents import (
     RequestResync,
 )
 from steuerung3d.core.joy_state import JoyState
+from steuerung3d.core.telemetry_axis_view import axis_scoped_snapshot
 from steuerung3d.protocol.estop_bits import decode_estop_word
 
 from ...domain.joy_motion_map import map_soll_speed_to_jog_winch
@@ -103,10 +104,11 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
             # Single-axis bring-up: avoid ambiguous selection mapping.
             motion_axis_id = actionable[0]
 
-    params = getattr(snap, "params", {}) or {}
+    snap_view = axis_scoped_snapshot(snap, axis_id or motion_axis_id)
+    params = getattr(snap_view, "params", {}) or {}
 
     now_s = float(inputs.now_ns) / 1e9
-    estop_word = int(parse_estop_word_from_snapshot(snap))
+    estop_word = int(parse_estop_word_from_snapshot(snap_view))
     logical = decode_estop_word(estop_word)
 
     axis_id_for_estate = axis_id
@@ -273,12 +275,12 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
 
     prev_device_tick = self.state.prev_device_tick
     tick_text, new_prev = compute_tick_text(
-        snap=snap,
+        snap=snap_view,
         axis_id=axis_id,
         prev_device_tick=prev_device_tick,
     )
 
-    lifetick_age = get_lifetick_age(snap=snap, axis_id=axis_id)
+    lifetick_age = get_lifetick_age(snap=snap_view, axis_id=axis_id)
     online_state = None
     if lifetick_age is not None:
         online_state = age_to_online_state(age=float(lifetick_age), good_max=30.0, warn_max=500.0)
@@ -290,7 +292,7 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
         age_ms = int((int(inputs.now_ns) - int(inputs.last_rx_ns)) / 1_000_000.0)
     stale = (age_ms is None) or (age_ms >= int(inputs.stale_after_ms))
 
-    main_text, slave_text = compute_drive_status_texts(snap=snap, axis_id=axis_id)
+    main_text, slave_text = compute_drive_status_texts(snap=snap_view, axis_id=axis_id)
     drive_status_summary = f"{main_text}|{slave_text}" if (main_text or slave_text) else ""
     drive_status = HipDriveStatusState(main_text=str(main_text), slave_text=str(slave_text))
 
@@ -309,7 +311,7 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     if attached and axis_id and axis_id in axes:
         ax = axes.get(axis_id)
         pos, vel = read_axis_pos_vel(ax)
-        amp, tmp = read_amp_and_temp(params=params, snap=snap)
+        amp, tmp = read_amp_and_temp(params=params, snap=snap_view)
         readouts = compute_readouts_state(
             ax=ax,
             pos=pos,
@@ -317,10 +319,10 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
             amp=amp,
             temp=tmp,
             params=params,
-            snap=snap,
+            snap=snap_view,
         )
         cut_markers = compute_cut_markers_state(
-            snap=snap,
+            snap=snap_view,
             params=params,
             estate=estate,
             mode=str(mode_now),
@@ -351,7 +353,7 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
         axis_id=str(axis_id or ""),
         now_ns=int(inputs.now_ns),
         estate=str(estate or ""),
-        snap=snap,
+        snap=snap_view,
         intents=intents,
         core_acks=list(inputs.core_acks or []),
     )

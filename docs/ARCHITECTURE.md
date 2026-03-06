@@ -220,3 +220,384 @@ This prevents the “last-writer wins” effect where HiPs appear to show the te
 
 Ack signals (`core_acks`) are one-shot fields in telemetry snapshots. The receiver may drain multiple snapshots per poll.
 Therefore, the HiP must process acks across **all** drained snapshots before deciding to resend or time out.
+
+
+
+# HiP ↔ DenSi Attachment Model
+
+## Overview
+
+The system supports **multiple HiP operator consoles** and **multiple DenSi device endpoints**.
+
+A HiP must **attach to a control target** before it can issue motion or parameter intents.
+
+The current implementation phase supports **1:1 attachment**:
+
+HiP → DenSi
+
+However, the architecture deliberately models attachment using **abstract targets** rather than
+hardcoding a HiP→DenSi relationship. This allows future support for grouped DenSis and coordinated motion.
+
+---
+
+## Core Ownership Principle
+
+Attachment authority is **centralized in the Core**.
+
+The core maintains the canonical mapping:
+
+target_id → hip_id | None
+
+Where:
+
+- `target_id` identifies an **attachable target**
+- `hip_id` identifies the owning HiP
+- `None` means the target is currently free
+
+This ensures:
+
+- deterministic ownership
+- no double attachment
+- consistent view for all HiPs
+
+HiPs never negotiate ownership directly with DenSis.
+
+---
+
+## Attachable Targets
+
+An **attachable target** represents something a HiP can control.
+
+Current implementation:
+
+target_kind = "leaf"  
+members = {single DenSi}
+
+Example:
+
+target: Anton  
+members: {Anton}
+
+Future targets may represent **groups of DenSis**.
+
+Example (future):
+
+target: FrontRig  
+members: {Anton, Debby, Cecil}
+
+Internally this abstraction prevents the system from baking in the assumption that
+an “axis” always corresponds to a single physical device.
+
+---
+
+## Boot Behavior
+
+On system startup:
+
+- all **DenSis register themselves** as available targets
+- all **HiPs start unattached**
+- all targets start **unclaimed**
+
+Thus the initial state is:
+
+HiP1 → NotAttached  
+HiP2 → NotAttached  
+
+Anton → free  
+Debby → free  
+Cecil → free
+
+---
+
+## Attach Procedure
+
+Operator selects a target in the HiP UI.
+
+HiP sends an intent:
+
+ClaimTarget(target_id)
+
+Core grants the claim only if:
+
+target.claimed_by == None
+
+If successful:
+
+target.claimed_by = hip_id
+
+Core telemetry then updates all HiPs.
+
+---
+
+## Detach Procedure
+
+Selecting **NotAttached** releases the current claim.
+
+HiP sends:
+
+ReleaseTarget(target_id)
+
+Core clears the ownership:
+
+target.claimed_by = None
+
+The target immediately becomes available to other HiPs.
+
+---
+
+## Stale Ownership Cleanup
+
+If a HiP disappears (watchdog timeout / lost lifetick):
+
+Core automatically releases all targets owned by that HiP.
+
+This prevents stranded DenSis after console crashes.
+
+---
+
+## UI Visibility Rules
+
+Each HiP should display:
+
+- `NotAttached`
+- all **free targets**
+- its **currently attached target**
+
+Targets claimed by other HiPs are not attachable.
+
+A birds-eye diagnostic view should show something like:
+
+Anton → hip1  
+Debby → free  
+Cecil → hip2
+
+---
+
+## Current Semantic Scope
+
+In the current system phase:
+
+- one target corresponds to **exactly one DenSi**
+- each HiP may attach to **at most one target**
+- each target may be owned by **at most one HiP**
+
+This results in a strict **1:1 mapping**.
+
+The attach layer exists purely to define **control authority** and does not define motion semantics.
+
+---
+
+# Future Extension: Grouped DenSi Targets
+
+The attachment model is designed to support **group targets**.
+
+Example:
+
+target: FrontRig  
+members: {Anton, Debby}
+
+If a HiP attaches to `FrontRig`, it implicitly controls both DenSis.
+
+To preserve exclusivity:
+
+Two targets conflict if their **member sets overlap**.
+
+Example:
+
+Anton  
+FrontRig {Anton, Debby}
+
+If `Anton` is claimed individually, `FrontRig` cannot be claimed.
+
+If `FrontRig` is claimed, neither `Anton` nor `Debby` can be attached individually.
+
+This rule guarantees deterministic ownership even with grouped targets.
+
+---
+
+# Future Extension: Coordination and Sync Semantics
+
+Grouped targets introduce a second architectural concern:
+
+**coordination semantics**.
+
+A group is not simply a set of DenSis; it is a **coordinated plant** with a defined motion model.
+
+Examples of coordination profiles:
+
+- equal_axis
+- ratio_axis
+- leader_follower
+- rig_kinematic
+
+Each profile defines:
+
+- how group commands map to leaf DenSi setpoints
+- acceptable position/velocity error
+- supervision policy and fault reactions
+
+Important design decision:
+
+**Coordination supervision belongs to the core/coordination layer, not the HiP.**
+
+HiPs display sync state but do not define or enforce it.
+
+This layer will be implemented in a later architectural step.
+
+---
+
+# Summary
+
+Current architecture stage:
+
+HiP → Target → DenSi
+
+- targets represent single DenSis
+- ownership is enforced by core
+- system supports N HiPs and N DenSis
+- attach/detach semantics are deterministic
+
+Future architecture:
+
+HiP → Target → {DenSi...}
+
+- targets may represent groups
+- coordination profiles define sync semantics
+- supervision is centralized in core
+
+Attachment Terminology & Diagrams
+This section standardizes terminology used across the codebase and documentation for
+HiP ↔ DenSi attachment and future grouped control.
+
+Core Terms
+HiP
+Human Interface Panel — the operator console.
+
+Responsibilities:
+
+send operator intents
+display telemetry
+request attach / detach
+A HiP does not own motion semantics and does not enforce coordination rules.
+
+DenSi
+A device endpoint controlling a physical actuator.
+
+Responsibilities:
+
+execute leaf commands
+report telemetry
+enforce local safety conditions
+A DenSi never decides ownership; it simply executes commands from the core.
+
+Target
+A Target is something a HiP can attach to.
+
+Examples:
+
+Leaf target:
+
+Anton → {Anton}
+
+Future group target:
+
+FrontRig → {Anton, Debby}
+
+A target therefore represents control authority, not necessarily a single device.
+
+Properties:
+
+target_id
+members (set of DenSis)
+target_kind = leaf | group
+claimed_by
+Claim
+A claim assigns ownership of a target to a HiP.
+
+Mapping maintained by core:
+
+target_id → hip_id | None
+
+Rules:
+
+each target can have at most one owner
+each HiP can control at most one target (current phase)
+claims are released when a HiP detaches or disappears
+Current System Diagram
+Current phase supports 1:1 attachment.
+
+HiP → Target → DenSi
+
+Example:
+
+HiP_A → Anton → Anton
+
+Internally:
+
+target: Anton
+members: {Anton}
+
+Multi‑Device Environment
+Multiple HiPs and DenSis may exist simultaneously.
+
+Example system state:
+
+HiP_A → Anton
+HiP_B → Debby
+HiP_C → NotAttached
+
+Anton → hip_A
+Debby → hip_B
+Cecil → free
+
+Ownership remains exclusive and enforced by core.
+
+Future Group Targets
+Future systems may expose group targets.
+
+Example:
+
+FrontRig → {Anton, Debby}
+
+Diagram:
+
+HiP_A → FrontRig → {Anton, Debby}
+
+Rules:
+
+group claims block individual members
+individual member claims block groups containing them
+Conflict rule:
+
+Two targets conflict if their member sets intersect.
+
+Coordination Layer (Future)
+Grouped targets introduce coordination semantics.
+
+A target may specify a coordination profile:
+
+equal_axis
+ratio_axis
+leader_follower
+rig_kinematic
+These profiles define:
+
+command transformation to leaf DenSis
+acceptable deviation tolerances
+supervision policy
+Coordination supervision will live in the core / coordination layer, not in the HiP.
+
+Design Principle
+The attachment layer defines who controls what.
+
+It does not define how motion is coordinated.
+
+This separation allows the system to scale from:
+
+HiP → DenSi
+
+to
+
+HiP → Target → {DenSi...}
+
+without redesigning the ownership model.

@@ -7,7 +7,7 @@ from typing import Iterable
 from steuerung3d.apps.joy2intent.config import load_joy2intent_config
 from steuerung3d.apps.joy2intent.mapping import JoyBindings, JoyLimits, JoyRig, synthesize_intents
 from steuerung3d.apps.joy2intent.state import JoyState
-from steuerung3d.core.intents import EnableAxis, JogWinch
+from steuerung3d.core.intents import EnableAxis, JogWinch, JoyStateUpdate
 from steuerung3d.protocol.raw_controls import RawControls
 
 
@@ -86,7 +86,7 @@ def test_single_winch_select_hip_fallback_emits_enable_and_jog(tmp_path: Path) -
     assert any(isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate > 0.0 for i in intents)
 
 
-def test_setup_manual_multi_select_targets_single_lowest_index(tmp_path: Path) -> None:
+def test_setup_manual_multi_select_targets_all_selected_lanes(tmp_path: Path) -> None:
     st = JoyState()
     bind = _bind()
     rig = _rig()
@@ -96,13 +96,14 @@ def test_setup_manual_multi_select_targets_single_lowest_index(tmp_path: Path) -
     rc = _rc(axes=[0.0, 0.6], pressed=(5, 0, 2))
     intents = synthesize_intents(st, rc, bind, rig, lim)
 
-    # Legacy arbitration: even if multiple select buttons are held, only one
-    # winch is targeted (lowest index wins).
+    # Multi-lane selection: every selected lane should receive enable/jog intents.
     enables = [i for i in intents if isinstance(i, EnableAxis) and i.enable]
     jugs = [i for i in intents if isinstance(i, JogWinch)]
 
-    assert {e.axis_id for e in enables} == {"Anton"}
-    assert {j.winch_id for j in jugs} == {"Anton"}
+    assert {e.axis_id for e in enables} == {"Anton", "Cecil"}
+    assert {j.winch_id for j in jugs} == {"Anton", "Cecil"}
+    joy = next(i for i in intents if isinstance(i, JoyStateUpdate))
+    assert set(joy.selected_axes) == {"Anton", "Cecil"}
 
     # Rate should be scaled by max_winch_mps
     for j in jugs:

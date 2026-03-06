@@ -71,7 +71,7 @@ def main() -> int:
         ),
     )
 
-    # UI telemetry targets (one HiP per axis; no broadcast)
+    # UI telemetry targets
     ap.add_argument(
         "--ui-telem-target",
         action="append",
@@ -79,7 +79,7 @@ def main() -> int:
         help=(
             "UI TelemetryOut target(s) as host:port. Repeatable. "
             "If not provided, defaults to 127.0.0.1:51002. "
-            "Strict mode: one target per axis (no broadcast)."
+            "In per_axis mode there must be one target per axis; in fanout mode snapshots are sent to every target."
         ),
     )
     ap.add_argument(
@@ -102,6 +102,12 @@ def main() -> int:
         "--ui-telem-disable",
         action="store_true",
         help="Disable UI TelemetryOut (C1) entirely.",
+    )
+    ap.add_argument(
+        "--ui-telem-mode",
+        default="per_axis",
+        choices=("per_axis", "fanout"),
+        help="UI telemetry routing mode: per_axis (legacy) or fanout (full snapshots to every HiP).",
     )
     ap.add_argument(
         "--c2-telem-target",

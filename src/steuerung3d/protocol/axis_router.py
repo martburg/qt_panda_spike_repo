@@ -36,6 +36,7 @@ class AxisRouter:
     axis_ids: List[str]
     dev_cmd_out_by_axis: Dict[str, CommandFrameSink]
     ui_telem_out_by_axis: Dict[str, TelemetrySink]
+    ui_telem_fanout: list[TelemetrySink] = field(default_factory=list)
 
     # --- device-scoped caches (multi-axis runs must pin these per axis) ---
     last_dev_params_by_axis: Dict[str, Dict[str, float]] = field(default_factory=dict)
@@ -70,6 +71,7 @@ class AxisRouter:
             for k, v in dict(self.ui_telem_out_by_axis or {}).items()
             if normalize_axis_id(k)
         }
+        self.ui_telem_fanout = list(self.ui_telem_fanout or [])
 
     # --------------------
     # Command routing
@@ -256,8 +258,68 @@ class AxisRouter:
             joy=getattr(snap, "joy", JoyState()),
         )
 
+
+    def _project_joy_for_axis(self, snap: TelemetrySnapshot, axis_id: str) -> JoyState:
+        joy = getattr(snap, "joy", JoyState())
+        if not isinstance(joy, JoyState):
+            joy = JoyState()
+        return JoyState(
+            deadman=bool(getattr(joy, "deadman", False)),
+            select_hip=joy.selected_for_axis(axis_id),
+            soll_speed=float(getattr(joy, "soll_speed", 0.0)),
+            selected_axes=getattr(joy, "selected_axes", ()),
+        )
+
+    def fanout_snapshot_with_axis_caches(self, snap: TelemetrySnapshot) -> TelemetrySnapshot:
+        return TelemetrySnapshot(
+            tick=int(getattr(snap, "tick", 0)),
+            t_s=float(getattr(snap, "t_s", 0.0)),
+            core_mode=str(getattr(snap, "core_mode", "")),
+            estop=bool(getattr(snap, "estop", False)),
+            fault=bool(getattr(snap, "fault", False)),
+            axes=dict(getattr(snap, "axes", {}) or {}),
+            rig_mode=str(getattr(snap, "rig_mode", "DISCOVERY")),
+            densis=dict(getattr(snap, "densis", {}) or {}),
+            lease_rig=str(getattr(snap, "lease_rig", "")),
+            lease_axis=dict(getattr(snap, "lease_axis", {}) or {}),
+            lease_rig_holder=str(getattr(snap, "lease_rig_holder", getattr(snap, "lease_rig", ""))),
+            lease_axis_holders=dict(getattr(snap, "lease_axis_holders", {}) or {}),
+            lease_denial_reason=str(getattr(snap, "lease_denial_reason", "")),
+            estop_status_word=int(getattr(snap, "estop_status_word", 0)),
+            param_edit_active=bool(getattr(snap, "param_edit_active", False)),
+            param_edit_group=str(getattr(snap, "param_edit_group", "")),
+            params=dict(getattr(snap, "params", {}) or {}),
+            plc_uplink_fields=dict(getattr(snap, "plc_uplink_fields", {}) or {}),
+            plc_uplink_tail=dict(getattr(snap, "plc_uplink_tail", {}) or {}),
+            axis_estop_status_word={str(k): int(v) for k, v in dict(self.last_dev_estop_word_by_axis or {}).items()},
+            axis_param_edit_active={str(k): bool(v) for k, v in dict(self.last_dev_param_edit_active_by_axis or {}).items()},
+            axis_param_edit_group={str(k): str(v) for k, v in dict(self.last_dev_param_edit_group_by_axis or {}).items()},
+            axis_params={str(k): dict(v or {}) for k, v in dict(self.last_dev_params_by_axis or {}).items()},
+            axis_plc_uplink_fields={str(k): dict(v or {}) for k, v in dict(self.last_dev_plc_uplink_fields_by_axis or {}).items()},
+            axis_plc_uplink_tail={str(k): dict(v or {}) for k, v in dict(self.last_dev_plc_uplink_tail_by_axis or {}).items()},
+            axis_param_commit_req_id={str(k): str(v) for k, v in dict(self.last_dev_param_commit_req_id_by_axis or {}).items()},
+            axis_param_commit_group={str(k): str(v) for k, v in dict(self.last_dev_param_commit_group_by_axis or {}).items()},
+            axis_param_commit_status={str(k): str(v) for k, v in dict(self.last_dev_param_commit_status_by_axis or {}).items()},
+            axis_param_commit_age_ticks={str(k): int(v) for k, v in dict(self.last_dev_param_commit_age_ticks_by_axis or {}).items()},
+            axis_param_commit_unmatched={str(k): list(v or []) for k, v in dict(self.last_dev_param_commit_unmatched_by_axis or {}).items()},
+            core_acks=list(getattr(snap, "core_acks", [])),
+            param_commit_req_id=str(getattr(snap, "param_commit_req_id", "")),
+            param_commit_group=str(getattr(snap, "param_commit_group", "")),
+            param_commit_status=str(getattr(snap, "param_commit_status", "idle")),
+            param_commit_age_ticks=int(getattr(snap, "param_commit_age_ticks", 0)),
+            param_commit_unmatched=list(getattr(snap, "param_commit_unmatched", []) or []),
+            joy=getattr(snap, "joy", JoyState()),
+        )
+
     def publish_ui_snapshot(self, snap: TelemetrySnapshot) -> int:
         sent = 0
+        if self.ui_telem_fanout:
+            fanout_snap = self.fanout_snapshot_with_axis_caches(snap)
+            for tx in self.ui_telem_fanout:
+                tx.publish_telemetry(fanout_snap)
+                sent += 1
+            return sent
+
         for axis_id in self.axis_ids:
             tx = self.ui_telem_out_by_axis.get(axis_id)
             if tx is None:

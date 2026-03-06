@@ -43,7 +43,13 @@ def expand_processes(spec: StackSpec, *, session_dir: Path) -> List[ProcessSpec]
         if svc.mode == "per_axis":
             for i, axis in enumerate(spec.axes):
                 ctx = make_context(
-                    stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=axis, axis_index=i
+                    stack=stack_ctx,
+                    net=net_ctx,
+                    rig=rig_ctx,
+                    axis=axis,
+                    axis_index=i,
+                    instance_index=None,
+                    instance_ordinal=None,
                 )
                 argv = [sys.executable, "-m", svc.module]
                 argv += render_argv(service_args_with_config(svc), ctx)
@@ -54,14 +60,26 @@ def expand_processes(spec: StackSpec, *, session_dir: Path) -> List[ProcessSpec]
             if isinstance(count, int) and count > 1:
                 for i in range(int(count)):
                     ctx = make_context(
-                        stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=None, axis_index=None
+                        stack=stack_ctx,
+                        net=net_ctx,
+                        rig=rig_ctx,
+                        axis=None,
+                        axis_index=None,
+                        instance_index=i,
+                        instance_ordinal=i + 1,
                     )
                     argv = [sys.executable, "-m", svc.module]
                     argv += render_argv(service_args_with_config(svc), ctx)
                     add_process(f"{svc_key}-{i + 1}", argv, dict(svc.env))
             else:
                 ctx = make_context(
-                    stack=stack_ctx, net=net_ctx, rig=rig_ctx, axis=None, axis_index=None
+                    stack=stack_ctx,
+                    net=net_ctx,
+                    rig=rig_ctx,
+                    axis=None,
+                    axis_index=None,
+                    instance_index=None,
+                    instance_ordinal=None,
                 )
                 argv = [sys.executable, "-m", svc.module]
                 argv += render_argv(service_args_with_config(svc), ctx)

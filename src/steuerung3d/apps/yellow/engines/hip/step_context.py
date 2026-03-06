@@ -40,6 +40,7 @@ def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepCon
         deadman=bool(getattr(joy_in, "deadman", False)),
         select_hip=bool(getattr(joy_in, "select_hip", False)),
         soll_speed=clamp_soll_speed(getattr(joy_in, "soll_speed", 0.0)),
+        selected_axes=tuple(getattr(joy_in, "selected_axes", ()) or ()),
     )
     if getattr(self._param_txn, "hip_id", "") != hip_id:
         self._param_txn.hip_id = hip_id

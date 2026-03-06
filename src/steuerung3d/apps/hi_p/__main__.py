@@ -44,6 +44,7 @@ def main() -> int:
         help="IntentOut target host:port (default 127.0.0.1:51001).",
     )
     ap.add_argument("--config", default="", help="TOML config path for HiP runtime.")
+    ap.add_argument("--hip-id", default="", help="Stable HiP identity used for claim ownership.")
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
     args = ap.parse_args()
 
@@ -70,6 +71,7 @@ def main() -> int:
         intent_out=intent_out,
         telemetry_in=telemetry_in,
         shadow_mode=shadow_mode,
+        hip_id=str(args.hip_id or ""),
     )
     axis_label = str(args.axis).strip() or "*"
     if str(args.axis).strip():

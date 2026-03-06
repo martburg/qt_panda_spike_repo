@@ -69,3 +69,23 @@ def test_claim_enforces_enable_and_jog():
     # Backward-compat: if claim exists and hip_id missing -> ignored
     apply_intent(st, JogAxis(axis_id="Anton", vel=3.0, hip_id=""))
     assert st.axis_cmd["Anton"].vel == pytest.approx(0.5)
+
+
+def test_claim_surface_is_mirrored_into_densi_registry_and_bulk_release() -> None:
+    st = MachineState()
+
+    st.set_axis_claim("Anton", "hipA")
+    st.set_axis_claim("Debby", "hipA")
+    st.set_axis_claim("Cecil", "hipB")
+
+    assert st.densi_registry["Anton"].claimed_by_hip == "hipA"
+    assert st.densi_registry["Debby"].claimed_by_hip == "hipA"
+    assert st.densi_registry["Cecil"].claimed_by_hip == "hipB"
+
+    released = st.clear_claims_for_hip("hipA")
+
+    assert released == ["Anton", "Debby"]
+    assert st.densi_registry["Anton"].claimed_by_hip == ""
+    assert st.densi_registry["Debby"].claimed_by_hip == ""
+    assert st.densi_registry["Cecil"].claimed_by_hip == "hipB"
+    assert st.axis_claims == {"Cecil": "hipB"}

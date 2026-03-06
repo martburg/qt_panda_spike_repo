@@ -74,6 +74,20 @@ class TelemetrySnapshot:
     plc_uplink_fields: Mapping[str, str] = field(default_factory=dict)  # base fields (pre-EOD)
     plc_uplink_tail: Mapping[str, str] = field(default_factory=dict)  # tail fields (post-EOD)
 
+    # Axis-scoped UI telemetry caches (used in fanout mode so each HiP can resolve
+    # attached-axis values without accidentally consuming whichever device updated last).
+    axis_estop_status_word: Mapping[str, int] = field(default_factory=dict)
+    axis_param_edit_active: Mapping[str, bool] = field(default_factory=dict)
+    axis_param_edit_group: Mapping[str, str] = field(default_factory=dict)
+    axis_params: Mapping[str, Mapping[str, float]] = field(default_factory=dict)
+    axis_plc_uplink_fields: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
+    axis_plc_uplink_tail: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
+    axis_param_commit_req_id: Mapping[str, str] = field(default_factory=dict)
+    axis_param_commit_group: Mapping[str, str] = field(default_factory=dict)
+    axis_param_commit_status: Mapping[str, str] = field(default_factory=dict)
+    axis_param_commit_age_ticks: Mapping[str, int] = field(default_factory=dict)
+    axis_param_commit_unmatched: Mapping[str, list[str]] = field(default_factory=dict)
+
     # HIP<->Core transactional acks (one-shot)
     core_acks: list[str] = field(default_factory=list)
 

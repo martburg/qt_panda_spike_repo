@@ -174,12 +174,16 @@ def run_core_udp_service(*, args, status) -> int:
         ui_telem_disable=bool(args.ui_telem_disable),
         axis_ids=axis_ids,
         ui_telem_targets=ui_telem_targets,
+        mode=str(getattr(args, "ui_telem_mode", "per_axis") or "per_axis"),
     )
     if err:
         return _fatal(err)
 
+    ui_mode = str(getattr(args, "ui_telem_mode", "per_axis") or "per_axis").strip().lower()
     axis_ui_outs = (
-        {axis_id: op_telem_outs[i] for i, axis_id in enumerate(axis_ids)} if op_telem_outs else {}
+        {axis_id: op_telem_outs[i] for i, axis_id in enumerate(axis_ids)}
+        if (op_telem_outs and ui_mode == "per_axis")
+        else {}
     )
     for a in axis_ids:
         st.ensure_axis(a)
@@ -188,6 +192,7 @@ def run_core_udp_service(*, args, status) -> int:
         axis_ids=axis_ids,
         dev_cmd_out_by_axis=axis_cmd_outs,
         ui_telem_out_by_axis=axis_ui_outs,
+        ui_telem_fanout=list(op_telem_outs) if ui_mode == "fanout" else [],
     )
 
     drain_intents = build_intent_drain(

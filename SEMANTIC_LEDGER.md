@@ -147,3 +147,33 @@ This file records *declared* semantic changes (RefOS Lane 2) made during stabili
 - `src/steuerung3d/apps/yellow/engines/densi/cut_markers.py`
 - `src/steuerung3d/apps/yellow/engines/densi/plc_anton_vel_cmd.py`
 - `src/steuerung3d/apps/yellow/engines/densi/param_defaults.py`
+
+
+## 2026-03-06 — Global deadman + multi-lane joystick selection foundation
+
+**Lane:** 2 (Declared Semantic Fix)
+
+### Change
+- Keep HiP↔DenSi attachment as the structural ownership model.
+- Keep joystick deadman as a **global** signal.
+- Extend `JoyState` / `JoyStateUpdate` with `selected_axes` so the console can select
+  multiple attached lanes at once.
+- Preserve legacy `select_hip` as the aggregate “any lane selected” compatibility flag.
+- `joy2intent` no longer collapses multi-select to a single lowest-index target.
+- `AxisRouter` projects per-axis selected state into sliced HiP telemetry while preserving
+  optional full-snapshot fanout support.
+
+### Motivation
+- The real console controls the whole system, not one private HiP.
+- Deadman applies globally, while select buttons choose which attached lanes receive live motion.
+- HiP UI must continue to show deadman and selected state, but selected state must now reflect
+  whether the attached lane is among the currently selected console lanes.
+
+### Files
+- `src/steuerung3d/core/joy_state.py`
+- `src/steuerung3d/core/intents_meta.py`
+- `src/steuerung3d/core/intent_routes/control.py`
+- `src/steuerung3d/protocol/codec.py`
+- `src/steuerung3d/protocol/axis_router.py`
+- `src/steuerung3d/apps/joy2intent/mapping.py`
+- `src/steuerung3d/apps/yellow/engines/hip/step_context.py`

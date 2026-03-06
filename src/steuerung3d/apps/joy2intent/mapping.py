@@ -171,7 +171,7 @@ def synthesize_intents(
     fine = (fine_btn is not None) and (fine_btn in pressed)
 
     select_btn = bind.buttons.get("select_hip")
-    select_hip = (select_btn is not None) and (select_btn in pressed)
+    select_hip_button = (select_btn is not None) and (select_btn in pressed)
 
     soll_speed = 0.0
     soll_axis = bind.axes.get("soll_speed")
@@ -182,14 +182,6 @@ def synthesize_intents(
         soll_speed = _apply_deadzone_only(soll_speed, bind.deadzone)
     soll_speed = clamp_soll_speed(soll_speed)
 
-    intents.append(
-        JoyStateUpdate(
-            deadman=bool(deadman),
-            select_hip=bool(select_hip),
-            soll_speed=float(soll_speed),
-        )
-    )
-
     rig_ids = rig.ordered_winch_ids()
 
     # Determine which winches are selected (by select_buttons index).
@@ -198,13 +190,17 @@ def synthesize_intents(
         if b in pressed and i < len(rig_ids):
             selected.append(rig_ids[i])
 
-    # Legacy arbitration: even if multiple select buttons are held, only one
-    # winch is targeted (lowest index wins). This mirrors the original
-    # "one active hip" behavior and avoids accidental multi-winch jogging.
-    if len(selected) > 1:
-        selected = [selected[0]]
-
     selected_set = set(selected)
+    select_hip = bool(select_hip_button) or bool(selected_set)
+
+    intents.append(
+        JoyStateUpdate(
+            deadman=bool(deadman),
+            select_hip=bool(select_hip),
+            soll_speed=float(soll_speed),
+            selected_axes=tuple(sorted(selected_set)),
+        )
+    )
 
     if deadman and select_hip and (not selected_set) and len(rig_ids) == 1:
         # Single-winch fallback for ambiguous select button mappings during bring-up.

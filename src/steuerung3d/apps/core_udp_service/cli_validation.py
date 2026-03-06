@@ -62,25 +62,41 @@ def validate_ui_telem_targets(
     ui_telem_disable: bool,
     axis_ids: list[str],
     ui_telem_targets: list[Tuple[str, int]],
+    mode: str = "per_axis",
 ) -> str | None:
     if ui_telem_disable:
         return None
+
+    mode = str(mode or "per_axis").strip().lower()
+    if mode not in ("per_axis", "fanout"):
+        return f"Unsupported UI telemetry mode: {mode}"
+
+    if mode == "fanout":
+        if len(ui_telem_targets) < 1:
+            return (
+                "Fanout UI telemetry mode requires at least one UI telemetry target.\n\n"
+                "Fix: provide one or more --ui-telem-target values or use --ui-telem-base/--ui-telem-count."
+            )
+        return None
+
     if len(axis_ids) > 1:
         if len(ui_telem_targets) != len(axis_ids):
             msg = (
-                "Multi-axis run requires one UI telemetry target per axis (no broadcast).\n\n"
+                "Multi-axis run requires one UI telemetry target per axis in per_axis mode.\n\n"
                 f"Axes ({len(axis_ids)}): {', '.join(axis_ids)}\n"
                 f"UI Telemetry targets provided ({len(ui_telem_targets)}): {ui_telem_targets}\n\n"
                 "Fix: provide N targets, e.g.\n"
                 "  --ui-telem-target 127.0.0.1:51002 --ui-telem-target 127.0.0.1:51003 ...\n"
                 "or use a local range, e.g.\n"
                 f"  --ui-telem-base 51002 --ui-telem-count {len(axis_ids)}\n"
+                "or switch to fanout mode for pooled HiPs:\n"
+                "  --ui-telem-mode fanout\n"
             )
             return msg
     else:
         if len(ui_telem_targets) != 1:
             msg = (
-                "Single-axis run requires exactly one UI telemetry target.\n\n"
+                "Single-axis run requires exactly one UI telemetry target in per_axis mode.\n\n"
                 f"Axis: {axis_ids[0] if axis_ids else 'X'}\n"
                 f"Targets provided ({len(ui_telem_targets)}): {ui_telem_targets}"
             )

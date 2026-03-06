@@ -188,7 +188,15 @@ class SnapshotHandler:
                 pass
 
         if not self.args.ui_telem_disable:
-            self.stats["ui_telem_out"] += max(1, len(self.axis_ids))
+            ui_mode = (
+                str(getattr(self.args, "ui_telem_mode", "per_axis") or "per_axis").strip().lower()
+            )
+            n_ui = (
+                len(getattr(self.router, "ui_telem_fanout", []) or [])
+                if ui_mode == "fanout"
+                else len(self.axis_ids)
+            )
+            self.stats["ui_telem_out"] += max(1, n_ui)
             self.last_seen["ui_telem_ts"] = time.monotonic()
             self.log.debug(
                 "tx ui telem: tick=%s estop=%s fault=%s", snap.tick, snap.estop, snap.fault

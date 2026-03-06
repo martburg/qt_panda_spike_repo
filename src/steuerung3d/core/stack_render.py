@@ -31,6 +31,8 @@ class RenderContext:
     rig: Any
     axis: str | None = None
     axis_index: int | None = None
+    instance_index: int | None = None
+    instance_ordinal: int | None = None
 
 
 def _csv(xs: Any) -> str:
@@ -143,6 +145,8 @@ def eval_expr(expr: str, ctx: RenderContext) -> Any:
         "rig": ctx.rig,
         "axis": ctx.axis,
         "axis_index": ctx.axis_index,
+        "instance_index": ctx.instance_index,
+        "instance_ordinal": ctx.instance_ordinal,
         **_SAFE_FUNCS,
     }
     tree = ast.parse(expr, mode="eval")
@@ -186,8 +190,21 @@ def render_argv(args: Iterable[Any], ctx: RenderContext) -> List[str]:
 
 
 def make_context(
-    *, stack: dict, net: dict, rig: dict, axis: str | None, axis_index: int | None
+    *,
+    stack: dict,
+    net: dict,
+    rig: dict,
+    axis: str | None,
+    axis_index: int | None,
+    instance_index: int | None = None,
+    instance_ordinal: int | None = None,
 ) -> RenderContext:
     return RenderContext(
-        stack=_ns(stack), net=_ns(net), rig=_ns(rig), axis=axis, axis_index=axis_index
+        stack=_ns(stack),
+        net=_ns(net),
+        rig=_ns(rig),
+        axis=axis,
+        axis_index=axis_index,
+        instance_index=instance_index,
+        instance_ordinal=instance_ordinal,
     )

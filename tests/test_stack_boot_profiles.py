@@ -83,3 +83,32 @@ def test_set_disables_service(tmp_path: Path):
     procs = expand_processes(spec, session_dir=tmp_path)
     names = [p.name for p in procs]
     assert "hip" not in names
+
+
+def test_two_dev_two_hip_attach_profile_loads_and_expands(tmp_path: Path):
+    profile = Path("configs/stacks/2dev_2hip_attach_sim.toml")
+    spec = load_stack_profile(profile)
+    assert spec.name == "2dev_2hip_attach_sim"
+    assert spec.axes == ["Anton", "Debby"]
+
+    procs = expand_processes(spec, session_dir=tmp_path)
+    names = [p.name for p in procs]
+
+    assert "core" in names
+    assert "densi-Anton" in names
+    assert "densi-Debby" in names
+    assert "hip-1" in names
+    assert "hip-2" in names
+    assert "inputd" not in names
+    assert "joy2intent" not in names
+
+    hip1 = next(p for p in procs if p.name == "hip-1")
+    hip2 = next(p for p in procs if p.name == "hip-2")
+
+    assert hip1.argv[hip1.argv.index("--telem-in") + 1].endswith(":51002")
+    assert hip2.argv[hip2.argv.index("--telem-in") + 1].endswith(":51003")
+    assert hip1.argv[hip1.argv.index("--hip-id") + 1] == "hip-1"
+    assert hip2.argv[hip2.argv.index("--hip-id") + 1] == "hip-2"
+
+    core = next(p for p in procs if p.name == "core")
+    assert core.argv[core.argv.index("--ui-telem-mode") + 1] == "fanout"

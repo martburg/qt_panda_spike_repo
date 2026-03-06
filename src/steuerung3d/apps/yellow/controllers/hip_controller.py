@@ -47,6 +47,7 @@ class HiPController:
     telemetry_in: TelemetryIn
 
     shadow_mode: str | None = None
+    hip_id: str = ""
 
     # If we stop receiving telemetry for this long, we go back to UNKNOWN
     stale_after_ms: int = 500
@@ -118,7 +119,7 @@ class HiPController:
         # JogWinch intents, and the core will ignore them as stale.
         #
         # In the future, we can make this per-instance/per-axis via config.
-        self._hip_id: str = os.environ.get("STEUERUNG3D_HIP_ID", "hip")
+        self._hip_id: str = str(self.hip_id or os.environ.get("STEUERUNG3D_HIP_ID", "hip") or "hip")
 
     def set_fixed_axis(self, axis_id: str, *, lock_combo: bool = True) -> None:
         self._fixed_axis = normalize_axis_id(axis_id)
