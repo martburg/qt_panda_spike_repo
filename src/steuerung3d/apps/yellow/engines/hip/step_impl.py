@@ -83,27 +83,6 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     attached = bool(selected_axis) or bool(fixed_axis)
     mode_now = str(getattr(snap, "core_mode", "") or "")
 
-    motion_axis_id = axis_id
-    if not motion_axis_id and len(axis_ids) == 1:
-        motion_axis_id = axis_ids[0]
-    if (not motion_axis_id) and self.state.joy.deadman and self.state.joy.select_hip:
-        actionable: list[str] = []
-        for axis_key in axis_ids:
-            ax = axes.get(axis_key)
-            if ax is None:
-                continue
-            in_scope = getattr(ax, "in_scope", True)
-            if in_scope is None:
-                in_scope = True
-            if not bool(in_scope):
-                continue
-            if bool(getattr(ax, "fault", False)):
-                continue
-            actionable.append(str(axis_key))
-        if len(actionable) == 1:
-            # Single-axis bring-up: avoid ambiguous selection mapping.
-            motion_axis_id = actionable[0]
-
     presentation_axis_id = axis_id if attached else ""
     snap_view = axis_scoped_snapshot(snap, presentation_axis_id)
     params = getattr(snap_view, "params", {}) or {}
@@ -134,6 +113,38 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     estop = bool(getattr(snap, "estop", False))
     fault = bool(getattr(snap, "fault", False))
 
+    # ---- local joy projection: global deadman, axis-local selection/speed ----
+    joy = getattr(snap, "joy", None) or JoyState()
+
+    joy_deadman = bool(getattr(joy, "deadman", False))
+    raw_soll_speed = float(getattr(joy, "soll_speed", 0.0) or 0.0)
+
+    selected_axes = tuple(getattr(joy, "selected_axes", ()) or ())
+    selected_axis_set = {str(x).strip() for x in selected_axes if str(x).strip()}
+
+    if selected_axis_set:
+        local_selected = bool(axis_id) and axis_id in selected_axis_set
+    else:
+        # Legacy fallback: aggregate select flag only applies when this HiP
+        # currently presents a valid axis.
+        local_selected = bool(axis_id) and bool(getattr(joy, "select_hip", False))
+
+    joy_select_hip = bool(local_selected)
+    joy_soll_speed = float(raw_soll_speed if local_selected else 0.0)
+
+    # ---- motion target resolution ----
+    motion_axis_id = axis_id
+    if not motion_axis_id and len(axis_ids) == 1 and joy_deadman and joy_select_hip:
+        actionable: list[str] = []
+        for axis_key in axis_ids:
+            ax = axes.get(axis_key)
+            if ax is None:
+                continue
+            actionable.append(str(axis_key))
+        if len(actionable) == 1:
+            # Single-axis bring-up: avoid ambiguous selection mapping.
+            motion_axis_id = actionable[0]
+
     prev_jog_active = bool(self.state.joy_jog_active)
     prev_jog_axis = str(self.state.joy_jog_axis or "")
 
@@ -144,7 +155,7 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     owner = get_claim_owner(snap, motion_axis_id) if motion_axis_id else ""
     owner_ok = owner == str(hip_id or "")
 
-    speed = float(self.state.joy.soll_speed)
+    speed = float(joy_soll_speed)
     speed_active = abs(speed) > 1e-3
     armed_ok = str(estate or "").upper() in ("ARMED", "READY")
     ready_ok = bool(logical.get("ready", False))
@@ -159,8 +170,8 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
         and bool(armed_ok)
         and bool(ready_ok)
         and owner_ok
-        and self.state.joy.deadman
-        and self.state.joy.select_hip
+        and joy_deadman
+        and joy_select_hip
         and speed_active
     )
 
@@ -183,9 +194,9 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
             return "ready"
         if not owner_ok:
             return f"owner={owner or '-'}"
-        if not self.state.joy.deadman:
+        if not joy_deadman:
             return "deadman"
-        if not self.state.joy.select_hip:
+        if not joy_select_hip:
             return "select"
         if not speed_active:
             return "zero_speed"
@@ -239,7 +250,7 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
                 0.0,
             ):
                 intents.append(JogWinch(winch_id=stop_axis_id, rate=0.0, hip_id=hip_id))
-            if (not self.state.joy.deadman) and should_emit_enable(
+            if (not joy_deadman) and should_emit_enable(
                 self.state.last_sent_enable_by_axis,
                 stop_axis_id,
                 False,
@@ -260,7 +271,9 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     self.state.joy_jog_active = bool(jog_allowed)
     self.state.joy_jog_axis = str(motion_axis_id or "") if jog_allowed else ""
 
-    if self.state.joy.select_hip and axis_id:
+    # Attachment claiming remains separate; only legacy aggregate select is allowed
+    # to drive this fallback path, never explicit selected_axes lane semantics.
+    if bool(getattr(joy, "select_hip", False)) and (not selected_axis_set) and axis_id:
         owner = get_claim_owner(snap, axis_id)
         if owner != str(hip_id or ""):
             has_claim = any(
@@ -297,29 +310,10 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     drive_status_summary = f"{main_text}|{slave_text}" if (main_text or slave_text) else ""
     drive_status = HipDriveStatusState(main_text=str(main_text), slave_text=str(slave_text))
 
-    
     def _brake_ok_display(raw: bool) -> bool:
-            if bool(taster) and bool(within_brake):
-                return True
-            return bool(raw)
-
-    joy = getattr(snap, "joy", None) or JoyState()
-
-    joy_deadman = bool(getattr(joy, "deadman", False))
-    raw_soll_speed = float(getattr(joy, "soll_speed", 0.0) or 0.0)
-
-    selected_axes = tuple(getattr(joy, "selected_axes", ()) or ())
-    selected_axis_set = {str(x).strip() for x in selected_axes if str(x).strip()}
-
-    if selected_axis_set:
-        local_selected = bool(axis_id) and axis_id in selected_axis_set
-    else:
-        # Legacy fallback: aggregate select flag only applies when this HiP
-        # currently presents a valid axis.
-        local_selected = bool(axis_id) and bool(getattr(joy, "select_hip", False))
-
-    joy_select_hip = bool(local_selected)
-    joy_soll_speed = float(raw_soll_speed if local_selected else 0.0)
+        if bool(taster) and bool(within_brake):
+            return True
+        return bool(raw)
 
     readouts = None
     cut_markers = None
@@ -342,6 +336,7 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
             estate=estate,
             mode=str(mode_now),
         )
+
     # --- UI actions -> intents (param ops, estop reset, resync) ---
     if ui.estop_reset_clicked and axis_id:
         intents.append(RequestEstopReset(axis_id=axis_id, hip_id=hip_id))
