@@ -83,6 +83,11 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     attached = bool(selected_axis) or bool(fixed_axis)
     mode_now = str(getattr(snap, "core_mode", "") or "")
 
+    ui_axis_id = normalize_axis_id(getattr(ui, "axis_selected", ""))
+    display_axis_id = axis_id or ui_axis_id
+    if not display_axis_id and len(axis_ids) == 1:
+        display_axis_id = axis_ids[0]
+
     presentation_axis_id = axis_id if attached else ""
     snap_view = axis_scoped_snapshot(snap, presentation_axis_id)
     params = getattr(snap_view, "params", {}) or {}
@@ -117,28 +122,35 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     joy = getattr(snap, "joy", None) or JoyState()
 
     joy_deadman = bool(getattr(joy, "deadman", False))
+    raw_select_hip = bool(getattr(joy, "select_hip", False))
     raw_soll_speed = float(getattr(joy, "soll_speed", 0.0) or 0.0)
 
     selected_axes = tuple(getattr(joy, "selected_axes", ()) or ())
     selected_axis_set = {str(x).strip() for x in selected_axes if str(x).strip()}
 
     if selected_axis_set:
-        local_selected = bool(axis_id) and axis_id in selected_axis_set
+        local_selected = bool(display_axis_id) and display_axis_id in selected_axis_set
     else:
-        # Legacy fallback: aggregate select flag only applies when this HiP
-        # currently presents a valid axis.
-        local_selected = bool(axis_id) and bool(getattr(joy, "select_hip", False))
+        local_selected = bool(display_axis_id) and raw_select_hip
 
     joy_select_hip = bool(local_selected)
     joy_soll_speed = float(raw_soll_speed if local_selected else 0.0)
-
     # ---- motion target resolution ----
     motion_axis_id = axis_id
-    if not motion_axis_id and len(axis_ids) == 1 and joy_deadman and joy_select_hip:
+    if not motion_axis_id and len(axis_ids) == 1 and self.state.joy.deadman and (
+        self.state.joy.select_hip or raw_select_hip
+    ):
         actionable: list[str] = []
         for axis_key in axis_ids:
             ax = axes.get(axis_key)
             if ax is None:
+                continue
+            in_scope = getattr(ax, "in_scope", True)
+            if in_scope is None:
+                in_scope = True
+            if not bool(in_scope):
+                continue
+            if bool(getattr(ax, "fault", False)):
                 continue
             actionable.append(str(axis_key))
         if len(actionable) == 1:
@@ -242,8 +254,19 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
             ):
                 intents.append(intent)
     else:
-        stop_axis_id = prev_jog_axis or str(motion_axis_id or "")
-        if stop_axis_id:
+        stop_axis_id = prev_jog_axis or str(motion_axis_id or display_axis_id or "")
+        raw_speed_active = abs(raw_soll_speed) > 1e-3
+        stop_pulse_needed = bool(
+            stop_axis_id
+            and (
+                prev_jog_active
+                or raw_speed_active
+                or (not joy_deadman)
+                or raw_select_hip
+                or joy_select_hip
+            )
+        )
+        if stop_axis_id and stop_pulse_needed:
             if should_emit_speed(
                 self.state.last_sent_speed_by_axis,
                 stop_axis_id,
