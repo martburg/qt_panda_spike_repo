@@ -334,7 +334,9 @@ class HipRuntime:
         return assemble_view_model(pres)
 
     def _emit_status(self, now_ns: int) -> None:
-        if not getattr(self, "_status", None):
+        # Status emitters may legitimately be falsey (e.g. a test stub that
+        # defines __bool__). Only skip emission when we truly don't have one.
+        if getattr(self, "_status", None) is None:
             return
 
         h = compute_health(

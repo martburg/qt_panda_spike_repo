@@ -34,6 +34,8 @@ from .intent_policy import (
     should_emit_enable,
     should_emit_speed,
 )
+from .joy_projection import project_joy
+from .motion_target import resolve_motion_axis_id
 from .param_ui import run_param_txn
 from .presentation import (
     compute_banner_estate,
@@ -118,40 +120,20 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
 
     # ---- local joy projection: global deadman, axis-local selection/speed ----
     joy = getattr(snap, "joy", None) or JoyState()
-
-    joy_deadman = bool(getattr(joy, "deadman", False))
-    raw_select_hip = bool(getattr(joy, "select_hip", False))
-    raw_soll_speed = float(getattr(joy, "soll_speed", 0.0) or 0.0)
-
-    selected_axes = tuple(getattr(joy, "selected_axes", ()) or ())
-    selected_axis_set = {str(x).strip() for x in selected_axes if str(x).strip()}
-
-    if selected_axis_set:
-        local_selected = bool(display_axis_id) and display_axis_id in selected_axis_set
-    else:
-        local_selected = False
-
-    joy_select_hip = bool(local_selected)
-    joy_soll_speed = float(raw_soll_speed if local_selected else 0.0)
+    joyp = project_joy(joy=joy, display_axis_id=str(display_axis_id or ""))
+    joy_deadman = bool(joyp.deadman)
+    joy_select_hip = bool(joyp.select_hip)
+    joy_soll_speed = float(joyp.soll_speed)
+    raw_select_hip = bool(joyp.raw_select_hip)
+    raw_soll_speed = float(joyp.raw_soll_speed)
     # ---- motion target resolution ----
-    motion_axis_id = axis_id
-    if not motion_axis_id and len(axis_ids) == 1 and joy_deadman and joy_select_hip:
-        actionable: list[str] = []
-        for axis_key in axis_ids:
-            ax = axes.get(axis_key)
-            if ax is None:
-                continue
-            in_scope = getattr(ax, "in_scope", True)
-            if in_scope is None:
-                in_scope = True
-            if not bool(in_scope):
-                continue
-            if bool(getattr(ax, "fault", False)):
-                continue
-            actionable.append(str(axis_key))
-        if len(actionable) == 1:
-            # Single-axis bring-up: avoid ambiguous selection mapping.
-            motion_axis_id = actionable[0]
+    motion_axis_id = resolve_motion_axis_id(
+        axis_id=str(axis_id or ""),
+        axis_ids=list(axis_ids),
+        joy_deadman=bool(joy_deadman),
+        joy_select_hip=bool(joy_select_hip),
+        axes=axes,
+    )
 
     prev_jog_active = bool(self.state.joy_jog_active)
     prev_jog_axis = str(self.state.joy_jog_axis or "")

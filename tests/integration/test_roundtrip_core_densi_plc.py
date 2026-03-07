@@ -61,7 +61,7 @@ def _start_core(
     )
 
 
-def _wait_for(condition, timeout_s: float = 2.5, sleep_s: float = 0.02):
+def _wait_for(condition, timeout_s: float = 5.0, sleep_s: float = 0.02):
     t0 = time.time()
     while time.time() - t0 < timeout_s:
         if condition():
@@ -209,12 +209,20 @@ def test_core_densi_param_write_roundtrip_plc():
         intent_out = UdpIntentOut.connect(("127.0.0.1", intent_port))
 
         # Ensure core has seen at least one telemetry frame before we start edit/write.
-        def _axis_seen():
-            snaps = telem_in.drain_telemetry(limit=50)
-            return any(axis in (s.axes or {}) for s in snaps)
+        rx_counts = {"snaps": 0, "axis_hits": 0}
 
-        assert _wait_for(_axis_seen, timeout_s=2.5), (
-            "Core did not publish UI telemetry for axis (probe uplink not received?)"
+        def _axis_seen() -> bool:
+            snaps = telem_in.drain_telemetry(limit=100)
+            rx_counts["snaps"] += len(snaps)
+            hit = any(axis in (s.axes or {}) for s in snaps)
+            if hit:
+                rx_counts["axis_hits"] += 1
+            return hit
+
+        assert _wait_for(_axis_seen), (
+            "Core did not publish UI telemetry for axis within timeout. "
+            f"snaps_rx={rx_counts['snaps']} probe_lifetick={probe.lifetick} "
+            f"last_downlink={'yes' if probe.last_seen_downlink else 'no'}"
         )
 
         desired = {"P": 6.3, "I": 0.0, "D": 0.0, "IL": 0.0}

@@ -217,7 +217,9 @@ class DensiRuntime:
                 pass
 
     def _emit_status(self, now_ns: int) -> None:
-        if not self._status:
+        # Status emitters may legitimately be falsey (e.g. a test stub that
+        # defines __bool__). Only skip emission when we truly don't have one.
+        if self._status is None:
             return
 
         h = compute_health(
