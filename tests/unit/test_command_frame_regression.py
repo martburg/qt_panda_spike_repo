@@ -50,7 +50,7 @@ def test_command_frame_sequence_regression_hash():
     for a in axis_ids:
         st.ensure_axis(a)
     st.core_mode = CoreMode.LIVE
-    st.joy = JoyState(select_hip=True)
+    st.joy = JoyState(deadman=True, selected_axes=("X", "Y"))
 
     frames: List[CommandFrame] = []
 
@@ -86,7 +86,8 @@ def test_command_frame_sequence_regression_hash():
     assert frames, "expected command frames"
     got = _fingerprint(frames)
 
-    # Baseline generated from current deterministic SIM behavior.
+    # Baseline generated from current deterministic SIM behavior with explicit
+    # selected_axes + deadman driving motion eligibility.
     expected = "4075eb972757e7312e6f7d3a0523d750ec3b4d0717c89b3d6f7db05d1684af2f"  # updated: CommandFrame now carries amp reset pulses
     # updated: CommandFrame now preserves axis-scoped resync
     # (and retains per-axis reset pulse fields), so the deterministic

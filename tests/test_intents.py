@@ -20,7 +20,7 @@ def test_enable_and_jog_writes_command_state_only_in_live():
 
     # LIVE -> commands are accepted
     st.core_mode = CoreMode.LIVE
-    st.joy = JoyState(select_hip=True)
+    st.joy = JoyState(deadman=True, selected_axes=("X",))
     apply_intent(st, EnableAxis(axis_id="X", enable=True, hip_id=hip_id))
     apply_intent(st, JogAxis(axis_id="X", vel=1.25, hip_id=hip_id))
 
@@ -58,7 +58,7 @@ def test_jog_winch_writes_vel_in_command_frame() -> None:
     hip_id = "hipA"
     apply_intent(st, RequestAxisLease(axis_id="Anton", hip_id=hip_id, req_id="lease-3"))
     st.core_mode = CoreMode.LIVE
-    st.joy = JoyState(select_hip=True)
+    st.joy = JoyState(deadman=True, selected_axes=("Anton",))
     apply_intent(st, EnableAxis(axis_id="Anton", enable=True, hip_id=hip_id))
     apply_intent(st, JogWinch(winch_id="Anton", rate=-0.5, hip_id=hip_id))
 

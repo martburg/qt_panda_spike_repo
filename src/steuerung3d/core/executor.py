@@ -183,21 +183,13 @@ def build_command_frame(state: MachineState) -> CommandFrame:
         if joy is not None
         else set()
     )
-    joy_select = bool(selected_axes) or (
-        bool(getattr(joy, "select_hip", False)) if joy is not None else False
-    )
-
     # Motion-resolution policy:
-    # - New lane semantics use explicit selected_axes + deadman. Only those axes may move.
-    # - Legacy paths (older stacks and lower-level tests) may only set select_hip=True.
-    #   In that compatibility mode, already-commanded leased/claimed axes remain active.
-    # - Without any live-selection signal, commanded velocity is suppressed.
+    # - Explicit selected_axes + deadman are authoritative. Only those axes may move.
+    # - Without a live lane selection, commanded velocity is suppressed.
     if core_mode != CoreMode.LIVE.value:
         active_axes: set[str] = set()
-    elif selected_axes:
-        active_axes = set(selected_axes) if joy_deadman else set()
-    elif joy_select:
-        active_axes = set(axes.keys())
+    elif selected_axes and joy_deadman:
+        active_axes = set(selected_axes)
     else:
         active_axes = set()
 

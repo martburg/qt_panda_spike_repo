@@ -30,9 +30,7 @@ def test_birds_eye_exposes_lane_selection_and_resolved_targets() -> None:
     status = _FakeStatus()
     state = MachineState()
     state.core_mode = "LIVE"
-    state.joy = JoyState(
-        deadman=True, select_hip=True, soll_speed=0.5, selected_axes=("Anton", "Debby")
-    )
+    state.joy = JoyState(deadman=True, soll_speed=0.5, selected_axes=("Anton", "Debby"))
     state.axis_claims = {"Anton": "hip-1", "Debby": "hip-2"}
     state.ensure_axis("Anton")
     state.ensure_axis("Debby")

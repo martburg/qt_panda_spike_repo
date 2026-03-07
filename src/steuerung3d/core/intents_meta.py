@@ -14,9 +14,9 @@ from typing import Literal, Tuple
 class JoyStateUpdate:
     """Atomic joystick state sample.
 
-    `select_hip` is kept for backward compatibility and remains the aggregate
-    "any lane selected" indicator. `selected_axes` carries the new multi-lane
-    selection surface used to project per-HiP selected state.
+    `selected_axes` is the authoritative multi-lane selection surface.
+    `select_hip` is a deprecated compatibility mirror and should not carry
+    independent semantics.
     """
 
     type: Literal["joy_state_update"] = "joy_state_update"

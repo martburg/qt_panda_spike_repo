@@ -134,7 +134,6 @@ def decode_telemetry(payload: Dict[str, Any]) -> TelemetrySnapshot:
         )
         joy = JoyState(
             deadman=bool(joy_in.get("deadman", False)),
-            select_hip=bool(joy_in.get("select_hip", False)) or bool(selected_axes),
             soll_speed=clamp_soll_speed(joy_in.get("soll_speed", 0.0)),
             selected_axes=selected_axes,
         )

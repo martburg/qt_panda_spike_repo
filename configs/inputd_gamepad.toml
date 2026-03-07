@@ -18,8 +18,7 @@ src = "gamepad0"
 # Convert D-pad hats to 4 virtual buttons per hat (up,down,left,right)
 hat_as_buttons = true
 
-# Optionally cap reported axes/buttons (useful if a device exposes lots).
-# Leave max_buttons unset when you want joy2intent to see every available physical button.
+# Optionally cap reported axes/buttons (useful if a device exposes lots)
 # max_axes = 8
 # max_buttons = 16
 

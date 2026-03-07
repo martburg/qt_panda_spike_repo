@@ -39,10 +39,8 @@ class JoyState:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "deadman", bool(self.deadman))
-        object.__setattr__(self, "select_hip", bool(self.select_hip))
         object.__setattr__(self, "soll_speed", clamp_soll_speed(self.soll_speed))
-        object.__setattr__(
-            self,
-            "selected_axes",
-            canonicalize_selected_axes(self.selected_axes),
-        )
+        selected_axes = canonicalize_selected_axes(self.selected_axes)
+        object.__setattr__(self, "selected_axes", selected_axes)
+        # Deprecated compatibility mirror only: selection authority is selected_axes.
+        object.__setattr__(self, "select_hip", bool(selected_axes))

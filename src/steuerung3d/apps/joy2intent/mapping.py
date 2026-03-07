@@ -26,13 +26,13 @@ from steuerung3d.core.joy_state import clamp_soll_speed
 class JoyBindings:
     # Mapping from logical axis name -> index in rc.axes
     axes: Dict[str, int]
-    # Mapping from logical button name -> one or more raw button indices
-    buttons: Dict[str, List[int]]
+    # Mapping from logical button name -> button index or alias list
+    buttons: Dict[str, int | list[int]]
     # Required (non-default) settings must appear before defaulted fields (dataclasses rule)
     deadzone: float
     expo: float
-    # Button index groups used to select winches by position (0..N-1)
-    select_buttons: List[List[int]] = field(default_factory=list)
+    # Button indices used to select winches by position (0..N-1)
+    select_buttons: List[int] = field(default_factory=list)
     # Optional axis inversion by logical axis name
     invert: Dict[str, bool] = field(default_factory=dict)
 
@@ -138,6 +138,30 @@ def _pressed_buttons(rc: Any) -> Set[int]:
     return set()
 
 
+def _button_aliases(value: int | list[int] | None) -> set[int]:
+    if value is None:
+        return set()
+    if isinstance(value, int):
+        return {value}
+    out: set[int] = set()
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, int):
+                out.add(item)
+    return out
+
+
+def _select_aliases(entry: int | list[int]) -> set[int]:
+    if isinstance(entry, int):
+        return {entry}
+    out: set[int] = set()
+    if isinstance(entry, list):
+        for item in entry:
+            if isinstance(item, int):
+                out.add(item)
+    return out
+
+
 def _axes(rc: Any) -> List[float]:
     if hasattr(rc, "axes"):
         try:
@@ -145,14 +169,6 @@ def _axes(rc: Any) -> List[float]:
         except Exception:
             return []
     return []
-
-
-def _is_pressed_any(pressed: Set[int], candidates: int | Sequence[int] | None) -> bool:
-    if candidates is None:
-        return False
-    if isinstance(candidates, int):
-        return int(candidates) in pressed
-    return any(int(c) in pressed for c in candidates)
 
 
 def synthesize_intents(
@@ -170,16 +186,13 @@ def synthesize_intents(
     """
     intents: List[object] = []
 
-    deadman_btns = bind.buttons.get("deadman")
-    fine_btns = bind.buttons.get("fine")
+    deadman_btn = _button_aliases(bind.buttons.get("deadman"))
+    fine_btn = _button_aliases(bind.buttons.get("fine"))
     pressed = _pressed_buttons(rc)
     axes = _axes(rc)
 
-    deadman = _is_pressed_any(pressed, deadman_btns)
-    fine = _is_pressed_any(pressed, fine_btns)
-
-    select_btns = bind.buttons.get("select_hip")
-    select_hip_button = _is_pressed_any(pressed, select_btns)
+    deadman = bool(deadman_btn & pressed)
+    fine = bool(fine_btn & pressed)
 
     soll_speed = 0.0
     soll_axis = bind.axes.get("soll_speed")
@@ -194,25 +207,24 @@ def synthesize_intents(
 
     # Determine which winches are selected (by select_buttons index).
     selected: List[str] = []
-    for i, button_group in enumerate(bind.select_buttons or []):
-        if _is_pressed_any(pressed, button_group) and i < len(rig_ids):
+    for i, entry in enumerate(bind.select_buttons or []):
+        aliases = _select_aliases(entry)
+        if aliases & pressed and i < len(rig_ids):
             selected.append(rig_ids[i])
 
     selected_set = set(selected)
-    select_hip = bool(select_hip_button) or bool(selected_set)
+    if deadman and (not selected_set) and len(rig_ids) == 1:
+        # Single-winch fallback for ambiguous/missing select mappings during bring-up.
+        selected_set = {rig_ids[0]}
 
     intents.append(
         JoyStateUpdate(
             deadman=bool(deadman),
-            select_hip=bool(select_hip),
+            select_hip=bool(selected_set),
             soll_speed=float(soll_speed),
             selected_axes=tuple(sorted(selected_set)),
         )
     )
-
-    if deadman and select_hip and (not selected_set) and len(rig_ids) == 1:
-        # Single-winch fallback for ambiguous select button mappings during bring-up.
-        selected_set = {rig_ids[0]}
 
     # Deadman released: disable any previously enabled winches.
     if not deadman:

@@ -15,7 +15,7 @@ def test_sim_plant_acc_limits_and_estop():
     st = MachineState()
     st.ensure_axis("X")
     st.core_mode = CoreMode.LIVE
-    st.joy = JoyState(select_hip=True)
+    st.joy = JoyState(deadman=True, selected_axes=("X",))
 
     plant = SimAxisPlant(params={"X": AxisPlantParams(max_vel=10.0, max_acc=1.0)})
 

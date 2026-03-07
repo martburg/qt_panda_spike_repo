@@ -126,7 +126,7 @@ axis_ids = ["Y"]
     st = rt.state
 
     st.core_mode = CoreMode.LIVE
-    st.joy = JoyState(select_hip=True)
+    st.joy = JoyState(deadman=True, selected_axes=("X", "Y"))
     # Activate + enable both axes and jog them differently.
     eng.step_once()
 

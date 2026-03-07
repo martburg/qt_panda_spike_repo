@@ -16,7 +16,7 @@ def test_joy_state_update_reaches_snapshot() -> None:
     bus = InMemTransport()
     snaps = []
 
-    bus.publish_intent(JoyStateUpdate(deadman=True, select_hip=True, soll_speed=-0.75))
+    bus.publish_intent(JoyStateUpdate(deadman=True, soll_speed=-0.75, selected_axes=("Anton",)))
 
     eng = CoreEngine(
         timebase=tb,
@@ -30,6 +30,7 @@ def test_joy_state_update_reaches_snapshot() -> None:
     assert len(snaps) == 1
     joy = snaps[0].joy
     assert joy.deadman is True
+    assert joy.selected_axes == ("Anton",)
     assert joy.select_hip is True
     assert abs(joy.soll_speed - (-0.75)) < 1e-6
 

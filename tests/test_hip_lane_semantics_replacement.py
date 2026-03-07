@@ -59,9 +59,9 @@ def _snap(
     )
 
 
-def test_select_hip_does_not_claim_axis_under_lane_semantics() -> None:
+def test_no_selected_lane_does_not_claim_axis_under_lane_semantics() -> None:
     eng = HipEngine(hip_id="hip-test")
-    joy = JoyState(deadman=True, select_hip=True, soll_speed=0.0)
+    joy = JoyState(deadman=True, soll_speed=0.0)
     snap = _snap("Anton", joy=joy, claimed_by="")
 
     inputs = HipStepInputs(
@@ -84,9 +84,9 @@ def test_select_hip_does_not_claim_axis_under_lane_semantics() -> None:
     assert not any(isinstance(i, ReleaseAxis) for i in res.intents)
 
 
-def test_select_hip_without_ownership_does_not_move_axis() -> None:
+def test_no_selected_lane_without_ownership_does_not_move_axis() -> None:
     eng = HipEngine(hip_id="hip-test")
-    joy = JoyState(deadman=True, select_hip=True, soll_speed=0.5)
+    joy = JoyState(deadman=True, soll_speed=0.5)
     snap = _snap("Anton", joy=joy, claimed_by="", vel_max=2.0)
 
     inputs = HipStepInputs(
@@ -110,9 +110,9 @@ def test_select_hip_without_ownership_does_not_move_axis() -> None:
     assert not any(isinstance(i, JogWinch) and abs(float(i.rate)) > 1e-9 for i in res.intents)
 
 
-def test_select_hip_with_ownership_drives_motion_but_not_attachment() -> None:
+def test_selected_lane_with_ownership_drives_motion_but_not_attachment() -> None:
     eng = HipEngine(hip_id="hip-test")
-    joy = JoyState(deadman=True, select_hip=True, soll_speed=0.4, selected_axes=("Anton",))
+    joy = JoyState(deadman=True, soll_speed=0.4, selected_axes=("Anton",))
     snap = _snap("Anton", joy=joy, claimed_by="hip-test", vel_max=2.0)
 
     inputs = HipStepInputs(

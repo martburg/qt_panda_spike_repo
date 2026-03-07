@@ -90,14 +90,11 @@ def joy_selected_for_axis(*, joy: object | None, axis_id: str) -> bool:
             except TypeError:
                 selected_axes = ()
 
-    if selected_axes:
-        selected_axis_set = {
-            normalize_axis_id(str(x).strip()) for x in selected_axes if str(x).strip()
-        }
-        return axis in selected_axis_set
+    if not selected_axes:
+        return False
 
-    facts = extract_joy_facts(joy)
-    return bool(facts.select_hip) and bool(axis)
+    selected_axis_set = {normalize_axis_id(str(x).strip()) for x in selected_axes if str(x).strip()}
+    return axis in selected_axis_set
 
 
 def joy_speed_for_axis(*, joy: object | None, axis_id: str) -> float:

@@ -37,7 +37,6 @@ def handle_joy_state_update(state: MachineState, intent: JoyStateUpdate) -> None
     selected_axes = tuple(getattr(intent, "selected_axes", ()) or ())
     state.joy = JoyState(
         deadman=bool(getattr(intent, "deadman", False)),
-        select_hip=bool(getattr(intent, "select_hip", False)) or bool(selected_axes),
         soll_speed=clamp_soll_speed(float(getattr(intent, "soll_speed", 0.0))),
         selected_axes=selected_axes,
     )

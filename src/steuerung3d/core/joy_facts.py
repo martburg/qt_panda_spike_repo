@@ -9,7 +9,7 @@ class JoyFacts:
 
     Semantics:
     - deadman: operator is holding the deadman switch.
-    - select_hip: operator has explicitly selected/armed control (SEL gate).
+    - select_hip: deprecated compatibility mirror; true iff any selected_axes exist.
     - soll_speed: commanded speed scalar (unitless policy input).
     """
 
@@ -23,15 +23,20 @@ def extract_joy_facts(joy: object | None) -> JoyFacts:
 
     Accepts:
     - None
-    - objects with attributes: deadman, select_hip, soll_speed
-    - legacy attr alias: select (falls back to select_hip if present)
+    - objects with attributes: deadman, selected_axes, soll_speed
+    - legacy attr alias: select_hip / select only as compatibility fallback when selected_axes is absent
     """
     if joy is None:
         return JoyFacts()
 
     deadman = bool(getattr(joy, "deadman", False))
-    # Prefer explicit select_hip; fall back to legacy 'select'
-    if hasattr(joy, "select_hip"):
+    raw_selected_axes = getattr(joy, "selected_axes", None)
+    if raw_selected_axes is not None:
+        try:
+            select_hip = any(str(x).strip() for x in raw_selected_axes)
+        except TypeError:
+            select_hip = False
+    elif hasattr(joy, "select_hip"):
         select_hip = bool(getattr(joy, "select_hip", False))
     else:
         select_hip = bool(getattr(joy, "select", False))
