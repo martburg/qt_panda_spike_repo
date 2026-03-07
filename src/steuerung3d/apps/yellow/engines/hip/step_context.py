@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Mapping, cast
 
 if TYPE_CHECKING:
     # Only needed for type checking; avoids runtime import cycles.
     from .engine import HipEngine
 
 from steuerung3d.core.axis_ids import normalize_axis_id
+from steuerung3d.core.axis_selection import authoritative_selected_axis, visible_axis_ids_for_hip
 from steuerung3d.core.intents import ClaimAxis, Intent, ReleaseAxis
 from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
 from steuerung3d.core.telemetry import DensiTelemetry, TelemetrySnapshot
@@ -28,58 +29,6 @@ class StepContext:
     intents: list[Intent]
 
 
-def _claim_owner_by_axis(*, densis: dict[str, DensiTelemetry], axis_id: str) -> str:
-    d = densis.get(str(axis_id or ""))
-    if d is None:
-        return ""
-    return str(getattr(d, "claimed_by_hip", "") or "")
-
-
-def _visible_axis_ids_for_hip(
-    *, densis: dict[str, DensiTelemetry], hip_id: str, prev_selected: str
-) -> list[str]:
-    visible: list[str] = []
-    hip_id = str(hip_id or "")
-    prev_selected = str(prev_selected or "")
-
-    for dev_id, d in densis.items():
-        axis_id = str(dev_id or "").strip()
-        if not axis_id:
-            continue
-
-        owner = str(getattr(d, "claimed_by_hip", "") or "")
-        online = bool(getattr(d, "online", False))
-
-        if online and owner in ("", hip_id):
-            visible.append(axis_id)
-            continue
-
-        if axis_id == prev_selected and owner == hip_id:
-            visible.append(axis_id)
-
-    return sorted({x for x in visible if x.strip()})
-
-
-def _authoritative_selected_axis(
-    *, densis: dict[str, DensiTelemetry], hip_id: str, selected_axis: str, prev_selected: str
-) -> str:
-    hip_id = str(hip_id or "")
-    selected_axis = str(selected_axis or "")
-    prev_selected = str(prev_selected or "")
-
-    if selected_axis:
-        owner = _claim_owner_by_axis(densis=densis, axis_id=selected_axis)
-        if owner == hip_id:
-            return selected_axis
-
-    if prev_selected:
-        owner = _claim_owner_by_axis(densis=densis, axis_id=prev_selected)
-        if owner == hip_id:
-            return prev_selected
-
-    return ""
-
-
 def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepContext:
     """Normalize HiP step inputs into a small, testable context object."""
     self = engine
@@ -97,11 +46,10 @@ def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepCon
     if getattr(self._param_txn, "hip_id", "") != hip_id:
         self._param_txn.hip_id = hip_id
 
-    densis_raw = getattr(snap, "densis", None)
-    densis = densis_raw if isinstance(densis_raw, dict) else {}
+    densis = cast(Mapping[str, DensiTelemetry], getattr(snap, "densis", {}) or {})
 
     prev_selected = str(self.state.selected_axis or "")
-    axis_ids = _visible_axis_ids_for_hip(
+    axis_ids = visible_axis_ids_for_hip(
         densis=densis,
         hip_id=hip_id,
         prev_selected=prev_selected,
@@ -134,7 +82,7 @@ def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepCon
         lock_axis_combo=bool(inputs.lock_axis_combo),
     )
 
-    authoritative_axis = _authoritative_selected_axis(
+    authoritative_axis = authoritative_selected_axis(
         densis=densis,
         hip_id=hip_id,
         selected_axis=selected_axis,
