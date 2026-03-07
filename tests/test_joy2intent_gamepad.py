@@ -23,8 +23,8 @@ def _rc(*, axes: list[float] | None = None, pressed: Iterable[int] = ()) -> RawC
 def _bind() -> JoyBindings:
     return JoyBindings(
         axes={"manual_jog": 1},
-        buttons={"deadman": 5, "fine": 7},
-        select_buttons=[0, 1, 2, 3],
+        buttons={"deadman": [5], "fine": [7]},
+        select_buttons=[[0], [1], [2], [3]],
         invert={"manual_jog": False},
         deadzone=0.05,
         expo=1.5,
@@ -70,8 +70,8 @@ def test_single_winch_select_hip_fallback_emits_enable_and_jog(tmp_path: Path) -
     st = JoyState()
     bind = JoyBindings(
         axes={"manual_jog": 1},
-        buttons={"deadman": 5, "select_hip": 3},
-        select_buttons=[0, 1, 2, 3],
+        buttons={"deadman": [5], "select_hip": [3]},
+        select_buttons=[[0], [1], [2], [3]],
         invert={"manual_jog": False},
         deadzone=0.05,
         expo=1.5,
@@ -109,6 +109,31 @@ def test_setup_manual_multi_select_targets_all_selected_lanes(tmp_path: Path) ->
     for j in jugs:
         assert j.rate > 0
         assert j.rate <= lim.max_winch_mps
+
+
+def test_alias_buttons_can_select_same_lane_and_same_function(tmp_path: Path) -> None:
+    st = JoyState()
+    bind = JoyBindings(
+        axes={"manual_jog": 1},
+        buttons={"deadman": [5, 11], "fine": [7, 12]},
+        select_buttons=[[0, 8], [1, 9], [2], [3]],
+        invert={"manual_jog": False},
+        deadzone=0.05,
+        expo=1.5,
+    )
+    rig = _rig()
+    lim = _lim_from_config(tmp_path)
+
+    rc = _rc(axes=[0.0, 0.6], pressed=(11, 9))
+    intents = synthesize_intents(st, rc, bind, rig, lim)
+
+    enables = [i for i in intents if isinstance(i, EnableAxis) and i.enable]
+    jugs = [i for i in intents if isinstance(i, JogWinch)]
+
+    assert {e.axis_id for e in enables} == {"Debby"}
+    assert {j.winch_id for j in jugs} == {"Debby"}
+    joy = next(i for i in intents if isinstance(i, JoyStateUpdate))
+    assert set(joy.selected_axes) == {"Debby"}
 
 
 def test_deadman_release_disables_previously_enabled_winches(tmp_path: Path) -> None:

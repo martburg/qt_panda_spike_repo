@@ -26,13 +26,13 @@ from steuerung3d.core.joy_state import clamp_soll_speed
 class JoyBindings:
     # Mapping from logical axis name -> index in rc.axes
     axes: Dict[str, int]
-    # Mapping from logical button name -> button index
-    buttons: Dict[str, int]
+    # Mapping from logical button name -> one or more raw button indices
+    buttons: Dict[str, List[int]]
     # Required (non-default) settings must appear before defaulted fields (dataclasses rule)
     deadzone: float
     expo: float
-    # Button indices used to select winches by position (0..N-1)
-    select_buttons: List[int] = field(default_factory=list)
+    # Button index groups used to select winches by position (0..N-1)
+    select_buttons: List[List[int]] = field(default_factory=list)
     # Optional axis inversion by logical axis name
     invert: Dict[str, bool] = field(default_factory=dict)
 
@@ -146,6 +146,15 @@ def _axes(rc: Any) -> List[float]:
             return []
     return []
 
+def _is_pressed_any(pressed: Set[int], candidates: int | Sequence[int] | None) -> bool:
+    if candidates is None:
+        return False
+    if isinstance(candidates, int):
+        return int(candidates) in pressed
+    return any(int(c) in pressed for c in candidates)
+
+
+
 
 def synthesize_intents(
     st: JoyStateLike,
@@ -162,16 +171,16 @@ def synthesize_intents(
     """
     intents: List[object] = []
 
-    deadman_btn = bind.buttons.get("deadman")
-    fine_btn = bind.buttons.get("fine")
+    deadman_btns = bind.buttons.get("deadman")
+    fine_btns = bind.buttons.get("fine")
     pressed = _pressed_buttons(rc)
     axes = _axes(rc)
 
-    deadman = (deadman_btn is not None) and (deadman_btn in pressed)
-    fine = (fine_btn is not None) and (fine_btn in pressed)
+    deadman = _is_pressed_any(pressed, deadman_btns)
+    fine = _is_pressed_any(pressed, fine_btns)
 
-    select_btn = bind.buttons.get("select_hip")
-    select_hip_button = (select_btn is not None) and (select_btn in pressed)
+    select_btns = bind.buttons.get("select_hip")
+    select_hip_button = _is_pressed_any(pressed, select_btns)
 
     soll_speed = 0.0
     soll_axis = bind.axes.get("soll_speed")
@@ -186,8 +195,8 @@ def synthesize_intents(
 
     # Determine which winches are selected (by select_buttons index).
     selected: List[str] = []
-    for i, b in enumerate(bind.select_buttons or []):
-        if b in pressed and i < len(rig_ids):
+    for i, button_group in enumerate(bind.select_buttons or []):
+        if _is_pressed_any(pressed, button_group) and i < len(rig_ids):
             selected.append(rig_ids[i])
 
     selected_set = set(selected)

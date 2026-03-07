@@ -19,8 +19,10 @@ hip_id = "hip"
 [rig]
 # Ordered axis ids (pos 0..N-1). Selection buttons address by position.
 winches = ["Anton", "Debby", "Cecil", "Burt"]
-# Physical button indices used to select winches by position (0..N-1).
-# Example: [0,1,2,3] means button0 selects winch[0], button1 selects winch[1], ...
+# Physical button groups used to select winches by position (0..N-1).
+# Each entry may be a single button or a list of alias buttons for that winch.
+# Example: [[0,8], [1,9], 2, 3] means either button0 or button8 selects winch[0],
+# either button1 or button9 selects winch[1], button2 selects winch[2], ...
 select_buttons = [0, 1, 2, 3]
 
 [mode]
@@ -49,6 +51,7 @@ z = 2
 deadman = 5
 select_hip = 3
 fine = 7
+# You may also assign aliases, e.g. deadman = [5, 11]
 
 [filters]
 deadzone = 0.08

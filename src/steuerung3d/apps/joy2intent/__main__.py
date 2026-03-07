@@ -57,8 +57,8 @@ def main() -> int:
     rig = JoyRig(winches=cfg.winches)
     bind = JoyBindings(
         axes=cfg.axes,
-        buttons=cfg.buttons,
-        select_buttons=list(cfg.select_buttons or []),
+        buttons={k: list(v) for k, v in cfg.buttons.items()},
+        select_buttons=[list(v) for v in (cfg.select_buttons or [])],
         invert=cfg.invert,
         deadzone=cfg.deadzone,
         expo=cfg.expo,
@@ -141,8 +141,11 @@ def main() -> int:
                 pressed = {i for i, v in enumerate(rc.buttons) if v}
             except Exception:
                 pressed = set()
-            dm_btn = bind.buttons.get("deadman")
-            deadman = (dm_btn is not None) and (dm_btn in pressed)
+            dm_btns = bind.buttons.get("deadman")
+            if isinstance(dm_btns, int):
+                deadman = int(dm_btns) in pressed
+            else:
+                deadman = bool(dm_btns) and any(int(b) in pressed for b in dm_btns)
             if ch.changed("deadman", bool(deadman)):
                 log.info("deadman=%s", bool(deadman))
 
@@ -151,10 +154,12 @@ def main() -> int:
                 rig_ids = rig.ordered_winch_ids()
                 selected_pairs: list[str] = []
                 sel: list[str] = []
-                for i, b in enumerate(bind.select_buttons or []):
+                for i, button_group in enumerate(bind.select_buttons or []):
                     axis_name = rig_ids[i] if i < len(rig_ids) else f"axis[{i}]"
-                    hit = b in pressed
-                    selected_pairs.append(f"b{b}->{axis_name}:{'ON' if hit else 'off'}")
+                    group = [button_group] if isinstance(button_group, int) else list(button_group)
+                    hit = any(int(b) in pressed for b in group)
+                    btn_label = "/".join(f"b{int(b)}" for b in group)
+                    selected_pairs.append(f"{btn_label}->{axis_name}:{'ON' if hit else 'off'}")
                     if hit and i < len(rig_ids):
                         sel.append(axis_name)
                 last_selected_axes = list(sel)
