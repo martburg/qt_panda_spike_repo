@@ -74,6 +74,8 @@ def main() -> int:
     sent_stale_zero = False
     last_buttons: list[int] = []
     last_axes: list[float] = []
+    last_axis_pairs: list[str] = []
+    last_selected_axes: list[str] = []
 
     hb = Heartbeat("joy2intent", interval_s=1.0)
     ch = ChangeTracker()
@@ -115,9 +117,22 @@ def main() -> int:
             except Exception:
                 last_buttons = []
             try:
-                last_axes = [float(x) for x in list(rc.axes)[:6]]
+                raw_axes = [float(x) for x in list(rc.axes)]
             except Exception:
-                last_axes = []
+                raw_axes = []
+            last_axes = raw_axes[:6]
+            axis_pairs: list[str] = []
+            for axis_name, axis_idx in sorted(bind.axes.items()):
+                axis_value = None
+                if 0 <= axis_idx < len(raw_axes):
+                    axis_value = raw_axes[axis_idx]
+                axis_pairs.append(
+                    f"{axis_name}@{axis_idx}={axis_value:+.3f}"
+                    if axis_value is not None
+                    else f"{axis_name}@{axis_idx}=NA"
+                )
+            last_axis_pairs = axis_pairs
+
             intents = synthesize_intents(st, rc, bind, rig, lim, hip_id=cfg.hip_id)
 
             # Minimal "what changed" logs (no spam)
@@ -130,14 +145,32 @@ def main() -> int:
             if ch.changed("deadman", bool(deadman)):
                 log.info("deadman=%s", bool(deadman))
 
-            # selection (setup_manual): log when selection changes
+            # selection (setup_manual): log raw buttons and resolved axes together
             try:
-                sel = []
+                rig_ids = rig.ordered_winch_ids()
+                selected_pairs: list[str] = []
+                sel: list[str] = []
                 for i, b in enumerate(bind.select_buttons or []):
-                    if b in pressed and i < len(rig.winches):
-                        sel.append(rig.winches[i])
-                if ch.changed("selected", tuple(sel)):
-                    log.info("selected=%s", list(sel))
+                    axis_name = rig_ids[i] if i < len(rig_ids) else f"axis[{i}]"
+                    hit = b in pressed
+                    selected_pairs.append(f"b{b}->{axis_name}:{'ON' if hit else 'off'}")
+                    if hit and i < len(rig_ids):
+                        sel.append(axis_name)
+                last_selected_axes = list(sel)
+                selected_detail = (
+                    tuple(sorted(pressed)),
+                    tuple(sel),
+                    tuple(selected_pairs),
+                    tuple(axis_pairs),
+                )
+                if ch.changed("selected_detail", selected_detail):
+                    log.info(
+                        "buttons=%s select_map=%s selected=%s axes=%s",
+                        sorted(pressed),
+                        selected_pairs,
+                        list(sel),
+                        axis_pairs,
+                    )
             except Exception:
                 pass
 
@@ -180,7 +213,7 @@ def main() -> int:
                 level=level,
                 summary=(
                     f"mode={st.mode} age_ms={age_ms_i if age_ms_i is not None else 'NA'} "
-                    f"stale_stop={sent_stale_zero} btn={btns_s} axes={axes_s}"
+                    f"stale_stop={sent_stale_zero} btn={btns_s} axes={axes_s} sel={last_selected_axes}"
                 ),
                 fields={
                     "mode": st.mode,
@@ -191,6 +224,8 @@ def main() -> int:
                     "winches": list(rig.winches),
                     "joy_buttons": list(last_buttons),
                     "joy_axes": list(last_axes),
+                    "joy_axis_pairs": list(last_axis_pairs),
+                    "selected_axes": list(last_selected_axes),
                 },
             )
 
