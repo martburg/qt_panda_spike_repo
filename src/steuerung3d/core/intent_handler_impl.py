@@ -21,6 +21,7 @@ from steuerung3d.core.intent_handlers.claims import (
     release_axis as _release_axis,
 )
 from steuerung3d.core.intent_handlers.enforce import enforce_core_mode_actions
+from steuerung3d.core.motion_gate import axis_local_motion_allowed
 from steuerung3d.core.intent_routes.control import (
     handle_echo_lifetick,
     handle_joy_state_update,
@@ -134,19 +135,33 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
         handler(state, intent)
         return
 
-    # --- MODE-GATED INTENTS (LIVE only) ---
+    # --- MODE-GATED INTENTS ---
     core_mode = core_mode_value(getattr(state, "core_mode", "")).upper()
-    is_live = False
-    if core_mode:
-        is_live = core_mode == CoreMode.LIVE.value
-
-    if not is_live or bool(state.estop) or bool(state.fault):
-        enforce_core_mode_actions(state)
-        return
+    is_live = bool(core_mode) and (core_mode == CoreMode.LIVE.value)
 
     handler = LIVE_ONLY_DISPATCH.get(type(intent))
     if handler is not None:
-        handler(state, intent)
+        if bool(state.estop) or bool(state.fault):
+            enforce_core_mode_actions(state)
+            return
+
+        if is_live:
+            handler(state, intent)
+            return
+
+        axis_id = ""
+        if isinstance(intent, EnableAxis):
+            axis_id = str(getattr(intent, "axis_id", "") or "")
+        elif isinstance(intent, JogAxis):
+            axis_id = str(getattr(intent, "axis_id", "") or "")
+        elif isinstance(intent, JogWinch):
+            axis_id = str(getattr(intent, "winch_id", "") or "")
+
+        if axis_id and axis_local_motion_allowed(state, axis_id):
+            handler(state, intent)
+            return
+
+        enforce_core_mode_actions(state)
         return
 
     # Unknown / intentionally ignored intents are a no-op.

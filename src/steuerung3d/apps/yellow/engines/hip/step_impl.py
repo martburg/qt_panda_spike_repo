@@ -134,7 +134,8 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     resync_ignored = False
     resync_reason = ""
     if ui.resync_clicked:
-        if str(presentation_phase.mode_now).upper() != "IDLE":
+        estate_now = str(presentation_phase.estate or "").upper()
+        if estate_now not in {"IDLE", "ARMED", "READY"}:
             resync_ignored = True
             resync_reason = (
                 f"mode={str(presentation_phase.mode_now)} estate={str(presentation_phase.estate)}"

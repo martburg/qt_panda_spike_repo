@@ -28,16 +28,20 @@ def test_hip_engine_attach_state_modal_locked() -> None:
     assert st.estop_reset_enabled is None
 
 
-def test_hip_engine_resync_gate_requires_idle_and_estate() -> None:
+def test_hip_engine_resync_gate_requires_per_axis_estate_not_global_mode() -> None:
     eng = HipEngine()
-    ok = eng.compute_attach_state(
-        HipAttachInputs(attached=True, modal_locked=False, last_mode="IDLE", last_estate="IDLE")
+    ok_ready = eng.compute_attach_state(
+        HipAttachInputs(attached=True, modal_locked=False, last_mode="LIVE", last_estate="READY")
     )
-    bad = eng.compute_attach_state(
-        HipAttachInputs(attached=True, modal_locked=False, last_mode="LIVE", last_estate="IDLE")
+    ok_armed = eng.compute_attach_state(
+        HipAttachInputs(attached=True, modal_locked=False, last_mode="READY", last_estate="ARMED")
     )
-    assert ok.resync_enabled is True
-    assert bad.resync_enabled is False
+    bad_estop = eng.compute_attach_state(
+        HipAttachInputs(attached=True, modal_locked=False, last_mode="IDLE", last_estate="ESTOP")
+    )
+    assert ok_ready.resync_enabled is True
+    assert ok_armed.resync_enabled is True
+    assert bad_estop.resync_enabled is False
 
 
 def test_hip_engine_banner_estate_matches_banner_helper() -> None:

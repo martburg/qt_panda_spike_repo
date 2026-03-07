@@ -11,6 +11,7 @@ from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamOp, 
 from steuerung3d.core.core_mode import CoreMode, core_mode_value
 from steuerung3d.core.intent_handlers.lease import axis_lease_allows_any
 from steuerung3d.core.joy_state import canonicalize_selected_axes
+from steuerung3d.core.motion_gate import axis_local_motion_allowed
 from steuerung3d.core.rig_logic import densi_online
 from steuerung3d.core.state import MachineState
 
@@ -185,11 +186,13 @@ def build_command_frame(state: MachineState) -> CommandFrame:
     )
     # Motion-resolution policy:
     # - Explicit selected_axes + deadman are authoritative. Only those axes may move.
-    # - Without a live lane selection, commanded velocity is suppressed.
-    if core_mode != CoreMode.LIVE.value:
-        active_axes: set[str] = set()
-    elif selected_axes and joy_deadman:
-        active_axes = set(selected_axes)
+    # - In local/manual mode, a selected axis may still move when that specific
+    #   axis is individually ready, even if global core_mode is below LIVE.
+    if selected_axes and joy_deadman:
+        if core_mode == CoreMode.LIVE.value:
+            active_axes = set(selected_axes)
+        else:
+            active_axes = {axis_id for axis_id in selected_axes if axis_local_motion_allowed(state, axis_id)}
     else:
         active_axes = set()
 
