@@ -11,7 +11,7 @@ import logging
 from dataclasses import asdict
 from typing import Any, Iterable
 
-from steuerung3d.core.intents import EchoLifeTick
+from steuerung3d.core.intents import EchoLifeTick, Intent
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
 from ...domain.param_txn import ParamEditTxnClient
@@ -203,12 +203,12 @@ class HipEngine:
         snap: TelemetrySnapshot,
         hip_id: str,
         last_lifetick_echo_sent: dict[str, int],
-    ) -> tuple[list[object], dict[str, int]]:
+    ) -> tuple[list[Intent], dict[str, int]]:
         axes = getattr(snap, "axes", None)
         if not isinstance(axes, dict) or not axes:
             return [], last_lifetick_echo_sent
 
-        intents: list[object] = []
+        intents: list[Intent] = []
         for axis_id, ax in axes.items():
             try:
                 v = int(getattr(ax, "device_tick", 0)) & 0xFFFF

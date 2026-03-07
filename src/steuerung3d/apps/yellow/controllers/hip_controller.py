@@ -14,20 +14,17 @@ from __future__ import annotations
 import logging
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import cast
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QWidget
 
-from steuerung3d.util.ratelimit import rl_log_exc
-
-# Optional structured status heartbeat (used by stack supervisor birds-eye)
-try:
-    from steuerung3d.core.status import StatusEmitter  # type: ignore
-except ImportError:  # pragma: no cover
-    StatusEmitter = None  # type: ignore
-
 from steuerung3d.core.axis_ids import normalize_axis_id
+from steuerung3d.core.intents import Intent
+from steuerung3d.core.telemetry import TelemetrySnapshot
+from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
+from steuerung3d.util.ratelimit import rl_log_exc
 
 from ..binders.hip_qt_binder import HipQtBinder
 from ..engines.hip.engine import HipEngine, HipUiInputs
@@ -35,7 +32,18 @@ from ..ports import IntentOut, TelemetryIn
 from ..qtutil.bindings import YellowBindings
 from ..qtutil.perf_watchdog import PerfWatchdog
 from ..runtimes.hip_runtime import HipRuntime
-from .controller_utils import init_observability, run_guarded, start_poll_timer
+from .controller_utils import StatusEmitterLike, init_observability, run_guarded, start_poll_timer
+
+_StatusEmitterCls: type[object] | None
+
+# Optional structured status heartbeat (used by stack supervisor birds-eye)
+try:
+    from steuerung3d.core.status import StatusEmitter as _StatusEmitter  # type: ignore
+
+    _StatusEmitterCls = _StatusEmitter
+except Exception:  # pragma: no cover
+    _StatusEmitterCls = None
+
 
 log = logging.getLogger("hi_p")
 
@@ -53,6 +61,20 @@ class HiPController:
     stale_after_ms: int = 500
 
     _dbg_next_s = 0.0
+    _dbg_vm_keys_once: bool = False
+
+    # Binder apply throttling (avoid log spam on repeated UI update errors)
+    _binder_apply_err_last_s: float = 0.0
+
+    # Late-initialized internal members (kept out of __init__ signature)
+    _hb: Heartbeat = field(init=False)
+    _ch: ChangeTracker = field(init=False)
+    _status: StatusEmitterLike | None = field(init=False, default=None)
+    _timer: QTimer | None = field(init=False, default=None)
+
+    # Qt-free runtime/engine
+    _hip_engine: HipEngine = field(init=False)
+    _hip_runtime: HipRuntime = field(init=False)
 
     def __post_init__(self) -> None:
         self.ui = YellowBindings.from_window(self.win)
@@ -80,7 +102,8 @@ class HiPController:
             shadow_mode=self.shadow_mode,
         )
 
-        self._timer: QTimer | None = None
+        # self._timer is declared as a dataclass field for typing; value set here.
+        self._timer = None
 
         # Axis selection config (pooling/fixed-axis)
         self._fixed_axis: str = ""
@@ -102,7 +125,7 @@ class HiPController:
         """Set up lightweight logs + optional structured status heartbeat."""
         self._hb, self._ch, self._status, _dbg = init_observability(
             "hi_p",
-            status_emitter_cls=StatusEmitter,
+            status_emitter_cls=cast("type[StatusEmitterLike] | None", _StatusEmitterCls),
             status_default_service="hi_p",
         )
         self._last_mode: str = ""
@@ -138,10 +161,12 @@ class HiPController:
     # Internal helpers
     # -------------------------------------------------------------------------
 
-    def _publish_intent(self, intent: object) -> None:
+    def _publish_intent(self, intent: Intent) -> None:
         self.intent_out.publish_intent(intent)
 
-    def _emit_birdseye_motion(self, *, snap, intents: list[object], estate: str) -> None:
+    def _emit_birdseye_motion(
+        self, *, snap: TelemetrySnapshot, intents: list[Intent], estate: str
+    ) -> None:
         status = getattr(self, "_status", None)
         if status is None:
             return
@@ -185,7 +210,7 @@ class HiPController:
 
         velmax = 0.0
         try:
-            params = getattr(snap, "params", {}) or {}
+            params = snap.params or {}
             velmax = float(params.get("VelMax", 0.0) or 0.0)
         except Exception:
             velmax = 0.0
@@ -194,22 +219,23 @@ class HiPController:
 
         joy_rate_mps = joy_soll_speed_norm * velmax if velmax > 0.0 else 0.0
 
-        estop = bool(getattr(snap, "estop", False))
-        fault = bool(getattr(snap, "fault", False))
-        core_mode = str(getattr(snap, "core_mode", "") or "")
+        estop = bool(snap.estop)
+        fault = bool(snap.fault)
+        core_mode = str(snap.core_mode or "")
         armed = bool(str(estate or "").upper() in ("ARMED", "READY"))
         ready = bool(str(estate or "").upper() == "READY")
 
-        enable = None
+        enable: bool | None = None
         try:
-            axes = getattr(snap, "axes", None) or {}
-            if axis_selected and isinstance(axes, dict):
-                ax = axes.get(axis_selected)
+            if axis_selected:
+                ax = snap.axes.get(axis_selected)
                 if ax is not None:
-                    if hasattr(ax, "enable_cmd"):
-                        enable = bool(getattr(ax, "enable_cmd", False))
-                    elif hasattr(ax, "enabled"):
-                        enable = bool(getattr(ax, "enabled", False))
+                    # prefer what core is commanding (echoed for UI)
+                    enable = (
+                        bool(ax.enable_cmd)
+                        if hasattr(ax, "enable_cmd")
+                        else bool(getattr(ax, "enabled", False))
+                    )
         except Exception:
             enable = None
 
@@ -227,7 +253,7 @@ class HiPController:
             f"estop={int(estop)} v={joy_rate_mps:+.2f}m/s out=[{intents_out_types}]"
         )
 
-        fields = {
+        fields: dict[str, object] = {
             "component": "hip",
             "axis_selected": str(axis_selected or ""),
             "deadman": bool(dm),

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from steuerung3d.core.intents import Intent
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
 from ...domain.param_txn import ParamEditTxnClient, RetryEvent
@@ -37,7 +38,7 @@ def run_param_txn(
     now_ns: int,
     estate: str,
     snap: TelemetrySnapshot,
-    intents: list[object],
+    intents: list[Intent],
     core_acks: list[str],
 ) -> ParamTxnResult:
     param_writeback_group = ""

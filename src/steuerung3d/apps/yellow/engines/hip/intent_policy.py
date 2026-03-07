@@ -5,15 +5,22 @@ from __future__ import annotations
 from typing import Iterable
 
 from steuerung3d.core.attach_targets import claim_owner_from_snapshot
-from steuerung3d.core.intents import EnableAxis, JogAxis, JogCartesian, JogWinch, SmoothStop
+from steuerung3d.core.intents import (
+    EnableAxis,
+    Intent,
+    JogAxis,
+    JogCartesian,
+    JogWinch,
+    SmoothStop,
+)
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
 
-def is_motion_intent(intent: object) -> bool:
+def is_motion_intent(intent: Intent) -> bool:
     return isinstance(intent, (EnableAxis, JogAxis, JogWinch, JogCartesian, SmoothStop))
 
 
-def _is_safe_release_intent(intent: object) -> bool:
+def _is_safe_release_intent(intent: Intent) -> bool:
     if isinstance(intent, EnableAxis):
         return not bool(getattr(intent, "enable", False))
     if isinstance(intent, JogWinch):
@@ -23,7 +30,7 @@ def _is_safe_release_intent(intent: object) -> bool:
     return False
 
 
-def gate_motion_intents(intents: Iterable[object], *, deadman: bool) -> list[object]:
+def gate_motion_intents(intents: Iterable[Intent], *, deadman: bool) -> list[Intent]:
     if bool(deadman):
         return list(intents)
     return [i for i in intents if (not is_motion_intent(i)) or _is_safe_release_intent(i)]

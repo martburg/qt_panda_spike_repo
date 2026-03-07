@@ -14,6 +14,7 @@ These helpers are intentionally dependency-free (stdlib only).
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, Mapping
@@ -59,7 +60,12 @@ class Heartbeat:
         return (now - float(self.last_emit_s)) >= float(self.interval_s)
 
     def emit(
-        self, log, *, level: str = "info", now_s: float | None = None, reset: bool = True
+        self,
+        log: logging.Logger,
+        *,
+        level: str = "info",
+        now_s: float | None = None,
+        reset: bool = True,
     ) -> None:
         """Emit a single summary line if due.
 

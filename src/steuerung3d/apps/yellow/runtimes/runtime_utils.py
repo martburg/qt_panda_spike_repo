@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping, Protocol
 
 from steuerung3d.util.ratelimit import rl_log_exc
 
@@ -37,8 +37,23 @@ def compute_status_level(estop: bool, fault: bool, stale: bool) -> str:
     return "OK"
 
 
+class StatusEmitterLike(Protocol):
+    def emit_every(self, *, level: str, summary: str, fields: dict[str, Any]) -> None: ...
+
+
+class RuntimeHealthLike(Protocol):
+    @property
+    def age_ms(self) -> float | None: ...
+
+    @property
+    def stale(self) -> bool: ...
+
+    @property
+    def level(self) -> str: ...
+
+
 def emit_status(
-    status,
+    status: StatusEmitterLike | None,
     *,
     level: str,
     summary: str,
@@ -47,6 +62,8 @@ def emit_status(
     exc_tag: str,
     exc_msg: str,
 ) -> None:
+    if status is None:
+        return
     try:
         status.emit_every(level=level, summary=summary, fields=dict(fields))
     except Exception:
@@ -96,3 +113,15 @@ def should_interval_log(now_s: float, last_log_s: float, *, interval_s: float = 
         return (float(now_s) - float(last_log_s)) >= float(interval_s)
     except Exception:
         return True
+
+
+__all__ = [
+    "RuntimeHealth",
+    "RuntimeHealthLike",
+    "StatusEmitterLike",
+    "compute_age_ms",
+    "format_age_ms",
+    "compute_stale",
+    "compute_status_level",
+    "emit_status",
+]

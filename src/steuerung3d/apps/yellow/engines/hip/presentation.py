@@ -1,8 +1,15 @@
-"""Presentation helpers for HipEngine (Qt-free)."""
+"""Presentation helpers for HipEngine (Qt-free).
+
+Typing note:
+These helpers are used across the Qt-free HiP pipeline. Keep annotations precise
+so Pylance/Pyright can follow the `TelemetrySnapshot` / `AxisTelemetry` surface.
+"""
 
 from __future__ import annotations
 
-from steuerung3d.core.telemetry import TelemetrySnapshot
+from typing import Mapping
+
+from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import decode_estop_word
 from steuerung3d.util.tick import compute_time_tick
 
@@ -33,11 +40,7 @@ def compute_tick_text(
     if not axis_id:
         return "--", None
 
-    axes = getattr(snap, "axes", None)
-    if not isinstance(axes, dict):
-        return "--", None
-
-    ax = axes.get(axis_id)
+    ax = snap.axes.get(axis_id)
     if ax is None:
         return "--", None
 
@@ -52,10 +55,7 @@ def compute_tick_text(
 
 
 def get_lifetick_age(*, snap: TelemetrySnapshot, axis_id: str) -> int | None:
-    axes = getattr(snap, "axes", None)
-    if not isinstance(axes, dict):
-        return None
-    ax = axes.get(axis_id)
+    ax = snap.axes.get(axis_id)
     if ax is None:
         return None
     try:
@@ -97,7 +97,7 @@ def raw_tail_token(snap: TelemetrySnapshot, key: str) -> str:
     return ""
 
 
-def read_axis_pos_vel(ax) -> tuple[float, float]:
+def read_axis_pos_vel(ax: AxisTelemetry) -> tuple[float, float]:
     try:
         pos = float(getattr(ax, "pos", 0.0) or 0.0)
     except Exception:
@@ -109,7 +109,9 @@ def read_axis_pos_vel(ax) -> tuple[float, float]:
     return pos, vel
 
 
-def read_amp_and_temp(*, params: dict, snap: TelemetrySnapshot) -> tuple[float, float]:
+def read_amp_and_temp(
+    *, params: Mapping[str, float], snap: TelemetrySnapshot
+) -> tuple[float, float]:
     def _pf(key: str, default: float) -> float:
         try:
             return float(params.get(key, default))
@@ -128,12 +130,12 @@ def read_amp_and_temp(*, params: dict, snap: TelemetrySnapshot) -> tuple[float, 
 
 def compute_readouts_state(
     *,
-    ax,
+    ax: AxisTelemetry | None,
     pos: float,
     vel: float,
     amp: float,
     temp: float,
-    params: dict,
+    params: Mapping[str, float],
     snap: TelemetrySnapshot,
 ) -> HipReadoutsState:
     pos_text = fmt_f_unit(pos, "m", ndigits=2)
@@ -248,7 +250,7 @@ def compute_readouts_state(
 def compute_cut_markers_state(
     *,
     snap: TelemetrySnapshot,
-    params: dict,
+    params: Mapping[str, float],
     estate: str,
     mode: str,
 ) -> HipCutMarkersState:
@@ -300,10 +302,7 @@ def compute_drive_status_texts(*, snap: TelemetrySnapshot, axis_id: str) -> tupl
         return "", ""
     if not axis_id:
         return "", ""
-    axes = getattr(snap, "axes", None)
-    if not isinstance(axes, dict):
-        return "", ""
-    ax = axes.get(axis_id)
+    ax = snap.axes.get(axis_id)
     if ax is None:
         return "", ""
     main_word = int(getattr(ax, "status_word", 0) or 0)

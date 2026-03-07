@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.intents import (
     EnableAxis,
+    Intent,
     JogWinch,
     RequestEstopReset,
     RequestGuiderReset,
@@ -68,13 +69,12 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     hip_id = ctx.hip_id
     axis_ids = ctx.axis_ids
 
-    axes = getattr(snap, "axes", None)
-    axes = axes if isinstance(axes, dict) else {}
+    axes = snap.axes
 
     attach_combo = ctx.attach_combo
     selected_axis = ctx.selected_axis
     fixed_applied = ctx.fixed_applied
-    intents: list[object] = list(ctx.intents)
+    intents: list[Intent] = list(ctx.intents)
 
     fixed_axis = normalize_axis_id(inputs.fixed_axis)
     axis_id = normalize_axis_id(selected_axis or fixed_axis)
@@ -325,7 +325,11 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     cut_markers = None
     if attached and axis_id and axis_id in axes:
         ax = axes.get(axis_id)
-        pos, vel = read_axis_pos_vel(ax)
+        if ax is None:
+            pos = 0.0
+            vel = 0.0
+        else:
+            pos, vel = read_axis_pos_vel(ax)
         amp, tmp = read_amp_and_temp(params=params, snap=snap_view)
         readouts = compute_readouts_state(
             ax=ax,

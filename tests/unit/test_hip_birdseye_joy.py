@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any, Mapping
 
 from steuerung3d.apps.yellow.engines.hip.engine import HipEngine
 from steuerung3d.apps.yellow.runtimes.hip_runtime import HipRuntime
@@ -10,10 +11,16 @@ from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 
 class _FakeStatus:
     def __init__(self) -> None:
-        self.last_summary = ""
-        self.last_fields = {}
+        self.last_summary: str = ""
+        self.last_fields: dict[str, Any] = {}
 
-    def emit_every(self, *, level: str = "OK", summary: str = "", fields=None) -> None:
+    def emit_every(
+        self,
+        *,
+        level: str = "OK",
+        summary: str = "",
+        fields: Mapping[str, Any] | None = None,
+    ) -> None:
         self.last_summary = str(summary)
         self.last_fields = dict(fields or {})
 
@@ -40,6 +47,7 @@ def test_hip_birdseye_includes_joy_fields() -> None:
 
     status = runtime._status
     assert status is not None
+    assert isinstance(status, _FakeStatus)
     assert "JOY" in status.last_summary
     assert "dm=" in status.last_summary
     assert "sel=" in status.last_summary

@@ -9,9 +9,15 @@ Lane 1 note: this is a structural refactor only.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Mapping
 
-from .runtime_utils import compute_runtime_health, emit_status
+from .runtime_utils import (
+    RuntimeHealthLike,
+    StatusEmitterLike,
+    compute_runtime_health,
+    emit_status,
+)
 
 
 def compute_health(
@@ -22,7 +28,7 @@ def compute_health(
     seen_first_rx: bool,
     estop: bool,
     fault: bool,
-):
+) -> RuntimeHealthLike:
     """Compute health for a runtime stream (telemetry or commands)."""
     return compute_runtime_health(
         now_ns=int(now_ns),
@@ -37,7 +43,7 @@ def compute_health(
 def with_health_fields(
     base_fields: Mapping[str, Any],
     *,
-    health,
+    health: RuntimeHealthLike,
     estop: bool,
     fault: bool,
 ) -> dict[str, Any]:
@@ -54,12 +60,12 @@ def with_health_fields(
 
 
 def emit_runtime_status(
-    status,
+    status: StatusEmitterLike | None,
     *,
     level: str,
     summary: str,
     fields: Mapping[str, Any],
-    log,
+    log: logging.Logger,
     exc_tag: str,
     exc_msg: str,
 ) -> None:

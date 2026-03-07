@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from steuerung3d.core.intents import Intent
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
@@ -133,7 +134,7 @@ class HipStepResult:
     view_model: "HipViewModel | None"
     legacy_view_model: "HipViewModel | None"
     presentation: "HipPresentationData"
-    intents: list[object]
+    intents: list[Intent]
     resync_ignored: bool
     resync_block_reason: str
     txn_events: list[RetryEvent] = field(default_factory=list)

@@ -14,7 +14,7 @@ import logging
 from dataclasses import dataclass
 
 from steuerung3d.core.axis_ids import normalize_axis_id
-from steuerung3d.core.intents import ParamEditBegin
+from steuerung3d.core.intents import Intent, ParamEditBegin
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
@@ -34,6 +34,7 @@ from ..engines.hip.types import HipPresentationData
 from ..engines.hip.viewmodel import HipViewModel
 from .hip_runtime_viewmodel import assemble_legacy_view_model, assemble_view_model
 from .runtime_kernel import compute_health, emit_runtime_status, with_health_fields
+from .runtime_utils import StatusEmitterLike
 
 
 @dataclass(frozen=True)
@@ -48,7 +49,7 @@ class HipRuntimeResult:
     snap: TelemetrySnapshot | None
     engine_result: HipStepResult | None
     view_model: HipViewModel | None
-    intents: list[object]
+    intents: list[Intent]
     txn_events: list[RetryEvent]
     resync_ignored: bool
     resync_block_reason: str
@@ -74,9 +75,9 @@ class HipRuntime:
         self.engine = engine
         self._hb = hb
         self._ch = ch
-        self._status = status
         self._stale_after_ms = int(stale_after_ms)
         self._log = log
+        self._status: StatusEmitterLike | None = status
         self._hip_id = str(hip_id or "")
 
         mode = shadow_mode
@@ -184,9 +185,9 @@ class HipRuntime:
             self._diff_shadow(engine_vm=vm, legacy_vm=legacy_vm)
 
         if self._dbg_rl.allow("hip_motion_dbg"):
-            axes = getattr(snap, "axes", {})
-            if not isinstance(axes, dict):
-                axes = {}
+            axes = snap.axes
+            # snap.axes is a Mapping[str, AxisTelemetry]
+
             axis_ids = sorted(list(axes.keys()))
             selected_axis = str(getattr(self.engine.state, "selected_axis", "") or "")
             fixed_axis = str(self._fixed_axis or "")

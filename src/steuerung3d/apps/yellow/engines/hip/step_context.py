@@ -8,24 +8,24 @@ if TYPE_CHECKING:
     from .engine import HipEngine
 
 from steuerung3d.core.axis_ids import normalize_axis_id
-from steuerung3d.core.intents import ClaimAxis, ReleaseAxis
+from steuerung3d.core.intents import ClaimAxis, Intent, ReleaseAxis
 from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
-from steuerung3d.core.telemetry import DensiTelemetry
+from steuerung3d.core.telemetry import DensiTelemetry, TelemetrySnapshot
 
 from .attach_state import NOT_ATTACHED, build_attach_combo
-from .types import HipAttachCombo, HipStepInputs
+from .types import HipAttachCombo, HipStepInputs, HipUiInputs
 
 
 @dataclass(frozen=True)
 class StepContext:
-    snap: object
-    ui: object
+    snap: TelemetrySnapshot
+    ui: HipUiInputs
     hip_id: str
     axis_ids: list[str]
     attach_combo: HipAttachCombo
     selected_axis: str
     fixed_applied: bool
-    intents: list[object]
+    intents: list[Intent]
 
 
 def _claim_owner_by_axis(*, densis: dict[str, DensiTelemetry], axis_id: str) -> str:
@@ -163,7 +163,7 @@ def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepCon
             fixed_axis_applied=bool(attach_combo.fixed_axis_applied),
         )
 
-    intents: list[object] = []
+    intents: list[Intent] = []
     if ui.axis_selection_changed:
         if prev_selected and (not selected_axis or prev_selected != selected_axis):
             intents.append(ReleaseAxis(axis_id=prev_selected, hip_id=hip_id))
