@@ -81,8 +81,6 @@ def run(cfg: InputdConfig, *, log_hz: float = 2.0) -> int:
     last_log_s = 0.0
     samples = 0
     last_desc = ""
-    last_buttons: list[int] = []
-    last_axes: list[float] = []
 
     hb = Heartbeat("inputd", interval_s=1.0)
     ch = ChangeTracker()
@@ -123,30 +121,18 @@ def run(cfg: InputdConfig, *, log_hz: float = 2.0) -> int:
             out.publish_raw_controls(rc)
             samples += 1
             hb.inc("tx", 1)
-            try:
-                last_buttons = [i for i, v in enumerate(buttons) if v]
-            except Exception:
-                last_buttons = []
-            try:
-                last_axes = [float(a) for a in axes[:6]]
-            except Exception:
-                last_axes = []
         else:
             # when disconnected, keep publishing nothing (policy layer has watchdog)
             prev_axes = None
-            last_buttons = []
-            last_axes = []
             hb.inc("drop", 1)
 
         hb.set("connected", bool(connected))
         hb.set("dev", str(desc) if desc else "")
-        hb.set("buttons", list(last_buttons))
-        hb.set("axes", [round(a, 3) for a in last_axes])
 
         now_s = time.monotonic()
         if now_s - last_log_s >= 1.0 / max(1e-6, log_hz):
             last_log_s = now_s
-            log.debug("tx samples=%d connected=%s out=%s buttons=%s axes=%s", samples, connected, cfg.out_addr, last_buttons, [round(a, 3) for a in last_axes])
+            log.debug("tx samples=%d connected=%s out=%s", samples, connected, cfg.out_addr)
 
         hb.emit(log)
 
@@ -155,17 +141,12 @@ def run(cfg: InputdConfig, *, log_hz: float = 2.0) -> int:
             level = "OK" if connected else "WARN"
             status.emit_every(
                 level=level,
-                summary=(
-                    f"connected={bool(connected)} tx={samples} out={cfg.out_addr} "
-                    f"buttons={last_buttons} axes={[round(a, 2) for a in last_axes]}"
-                ),
+                summary=f"connected={bool(connected)} tx={samples} out={cfg.out_addr}",
                 fields={
                     "connected": bool(connected),
                     "tx_samples": int(samples),
                     "out": str(cfg.out_addr),
                     "dev": str(desc) if desc else "",
-                    "joy_buttons": list(last_buttons),
-                    "joy_axes": [float(a) for a in last_axes],
                 },
             )
 

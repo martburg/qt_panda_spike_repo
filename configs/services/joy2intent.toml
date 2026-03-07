@@ -2,6 +2,7 @@
 # Used by profiles and distributed deployments.
 #
 # Policy: this file is intentionally explicit. Avoid silent code defaults.
+# Semantic lane mapping lives here; profiles may override IO endpoints but not winch lists.
 # If you add new operational knobs, prefer adding them here and making the loader require them.
 
 [io]

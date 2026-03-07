@@ -213,9 +213,6 @@ def synthesize_intents(
             selected.append(rig_ids[i])
 
     selected_set = set(selected)
-    if deadman and (not selected_set) and len(rig_ids) == 1:
-        # Single-winch fallback for ambiguous/missing select mappings during bring-up.
-        selected_set = {rig_ids[0]}
 
     intents.append(
         JoyStateUpdate(

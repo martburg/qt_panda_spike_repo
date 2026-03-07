@@ -66,7 +66,7 @@ def _lim_from_config(tmp_path: Path) -> JoyLimits:
     )
 
 
-def test_single_winch_select_hip_fallback_emits_enable_and_jog(tmp_path: Path) -> None:
+def test_single_winch_without_explicit_select_emits_no_enable_or_jog(tmp_path: Path) -> None:
     st = JoyState()
     bind = JoyBindings(
         axes={"manual_jog": 1},
@@ -82,8 +82,10 @@ def test_single_winch_select_hip_fallback_emits_enable_and_jog(tmp_path: Path) -
     rc = _rc(axes=[0.0, 0.8], pressed=(5, 3))
     intents = synthesize_intents(st, rc, bind, rig, lim)
 
-    assert any(isinstance(i, EnableAxis) and i.axis_id == "Anton" and i.enable for i in intents)
-    assert any(isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate > 0.0 for i in intents)
+    assert not any(isinstance(i, EnableAxis) and i.axis_id == "Anton" and i.enable for i in intents)
+    assert not any(
+        isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate > 0.0 for i in intents
+    )
 
 
 def test_setup_manual_multi_select_targets_all_selected_lanes(tmp_path: Path) -> None:

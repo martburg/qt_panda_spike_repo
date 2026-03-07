@@ -82,5 +82,4 @@ config = "configs/services/joy2intent.toml"
 args = [
   "--raw-in", "{net.raw_in}",
   "--intent-out", "{net.intent}",
-  "--winches", "{csv(rig.axes)}",
 ]

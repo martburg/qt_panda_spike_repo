@@ -65,5 +65,4 @@ mode = "single"
 config = "configs/services/joy2intent.toml"
 args = [
   "--intent-out", "{net.intent}",
-  "--winches", "{csv(rig.axes)}",
 ]
