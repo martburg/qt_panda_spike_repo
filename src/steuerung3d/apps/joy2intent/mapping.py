@@ -146,14 +146,13 @@ def _axes(rc: Any) -> List[float]:
             return []
     return []
 
+
 def _is_pressed_any(pressed: Set[int], candidates: int | Sequence[int] | None) -> bool:
     if candidates is None:
         return False
     if isinstance(candidates, int):
         return int(candidates) in pressed
     return any(int(c) in pressed for c in candidates)
-
-
 
 
 def synthesize_intents(

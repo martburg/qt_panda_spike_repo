@@ -17,6 +17,7 @@ def _require(mapping: dict, key: str, *, ctx: str) -> object:
         raise ValueError(f"Missing required config key '{ctx}.{key}' in joy2intent config")
     return mapping[key]
 
+
 def _int_list(value: Any, *, ctx: str) -> List[int]:
     if isinstance(value, bool):
         raise ValueError(f"Invalid boolean for {ctx}; expected int or list[int]")
@@ -32,7 +33,9 @@ def _int_list(value: Any, *, ctx: str) -> List[int]:
             except Exception as e:
                 raise ValueError(f"Invalid button index for {ctx}[{idx}]: {item!r}") from e
         return out
-    raise ValueError(f"Invalid value for {ctx}; expected int or list[int], got {type(value).__name__}")
+    raise ValueError(
+        f"Invalid value for {ctx}; expected int or list[int], got {type(value).__name__}"
+    )
 
 
 def _button_map(mapping: dict, *, ctx: str) -> Dict[str, List[int]]:
@@ -47,9 +50,8 @@ def _select_groups(value: Any, *, ctx: str) -> List[List[int]]:
         raise ValueError(f"Missing or empty config key '{ctx}' in joy2intent config")
     out: List[List[int]] = []
     for idx, item in enumerate(value):
-        out.append(_int_list(item, ctx=f"{ctx}[{idx}]") )
+        out.append(_int_list(item, ctx=f"{ctx}[{idx}]"))
     return out
-
 
 
 @dataclass(frozen=True)
@@ -108,12 +110,16 @@ def load_joy2intent_config(path: Path) -> Joy2IntentConfig:
         stale_after_ms=int(_require(io, "stale_after_ms", ctx="io")),
         winches=list(_require(rig, "winches", ctx="rig")),
         default_mode=str(_require(mode, "default", ctx="mode")),
-        select_buttons=_select_groups(_require(rig, "select_buttons", ctx="rig"), ctx="rig.select_buttons"),
+        select_buttons=_select_groups(
+            _require(rig, "select_buttons", ctx="rig"), ctx="rig.select_buttons"
+        ),
         max_winch_mps=float(_require(lim_m, "max_winch_mps", ctx="limits.manual")),
         fine_scale=float(_require(lim_m, "fine_scale", ctx="limits.manual")),
         sync_max_v=dict((lim_s.get("max_v") or {})),
         axes=dict(_require(bindings, "axes", ctx="bindings")),
-        buttons=_button_map(dict(_require(bindings, "buttons", ctx="bindings")), ctx="bindings.buttons"),
+        buttons=_button_map(
+            dict(_require(bindings, "buttons", ctx="bindings")), ctx="bindings.buttons"
+        ),
         deadzone=float(_require(f, "deadzone", ctx="filters")),
         expo=float(_require(f, "expo", ctx="filters")),
         invert=dict((f.get("invert") or {})),
