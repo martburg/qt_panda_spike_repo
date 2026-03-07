@@ -24,7 +24,7 @@ args = [
   "--config", "configs/services/joy2intent.toml",
   "--raw-in", "{net.raw_controls}",
   "--intent-out", "{net.remote_intent}",
-  "--winches", "Anton",
+  "--winches", "Anton","Debby"
 ]
 
 [rig]
