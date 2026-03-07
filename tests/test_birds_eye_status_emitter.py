@@ -30,7 +30,9 @@ def test_birds_eye_exposes_lane_selection_and_resolved_targets() -> None:
     status = _FakeStatus()
     state = MachineState()
     state.core_mode = "LIVE"
-    state.joy = JoyState(deadman=True, select_hip=True, soll_speed=0.5, selected_axes=("Anton", "Debby"))
+    state.joy = JoyState(
+        deadman=True, select_hip=True, soll_speed=0.5, selected_axes=("Anton", "Debby")
+    )
     state.axis_claims = {"Anton": "hip-1", "Debby": "hip-2"}
     state.ensure_axis("Anton")
     state.ensure_axis("Debby")
@@ -39,7 +41,15 @@ def test_birds_eye_exposes_lane_selection_and_resolved_targets() -> None:
     state.axis_cmd["Debby"].enable = True
     state.axis_cmd["Debby"].vel = 0.0
 
-    snap = TelemetrySnapshot(tick=1, t_s=0.0, core_mode="LIVE", estop=False, fault=False, axes={}, densis={"Anton": object(), "Debby": object()})
+    snap = TelemetrySnapshot(
+        tick=1,
+        t_s=0.0,
+        core_mode="LIVE",
+        estop=False,
+        fault=False,
+        axes={},
+        densis={"Anton": object(), "Debby": object()},
+    )
 
     emit_birds_eye_status(
         status=status,
@@ -48,7 +58,13 @@ def test_birds_eye_exposes_lane_selection_and_resolved_targets() -> None:
         router=_FakeRouter(),
         axis_ids=["Anton", "Debby"],
         last_intents_meta={"count": 0, "types": []},
-        last_seen={"intent_ts": None, "dev_telem_ts": None, "cmd_ts": None, "ui_telem_ts": None, "c2_telem_ts": None},
+        last_seen={
+            "intent_ts": None,
+            "dev_telem_ts": None,
+            "cmd_ts": None,
+            "ui_telem_ts": None,
+            "c2_telem_ts": None,
+        },
     )
 
     assert status.calls, "expected birds-eye emission"

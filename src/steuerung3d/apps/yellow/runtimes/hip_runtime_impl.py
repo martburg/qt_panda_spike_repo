@@ -199,8 +199,16 @@ class HipRuntime:
             legacy_mode = str(getattr(snap, "mode", ""))
             joy = getattr(snap, "joy", JoyState())
             dm = bool(getattr(joy, "deadman", False))
-            sel = bool(getattr(joy, "select_hip", False))
-            sp = float(getattr(joy, "soll_speed", 0.0) or 0.0)
+            raw_sp = float(getattr(joy, "soll_speed", 0.0) or 0.0)
+            selected_axes = tuple(getattr(joy, "selected_axes", ()) or ())
+            selected_axis_set = {str(x).strip() for x in selected_axes if str(x).strip()}
+
+            if selected_axis_set:
+                sel = bool(motion_axis) and motion_axis in selected_axis_set
+            else:
+                sel = False
+
+            sp = float(raw_sp if sel else 0.0)
 
             motion_enabled = (
                 bool(motion_axis)
@@ -345,9 +353,19 @@ class HipRuntime:
         ready = bool(str(estate or "").upper() == "READY")
         age_disp = str(getattr(h, "age_disp", "") or "")
         joy = getattr(self.engine.state, "joy", JoyState())
-        dm = 1 if bool(getattr(joy, "deadman", False)) else 0
-        sel = 1 if bool(getattr(joy, "select_hip", False)) else 0
-        sp = float(getattr(joy, "soll_speed", 0.0))
+        dm_bool = bool(getattr(joy, "deadman", False))
+        raw_sp = float(getattr(joy, "soll_speed", 0.0) or 0.0)
+        selected_axes = tuple(getattr(joy, "selected_axes", ()) or ())
+        selected_axis_set = {str(x).strip() for x in selected_axes if str(x).strip()}
+
+        if selected_axis_set:
+            sel_bool = bool(axis) and axis in selected_axis_set
+        else:
+            sel_bool = False
+
+        sp = float(raw_sp if sel_bool else 0.0)
+        dm = 1 if dm_bool else 0
+        sel = 1 if sel_bool else 0
         summary = (
             f"axis={axis or '-'} core_mode={mode or '-'} legacy_mode={estate or '-'} "
             f"age_ms={age_disp} JOY dm={dm} sel={sel} sp={sp:+.2f}"
@@ -360,8 +378,8 @@ class HipRuntime:
                 "estate": str(estate or ""),
                 "armed": bool(armed),
                 "ready": bool(ready),
-                "joy_deadman": bool(getattr(joy, "deadman", False)),
-                "joy_select_hip": bool(getattr(joy, "select_hip", False)),
+                "joy_deadman": bool(dm_bool),
+                "joy_select_hip": bool(sel_bool),
                 "joy_soll_speed": float(sp),
             },
             health=h,

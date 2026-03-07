@@ -166,9 +166,18 @@ class HiPController:
         dm = False
         sel = False
         try:
-            joy_soll_speed_norm = float(getattr(joy, "soll_speed", 0.0) or 0.0)
+            raw_sp = float(getattr(joy, "soll_speed", 0.0) or 0.0)
             dm = bool(getattr(joy, "deadman", False))
-            sel = bool(getattr(joy, "select_hip", False))
+
+            selected_axes = tuple(getattr(joy, "selected_axes", ()) or ())
+            selected_axis_set = {str(x).strip() for x in selected_axes if str(x).strip()}
+
+            if selected_axis_set:
+                sel = bool(axis_selected) and axis_selected in selected_axis_set
+            else:
+                sel = False
+
+            joy_soll_speed_norm = float(raw_sp if sel else 0.0)
         except Exception:
             joy_soll_speed_norm = 0.0
             dm = False

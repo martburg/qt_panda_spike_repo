@@ -76,7 +76,7 @@ def test_hip_viewmodel_joy_defaults() -> None:
 def test_hip_viewmodel_joy_values_passthrough() -> None:
     axis_id = "Anton"
     rt = _runtime()
-    joy = JoyState(deadman=True, select_hip=True, soll_speed=-0.75)
+    joy = JoyState(deadman=True, select_hip=True, soll_speed=-0.75, selected_axes=(axis_id,))
     snap = _snap(axis_id, joy=joy)
 
     res = rt.tick(inputs=HipRuntimeInputs(snaps=[snap], now_ns=0, ui=_ui(axis_id)))

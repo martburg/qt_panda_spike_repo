@@ -9,8 +9,8 @@ from typing import Dict, Optional
 from steuerung3d.config.lifetick_config import LifetickTraceConfig, load_lifetick_config
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamOp, coerce_param_ops
 from steuerung3d.core.core_mode import CoreMode, core_mode_value
-from steuerung3d.core.joy_state import canonicalize_selected_axes
 from steuerung3d.core.intent_handlers.lease import axis_lease_allows_any
+from steuerung3d.core.joy_state import canonicalize_selected_axes
 from steuerung3d.core.rig_logic import densi_online
 from steuerung3d.core.state import MachineState
 
@@ -178,7 +178,9 @@ def build_command_frame(state: MachineState) -> CommandFrame:
     joy = getattr(state, "joy", None)
     joy_deadman = bool(getattr(joy, "deadman", False)) if joy is not None else False
     selected_axes = (
-        set(canonicalize_selected_axes(getattr(joy, "selected_axes", ()))) if joy is not None else set()
+        set(canonicalize_selected_axes(getattr(joy, "selected_axes", ())))
+        if joy is not None
+        else set()
     )
     joy_select = bool(selected_axes) or (
         bool(getattr(joy, "select_hip", False)) if joy is not None else False

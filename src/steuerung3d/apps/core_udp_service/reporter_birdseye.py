@@ -82,19 +82,31 @@ def emit_birds_eye_status(
         jf = extract_joy_facts(joy)
         joy_dm = bool(jf.deadman)
         joy_sel = bool(jf.select_hip)
-        selected_lanes = sorted(
-            [str(x) for x in tuple(getattr(joy, "selected_axes", ()) or ()) if str(x).strip()]
-        ) if joy is not None else []
-        attached_lanes = sorted(
-            [f"{axis_id}:{owner}" for axis_id, owner in dict(getattr(state, "axis_claims", {}) or {}).items() if str(owner or "")]
+        selected_lanes = (
+            sorted(
+                [str(x) for x in tuple(getattr(joy, "selected_axes", ()) or ()) if str(x).strip()]
+            )
+            if joy is not None
+            else []
         )
-        resolved_moving_targets = sorted(
+        attached_lanes = sorted(
             [
-                str(axis_id)
-                for axis_id, sp in dict(getattr(cmd_frame, "axes", {}) or {}).items()
-                if abs(float(getattr(sp, "vel", 0.0) or 0.0)) > 1e-9
+                f"{axis_id}:{owner}"
+                for axis_id, owner in dict(getattr(state, "axis_claims", {}) or {}).items()
+                if str(owner or "")
             ]
-        ) if cmd_frame is not None else []
+        )
+        resolved_moving_targets = (
+            sorted(
+                [
+                    str(axis_id)
+                    for axis_id, sp in dict(getattr(cmd_frame, "axes", {}) or {}).items()
+                    if abs(float(getattr(sp, "vel", 0.0) or 0.0)) > 1e-9
+                ]
+            )
+            if cmd_frame is not None
+            else []
+        )
         motion_allowed_i = int(bool(getattr(state, "core_motion_allowed", False)))
         summary = (
             f"core_mode={mode_v} motion_allowed={motion_allowed_i} blocked_by=[{blocked_summary}] "

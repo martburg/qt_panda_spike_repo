@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 from steuerung3d.apps.yellow.engines.hip.engine import HipEngine, HipStepInputs, HipUiInputs
 from steuerung3d.core.intents import ClaimAxis, EnableAxis, JogAxis, JogWinch
 from steuerung3d.core.joy_state import JoyState
@@ -101,7 +100,7 @@ def test_soll_speed_negative_is_clamped_and_stored() -> None:
 
 def test_soll_speed_emits_jog_winch_when_deadman_held() -> None:
     eng = HipEngine(hip_id="hip-test")
-    joy = JoyState(deadman=True, select_hip=True, soll_speed=0.4)
+    joy = JoyState(deadman=True, select_hip=True, soll_speed=0.4, selected_axes=("Anton",))
     snap = _snap("Anton", joy=joy, claimed_by="hip-test", vel_max=2.0)
 
     inputs = HipStepInputs(
@@ -128,7 +127,7 @@ def test_soll_speed_emits_jog_winch_when_deadman_held() -> None:
 
 def test_soll_speed_negative_emits_jog_when_ready() -> None:
     eng = HipEngine(hip_id="hip-test")
-    joy = JoyState(deadman=True, select_hip=True, soll_speed=-0.5)
+    joy = JoyState(deadman=True, select_hip=True, soll_speed=-0.5, selected_axes=("Anton",))
     snap = _snap("Anton", joy=joy, claimed_by="hip-test", vel_max=2.0)
 
     inputs = HipStepInputs(
@@ -154,7 +153,7 @@ def test_soll_speed_negative_emits_jog_when_ready() -> None:
 
 def test_not_owner_blocks_jog() -> None:
     eng = HipEngine(hip_id="hip-test")
-    joy = JoyState(deadman=True, select_hip=True, soll_speed=0.5)
+    joy = JoyState(deadman=True, select_hip=True, soll_speed=0.5, selected_axes=("Anton",))
     snap = _snap("Anton", joy=joy, claimed_by="", vel_max=2.0)
 
     inputs = HipStepInputs(
@@ -236,7 +235,7 @@ def test_single_actionable_axis_fallback_selects_in_scope_axis() -> None:
             self.in_scope = in_scope
 
     eng = HipEngine(hip_id="hip-test")
-    joy = JoyState(deadman=True, select_hip=True, soll_speed=0.5)
+    joy = JoyState(deadman=True, select_hip=True, soll_speed=0.5, selected_axes=("Anton",))
     axes = {
         "Anton": _AxisWithScope(in_scope=True, fault=False),
         "Debby": _AxisWithScope(in_scope=False, fault=False),

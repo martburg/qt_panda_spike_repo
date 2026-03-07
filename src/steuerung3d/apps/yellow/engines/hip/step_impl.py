@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 
 from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.intents import (
-    ClaimAxis,
     EnableAxis,
     JogWinch,
     RequestEstopReset,
@@ -29,7 +28,6 @@ from steuerung3d.protocol.estop_bits import decode_estop_word
 from ...domain.joy_motion_map import map_soll_speed_to_jog_winch
 from ...domain.ui_estop import age_to_online_state, infer_estop_profile
 from .intent_policy import (
-    claim_allowed,
     gate_motion_intents,
     get_claim_owner,
     should_emit_enable,
@@ -131,15 +129,13 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     if selected_axis_set:
         local_selected = bool(display_axis_id) and display_axis_id in selected_axis_set
     else:
-        local_selected = bool(display_axis_id) and raw_select_hip
+        local_selected = False
 
     joy_select_hip = bool(local_selected)
     joy_soll_speed = float(raw_soll_speed if local_selected else 0.0)
     # ---- motion target resolution ----
     motion_axis_id = axis_id
-    if not motion_axis_id and len(axis_ids) == 1 and self.state.joy.deadman and (
-        self.state.joy.select_hip or raw_select_hip
-    ):
+    if not motion_axis_id and len(axis_ids) == 1 and joy_deadman and joy_select_hip:
         actionable: list[str] = []
         for axis_key in axis_ids:
             ax = axes.get(axis_key)
@@ -294,21 +290,8 @@ def step(*, engine: "HipEngine", inputs: HipStepInputs) -> HipStepResult:
     self.state.joy_jog_active = bool(jog_allowed)
     self.state.joy_jog_axis = str(motion_axis_id or "") if jog_allowed else ""
 
-    # Attachment claiming remains separate; only legacy aggregate select is allowed
-    # to drive this fallback path, never explicit selected_axes lane semantics.
-    if bool(getattr(joy, "select_hip", False)) and (not selected_axis_set) and axis_id:
-        owner = get_claim_owner(snap, axis_id)
-        if owner != str(hip_id or ""):
-            has_claim = any(
-                isinstance(i, ClaimAxis) and str(getattr(i, "axis_id", "")) == axis_id
-                for i in intents
-            )
-            if (not has_claim) and claim_allowed(
-                self.state.last_claim_attempt_ns_by_axis,
-                axis_id,
-                int(inputs.now_ns),
-            ):
-                intents.append(ClaimAxis(axis_id=axis_id, hip_id=hip_id))
+    # Explicit lane selection now owns activation; legacy aggregate select no longer
+    # drives attachment claims in pooled multi-HiP mode.
 
     prev_device_tick = self.state.prev_device_tick
     tick_text, new_prev = compute_tick_text(

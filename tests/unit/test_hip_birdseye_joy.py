@@ -46,4 +46,4 @@ def test_hip_birdseye_includes_joy_fields() -> None:
     assert "sp=" in status.last_summary
     assert status.last_fields.get("joy_deadman") is True
     assert status.last_fields.get("joy_select_hip") is False
-    assert abs(float(status.last_fields.get("joy_soll_speed", 0.0)) - (-0.5)) < 1e-6
+    assert abs(float(status.last_fields.get("joy_soll_speed", 0.0)) - 0.0) < 1e-6

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from steuerung3d.apps.yellow.engines.hip.engine import HipEngine, HipStepInputs, HipUiInputs
-from steuerung3d.core.intents import ClaimAxis, ReleaseAxis, EnableAxis, JogWinch
+from steuerung3d.core.intents import ClaimAxis, EnableAxis, JogWinch, ReleaseAxis
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS, encode_estop_word
@@ -112,7 +112,7 @@ def test_select_hip_without_ownership_does_not_move_axis() -> None:
 
 def test_select_hip_with_ownership_drives_motion_but_not_attachment() -> None:
     eng = HipEngine(hip_id="hip-test")
-    joy = JoyState(deadman=True, select_hip=True, soll_speed=0.4)
+    joy = JoyState(deadman=True, select_hip=True, soll_speed=0.4, selected_axes=("Anton",))
     snap = _snap("Anton", joy=joy, claimed_by="hip-test", vel_max=2.0)
 
     inputs = HipStepInputs(
@@ -134,4 +134,6 @@ def test_select_hip_with_ownership_drives_motion_but_not_attachment() -> None:
     assert not any(isinstance(i, ClaimAxis) for i in res.intents)
     assert not any(isinstance(i, ReleaseAxis) for i in res.intents)
     assert any(isinstance(i, EnableAxis) and i.enable for i in res.intents)
-    assert any(isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate == 0.8 for i in res.intents)
+    assert any(
+        isinstance(i, JogWinch) and i.winch_id == "Anton" and i.rate == 0.8 for i in res.intents
+    )

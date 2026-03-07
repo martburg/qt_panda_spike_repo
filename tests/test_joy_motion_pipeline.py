@@ -105,7 +105,7 @@ def test_joy_motion_end_to_end_gating_and_sign() -> None:
     assert any(isinstance(i, EnableAxis) and i.enable is False for i in intents)
 
     # B) deadman true + selected + owned => EnableAxis(True) + JogWinch with scaled sign
-    joy = JoyState(deadman=True, select_hip=True, soll_speed=-0.6)
+    joy = JoyState(deadman=True, select_hip=True, soll_speed=-0.6, selected_axes=(axis_id,))
     intents = _step_engine(axis_id=axis_id, joy=joy, claimed_by=hip_id, hip_id=hip_id, vel_max=2.0)
     assert any(isinstance(i, EnableAxis) and i.enable is True for i in intents)
     assert any(isinstance(i, JogWinch) and i.rate == -1.2 for i in intents)
@@ -173,11 +173,12 @@ def test_core_select_allows_speed_when_selected() -> None:
     st.densi_registry[axis_id].last_seen_core_tick = st.tick
     apply_intent(st, EnableAxis(axis_id=axis_id, enable=True, hip_id=hip_id))
     apply_intent(st, JogWinch(winch_id=axis_id, rate=-0.4, hip_id=hip_id))
-    apply_intent(st, JoyStateUpdate(deadman=True, select_hip=True, soll_speed=-0.4, selected_axes=(axis_id,)))
+    apply_intent(
+        st, JoyStateUpdate(deadman=True, select_hip=True, soll_speed=-0.4, selected_axes=(axis_id,))
+    )
 
     cmd = build_command_frame(st)
     assert cmd.axes[axis_id].vel == -0.4
-
 
 
 def test_core_resolves_selected_lanes_through_claims() -> None:
@@ -186,7 +187,9 @@ def test_core_resolves_selected_lanes_through_claims() -> None:
     for axis_id in ("Anton", "Debby"):
         st.ensure_axis(axis_id)
         if axis_id == "Anton":
-            apply_intent(st, RequestAxisLease(axis_id=axis_id, hip_id="hip-a", req_id=f"lease-{axis_id}"))
+            apply_intent(
+                st, RequestAxisLease(axis_id=axis_id, hip_id="hip-a", req_id=f"lease-{axis_id}")
+            )
             apply_intent(st, EnableAxis(axis_id=axis_id, enable=True, hip_id="hip-a"))
         else:
             # Debby deliberately remains unattached/unclaimed and not leased
