@@ -76,6 +76,7 @@ def main() -> int:
     last_axes: list[float] = []
     last_axis_pairs: list[str] = []
     last_selected_axes: list[str] = []
+    last_select_map: list[str] = []
 
     hb = Heartbeat("joy2intent", interval_s=1.0)
     ch = ChangeTracker()
@@ -157,6 +158,7 @@ def main() -> int:
                     if hit and i < len(rig_ids):
                         sel.append(axis_name)
                 last_selected_axes = list(sel)
+                last_select_map = list(selected_pairs)
                 selected_detail = (
                     tuple(sorted(pressed)),
                     tuple(sel),
@@ -199,6 +201,11 @@ def main() -> int:
                     sent_stale_zero = True
                     log.warning("raw input stale (age_ms=%.1f) -> emitted stop", age_ms)
 
+        hb.set("buttons", list(last_buttons))
+        hb.set("selected", list(last_selected_axes))
+        hb.set("select_map", list(last_select_map))
+        hb.set("axes", list(last_axis_pairs))
+
         # Structured birds-eye status (side-channel; does not affect PLC packets)
         if status is not None:
             age_ms_f: float | None = None
@@ -213,7 +220,8 @@ def main() -> int:
                 level=level,
                 summary=(
                     f"mode={st.mode} age_ms={age_ms_i if age_ms_i is not None else 'NA'} "
-                    f"stale_stop={sent_stale_zero} btn={btns_s} axes={axes_s} sel={last_selected_axes}"
+                    f"stale_stop={sent_stale_zero} btn={btns_s} axes={axes_s} "
+                    f"sel={last_selected_axes} map={last_select_map}"
                 ),
                 fields={
                     "mode": st.mode,
