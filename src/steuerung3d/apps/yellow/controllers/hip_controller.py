@@ -22,7 +22,6 @@ from PySide6.QtWidgets import QWidget
 
 from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.intents import Intent
-from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 from steuerung3d.util.ratelimit import rl_log_exc
 
@@ -164,127 +163,13 @@ class HiPController:
     def _publish_intent(self, intent: Intent) -> None:
         self.intent_out.publish_intent(intent)
 
-    def _emit_birdseye_motion(
-        self, *, snap: TelemetrySnapshot, intents: list[Intent], estate: str
-    ) -> None:
-        status = getattr(self, "_status", None)
-        if status is None:
-            return
-
-        axis_selected = ""
-        try:
-            axis_selected = str(getattr(self._hip_engine.state, "selected_axis", "") or "")
-        except Exception:
-            axis_selected = ""
-        if not axis_selected:
-            axis_selected = str(getattr(self, "_fixed_axis", "") or "")
-
-        joy = None
-        try:
-            joy = getattr(self._hip_engine.state, "joy", None)
-        except Exception:
-            joy = None
-        if joy is None:
-            joy = getattr(snap, "joy", None)
-
-        joy_soll_speed_norm = 0.0
-        dm = False
-        sel = False
-        try:
-            raw_sp = float(getattr(joy, "soll_speed", 0.0) or 0.0)
-            dm = bool(getattr(joy, "deadman", False))
-
-            selected_axes = tuple(getattr(joy, "selected_axes", ()) or ())
-            selected_axis_set = {str(x).strip() for x in selected_axes if str(x).strip()}
-
-            if selected_axis_set:
-                sel = bool(axis_selected) and axis_selected in selected_axis_set
-            else:
-                sel = False
-
-            joy_soll_speed_norm = float(raw_sp if sel else 0.0)
-        except Exception:
-            joy_soll_speed_norm = 0.0
-            dm = False
-            sel = False
-
-        velmax = 0.0
-        try:
-            params = snap.params or {}
-            velmax = float(params.get("VelMax", 0.0) or 0.0)
-        except Exception:
-            velmax = 0.0
-        if velmax < 0.0:
-            velmax = 0.0
-
-        joy_rate_mps = joy_soll_speed_norm * velmax if velmax > 0.0 else 0.0
-
-        estop = bool(snap.estop)
-        fault = bool(snap.fault)
-        core_mode = str(snap.core_mode or "")
-        armed = bool(str(estate or "").upper() in ("ARMED", "READY"))
-        ready = bool(str(estate or "").upper() == "READY")
-
-        enable: bool | None = None
-        try:
-            if axis_selected:
-                ax = snap.axes.get(axis_selected)
-                if ax is not None:
-                    # prefer what core is commanding (echoed for UI)
-                    enable = (
-                        bool(ax.enable_cmd)
-                        if hasattr(ax, "enable_cmd")
-                        else bool(getattr(ax, "enabled", False))
-                    )
-        except Exception:
-            enable = None
-
-        types = []
-        try:
-            types = sorted({type(i).__name__ for i in (intents or [])})
-        except Exception:
-            types = []
-        intents_out_types = ",".join(types)
-        intents_out_count = int(len(intents or []))
-
-        summary = (
-            f"hip axis={axis_selected or '-'} core_mode={core_mode or '-'} "
-            f"legacy_mode={estate or '-'} dm={int(dm)} sel={int(sel)} "
-            f"estop={int(estop)} v={joy_rate_mps:+.2f}m/s out=[{intents_out_types}]"
+    def _emit_birdseye_motion(self, *, snap: object, intents: list[Intent], estate: str) -> None:
+        self._hip_runtime.emit_birdseye_motion(
+            snap=snap,
+            intents=list(intents or []),
+            estate=str(estate or ""),
+            soft_errors=dict(getattr(self, "_soft_errors", {}) or {}),
         )
-
-        fields: dict[str, object] = {
-            "component": "hip",
-            "axis_selected": str(axis_selected or ""),
-            "deadman": bool(dm),
-            "select_hip": bool(sel),
-            "joy_soll_speed_norm": float(joy_soll_speed_norm),
-            "velmax": float(velmax),
-            "joy_rate_mps": float(joy_rate_mps),
-            "intents_out_types": str(intents_out_types),
-            "intents_out_count": int(intents_out_count),
-            "estop": bool(estop),
-            "fault": bool(fault),
-            "mode": str(core_mode),
-            "estate": str(estate or ""),
-            "armed": bool(armed),
-            "ready": bool(ready),
-            "sel": bool(sel),
-            "dm": bool(dm),
-        }
-        try:
-            soft = dict(getattr(self, "_soft_errors", {}) or {})
-            fields["soft_errors_total"] = int(sum(int(v) for v in soft.values()))
-            fields["soft_errors_by_key"] = {str(k): int(v) for k, v in soft.items()}
-        except Exception:
-            pass
-        if enable is not None:
-            fields["enable"] = bool(enable)
-
-        try:
-            status.emit_every(level="OK", summary=summary, fields=fields)
-        except Exception:
-            return
 
     # -------------------------------------------------------------------------
     # Polling
