@@ -35,4 +35,19 @@ def slice_command_frame(cmd: CommandFrame, axis_ids: Iterable[str]) -> CommandFr
         lifetick_echo={
             k: v for k, v in dict(getattr(cmd, "lifetick_echo", {}) or {}).items() if k in axis_set
         },
+        resync_by_axis={
+            k: bool(v)
+            for k, v in dict(getattr(cmd, "resync_by_axis", {}) or {}).items()
+            if k in axis_set and bool(v)
+        },
+        main_reset_by_axis={
+            k: bool(v)
+            for k, v in dict(getattr(cmd, "main_reset_by_axis", {}) or {}).items()
+            if k in axis_set and bool(v)
+        },
+        guider_reset_by_axis={
+            k: bool(v)
+            for k, v in dict(getattr(cmd, "guider_reset_by_axis", {}) or {}).items()
+            if k in axis_set and bool(v)
+        },
     )

@@ -106,6 +106,12 @@ class AxisRouter:
                 echo_val = None
             lifetick_echo_axis = {axis_id: (int(echo_val) & 0xFFFF)} if echo_val is not None else {}
 
+            resync_map = getattr(cmd_frame, "resync_by_axis", {}) or {}
+            resync_axis = bool(resync_map.get(axis_id, False))
+            # Legacy fallback: only honor the flat bit in true single-axis frames.
+            if not resync_axis and len(getattr(cmd_frame, "axes", {}) or {}) == 1:
+                resync_axis = bool(getattr(cmd_frame, "resync", False))
+
             frame_axis = CommandFrame(
                 tick=cmd_frame.tick,
                 t_s=cmd_frame.t_s,
@@ -114,11 +120,20 @@ class AxisRouter:
                 core_mode=cmd_frame.core_mode,
                 axes={axis_id: sp},
                 intent=bool(getattr(cmd_frame, "intent", True)),
-                resync=bool(getattr(cmd_frame, "resync", False)),
+                resync=resync_axis,
                 gui_not_halt=bool(getattr(cmd_frame, "gui_not_halt", False)),
                 lifetick_echo=lifetick_echo_axis,
+                resync_by_axis={axis_id: True} if resync_axis else {},
                 estop_reset=bool(estop_reset_by_axis.get(axis_id, False)),
                 param_ops=coerce_param_ops(param_ops_by_axis.get(axis_id, [])),
+                main_reset_by_axis={
+                    axis_id: bool(getattr(cmd_frame, "main_reset_by_axis", {}).get(axis_id, False))
+                },
+                guider_reset_by_axis={
+                    axis_id: bool(
+                        getattr(cmd_frame, "guider_reset_by_axis", {}).get(axis_id, False)
+                    )
+                },
             )
 
             out = self.dev_cmd_out_by_axis.get(axis_id)

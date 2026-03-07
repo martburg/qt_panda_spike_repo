@@ -72,16 +72,17 @@ def _get_lifetick_logger() -> Optional[logging.Logger]:
 
 
 def _compute_resync_any(state: MachineState) -> bool:
-    resync_any = bool(getattr(state, "resync_req", False))
-    if resync_any:
-        return True
+    """Return legacy/global resync pulse state.
+
+    Multi-axis code should prefer ``_compute_resync_by_axis``. The legacy
+    global field is kept for single-axis compatibility only.
+    """
+    return bool(getattr(state, "resync_req", False))
+
+
+def _compute_resync_by_axis(state: MachineState) -> dict[str, bool]:
     m = getattr(state, "resync_req_by_axis", {})
-    if isinstance(m, dict):
-        try:
-            return any(bool(v) for v in m.values())
-        except Exception:
-            return bool(getattr(state, "resync_req", False))
-    return False
+    return {str(k): bool(v) for k, v in dict(m).items()} if isinstance(m, dict) else {}
 
 
 def _compute_estop_reset_any(state: MachineState) -> bool:
@@ -215,6 +216,7 @@ def build_command_frame(state: MachineState) -> CommandFrame:
         resync=resync_any,  # legacy ReSync pulse
         param_ops=coerce_param_ops(_compute_param_ops_any(state)),
         lifetick_echo=lifetick_echo,
+        resync_by_axis=_compute_resync_by_axis(state),
         main_reset_by_axis=_compute_main_reset_by_axis(state),
         guider_reset_by_axis=_compute_guider_reset_by_axis(state),
     )

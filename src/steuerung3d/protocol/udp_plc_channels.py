@@ -247,6 +247,7 @@ class UdpPlcCommandIn:
                     gui_not_halt=bool(gui_not_halt),
                     estop_reset=_to_bool_token(f.get("EStopReset", "False"), False),
                     lifetick_echo={axis_id: tick_ui_rx},
+                    resync_by_axis={axis_id: bool(resync)} if bool(resync) else {},
                     param_ops=param_ops,
                 )
                 out.append(cmd)

@@ -267,6 +267,12 @@ def encode_command_frame(frame: CommandFrame) -> Dict[str, Any]:
     # omit empty optional keys
     if not d.get("lifetick_echo"):
         d.pop("lifetick_echo", None)
+    if not d.get("resync_by_axis"):
+        d.pop("resync_by_axis", None)
+    if not d.get("main_reset_by_axis"):
+        d.pop("main_reset_by_axis", None)
+    if not d.get("guider_reset_by_axis"):
+        d.pop("guider_reset_by_axis", None)
     # keep hashes stable: omit legacy knobs when at default values
     if d.get("intent", True) is True:
         d.pop("intent", None)
@@ -295,4 +301,11 @@ def decode_command_frame(payload: Dict[str, Any]) -> CommandFrame:
         estop_reset=bool(payload.get("estop_reset", False)),  # NEW
         param_ops=decode_param_ops(payload.get("param_ops", [])),
         lifetick_echo={k: int(v) for k, v in dict(payload.get("lifetick_echo", {})).items()},
+        resync_by_axis={k: bool(v) for k, v in dict(payload.get("resync_by_axis", {})).items()},
+        main_reset_by_axis={
+            k: bool(v) for k, v in dict(payload.get("main_reset_by_axis", {})).items()
+        },
+        guider_reset_by_axis={
+            k: bool(v) for k, v in dict(payload.get("guider_reset_by_axis", {})).items()
+        },
     )

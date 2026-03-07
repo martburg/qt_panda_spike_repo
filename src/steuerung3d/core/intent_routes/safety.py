@@ -56,13 +56,11 @@ def handle_request_resync(state: MachineState, intent: RequestResync) -> None:
     axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     hip_id = str(getattr(intent, "hip_id", "") or "")
 
-    if axis_id:
-        owner = state.claim_owner(axis_id)
-        if owner and hip_id and owner != hip_id:
-            return
-        state.resync_req_by_axis[axis_id] = True
-    else:
-        state.resync_req = True
+    allowed, _reason = axis_reset_allowed(state, axis_id, hip_id)
+    if not allowed:
+        return
+
+    state.resync_req_by_axis[axis_id] = True
 
 
 def _claim_allows(state: MachineState, axis_id: str, hip_id: str) -> bool:

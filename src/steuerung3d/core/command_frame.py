@@ -108,6 +108,8 @@ class CommandFrame:
     # intent: controller "claim" bit (PLC expects "True"/"False" string)
     intent: bool = True
     # resync: legacy ReSync signal (clears cut markers / recover flow)
+    # Keep for single-axis compatibility; multi-axis code should prefer
+    # resync_by_axis so the pulse stays target-scoped through routing.
     resync: bool = False
     # gui_not_halt: legacy GUI Not-Halt input (placeholder until verified)
     gui_not_halt: bool = False
@@ -119,6 +121,9 @@ class CommandFrame:
     # NEW (optional): UI-originating livetick echo values by axis.
     # Keep empty by default so existing regression fingerprints stay stable.
     lifetick_echo: Dict[str, int] = field(default_factory=dict)
+    # NEW: per-axis resync pulses. Preferred over the legacy global resync bit
+    # in multi-axis / multi-HiP runs.
+    resync_by_axis: Dict[str, bool] = field(default_factory=dict)
     # NEW: per-axis amplifier reset pulses (bit-wrangled into ControlIN / GuideControlUI)
     main_reset_by_axis: Dict[str, bool] = field(default_factory=dict)
     guider_reset_by_axis: Dict[str, bool] = field(default_factory=dict)

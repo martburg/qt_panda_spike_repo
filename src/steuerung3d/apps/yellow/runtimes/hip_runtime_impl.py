@@ -29,11 +29,11 @@ except Exception:  # pragma: no cover
 from ..domain.param_txn import RetryEvent
 from ..domain.ui_estop import infer_estop_profile
 from ..engines.hip.engine import HipEngine, HipStepInputs, HipStepResult, HipUiInputs
+from ..engines.hip.intent_policy import get_claim_owner
 from ..engines.hip.types import HipPresentationData
 from ..engines.hip.viewmodel import HipViewModel
-from .hip_runtime_status import build_hip_motion_debug_snapshot, build_hip_status_payload
 from .hip_runtime_viewmodel import assemble_legacy_view_model, assemble_view_model
-from .runtime_kernel import emit_runtime_status
+from .runtime_kernel import compute_health, emit_runtime_status, with_health_fields
 from .runtime_utils import StatusEmitterLike
 
 
@@ -185,17 +185,49 @@ class HipRuntime:
             self._diff_shadow(engine_vm=vm, legacy_vm=legacy_vm)
 
         if self._dbg_rl.allow("hip_motion_dbg"):
-            dbg = build_hip_motion_debug_snapshot(runtime=self, snap=snap)
+            axes = snap.axes
+            # snap.axes is a Mapping[str, AxisTelemetry]
+
+            axis_ids = sorted(list(axes.keys()))
+            selected_axis = str(getattr(self.engine.state, "selected_axis", "") or "")
+            fixed_axis = str(self._fixed_axis or "")
+            motion_axis = selected_axis or fixed_axis
+            if not motion_axis and len(axis_ids) == 1:
+                motion_axis = axis_ids[0]
+
+            owner = get_claim_owner(snap, motion_axis) if motion_axis else ""
+            core_mode = str(getattr(snap, "core_mode", ""))
+            legacy_mode = str(getattr(snap, "mode", ""))
+            joy = getattr(snap, "joy", JoyState())
+            dm = bool(getattr(joy, "deadman", False))
+            raw_sp = float(getattr(joy, "soll_speed", 0.0) or 0.0)
+            selected_axes = tuple(getattr(joy, "selected_axes", ()) or ())
+            selected_axis_set = {str(x).strip() for x in selected_axes if str(x).strip()}
+
+            if selected_axis_set:
+                sel = bool(motion_axis) and motion_axis in selected_axis_set
+            else:
+                sel = False
+
+            sp = float(raw_sp if sel else 0.0)
+
+            motion_enabled = (
+                bool(motion_axis)
+                and core_mode.upper() == "LIVE"
+                and owner == self._hip_id
+                and dm
+                and sel
+            )
             self._log.info(
                 "hip_motion_dbg core_mode=%s legacy_mode=%s dm=%s sel=%s sp=%.3f motion_enabled=%s axis=%s owner=%s",
-                dbg.core_mode,
-                dbg.legacy_mode,
-                int(dbg.joy_deadman),
-                int(dbg.joy_select_hip),
-                dbg.joy_soll_speed,
-                int(dbg.motion_enabled),
-                dbg.motion_axis or "",
-                dbg.owner,
+                core_mode,
+                legacy_mode,
+                int(dm),
+                int(sel),
+                sp,
+                int(motion_enabled),
+                motion_axis or "",
+                owner,
             )
 
         if vm.param_writeback_values and vm.param_writeback_group:
@@ -307,12 +339,62 @@ class HipRuntime:
         if getattr(self, "_status", None) is None:
             return
 
-        payload = build_hip_status_payload(runtime=self, now_ns=now_ns)
+        h = compute_health(
+            now_ns=int(now_ns),
+            last_rx_ns=self._last_rx_ns,
+            stale_after_ms=self._stale_after_ms,
+            seen_first_rx=bool(self._seen_first_telem),
+            estop=bool(self._last_estop),
+            fault=bool(self._last_fault),
+        )
+        axis = str(getattr(self.engine.state, "selected_axis", "") or "") or (
+            self._fixed_axis or ""
+        )
+        estate = str(self._last_estate or "")
+        mode = str(self._last_mode or "")
+        armed = bool(str(estate or "").upper() in ("ARMED", "READY"))
+        ready = bool(str(estate or "").upper() == "READY")
+        age_disp = str(getattr(h, "age_disp", "") or "")
+        joy = getattr(self.engine.state, "joy", JoyState())
+        dm_bool = bool(getattr(joy, "deadman", False))
+        raw_sp = float(getattr(joy, "soll_speed", 0.0) or 0.0)
+        selected_axes = tuple(getattr(joy, "selected_axes", ()) or ())
+        selected_axis_set = {str(x).strip() for x in selected_axes if str(x).strip()}
+
+        if selected_axis_set:
+            sel_bool = bool(axis) and axis in selected_axis_set
+        else:
+            sel_bool = False
+
+        sp = float(raw_sp if sel_bool else 0.0)
+        dm = 1 if dm_bool else 0
+        sel = 1 if sel_bool else 0
+        summary = (
+            f"axis={axis or '-'} core_mode={mode or '-'} legacy_mode={estate or '-'} "
+            f"age_ms={age_disp} JOY dm={dm} sel={sel} sp={sp:+.2f}"
+        )
+
+        fields = with_health_fields(
+            {
+                "axis": axis,
+                "mode": mode,
+                "estate": str(estate or ""),
+                "armed": bool(armed),
+                "ready": bool(ready),
+                "joy_deadman": bool(dm_bool),
+                "joy_select_hip": bool(sel_bool),
+                "joy_soll_speed": float(sp),
+            },
+            health=h,
+            estop=bool(self._last_estop),
+            fault=bool(self._last_fault),
+        )
+
         emit_runtime_status(
             self._status,
-            level=payload.level,
-            summary=payload.summary,
-            fields=payload.fields,
+            level=str(getattr(h, "level", "") or ""),
+            summary=summary,
+            fields=fields,
             log=self._log,
             exc_tag="hip.status.emit",
             exc_msg="HiP status emission failed",

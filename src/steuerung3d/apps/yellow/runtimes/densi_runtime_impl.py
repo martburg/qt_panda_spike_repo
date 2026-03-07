@@ -18,8 +18,7 @@ from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 
-from .densi_runtime_status import build_densi_status_payload
-from .runtime_kernel import emit_runtime_status
+from .runtime_kernel import compute_health, emit_runtime_status, with_health_fields
 from .runtime_utils import (
     should_interval_log,
 )
@@ -223,12 +222,85 @@ class DensiRuntime:
         if self._status is None:
             return
 
-        payload = build_densi_status_payload(runtime=self, now_ns=now_ns)
+        h = compute_health(
+            now_ns=int(now_ns),
+            last_rx_ns=self._last_cmd_ns,
+            stale_after_ms=self._stale_after_ms,
+            seen_first_rx=bool(self._seen_first_cmd),
+            estop=bool(self._last_estop),
+            fault=bool(self._last_fault),
+        )
+        axis = self._axis_ids[0] if self._axis_ids else ""
+        mode = self._last_mode or ""
+        online = bool(getattr(h, "online", False))
+        cmd = self._last_cmd
+        cmd_mode = str(getattr(cmd, "core_mode", "") or "") if cmd is not None else ""
+        cmd_intent = bool(getattr(cmd, "intent", False)) if cmd is not None else False
+        cmd_enable = False
+        cmd_vel = 0.0
+        try:
+            if cmd is not None and axis:
+                sp = (getattr(cmd, "axes", {}) or {}).get(axis)
+                if sp is not None:
+                    cmd_enable = bool(getattr(sp, "enable", False))
+                    cmd_vel = float(getattr(sp, "vel", 0.0) or 0.0)
+        except Exception:
+            cmd_enable = False
+            cmd_vel = 0.0
+
+        ready_for_sollvel = bool(getattr(self.engine, "drive_ready", False))
+        estop_now = bool(getattr(self.engine.state, "estop", False))
+        fault_now = bool(getattr(self.engine.state, "fault", False))
+
+        vel_applied = 0.0
+        pos_applied = 0.0
+        lifetick_age_ticks = None
+        try:
+            ax = (getattr(self.engine.state, "axes", {}) or {}).get(axis)
+            if ax is not None:
+                vel_applied = float(getattr(ax, "vel", 0.0) or 0.0)
+                pos_applied = float(getattr(ax, "pos", 0.0) or 0.0)
+                lifetick_age_ticks = int(getattr(ax, "meta", {}).get("plc_lifetick_age_ticks", 0))
+        except Exception:
+            vel_applied = 0.0
+            pos_applied = 0.0
+            lifetick_age_ticks = None
+
+        summary = (
+            f"densi axis={axis or '-'} ctrl={int(cmd_enable)} "
+            f"soll={cmd_vel:+.2f} ready={int(ready_for_sollvel)} "
+            f"estop={int(estop_now)} applied={vel_applied:+.2f}"
+        )
+
+        fields = with_health_fields(
+            {
+                "component": "densi",
+                "axis": axis,
+                "core_mode": mode,
+                "online": bool(online),
+                "tick": int(getattr(self.engine.state, "tick", 0) or 0),
+                "last_cmd_rx_age_ms": (
+                    -1 if getattr(h, "age_ms", None) is None else float(getattr(h, "age_ms", 0.0))
+                ),
+                "cmd_core_mode": str(cmd_mode),
+                "cmd_intent": bool(cmd_intent),
+                "cmd_enable": bool(cmd_enable),
+                "cmd_vel": float(cmd_vel),
+                "ready_for_sollvel": bool(ready_for_sollvel),
+                "vel_applied": float(vel_applied),
+                "pos": float(pos_applied),
+                "lifetick_age_ticks": lifetick_age_ticks,
+            },
+            health=h,
+            estop=bool(estop_now),
+            fault=bool(fault_now),
+        )
+
         emit_runtime_status(
             self._status,
-            level=payload.level,
-            summary=payload.summary,
-            fields=payload.fields,
+            level=str(getattr(h, "level", "") or ""),
+            summary=summary,
+            fields=fields,
             log=self._log,
             exc_tag="densi.status.emit",
             exc_msg="DenSi status emission failed",

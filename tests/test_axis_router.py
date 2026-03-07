@@ -46,6 +46,9 @@ def test_router_reduces_multi_axis_command_frame_and_lifetick_echo():
             "Y": AxisSetpoint(enable=False, vel=4.0),
         },
         lifetick_echo={"X": 123, "Y": 456},
+        resync_by_axis={"X": True},
+        main_reset_by_axis={"X": True, "Y": False},
+        guider_reset_by_axis={"X": False, "Y": True},
         estop_reset=False,
         param_ops=[],
     )
@@ -68,8 +71,16 @@ def test_router_reduces_multi_axis_command_frame_and_lifetick_echo():
     assert list(fy.axes.keys()) == ["Y"]
     assert fx.lifetick_echo == {"X": 123}
     assert fy.lifetick_echo == {"Y": 456}
+    assert fx.resync is True
+    assert fy.resync is False
+    assert fx.resync_by_axis == {"X": True}
+    assert fy.resync_by_axis == {}
     assert fx.estop_reset is True
     assert fy.estop_reset is False
+    assert fx.main_reset_by_axis == {"X": True}
+    assert fy.main_reset_by_axis == {"Y": False}
+    assert fx.guider_reset_by_axis == {"X": False}
+    assert fy.guider_reset_by_axis == {"Y": True}
     assert len(fx.param_ops) == 1
     assert fy.param_ops == []
 
