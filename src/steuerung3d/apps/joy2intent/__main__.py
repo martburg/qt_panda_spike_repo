@@ -83,7 +83,8 @@ def main() -> int:
 
     log.info(
         "joy2intent started mode=%s raw_in=%s intent_out=%s tick_hz=%.1f stale_after_ms=%d "
-        "max_winch_mps=%.3f fine_scale=%.3f deadzone=%.3f expo=%.3f hip_id=%s",
+        "max_winch_mps=%.3f fine_scale=%.3f deadzone=%.3f expo=%.3f hip_id=%s "
+        "winches=%s select_buttons=%s button_bindings=%s",
         st.mode,
         cfg.raw_in,
         cfg.intent_out,
@@ -94,6 +95,9 @@ def main() -> int:
         cfg.deadzone,
         cfg.expo,
         cfg.hip_id,
+        list(rig.winches),
+        list(bind.select_buttons or []),
+        dict(bind.buttons),
     )
 
     while True:
@@ -141,20 +145,22 @@ def main() -> int:
                 pressed = {i for i, v in enumerate(rc.buttons) if v}
             except Exception:
                 pressed = set()
-            dm_btn = bind.buttons.get("deadman")
-            deadman = (dm_btn is not None) and (dm_btn in pressed)
+            from .mapping import _button_aliases, _select_aliases
+            deadman = bool(_button_aliases(bind.buttons.get("deadman")) & pressed)
             if ch.changed("deadman", bool(deadman)):
-                log.info("deadman=%s", bool(deadman))
+                log.info("deadman=%s buttons=%s", bool(deadman), sorted(pressed))
 
             # selection (setup_manual): log raw buttons and resolved axes together
             try:
                 rig_ids = rig.ordered_winch_ids()
                 selected_pairs: list[str] = []
                 sel: list[str] = []
-                for i, b in enumerate(bind.select_buttons or []):
+                for i, entry in enumerate(bind.select_buttons or []):
                     axis_name = rig_ids[i] if i < len(rig_ids) else f"axis[{i}]"
-                    hit = b in pressed
-                    selected_pairs.append(f"b{b}->{axis_name}:{'ON' if hit else 'off'}")
+                    aliases = sorted(_select_aliases(entry))
+                    hit = bool(set(aliases) & pressed)
+                    alias_label = "/".join(str(x) for x in aliases) if aliases else "-"
+                    selected_pairs.append(f"b{alias_label}->{axis_name}:{'ON' if hit else 'off'}")
                     if hit and i < len(rig_ids):
                         sel.append(axis_name)
                 last_selected_axes = list(sel)
