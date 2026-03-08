@@ -141,7 +141,7 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
 
     handler = LIVE_ONLY_DISPATCH.get(type(intent))
     if handler is not None:
-        if bool(state.estop) or bool(state.fault):
+        if bool(state.estop):
             enforce_core_mode_actions(state)
             return
 

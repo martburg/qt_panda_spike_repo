@@ -47,8 +47,11 @@ def encode_downlink(
     modus = "w" if want_write else "E"
 
     # base fields
-    # Apply global safety gating to the legacy ControlIN and setpoints.
-    enable = bool(enable_cmd) and (not bool(frame.estop)) and (not bool(frame.fault))
+    # ESTOP remains a hard global stop.
+    # Global frame.fault must not blanket-block unrelated healthy axes;
+    # those per-axis decisions have already been made upstream when the
+    # command frame was built.
+    enable = bool(enable_cmd) and (not bool(frame.estop))
     vel_eff = float(vel) if enable else 0.0
 
     intent = bool(getattr(frame, "intent", True))

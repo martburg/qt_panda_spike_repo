@@ -68,3 +68,21 @@ def test_encode_downlink_uses_true_false_tokens() -> None:
     assert dec.fields.get("EStopReset") == "True"
     assert dec.fields.get("ReSync") == "False"
     assert dec.fields.get("GUINotHaltIN") == "True"
+
+
+def test_encode_downlink_keeps_axis_enable_during_global_fault() -> None:
+    from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
+
+    cmd = CommandFrame(
+        tick=1,
+        t_s=0.0,
+        estop=False,
+        fault=True,
+        core_mode="FAULT",
+        axes={"Anton": AxisSetpoint(enable=True, vel=1.25)},
+    )
+    payload = encode_downlink(axis_id="Anton", frame=cmd, lifetick_ui_rx=7)
+    dec = decode_downlink(payload)
+    assert dec is not None
+    assert dec.fields.get("ControlIN") == "1"
+    assert dec.fields.get("SpeedSollIN") == "1.25"

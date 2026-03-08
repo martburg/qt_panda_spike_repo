@@ -16,7 +16,7 @@ def axis_local_motion_allowed(state: MachineState, axis_id: str) -> bool:
     - axis must be in scope and effectively KEY0 eligible
     - axis must not be missing/stale
     - axis must not have active hard/fault estop causes
-    - axis must be armed and ready
+    - axis must be ready
     """
 
     axis_id = normalize_axis_id(axis_id)
@@ -37,6 +37,5 @@ def axis_local_motion_allowed(state: MachineState, axis_id: str) -> bool:
         and not bool(gate.get("stale", False))
         and not bool(gate.get("hard_estop_active", False))
         and not bool(gate.get("fault_estop_active", False))
-        and bool(gate.get("armed", False))
         and bool(gate.get("ready", False))
     )

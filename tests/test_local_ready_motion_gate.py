@@ -90,6 +90,41 @@ def test_local_not_ready_axis_stays_blocked_outside_live() -> None:
     assert build_command_frame(st).axes["Debby"].vel == 0.0
 
 
+
+def test_local_ready_axis_can_move_while_other_axis_is_in_fault() -> None:
+    st = MachineState()
+    st.core_mode = CoreMode.FAULT
+    st.estop = False
+    st.fault = True
+    st.joy = JoyState(deadman=True, selected_axes=("Debby",))
+
+    for axis_id, ready, fault_active in (("Anton", False, True), ("Debby", True, False)):
+        st.ensure_axis(axis_id)
+        st.densi_registry[axis_id] = DensiRuntime(device_id=axis_id, last_seen_core_tick=st.tick)
+        st.core_axis_gate[axis_id] = {
+            "in_scope": True,
+            "missing": False,
+            "stale": False,
+            "hard_estop_active": False,
+            "fault_estop_active": bool(fault_active),
+            "ready": bool(ready),
+        }
+        apply_intent(st, RequestAxisLease(axis_id=axis_id, hip_id="hip", req_id=f"lease-{axis_id}"))
+    st.set_axis_claim("Debby", "hip")
+
+    apply_intent(st, EnableAxis(axis_id="Debby", enable=True, hip_id="hip"))
+    apply_intent(st, JogWinch(winch_id="Debby", rate=0.6, hip_id="hip"))
+    enforce_core_mode_actions(st)
+
+    assert st.axis_cmd["Debby"].enable is True
+    assert st.axis_cmd["Debby"].vel == 0.6
+    assert st.axis_cmd["Anton"].vel == 0.0
+
+    cmd = build_command_frame(st)
+    assert cmd.axes["Debby"].enable is True
+    assert cmd.axes["Debby"].vel == 0.6
+
+
 def test_group_cartesian_motion_still_requires_live_sync_active() -> None:
     st = MachineState()
     st.core_mode = CoreMode.ARMED
