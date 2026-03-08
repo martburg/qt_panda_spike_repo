@@ -42,7 +42,7 @@ class AxisRouter:
     axis_ids: Sequence[str]
     dev_cmd_out_by_axis: Mapping[str, CommandFrameSink]
     ui_telem_out_by_axis: Mapping[str, TelemetrySink]
-    ui_telem_fanout: Sequence[TelemetrySink] = field(default_factory=list)
+    ui_telem_fanout: list[TelemetrySink] = field(default_factory=list)
 
     # --- device-scoped caches (multi-axis runs must pin these per axis) ---
     last_dev_params_by_axis: dict[str, dict[str, float]] = field(default_factory=lambda: {})
@@ -81,7 +81,8 @@ class AxisRouter:
             for k, v in dict(self.ui_telem_out_by_axis or {}).items()
             if normalize_axis_id(k)
         }
-        self.ui_telem_fanout = list(self.ui_telem_fanout or [])
+        fanout: list[TelemetrySink] = list(self.ui_telem_fanout or [])
+        self.ui_telem_fanout = fanout
 
     # --------------------
     # Command routing

@@ -61,7 +61,7 @@ def _visible_axis_ids_for_hip(
 
 
 def _authoritative_selected_axis(
-    *, densis: dict[str, DensiTelemetry], hip_id: str, selected_axis: str, prev_selected: str
+    *, densis: Mapping[str, DensiTelemetry], hip_id: str, selected_axis: str, prev_selected: str
 ) -> str:
     hip_id = str(hip_id or "")
     selected_axis = str(selected_axis or "")
