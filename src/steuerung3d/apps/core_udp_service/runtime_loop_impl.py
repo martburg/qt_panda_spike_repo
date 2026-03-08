@@ -2,17 +2,21 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import List, Tuple
+from typing import List, Protocol, Tuple
 
 from steuerung3d.common.timebase import Timebase
-from steuerung3d.core.control_context import ControlContext
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.net import parse_hostport
 from steuerung3d.core.state import MachineState
 from steuerung3d.protocol.axis_router import AxisRouter
 from steuerung3d.protocol.core_runner import CoreRunner
-from steuerung3d.protocol.udp_channels import UdpControlContextOut, UdpIntentIn, UdpTelemetryFanout, UdpTelemetryOut
+from steuerung3d.protocol.udp_channels import (
+    UdpControlContextOut,
+    UdpIntentIn,
+    UdpTelemetryFanout,
+    UdpTelemetryOut,
+)
 from steuerung3d.protocol.udp_plc_channels import UdpPlcCommandOut, UdpPlcTelemetryIn
 
 from .cli_validation import (
@@ -40,7 +44,29 @@ __all__ = [
 ]
 
 
-def run_core_udp_service(*, args, status) -> int:
+class CoreUdpServiceArgs(Protocol):
+    intent_in: str
+    control_context_target: str
+    ui_telem_disable: bool
+    ui_telem_target: list[str]
+    ui_telem_host: str
+    ui_telem_base: str | None
+    ui_telem_count: int
+    ui_telem_mode: str
+    c2_telem_target: list[str]
+    c2_telem_host: str
+    c2_telem_base: str | None
+    c2_telem_count: int
+    dev_telem_in: str
+    dev_cmd_target: list[str]
+    dev_cmd_host: str
+    dev_cmd_base: str | None
+    dev_cmd_count: int
+    axis: list[str]
+    dt: float
+
+
+def run_core_udp_service(*, args: CoreUdpServiceArgs, status: object) -> int:
     # --- UDP endpoints ---
     intent_in_bind = parse_hostport(args.intent_in)
 

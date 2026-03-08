@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Mapping
 
 if TYPE_CHECKING:
     # Only needed for type checking; avoids runtime import cycles.
@@ -28,7 +28,7 @@ class StepContext:
     intents: list[Intent]
 
 
-def _claim_owner_by_axis(*, densis: dict[str, DensiTelemetry], axis_id: str) -> str:
+def _claim_owner_by_axis(*, densis: Mapping[str, DensiTelemetry], axis_id: str) -> str:
     d = densis.get(str(axis_id or ""))
     if d is None:
         return ""
@@ -36,7 +36,7 @@ def _claim_owner_by_axis(*, densis: dict[str, DensiTelemetry], axis_id: str) -> 
 
 
 def _visible_axis_ids_for_hip(
-    *, densis: dict[str, DensiTelemetry], hip_id: str, prev_selected: str
+    *, densis: Mapping[str, DensiTelemetry], hip_id: str, prev_selected: str
 ) -> list[str]:
     visible: list[str] = []
     hip_id = str(hip_id or "")
@@ -80,7 +80,7 @@ def _authoritative_selected_axis(
     return ""
 
 
-def _densis_dbg(densis: dict[str, DensiTelemetry]) -> dict[str, dict[str, object]]:
+def _densis_dbg(densis: Mapping[str, DensiTelemetry]) -> dict[str, dict[str, object]]:
     out: dict[str, dict[str, object]] = {}
     for k, d in densis.items():
         out[str(k)] = {
@@ -107,8 +107,7 @@ def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepCon
     if getattr(self._param_txn, "hip_id", "") != hip_id:
         self._param_txn.hip_id = hip_id
 
-    densis_raw = getattr(snap, "densis", None)
-    densis = densis_raw if isinstance(densis_raw, dict) else {}
+    densis = snap.densis
 
     prev_selected = str(self.state.selected_axis or "")
     axis_ids = _visible_axis_ids_for_hip(
