@@ -16,7 +16,8 @@ tick_hz = 50
 stale_after_ms = 200
 
 [identity]
-# Must match the claim owner (HiP). Stamped into motion intents.
+# Fallback identity for legacy owner-bound motion intents.
+# Independent-axis local manual requests no longer stamp hip_id.
 hip_id = "hip"
 
 [rig]

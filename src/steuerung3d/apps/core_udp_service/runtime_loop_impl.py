@@ -2,17 +2,21 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import List, Tuple
+from typing import Any, List, Tuple, cast
 
 from steuerung3d.common.timebase import Timebase
-from steuerung3d.core.control_context import ControlContext
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.net import parse_hostport
 from steuerung3d.core.state import MachineState
 from steuerung3d.protocol.axis_router import AxisRouter
 from steuerung3d.protocol.core_runner import CoreRunner
-from steuerung3d.protocol.udp_channels import UdpControlContextOut, UdpIntentIn, UdpTelemetryFanout, UdpTelemetryOut
+from steuerung3d.protocol.udp_channels import (
+    UdpControlContextOut,
+    UdpIntentIn,
+    UdpTelemetryFanout,
+    UdpTelemetryOut,
+)
 from steuerung3d.protocol.udp_plc_channels import UdpPlcCommandOut, UdpPlcTelemetryIn
 
 from .cli_validation import (
@@ -40,13 +44,15 @@ __all__ = [
 ]
 
 
-def run_core_udp_service(*, args, status) -> int:
+def run_core_udp_service(*, args: Any, status: Any) -> int:
     # --- UDP endpoints ---
-    intent_in_bind = parse_hostport(args.intent_in)
+    intent_in_addr = str(args.intent_in)
+    intent_in_bind = parse_hostport(intent_in_addr)
 
     op_intent_in = UdpIntentIn.bind(intent_in_bind)
 
-    control_context_out = UdpControlContextOut.connect(parse_hostport(args.control_context_target))
+    control_context_target = str(args.control_context_target)
+    control_context_out = UdpControlContextOut.connect(parse_hostport(control_context_target))
 
     # UI telemetry targets
     if args.ui_telem_disable and (
@@ -55,8 +61,8 @@ def run_core_udp_service(*, args, status) -> int:
         return _fatal("UI telemetry disabled but UI targets were provided.")
 
     ui_telem_targets = _expand_targets(
-        args.ui_telem_target,
-        base=args.ui_telem_base,
+        list(cast(list[str], args.ui_telem_target)),
+        base=None if args.ui_telem_base is None else str(args.ui_telem_base),
         count=int(args.ui_telem_count),
         base_host=args.ui_telem_host,
         default_target=None if args.ui_telem_disable else ("127.0.0.1", 51002),
@@ -65,8 +71,8 @@ def run_core_udp_service(*, args, status) -> int:
 
     c2_telem_targets: List[Tuple[str, int]] = []
     c2_telem_targets = _expand_targets(
-        args.c2_telem_target,
-        base=args.c2_telem_base,
+        list(cast(list[str], args.c2_telem_target)),
+        base=None if args.c2_telem_base is None else str(args.c2_telem_base),
         count=int(args.c2_telem_count),
         base_host=args.c2_telem_host,
         default_target=None,
@@ -79,8 +85,8 @@ def run_core_udp_service(*, args, status) -> int:
 
     # Device command broadcast targets (N DenSi apps each binding a unique command port)
     dev_cmd_targets: List[Tuple[str, int]] = []
-    for s in args.dev_cmd_target:
-        dev_cmd_targets.append(parse_hostport(s))
+    for s in cast(list[str], args.dev_cmd_target):
+        dev_cmd_targets.append(parse_hostport(str(s)))
 
     if args.dev_cmd_base is not None and int(args.dev_cmd_count) > 0:
         base = int(str(args.dev_cmd_base).strip())
@@ -152,7 +158,7 @@ def run_core_udp_service(*, args, status) -> int:
     log.info("timebase dt = %.4fs", tb.dt_s)
 
     st = MachineState()
-    axis_ids = [a.strip() for a in args.axis if a and a.strip()]
+    axis_ids = [str(a).strip() for a in cast(list[str], args.axis) if a and str(a).strip()]
     if not axis_ids:
         axis_ids = ["X"]
 
@@ -193,9 +199,9 @@ def run_core_udp_service(*, args, status) -> int:
 
     router = AxisRouter(
         axis_ids=axis_ids,
-        dev_cmd_out_by_axis=axis_cmd_outs,
-        ui_telem_out_by_axis=axis_ui_outs,
-        ui_telem_fanout=list(op_telem_outs) if ui_mode == "fanout" else [],
+        dev_cmd_out_by_axis=cast(dict[str, Any], axis_cmd_outs),
+        ui_telem_out_by_axis=cast(dict[str, Any], axis_ui_outs),
+        ui_telem_fanout=cast(list[Any], list(op_telem_outs) if ui_mode == "fanout" else []),
     )
 
     drain_intents = build_intent_drain(

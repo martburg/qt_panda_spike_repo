@@ -3,7 +3,13 @@ from __future__ import annotations
 from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.core_mode import CoreMode, core_mode_value
 from steuerung3d.core.intent_handlers.lease import axis_lease_allows as _axis_lease_allows
-from steuerung3d.core.intents import EnableAxis, JogAxis, JogCartesian, JogWinch, LocalAxisManualRequest
+from steuerung3d.core.intents import (
+    EnableAxis,
+    JogAxis,
+    JogCartesian,
+    JogWinch,
+    LocalAxisManualRequest,
+)
 from steuerung3d.core.motion_gate import axis_local_motion_allowed
 from steuerung3d.core.rig_types import RigMode
 from steuerung3d.core.state import MachineState

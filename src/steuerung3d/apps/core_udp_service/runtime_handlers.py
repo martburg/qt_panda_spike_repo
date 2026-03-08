@@ -3,10 +3,9 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-
-from steuerung3d.core.control_context import ControlContext
 from typing import Any, Callable, Dict
 
+from steuerung3d.core.control_context import ControlContext
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import TelemetrySnapshot, apply_measured_snapshot
 from steuerung3d.protocol.axis_router import AxisRouter
@@ -217,7 +216,9 @@ class SnapshotHandler:
         self.control_context_out.publish_control_context(
             ControlContext(
                 seq=int(self.context_seq),
-                mode=mode if mode in {"independent_axes", "sync_kinematic_jog", "goto_pose", "follow_path"} else "independent_axes",
+                mode=mode
+                if mode in {"independent_axes", "sync_kinematic_jog", "goto_pose", "follow_path"}
+                else "independent_axes",
                 selected_target_kind="axis",
                 input_mapping=input_mapping,
                 motion_enabled=True,

@@ -70,7 +70,6 @@ def main() -> int:
     last_axis_pairs: list[str] = []
     last_selected_axes: list[str] = []
     last_select_map: list[str] = []
-    last_ctx_ns: int | None = None
     latest_ctx: ControlContext | None = None
 
     hb = Heartbeat("joy2intent", interval_s=1.0)
@@ -102,7 +101,6 @@ def main() -> int:
         ctxs = context_in.drain_contexts(limit=20)
         if ctxs:
             latest_ctx = ctxs[-1]
-            last_ctx_ns = now_ns
 
         # Heartbeat counters
         hb.inc("rx", len(rcs))
@@ -135,7 +133,15 @@ def main() -> int:
                 )
             last_axis_pairs = axis_pairs
 
-            intents = synthesize_intents(st, rc, bind, rig, lim, hip_id=cfg.hip_id)
+            intents = synthesize_intents(
+                st,
+                rc,
+                bind,
+                rig,
+                lim,
+                hip_id=cfg.hip_id,
+                control_context=latest_ctx,
+            )
 
             # Minimal "what changed" logs (no spam)
             try:
@@ -185,20 +191,32 @@ def main() -> int:
             if last_rx_ns is not None:
                 age_ms = (now_ns - last_rx_ns) / 1_000_000.0
                 if age_ms > cfg.stale_after_ms and not sent_stale_zero:
-                    # Emit stop for both domains; core will ignore the one that doesn't match current mode
-                    intent_out.publish_intent(JogCartesian(vx=0.0, vy=0.0, vz=0.0))
-                    # Stop any winches that were actively driven last tick.
-                    if rig.winches and st.prev_active_winch_idxs:
-                        for idx in sorted(st.prev_active_winch_idxs):
-                            if 0 <= idx < len(rig.winches):
-                                intent_out.publish_intent(
-                                    JogWinch(winch_id=rig.winches[idx], rate=0.0)
-                                )
-                        st.prev_active_winch_idxs.clear()
+                    # Emit a stop matching the active control grammar.
+                    if (
+                        latest_ctx is not None
+                        and str(getattr(latest_ctx, "mode", "")) == "independent_axes"
+                        and str(getattr(latest_ctx, "input_mapping", "")) == "axis_rate"
+                    ):
+                        axis_ids = tuple(sorted(last_selected_axes))
+                        from steuerung3d.core.intents import LocalAxisManualRequest
+
+                        intent_out.publish_intent(
+                            LocalAxisManualRequest(axis_ids=axis_ids, enable=False, rate=0.0)
+                        )
                     else:
-                        # Fallback (legacy single-select)
-                        wid = rig.winches[st.selected_winch_idx] if rig.winches else "WINCH"
-                        intent_out.publish_intent(JogWinch(winch_id=wid, rate=0.0))
+                        intent_out.publish_intent(JogCartesian(vx=0.0, vy=0.0, vz=0.0))
+                        # Stop any winches that were actively driven last tick.
+                        if rig.winches and st.prev_active_winch_idxs:
+                            for idx in sorted(st.prev_active_winch_idxs):
+                                if 0 <= idx < len(rig.winches):
+                                    intent_out.publish_intent(
+                                        JogWinch(winch_id=rig.winches[idx], rate=0.0)
+                                    )
+                            st.prev_active_winch_idxs.clear()
+                        else:
+                            # Fallback (legacy single-select)
+                            wid = rig.winches[st.selected_winch_idx] if rig.winches else "WINCH"
+                            intent_out.publish_intent(JogWinch(winch_id=wid, rate=0.0))
                     sent_stale_zero = True
                     log.warning("raw input stale (age_ms=%.1f) -> emitted stop", age_ms)
 

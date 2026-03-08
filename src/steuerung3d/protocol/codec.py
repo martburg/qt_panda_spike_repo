@@ -100,8 +100,6 @@ def decode_intent(payload: Dict[str, Any]) -> Intent:
     return cls(**payload)
 
 
-
-
 # ---------------------------
 # Control context
 # ---------------------------
@@ -113,6 +111,7 @@ def encode_control_context(ctx: ControlContext) -> Dict[str, Any]:
 
 def decode_control_context(payload: Dict[str, Any]) -> ControlContext:
     return ControlContext(**payload)
+
 
 # ---------------------------
 # Telemetry

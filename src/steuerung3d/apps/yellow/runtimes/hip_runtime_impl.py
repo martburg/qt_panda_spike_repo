@@ -14,7 +14,7 @@ import logging
 from dataclasses import dataclass
 
 from steuerung3d.core.axis_ids import normalize_axis_id
-from steuerung3d.core.intents import Intent, ParamEditBegin
+from steuerung3d.core.intents import Intent
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
@@ -31,12 +31,12 @@ from ..domain.ui_estop import infer_estop_profile
 from ..engines.hip.engine import HipEngine, HipStepInputs, HipStepResult, HipUiInputs
 from ..engines.hip.types import HipPresentationData
 from ..engines.hip.viewmodel import HipViewModel
-from .hip_runtime_viewmodel import assemble_legacy_view_model, assemble_view_model
 from .hip_runtime_status import (
     build_hip_birdseye_payload,
     build_hip_motion_debug_snapshot,
     build_hip_status_payload,
 )
+from .hip_runtime_viewmodel import assemble_legacy_view_model, assemble_view_model
 from .runtime_kernel import emit_runtime_status
 from .runtime_utils import StatusEmitterLike
 
@@ -123,24 +123,11 @@ class HipRuntime:
         apply_startup = False
 
         if not snaps:
-            if self._dbg_rl.allow("hip_snap_src_empty"):
-                self._log.info(
-                    "hip snap src=empty now_ns=%s last_rx_ns=%s stale_after_ms=%s apply_startup=%s",
-                    now_ns,
-                    self._last_rx_ns,
-                    self._stale_after_ms,
-                    int(apply_startup),
-                )
             if self._last_rx_ns is not None:
                 age_ms = (now_ns - int(self._last_rx_ns)) / 1_000_000.0
                 if age_ms >= float(self._stale_after_ms):
                     self._last_rx_ns = None
                     apply_startup = True
-                    self._log.info(
-                        "hip snap src=stale age_ms=%.1f stale_after_ms=%s -> apply_startup=1",
-                        age_ms,
-                        self._stale_after_ms,
-                    )
             self._emit_status(now_ns)
             return HipRuntimeResult(
                 snap=None,
@@ -157,37 +144,13 @@ class HipRuntime:
         snap = snaps[-1]
         self._last_rx_ns = now_ns
 
-        if self._dbg_rl.allow("hip_snap_src_rx"):
-            densis_dbg: dict[str, dict[str, object]] = {}
-            for axis_key, densi in dict(getattr(snap, "densis", {}) or {}).items():
-                densis_dbg[str(axis_key)] = {
-                    "online": bool(getattr(densi, "online", False)),
-                    "owner": str(getattr(densi, "claimed_by_hip", "") or ""),
-                }
-            self._log.info(
-                "hip snap src=rx rx_count=%s tick=%s core_mode=%s estop=%s fault=%s densis=%s",
-                len(snaps),
-                getattr(snap, "tick", None),
-                getattr(snap, "core_mode", None),
-                getattr(snap, "estop", None),
-                getattr(snap, "fault", None),
-                densis_dbg,
-            )
-
         if not self._seen_first_telem:
-            densis_dbg: dict[str, dict[str, object]] = {}
-            for axis_key, densi in dict(getattr(snap, "densis", {}) or {}).items():
-                densis_dbg[str(axis_key)] = {
-                    "online": bool(getattr(densi, "online", False)),
-                    "owner": str(getattr(densi, "claimed_by_hip", "") or ""),
-                }
             self._log.info(
-                "rx first telemetry: tick=%s core_mode=%s estop=%s fault=%s densis=%s",
+                "rx first telemetry: tick=%s core_mode=%s estop=%s fault=%s",
                 getattr(snap, "tick", None),
                 getattr(snap, "core_mode", None),
                 getattr(snap, "estop", None),
                 getattr(snap, "fault", None),
-                densis_dbg,
             )
             self._seen_first_telem = True
 
@@ -230,22 +193,8 @@ class HipRuntime:
 
         if self._dbg_rl.allow("hip_motion_dbg"):
             motion_dbg = build_hip_motion_debug_snapshot(runtime=self, snap=snap)
-            combo_current = ""
-            combo_items: list[str] = []
-            try:
-                combo_current = str(getattr(vm.axis_combo, "current", "") or "")
-                combo_items = [str(x) for x in list(getattr(vm.axis_combo, "items", []) or [])]
-            except Exception:
-                combo_current = ""
-                combo_items = []
-            densis_dbg: dict[str, dict[str, object]] = {}
-            for axis_key, densi in dict(getattr(snap, "densis", {}) or {}).items():
-                densis_dbg[str(axis_key)] = {
-                    "online": bool(getattr(densi, "online", False)),
-                    "owner": str(getattr(densi, "claimed_by_hip", "") or ""),
-                }
             self._log.info(
-                "hip motion axis=%s mode=%s legacy=%s owner=%s enabled=%s dm=%s sel=%s sp=%.3f combo_current=%s combo_items=%s snap_tick=%s snap_core_mode=%s densis=%s",
+                "hip motion axis=%s mode=%s legacy=%s owner=%s enabled=%s dm=%s sel=%s sp=%.3f",
                 motion_dbg.motion_axis or "-",
                 motion_dbg.core_mode or "-",
                 motion_dbg.legacy_mode or "-",
@@ -254,11 +203,6 @@ class HipRuntime:
                 int(motion_dbg.joy_deadman),
                 int(motion_dbg.joy_select_hip),
                 motion_dbg.joy_soll_speed,
-                combo_current,
-                combo_items,
-                getattr(snap, "tick", None),
-                getattr(snap, "core_mode", None),
-                densis_dbg,
             )
 
         self._emit_status(now_ns)

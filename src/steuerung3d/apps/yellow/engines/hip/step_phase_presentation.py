@@ -78,7 +78,7 @@ def compute_presentation_phase(
     estop = bool(getattr(snap, "estop", False))
     fault = bool(getattr(snap, "fault", False))
 
-    state = getattr(engine, 'state')
+    state = engine.state
     prev_device_tick = getattr(state, "prev_device_tick", None)
     tick_text, new_prev = compute_tick_text(
         snap=snap_view,
@@ -180,7 +180,7 @@ def compute_presentation_phase(
     )
 
     if update_state:
-        setattr(state, "prev_device_tick", new_prev)
+        state.prev_device_tick = new_prev
 
     return HipPresentationPhase(
         presentation=presentation,

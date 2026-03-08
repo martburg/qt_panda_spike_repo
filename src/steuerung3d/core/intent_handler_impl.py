@@ -21,7 +21,6 @@ from steuerung3d.core.intent_handlers.claims import (
     release_axis as _release_axis,
 )
 from steuerung3d.core.intent_handlers.enforce import enforce_core_mode_actions
-from steuerung3d.core.motion_gate import axis_local_motion_allowed
 from steuerung3d.core.intent_routes.control import (
     handle_echo_lifetick,
     handle_joy_state_update,
@@ -79,6 +78,7 @@ from steuerung3d.core.intents import (
     SetEstop,
     SmoothStop,
 )
+from steuerung3d.core.motion_gate import axis_local_motion_allowed
 from steuerung3d.core.state import MachineState
 
 log = logging.getLogger("core")

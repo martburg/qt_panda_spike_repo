@@ -5,6 +5,7 @@ from typing import Dict, List
 
 from steuerung3d.core.core_mode import core_mode_value
 from steuerung3d.core.joy_facts import extract_joy_facts
+from steuerung3d.core.motion_gate import axis_local_motion_allowed
 
 from .reporter_axis_detail import build_blocked_and_axes_snapshot
 
@@ -108,11 +109,16 @@ def emit_birds_eye_status(
             else []
         )
         motion_allowed_i = int(bool(getattr(state, "core_motion_allowed", False)))
+        local_manual_axes = [
+            axis_id
+            for axis_id in selected_lanes
+            if axis_id in axis_ids and axis_local_motion_allowed(state, axis_id)
+        ]
         summary = (
             f"core_mode={mode_v} motion_allowed={motion_allowed_i} blocked_by=[{blocked_summary}] "
-            f"dm={int(joy_dm)} sel=[{','.join(selected_lanes)}] moving=[{','.join(resolved_moving_targets)}] "
-            f"in=[{intents_types_str}] n={int(last_intents_meta.get('count', 0))} "
-            f"reset_denied={int(reset_denied_total)}"
+            f"local_manual=[{','.join(local_manual_axes)}] dm={int(joy_dm)} sel=[{','.join(selected_lanes)}] "
+            f"moving=[{','.join(resolved_moving_targets)}] in=[{intents_types_str}] "
+            f"n={int(last_intents_meta.get('count', 0))} reset_denied={int(reset_denied_total)}"
         )
 
         # Discovered devices (REAL) or spawned sims (SIM): expose as fields so the
@@ -137,6 +143,8 @@ def emit_birds_eye_status(
                 "attached_lanes": list(attached_lanes),
                 "resolved_moving_targets": list(resolved_moving_targets),
                 "motion_allowed": bool(getattr(state, "core_motion_allowed", False)),
+                "local_manual_axes": list(local_manual_axes),
+                "local_manual_allowed": bool(local_manual_axes),
                 "tick": int(getattr(snap, "tick", 0) or 0),
                 "mode": str(mode_v),
                 "estop": estop_v,

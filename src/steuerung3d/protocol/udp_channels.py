@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from typing import Callable, Generic, List, Protocol, Tuple, TypeVar
+from typing import Callable, Generic, List, Protocol, Sequence, Tuple, TypeVar
 
 from steuerung3d.adapters.links.udp_link import UdpLink
 from steuerung3d.core.command_frame import CommandFrame
@@ -187,7 +187,7 @@ class TelemetryOut(Protocol):
 
 @dataclass
 class UdpTelemetryFanout:
-    outs: List[TelemetryOut]
+    outs: Sequence[TelemetryOut]
 
     def publish_telemetry(self, snap: TelemetrySnapshot) -> None:
         for out in list(self.outs or []):

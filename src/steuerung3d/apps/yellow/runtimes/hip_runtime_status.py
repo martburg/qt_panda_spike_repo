@@ -46,7 +46,9 @@ class HipAxisSelectionSnapshot:
     attached: bool
 
 
-def resolve_hip_axis_selection(*, runtime: object, snap: object | None = None) -> HipAxisSelectionSnapshot:
+def resolve_hip_axis_selection(
+    *, runtime: object, snap: object | None = None
+) -> HipAxisSelectionSnapshot:
     del snap
     engine = getattr(runtime, "engine", None)
     engine_state = getattr(engine, "state", None)
@@ -194,8 +196,10 @@ def build_hip_birdseye_payload(
         if axis:
             ax = getattr(snap, "axes", {}).get(axis)
             if ax is not None:
-                enable = bool(ax.enable_cmd) if hasattr(ax, "enable_cmd") else bool(
-                    getattr(ax, "enabled", False)
+                enable = (
+                    bool(ax.enable_cmd)
+                    if hasattr(ax, "enable_cmd")
+                    else bool(getattr(ax, "enabled", False))
                 )
     except Exception:
         enable = None

@@ -19,7 +19,13 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Protocol, Sequence, Set
 
 from steuerung3d.core.control_context import ControlContext
-from steuerung3d.core.intents import ClaimAxis, EnableAxis, JogWinch, JoyStateUpdate, LocalAxisManualRequest
+from steuerung3d.core.intents import (
+    ClaimAxis,
+    EnableAxis,
+    JogWinch,
+    JoyStateUpdate,
+    LocalAxisManualRequest,
+)
 from steuerung3d.core.joy_state import clamp_soll_speed
 
 
@@ -247,7 +253,11 @@ def synthesize_intents(
 
         if prev_deadman and active_ids:
             if use_contextual_local_manual:
-                intents.append(LocalAxisManualRequest(axis_ids=tuple(sorted(active_ids)), enable=False, rate=0.0))
+                intents.append(
+                    LocalAxisManualRequest(
+                        axis_ids=tuple(sorted(active_ids)), enable=False, rate=0.0
+                    )
+                )
             else:
                 for wid in sorted(active_ids):
                     intents.append(EnableAxis(axis_id=wid, enable=False, hip_id=hip_id))
@@ -312,7 +322,9 @@ def synthesize_intents(
 
     if use_contextual_local_manual:
         intents.append(
-            LocalAxisManualRequest(axis_ids=tuple(sorted(selected_set)), enable=bool(deadman), rate=float(rate))
+            LocalAxisManualRequest(
+                axis_ids=tuple(sorted(selected_set)), enable=bool(deadman), rate=float(rate)
+            )
         )
     elif rate != 0.0:
         for wid in sorted(selected_set):

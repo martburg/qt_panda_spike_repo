@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from steuerung3d.core.command_frame import coerce_param_ops
+from steuerung3d.core.command_frame import ParamOp, coerce_param_ops
 from steuerung3d.core.mode_aggregate import aggregate_core_mode
 from steuerung3d.core.state import MachineState
 from steuerung3d.protocol.axis_router import AxisRouter
@@ -10,7 +10,7 @@ from .facts_builder import build_aggregate_inputs
 
 def compute_one_shots_by_axis(
     state: MachineState, axis_ids: list[str]
-) -> tuple[dict[str, bool], dict[str, list]]:
+) -> tuple[dict[str, bool], dict[str, list[ParamOp]]]:
     """Compute per-axis one-shot signals for strict device routing.
 
     Returns:

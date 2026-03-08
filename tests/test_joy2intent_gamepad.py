@@ -6,8 +6,8 @@ from typing import Iterable
 
 from steuerung3d.apps.joy2intent.config import load_joy2intent_config
 from steuerung3d.apps.joy2intent.mapping import JoyBindings, JoyLimits, JoyRig, synthesize_intents
-from steuerung3d.core.control_context import ControlContext
 from steuerung3d.apps.joy2intent.state import JoyState
+from steuerung3d.core.control_context import ControlContext
 from steuerung3d.core.intents import EnableAxis, JogWinch, JoyStateUpdate, LocalAxisManualRequest
 from steuerung3d.protocol.raw_controls import RawControls
 
@@ -193,3 +193,26 @@ def test_contextual_independent_axes_emits_local_axis_manual_request(tmp_path: P
     assert req.rate > 0.0
     assert not any(isinstance(i, EnableAxis) and i.enable for i in intents)
     assert not any(isinstance(i, JogWinch) for i in intents)
+
+
+def test_contextual_independent_axes_deadman_release_emits_only_local_stop(tmp_path: Path) -> None:
+    st = JoyState()
+    bind = _bind()
+    rig = _rig()
+    lim = _lim_from_config(tmp_path)
+    ctx = ControlContext(mode="independent_axes", input_mapping="axis_rate", motion_enabled=True)
+
+    intents1 = synthesize_intents(
+        st, _rc(axes=[0.0, 0.4], pressed=(5, 0)), bind, rig, lim, control_context=ctx
+    )
+    assert any(isinstance(i, LocalAxisManualRequest) and i.enable for i in intents1)
+
+    intents2 = synthesize_intents(
+        st, _rc(axes=[0.0, 0.4], pressed=(0,)), bind, rig, lim, control_context=ctx
+    )
+    req = next(i for i in intents2 if isinstance(i, LocalAxisManualRequest))
+    assert req.enable is False
+    assert req.rate == 0.0
+    assert req.axis_ids == ("Anton",)
+    assert not any(isinstance(i, EnableAxis) for i in intents2)
+    assert not any(isinstance(i, JogWinch) for i in intents2)

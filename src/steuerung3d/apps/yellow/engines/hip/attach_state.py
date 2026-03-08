@@ -23,7 +23,9 @@ def compute_attach_state(inputs: HipAttachInputs) -> HipAttachState:
     main_amp_reset_enabled = bool(attached) and (not modal_locked)
     guider_amp_reset_enabled = bool(attached) and (not modal_locked)
 
-    resync_enabled = bool(attached) and (not modal_locked) and (last_estate in {"IDLE", "ARMED", "READY"})
+    resync_enabled = (
+        bool(attached) and (not modal_locked) and (last_estate in {"IDLE", "ARMED", "READY"})
+    )
 
     estop_reset_enabled: bool | None = None if attached else False
 

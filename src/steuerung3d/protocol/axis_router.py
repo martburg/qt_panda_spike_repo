@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import logging
-from typing import Dict, Iterable, List, Mapping, Optional, Protocol
+from dataclasses import dataclass, field
+from typing import Iterable, Mapping, Optional, Protocol, Sequence
 
 from steuerung3d.core.axis_id import normalize_axis_id
 from steuerung3d.core.command_frame import CommandFrame, ParamOp, coerce_param_ops
@@ -34,26 +34,30 @@ class AxisRouter:
         per axis via caches updated from device telemetry.
     """
 
-    axis_ids: List[str]
-    dev_cmd_out_by_axis: Dict[str, CommandFrameSink]
-    ui_telem_out_by_axis: Dict[str, TelemetrySink]
-    ui_telem_fanout: list[TelemetrySink] = field(default_factory=list)
+    axis_ids: Sequence[str]
+    dev_cmd_out_by_axis: Mapping[str, CommandFrameSink]
+    ui_telem_out_by_axis: Mapping[str, TelemetrySink]
+    ui_telem_fanout: list[TelemetrySink] = field(default_factory=lambda: [])
 
     # --- device-scoped caches (multi-axis runs must pin these per axis) ---
-    last_dev_params_by_axis: Dict[str, Dict[str, float]] = field(default_factory=dict)
-    last_dev_estop_word_by_axis: Dict[str, int] = field(default_factory=dict)
-    last_dev_param_edit_active_by_axis: Dict[str, bool] = field(default_factory=dict)
-    last_dev_param_edit_group_by_axis: Dict[str, str] = field(default_factory=dict)
+    last_dev_params_by_axis: dict[str, dict[str, float]] = field(default_factory=lambda: {})
+    last_dev_estop_word_by_axis: dict[str, int] = field(default_factory=lambda: {})
+    last_dev_param_edit_active_by_axis: dict[str, bool] = field(default_factory=lambda: {})
+    last_dev_param_edit_group_by_axis: dict[str, str] = field(default_factory=lambda: {})
 
     # Raw PLC uplink payload caches (per axis). HiP may consume these directly.
-    last_dev_plc_uplink_fields_by_axis: Dict[str, Dict[str, str]] = field(default_factory=dict)
-    last_dev_plc_uplink_tail_by_axis: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    last_dev_plc_uplink_fields_by_axis: dict[str, dict[str, str]] = field(
+        default_factory=lambda: {}
+    )
+    last_dev_plc_uplink_tail_by_axis: dict[str, dict[str, str]] = field(default_factory=lambda: {})
 
-    last_dev_param_commit_req_id_by_axis: Dict[str, str] = field(default_factory=dict)
-    last_dev_param_commit_group_by_axis: Dict[str, str] = field(default_factory=dict)
-    last_dev_param_commit_status_by_axis: Dict[str, str] = field(default_factory=dict)
-    last_dev_param_commit_age_ticks_by_axis: Dict[str, int] = field(default_factory=dict)
-    last_dev_param_commit_unmatched_by_axis: Dict[str, List[str]] = field(default_factory=dict)
+    last_dev_param_commit_req_id_by_axis: dict[str, str] = field(default_factory=lambda: {})
+    last_dev_param_commit_group_by_axis: dict[str, str] = field(default_factory=lambda: {})
+    last_dev_param_commit_status_by_axis: dict[str, str] = field(default_factory=lambda: {})
+    last_dev_param_commit_age_ticks_by_axis: dict[str, int] = field(default_factory=lambda: {})
+    last_dev_param_commit_unmatched_by_axis: dict[str, list[str]] = field(
+        default_factory=lambda: {}
+    )
 
     def __post_init__(self) -> None:
         # Canonicalize axis ids at the boundary so downstream dict keys stay stable.
@@ -82,7 +86,7 @@ class AxisRouter:
         cmd_frame: CommandFrame,
         *,
         estop_reset_by_axis: Optional[Mapping[str, bool]] = None,
-        param_ops_by_axis: Optional[Mapping[str, List[ParamOp]]] = None,
+        param_ops_by_axis: Optional[Mapping[str, list[ParamOp]]] = None,
     ) -> int:
         """Route a multi-axis CommandFrame into one command per axis.
 
@@ -280,7 +284,7 @@ class AxisRouter:
             joy = JoyState()
         return JoyState(
             deadman=bool(getattr(joy, "deadman", False)),
-            select_hip=joy.selected_for_axis(axis_id),
+            select_hip=normalize_axis_id(axis_id) in tuple(getattr(joy, "selected_axes", ()) or ()),
             soll_speed=float(getattr(joy, "soll_speed", 0.0)),
             selected_axes=getattr(joy, "selected_axes", ()),
         )

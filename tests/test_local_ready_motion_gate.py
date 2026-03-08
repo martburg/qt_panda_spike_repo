@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.executor import build_command_frame
-from steuerung3d.core.intent_handler import enforce_core_mode_actions
-from steuerung3d.core.intent_handler import apply_intent
+from steuerung3d.core.intent_handler import apply_intent, enforce_core_mode_actions
 from steuerung3d.core.intents import EnableAxis, JogCartesian, JogWinch, RequestAxisLease
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.rig_types import DensiRuntime, RigMode
@@ -44,7 +43,6 @@ def test_local_ready_axis_can_move_while_other_axis_is_not_ready() -> None:
     cmd = build_command_frame(st)
     assert cmd.axes["Anton"].vel == 0.6
     assert cmd.axes["Debby"].vel == 0.0
-
 
 
 def test_local_ready_axis_survives_per_tick_enforce_outside_live() -> None:
@@ -88,7 +86,6 @@ def test_local_not_ready_axis_stays_blocked_outside_live() -> None:
     assert st.axis_cmd["Debby"].enable is False
     assert st.axis_cmd["Debby"].vel == 0.0
     assert build_command_frame(st).axes["Debby"].vel == 0.0
-
 
 
 def test_local_ready_axis_can_move_while_other_axis_is_in_fault() -> None:

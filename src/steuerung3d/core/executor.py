@@ -192,7 +192,9 @@ def build_command_frame(state: MachineState) -> CommandFrame:
         if core_mode == CoreMode.LIVE.value:
             active_axes = set(selected_axes)
         else:
-            active_axes = {axis_id for axis_id in selected_axes if axis_local_motion_allowed(state, axis_id)}
+            active_axes = {
+                axis_id for axis_id in selected_axes if axis_local_motion_allowed(state, axis_id)
+            }
     else:
         active_axes = set()
 
