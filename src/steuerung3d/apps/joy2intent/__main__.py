@@ -5,9 +5,10 @@ import logging
 import time
 from dataclasses import replace
 from pathlib import Path
+from typing import cast
 
 from steuerung3d.core.control_context import ControlContext
-from steuerung3d.core.intents import JogCartesian, JogWinch
+from steuerung3d.core.intents import Intent, JogCartesian, JogWinch
 from steuerung3d.core.net import parse_hostport
 from steuerung3d.core.status import StatusEmitter
 from steuerung3d.protocol.raw_controls import RawControls
@@ -16,7 +17,7 @@ from steuerung3d.util.app_bootstrap import bootstrap_logging
 from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 
 from .config import load_joy2intent_config
-from .mapping import JoyBindings, JoyLimits, JoyRig, synthesize_intents
+from .mapping import JoyBindings, JoyLimits, JoyReportLike, JoyRig, synthesize_intents
 from .state import JoyState
 
 log = logging.getLogger("joy2intent")
@@ -135,7 +136,7 @@ def main() -> int:
 
             intents = synthesize_intents(
                 st,
-                rc,
+                cast(JoyReportLike, rc),
                 bind,
                 rig,
                 lim,
@@ -147,7 +148,7 @@ def main() -> int:
             try:
                 pressed = {i for i, v in enumerate(rc.buttons) if v}
             except Exception:
-                pressed = set()
+                pressed: set[int] = set()
             dm_btn = bind.buttons.get("deadman")
             deadman = (dm_btn is not None) and (dm_btn in pressed)
             if ch.changed("deadman", bool(deadman)):
@@ -185,7 +186,7 @@ def main() -> int:
 
             hb.inc("intent", len(intents))
             for it in intents:
-                intent_out.publish_intent(it)
+                intent_out.publish_intent(cast(Intent, it))
         else:
             # stale watchdog: if input stream dies, stop motion once
             if last_rx_ns is not None:

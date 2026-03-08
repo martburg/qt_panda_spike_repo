@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Iterable, Mapping, Optional, Protocol, Sequence
+from typing import Any, Iterable, Mapping, Optional, Protocol, Sequence, cast
 
 from steuerung3d.core.axis_id import normalize_axis_id
 from steuerung3d.core.command_frame import CommandFrame, ParamOp, coerce_param_ops
@@ -16,6 +16,11 @@ class CommandFrameSink(Protocol):
 
 class TelemetrySink(Protocol):
     def publish_telemetry(self, snap: TelemetrySnapshot) -> None: ...
+
+
+def _make_snapshot(**kwargs: Any) -> TelemetrySnapshot:
+    ctor = cast(Any, TelemetrySnapshot)
+    return ctor(**kwargs)
 
 
 @dataclass
@@ -37,7 +42,7 @@ class AxisRouter:
     axis_ids: Sequence[str]
     dev_cmd_out_by_axis: Mapping[str, CommandFrameSink]
     ui_telem_out_by_axis: Mapping[str, TelemetrySink]
-    ui_telem_fanout: list[TelemetrySink] = field(default_factory=lambda: [])
+    ui_telem_fanout: Sequence[TelemetrySink] = field(default_factory=list)
 
     # --- device-scoped caches (multi-axis runs must pin these per axis) ---
     last_dev_params_by_axis: dict[str, dict[str, float]] = field(default_factory=lambda: {})
@@ -102,14 +107,18 @@ class AxisRouter:
                 continue
 
             # Reduce echo-map to this device.
-            echo_val = None
+            echo_val: int | None = None
             try:
-                echo_map = getattr(cmd_frame, "lifetick_echo", {}) or {}
-                if isinstance(echo_map, dict):
-                    echo_val = echo_map.get(axis_id)
+                raw_echo_map = getattr(cmd_frame, "lifetick_echo", {}) or {}
+                echo_map = (
+                    cast(dict[str, object], raw_echo_map) if isinstance(raw_echo_map, dict) else {}
+                )
+                raw_echo_val = echo_map.get(axis_id)
+                if isinstance(raw_echo_val, (int, float, str)):
+                    echo_val = int(raw_echo_val)
             except Exception:
                 echo_val = None
-            lifetick_echo_axis = {axis_id: (int(echo_val) & 0xFFFF)} if echo_val is not None else {}
+            lifetick_echo_axis = {axis_id: (echo_val & 0xFFFF)} if echo_val is not None else {}
 
             resync_map = getattr(cmd_frame, "resync_by_axis", {}) or {}
             resync_axis = bool(resync_map.get(axis_id, False))
@@ -210,7 +219,7 @@ class AxisRouter:
         lease_axis = dict(getattr(snap, "lease_axis", {}) or {})
         lease_one = {axis_id: lease_axis[axis_id]} if axis_id in lease_axis else {}
 
-        return TelemetrySnapshot(
+        return _make_snapshot(
             tick=int(getattr(snap, "tick", 0)),
             t_s=float(getattr(snap, "t_s", 0.0)),
             core_mode=str(getattr(snap, "core_mode", "")),
@@ -290,7 +299,7 @@ class AxisRouter:
         )
 
     def fanout_snapshot_with_axis_caches(self, snap: TelemetrySnapshot) -> TelemetrySnapshot:
-        return TelemetrySnapshot(
+        return _make_snapshot(
             tick=int(getattr(snap, "tick", 0)),
             t_s=float(getattr(snap, "t_s", 0.0)),
             core_mode=str(getattr(snap, "core_mode", "")),
@@ -366,7 +375,7 @@ class AxisRouter:
         if self.ui_telem_fanout:
             fanout_snap = self.fanout_snapshot_with_axis_caches(snap)
             _diag_log = logging.getLogger("axis_router")
-            densis_dbg = {}
+            densis_dbg: dict[str, dict[str, str | bool]] = {}
             for k, d in dict(getattr(fanout_snap, "densis", {}) or {}).items():
                 densis_dbg[str(k)] = {
                     "online": bool(getattr(d, "online", False)),
