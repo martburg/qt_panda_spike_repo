@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
+
+from steuerung3d.core.control_context import ControlContext
 from typing import Any, Callable, Dict
 
 from steuerung3d.core.state import MachineState
@@ -121,6 +123,7 @@ class SnapshotHandler:
     args: Any
     c2_fanout: Any
     c2_telem_outs: list[Any]
+    control_context_out: Any
     stats: Dict[str, int]
     last_seen: Dict[str, Any]
     status: Any
@@ -130,6 +133,7 @@ class SnapshotHandler:
 
     state_ch: ChangeTracker = field(default_factory=ChangeTracker)
     lt_last_ui_log_s_by_axis: dict[str, float] = field(default_factory=dict)
+    context_seq: int = 0
 
     def __call__(self, snap: TelemetrySnapshot) -> None:
         # Log key state changes once (helps a lot during field debugging).
@@ -201,6 +205,24 @@ class SnapshotHandler:
             self.log.debug(
                 "tx ui telem: tick=%s estop=%s fault=%s", snap.tick, snap.estop, snap.fault
             )
+
+        self.context_seq += 1
+        mode = str(getattr(self.state, "control_mode", "") or "independent_axes")
+        input_mapping = {
+            "independent_axes": "axis_rate",
+            "sync_kinematic_jog": "cartesian_xyz",
+            "goto_pose": "pose_speed",
+            "follow_path": "path_speed_trim",
+        }.get(mode, "axis_rate")
+        self.control_context_out.publish_control_context(
+            ControlContext(
+                seq=int(self.context_seq),
+                mode=mode if mode in {"independent_axes", "sync_kinematic_jog", "goto_pose", "follow_path"} else "independent_axes",
+                selected_target_kind="axis",
+                input_mapping=input_mapping,
+                motion_enabled=True,
+            )
+        )
 
         # Structured heartbeat for supervisor birds-eye (PLC telemetry remains unchanged).
         emit_birds_eye_status(

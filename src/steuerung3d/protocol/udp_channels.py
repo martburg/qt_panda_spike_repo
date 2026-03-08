@@ -7,14 +7,17 @@ from typing import Callable, Generic, List, Protocol, Tuple, TypeVar
 
 from steuerung3d.adapters.links.udp_link import UdpLink
 from steuerung3d.core.command_frame import CommandFrame
+from steuerung3d.core.control_context import ControlContext
 from steuerung3d.core.intents import Intent
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.codec import (
     decode_command_frame,
+    decode_control_context,
     decode_intent,
     decode_raw_controls,
     decode_telemetry,
     encode_command_frame,
+    encode_control_context,
     encode_intent,
     encode_raw_controls,
     encode_telemetry,
@@ -119,6 +122,35 @@ class UdpIntentOut:
 
     def publish_intent(self, intent: Intent) -> None:
         self.tx.send(intent)
+
+
+@dataclass
+@dataclass
+class UdpControlContextIn:
+    rx: _UdpJsonRx[ControlContext]
+
+    @staticmethod
+    def bind(addr: Tuple[str, int]) -> "UdpControlContextIn":
+        link = UdpLink(bind=addr, target=addr)
+        return UdpControlContextIn(rx=_UdpJsonRx(link=link, decode=decode_control_context))
+
+    def drain_contexts(self, limit: int = 1000) -> List[ControlContext]:
+        return self.rx.drain(limit=limit)
+
+
+@dataclass
+class UdpControlContextOut:
+    tx: _UdpJsonTx[ControlContext]
+
+    @staticmethod
+    def connect(
+        target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
+    ) -> "UdpControlContextOut":
+        link = UdpLink(bind=bind, target=target)
+        return UdpControlContextOut(tx=_UdpJsonTx(link=link, encode=encode_control_context))
+
+    def publish_control_context(self, ctx: ControlContext) -> None:
+        self.tx.send(ctx)
 
 
 @dataclass

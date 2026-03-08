@@ -6,11 +6,12 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
+from steuerung3d.core.control_context import ControlContext
 from steuerung3d.core.intents import JogCartesian, JogWinch
 from steuerung3d.core.net import parse_hostport
 from steuerung3d.core.status import StatusEmitter
 from steuerung3d.protocol.raw_controls import RawControls
-from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpRawControlsIn
+from steuerung3d.protocol.udp_channels import UdpControlContextIn, UdpIntentOut, UdpRawControlsIn
 from steuerung3d.util.app_bootstrap import bootstrap_logging
 from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 
@@ -42,6 +43,7 @@ def main() -> int:
         cfg = replace(cfg, intent_out=parse_hostport(str(args.intent_out)))
 
     raw_in = UdpRawControlsIn.bind(cfg.raw_in)
+    context_in = UdpControlContextIn.bind(cfg.context_in)
     intent_out = UdpIntentOut.connect(cfg.intent_out)
 
     st = JoyState(mode=cfg.default_mode)
@@ -68,6 +70,8 @@ def main() -> int:
     last_axis_pairs: list[str] = []
     last_selected_axes: list[str] = []
     last_select_map: list[str] = []
+    last_ctx_ns: int | None = None
+    latest_ctx: ControlContext | None = None
 
     hb = Heartbeat("joy2intent", interval_s=1.0)
     ch = ChangeTracker()
@@ -95,6 +99,10 @@ def main() -> int:
         # Drain input; keep only newest sample
         rcs = raw_in.drain_raw_controls(limit=50)
         rc: RawControls | None = rcs[-1] if rcs else None
+        ctxs = context_in.drain_contexts(limit=20)
+        if ctxs:
+            latest_ctx = ctxs[-1]
+            last_ctx_ns = now_ns
 
         # Heartbeat counters
         hb.inc("rx", len(rcs))
@@ -196,6 +204,7 @@ def main() -> int:
 
         hb.set("buttons", list(last_buttons))
         hb.set("selected", list(last_selected_axes))
+        hb.set("ctx_mode", str(getattr(latest_ctx, "mode", "")))
         hb.set("select_map", list(last_select_map))
         hb.set("axes", list(last_axis_pairs))
 

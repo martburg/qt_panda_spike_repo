@@ -9,6 +9,7 @@ from dataclasses import asdict
 from typing import Any, Dict
 
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, decode_param_ops
+from steuerung3d.core.control_context import ControlContext
 from steuerung3d.core.intents import (
     ClaimAxis,
     ClearFault,
@@ -19,6 +20,7 @@ from steuerung3d.core.intents import (
     JogCartesian,
     JogWinch,
     JoyStateUpdate,
+    LocalAxisManualRequest,
     ParamCancel,
     ParamEditBegin,
     ParamWrite,
@@ -45,6 +47,7 @@ _INTENT_TYPE_MAP = {
     "enable_axis": EnableAxis,
     "jog_axis": JogAxis,
     "jog_winch": JogWinch,
+    "local_axis_manual": LocalAxisManualRequest,
     "jog_cartesian": JogCartesian,
     "set_control_mode": SetControlMode,
     "smooth_stop": SmoothStop,
@@ -96,6 +99,20 @@ def decode_intent(payload: Dict[str, Any]) -> Intent:
     # dataclass ctor matches keys (including 'type')
     return cls(**payload)
 
+
+
+
+# ---------------------------
+# Control context
+# ---------------------------
+
+
+def encode_control_context(ctx: ControlContext) -> Dict[str, Any]:
+    return asdict(ctx)
+
+
+def decode_control_context(payload: Dict[str, Any]) -> ControlContext:
+    return ControlContext(**payload)
 
 # ---------------------------
 # Telemetry

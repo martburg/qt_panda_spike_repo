@@ -23,6 +23,7 @@ class Joy2IntentConfig:
     # --- required ---
     raw_in: Tuple[str, int]
     intent_out: Tuple[str, int]
+    context_in: Tuple[str, int]
     tick_hz: float
     stale_after_ms: int
 
@@ -69,6 +70,7 @@ def load_joy2intent_config(path: Path) -> Joy2IntentConfig:
     return Joy2IntentConfig(
         raw_in=_hostport(str(_require(io, "raw_in", ctx="io"))),
         intent_out=_hostport(str(_require(io, "intent_out", ctx="io"))),
+        context_in=_hostport(str(_require(io, "context_in", ctx="io"))),
         tick_hz=float(_require(io, "tick_hz", ctx="io")),
         stale_after_ms=int(_require(io, "stale_after_ms", ctx="io")),
         winches=list(_require(rig, "winches", ctx="rig")),

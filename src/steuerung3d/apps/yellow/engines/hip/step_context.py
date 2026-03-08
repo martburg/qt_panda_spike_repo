@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -78,6 +79,16 @@ def _authoritative_selected_axis(
             return prev_selected
 
     return ""
+
+
+def _densis_dbg(densis: dict[str, DensiTelemetry]) -> dict[str, dict[str, object]]:
+    out: dict[str, dict[str, object]] = {}
+    for k, d in densis.items():
+        out[str(k)] = {
+            "online": bool(getattr(d, "online", False)),
+            "owner": str(getattr(d, "claimed_by_hip", "") or ""),
+        }
+    return out
 
 
 def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepContext:
@@ -169,6 +180,22 @@ def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepCon
             intents.append(ReleaseAxis(axis_id=prev_selected, hip_id=hip_id))
         if selected_axis and selected_axis != prev_selected:
             intents.append(ClaimAxis(axis_id=selected_axis, hip_id=hip_id))
+
+    dbg_rl = getattr(self, "_dbg_rl", None)
+    if dbg_rl is not None and dbg_rl.allow("hip_attach_ctx"):
+        logging.getLogger("hi_p").info(
+            "hip attach ctx hip=%s snap_tick=%s snap_core_mode=%s prev_selected=%s ui_axis=%s axis_ids=%s selected_axis=%s combo_current=%s combo_items=%s densis=%s",
+            hip_id or "-",
+            getattr(snap, "tick", None),
+            getattr(snap, "core_mode", None),
+            prev_selected or "-",
+            ui.axis_selected or "-",
+            list(axis_ids),
+            selected_axis or "-",
+            getattr(attach_combo, "current", None),
+            list(getattr(attach_combo, "items", []) or []),
+            _densis_dbg(densis),
+        )
 
     return StepContext(
         snap=snap,

@@ -10,6 +10,8 @@
 raw_in = "127.0.0.1:50100"
 # Where intents are sent (UdpIntentOut target address).
 intent_out = "127.0.0.1:51001"
+# Where core publishes control context for colocated joy2intent.
+context_in = "127.0.0.1:51010"
 tick_hz = 50
 stale_after_ms = 200
 

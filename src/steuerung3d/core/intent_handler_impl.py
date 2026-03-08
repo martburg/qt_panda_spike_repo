@@ -39,6 +39,7 @@ from steuerung3d.core.intent_routes.motion import (
     handle_jog_axis,
     handle_jog_cartesian,
     handle_jog_winch,
+    handle_local_axis_manual,
 )
 from steuerung3d.core.intent_routes.params import (
     handle_param_cancel,
@@ -61,6 +62,7 @@ from steuerung3d.core.intents import (
     JogCartesian,
     JogWinch,
     JoyStateUpdate,
+    LocalAxisManualRequest,
     ParamCancel,
     ParamEditBegin,
     ParamWrite,
@@ -99,6 +101,7 @@ UNGATED_DISPATCH: Dict[Type[Intent], Handler] = {
     # UI livetick echo + joy
     EchoLifeTick: lambda s, i: handle_echo_lifetick(s, i),
     JoyStateUpdate: lambda s, i: handle_joy_state_update(s, i),
+    LocalAxisManualRequest: lambda s, i: handle_local_axis_manual(s, i),
     # Safety / global requests
     SetEstop: lambda s, i: handle_set_estop(s, i),
     RequestEstopReset: lambda s, i: handle_request_estop_reset(s, i),

@@ -5,13 +5,14 @@ import time
 from typing import List, Tuple
 
 from steuerung3d.common.timebase import Timebase
+from steuerung3d.core.control_context import ControlContext
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.net import parse_hostport
 from steuerung3d.core.state import MachineState
 from steuerung3d.protocol.axis_router import AxisRouter
 from steuerung3d.protocol.core_runner import CoreRunner
-from steuerung3d.protocol.udp_channels import UdpIntentIn, UdpTelemetryFanout, UdpTelemetryOut
+from steuerung3d.protocol.udp_channels import UdpControlContextOut, UdpIntentIn, UdpTelemetryFanout, UdpTelemetryOut
 from steuerung3d.protocol.udp_plc_channels import UdpPlcCommandOut, UdpPlcTelemetryIn
 
 from .cli_validation import (
@@ -44,6 +45,8 @@ def run_core_udp_service(*, args, status) -> int:
     intent_in_bind = parse_hostport(args.intent_in)
 
     op_intent_in = UdpIntentIn.bind(intent_in_bind)
+
+    control_context_out = UdpControlContextOut.connect(parse_hostport(args.control_context_target))
 
     # UI telemetry targets
     if args.ui_telem_disable and (
@@ -221,6 +224,7 @@ def run_core_udp_service(*, args, status) -> int:
         args=args,
         c2_fanout=c2_fanout,
         c2_telem_outs=c2_telem_outs,
+        control_context_out=control_context_out,
         stats=stats,
         last_seen=last_seen,
         status=status,

@@ -30,6 +30,7 @@ from .intents_motion import (
     JogAxis,
     JogCartesian,
     JogWinch,
+    LocalAxisManualRequest,
     SetControlMode,
     SmoothStop,
 )
@@ -40,6 +41,7 @@ Intent = Union[
     EnableAxis,
     JogAxis,
     JogWinch,
+    LocalAxisManualRequest,
     JogCartesian,
     SetControlMode,
     SmoothStop,
@@ -76,6 +78,7 @@ __all__ = [
     "EnableAxis",
     "JogAxis",
     "JogWinch",
+    "LocalAxisManualRequest",
     "JogCartesian",
     "SetControlMode",
     "SmoothStop",

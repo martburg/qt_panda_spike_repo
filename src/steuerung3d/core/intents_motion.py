@@ -46,6 +46,14 @@ class JogWinch:
 
 
 @dataclass(frozen=True)
+class LocalAxisManualRequest:
+    type: Literal["local_axis_manual"] = "local_axis_manual"
+    axis_ids: tuple[str, ...] = ()
+    enable: bool = False
+    rate: float = 0.0
+
+
+@dataclass(frozen=True)
 class JogCartesian:
     type: Literal["jog_cartesian"] = "jog_cartesian"
     vx: float = 0.0

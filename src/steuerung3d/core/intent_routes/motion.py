@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from steuerung3d.core.axis_ids import normalize_axis_id
+from steuerung3d.core.core_mode import CoreMode, core_mode_value
 from steuerung3d.core.intent_handlers.lease import axis_lease_allows as _axis_lease_allows
-from steuerung3d.core.intents import EnableAxis, JogAxis, JogCartesian, JogWinch
+from steuerung3d.core.intents import EnableAxis, JogAxis, JogCartesian, JogWinch, LocalAxisManualRequest
+from steuerung3d.core.motion_gate import axis_local_motion_allowed
 from steuerung3d.core.rig_types import RigMode
 from steuerung3d.core.state import MachineState
 
@@ -94,3 +96,26 @@ def handle_jog_cartesian(state: MachineState, intent: JogCartesian) -> None:
             cmd = state.ensure_axis_cmd(axis_id)
             if cmd.enable:
                 cmd.vel = float(vel)
+
+
+def handle_local_axis_manual(state: MachineState, intent: LocalAxisManualRequest) -> None:
+    axis_ids = tuple(normalize_axis_id(a) for a in tuple(getattr(intent, "axis_ids", ()) or ()))
+    axis_ids = tuple(a for a in axis_ids if a)
+    enable = bool(getattr(intent, "enable", False))
+    rate = float(getattr(intent, "rate", 0.0))
+    is_live = core_mode_value(getattr(state, "core_mode", "")).upper() == CoreMode.LIVE.value
+
+    for axis_id in axis_ids:
+        state.ensure_axis(axis_id)
+        cmd = state.axis_cmd[axis_id]
+        if not enable:
+            cmd.enable = False
+            cmd.vel = 0.0
+            continue
+        if not str(state.axis_owner(axis_id) or ""):
+            state.lease_last_denial_reason = f"axis_owner_required:{axis_id}"
+            continue
+        if (not is_live) and (not axis_local_motion_allowed(state, axis_id)):
+            continue
+        cmd.enable = True
+        cmd.vel = float(rate)

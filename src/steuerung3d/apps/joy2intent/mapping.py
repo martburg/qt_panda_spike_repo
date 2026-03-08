@@ -18,7 +18,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Protocol, Sequence, Set
 
-from steuerung3d.core.intents import ClaimAxis, EnableAxis, JogWinch, JoyStateUpdate
+from steuerung3d.core.control_context import ControlContext
+from steuerung3d.core.intents import ClaimAxis, EnableAxis, JogWinch, JoyStateUpdate, LocalAxisManualRequest
 from steuerung3d.core.joy_state import clamp_soll_speed
 
 
@@ -179,6 +180,7 @@ def synthesize_intents(
     lim: JoyLimits,
     # Must match the claim owner (HiP) to avoid the core treating motion intents as stale.
     hip_id: str = "hip",
+    control_context: ControlContext | None = None,
 ) -> List[object]:
     """Convert a joystick report into a list of core intents.
 
@@ -223,6 +225,13 @@ def synthesize_intents(
         )
     )
 
+    use_contextual_local_manual = bool(
+        control_context is not None
+        and str(getattr(control_context, "mode", "")) == "independent_axes"
+        and str(getattr(control_context, "input_mapping", "")) == "axis_rate"
+    )
+    motion_enabled = bool(getattr(control_context, "motion_enabled", True))
+
     # Deadman released: disable any previously enabled winches.
     if not deadman:
         prev_deadman = bool(getattr(st, "prev_deadman", getattr(st, "deadman_prev", False)))
@@ -237,8 +246,11 @@ def synthesize_intents(
             active_ids = {str(x) for x in prev_active}
 
         if prev_deadman and active_ids:
-            for wid in sorted(active_ids):
-                intents.append(EnableAxis(axis_id=wid, enable=False, hip_id=hip_id))
+            if use_contextual_local_manual:
+                intents.append(LocalAxisManualRequest(axis_ids=tuple(sorted(active_ids)), enable=False, rate=0.0))
+            else:
+                for wid in sorted(active_ids):
+                    intents.append(EnableAxis(axis_id=wid, enable=False, hip_id=hip_id))
         if hasattr(st, "prev_active_winch_idxs"):
             st.prev_active_winch_idxs.clear()
         elif hasattr(st, "enabled_winch_ids"):
@@ -247,6 +259,17 @@ def synthesize_intents(
             st.prev_deadman = False
         else:
             st.deadman_prev = False
+        return intents
+
+    if use_contextual_local_manual and not motion_enabled:
+        if hasattr(st, "prev_active_winch_idxs"):
+            st.prev_active_winch_idxs = {rig_ids.index(w) for w in selected_set if w in rig_ids}
+        elif hasattr(st, "enabled_winch_ids"):
+            st.enabled_winch_ids = set(selected_set)
+        if hasattr(st, "prev_deadman"):
+            st.prev_deadman = True
+        else:
+            st.deadman_prev = True
         return intents
 
     # Deadman pressed: enable selected winches and issue jogs.
@@ -267,10 +290,11 @@ def synthesize_intents(
     # If EnableAxis(True) is only emitted on the first transition, it can be
     # dropped by core safety gating and never re-sent, leaving cmd_en=0 even
     # though JogWinch continues to stream.
-    for wid in sorted(selected_set):
-        if wid not in current_active:
-            intents.append(ClaimAxis(axis_id=wid, hip_id=hip_id))
-        intents.append(EnableAxis(axis_id=wid, enable=True, hip_id=hip_id))
+    if not use_contextual_local_manual:
+        for wid in sorted(selected_set):
+            if wid not in current_active:
+                intents.append(ClaimAxis(axis_id=wid, hip_id=hip_id))
+            intents.append(EnableAxis(axis_id=wid, enable=True, hip_id=hip_id))
 
     # Compute jog rate
     axis_idx = bind.axes.get("manual_jog")
@@ -286,7 +310,11 @@ def synthesize_intents(
     if fine:
         rate *= float(lim.fine_scale)
 
-    if rate != 0.0:
+    if use_contextual_local_manual:
+        intents.append(
+            LocalAxisManualRequest(axis_ids=tuple(sorted(selected_set)), enable=bool(deadman), rate=float(rate))
+        )
+    elif rate != 0.0:
         for wid in sorted(selected_set):
             intents.append(JogWinch(winch_id=wid, rate=rate, hip_id=hip_id))
     if hasattr(st, "prev_active_winch_idxs"):

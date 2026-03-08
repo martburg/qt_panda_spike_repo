@@ -6,8 +6,9 @@ from typing import Iterable
 
 from steuerung3d.apps.joy2intent.config import load_joy2intent_config
 from steuerung3d.apps.joy2intent.mapping import JoyBindings, JoyLimits, JoyRig, synthesize_intents
+from steuerung3d.core.control_context import ControlContext
 from steuerung3d.apps.joy2intent.state import JoyState
-from steuerung3d.core.intents import EnableAxis, JogWinch, JoyStateUpdate
+from steuerung3d.core.intents import EnableAxis, JogWinch, JoyStateUpdate, LocalAxisManualRequest
 from steuerung3d.protocol.raw_controls import RawControls
 
 
@@ -174,3 +175,21 @@ def test_fine_button_scales_rate(tmp_path: Path) -> None:
     )
 
     assert rate_fine == rate_fast * lim.fine_scale
+
+
+def test_contextual_independent_axes_emits_local_axis_manual_request(tmp_path: Path) -> None:
+    st = JoyState()
+    bind = _bind()
+    rig = _rig()
+    lim = _lim_from_config(tmp_path)
+    rc = _rc(axes=[0.0, 0.6], pressed=(5, 0, 2))
+    ctx = ControlContext(mode="independent_axes", input_mapping="axis_rate", motion_enabled=True)
+
+    intents = synthesize_intents(st, rc, bind, rig, lim, control_context=ctx)
+
+    req = next(i for i in intents if isinstance(i, LocalAxisManualRequest))
+    assert set(req.axis_ids) == {"Anton", "Cecil"}
+    assert req.enable is True
+    assert req.rate > 0.0
+    assert not any(isinstance(i, EnableAxis) and i.enable for i in intents)
+    assert not any(isinstance(i, JogWinch) for i in intents)

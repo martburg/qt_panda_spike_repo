@@ -21,6 +21,11 @@ def main() -> int:
         help="Operator IntentIn bind host:port (default 127.0.0.1:51001).",
     )
     ap.add_argument(
+        "--control-context-target",
+        default="127.0.0.1:51010",
+        help="ControlContext UDP target host:port for colocated joy2intent (default 127.0.0.1:51010).",
+    )
+    ap.add_argument(
         "--axis",
         action="append",
         # Important: for action='append', argparse will *append to the default*.

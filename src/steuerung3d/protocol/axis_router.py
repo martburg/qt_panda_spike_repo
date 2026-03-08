@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import logging
 from typing import Dict, Iterable, List, Mapping, Optional, Protocol
 
 from steuerung3d.core.axis_id import normalize_axis_id
@@ -360,7 +361,24 @@ class AxisRouter:
         sent = 0
         if self.ui_telem_fanout:
             fanout_snap = self.fanout_snapshot_with_axis_caches(snap)
+            _diag_log = logging.getLogger("axis_router")
+            densis_dbg = {}
+            for k, d in dict(getattr(fanout_snap, "densis", {}) or {}).items():
+                densis_dbg[str(k)] = {
+                    "online": bool(getattr(d, "online", False)),
+                    "owner": str(getattr(d, "claimed_by_hip", "") or ""),
+                }
             for tx in self.ui_telem_fanout:
+                target = getattr(getattr(getattr(tx, "tx", None), "link", None), "target", None)
+                _diag_log.info(
+                    "ui fanout tx target=%s tick=%s core_mode=%s estop=%s fault=%s densis=%s",
+                    target,
+                    getattr(fanout_snap, "tick", None),
+                    getattr(fanout_snap, "core_mode", None),
+                    getattr(fanout_snap, "estop", None),
+                    getattr(fanout_snap, "fault", None),
+                    densis_dbg,
+                )
                 tx.publish_telemetry(fanout_snap)
                 sent += 1
             return sent
