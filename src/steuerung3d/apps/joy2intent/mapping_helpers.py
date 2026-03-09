@@ -16,12 +16,23 @@ from steuerung3d.core.joy_state import clamp_soll_speed
 
 
 class _JoyBindingsLike(Protocol):
-    axes: Mapping[str, int]
-    buttons: Mapping[str, int | Sequence[int]]
-    deadzone: float
-    expo: float
-    select_buttons: Sequence[int | Sequence[int]]
-    invert: Mapping[str, bool]
+    @property
+    def axes(self) -> Mapping[str, int]: ...
+
+    @property
+    def buttons(self) -> Mapping[str, int | Sequence[int]]: ...
+
+    @property
+    def deadzone(self) -> float: ...
+
+    @property
+    def expo(self) -> float: ...
+
+    @property
+    def select_buttons(self) -> Sequence[int | Sequence[int]]: ...
+
+    @property
+    def invert(self) -> Mapping[str, bool]: ...
 
 
 class _JoyLimitsLike(Protocol):
@@ -33,11 +44,15 @@ class _JoyLimitsLike(Protocol):
 
 class _IndexedJoyStateLike(Protocol):
     prev_deadman: bool
+    deadman_prev: bool
     prev_active_winch_idxs: set[int]
+    enabled_winch_ids: set[str]
 
 
 class _NamedJoyStateLike(Protocol):
+    prev_deadman: bool
     deadman_prev: bool
+    prev_active_winch_idxs: set[int]
     enabled_winch_ids: set[str]
 
 

@@ -24,3 +24,19 @@ class JoyState:
     prev_disarm: bool = False
     prev_clear_fault: bool = False
     prev_smooth_stop: bool = False
+
+    @property
+    def deadman_prev(self) -> bool:
+        return bool(self.prev_deadman)
+
+    @deadman_prev.setter
+    def deadman_prev(self, value: bool) -> None:
+        self.prev_deadman = bool(value)
+
+    @property
+    def enabled_winch_ids(self) -> set[str]:
+        return {str(idx) for idx in self.prev_active_winch_idxs}
+
+    @enabled_winch_ids.setter
+    def enabled_winch_ids(self, value: set[str]) -> None:
+        self.prev_active_winch_idxs = {int(v) for v in value if str(v).isdigit()}
