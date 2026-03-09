@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import List
+from collections.abc import Mapping, Sequence
+from typing import Protocol
 
 from steuerung3d.core.joy_facts import extract_joy_facts
 from steuerung3d.core.mode_aggregate import AggregateInputs, AxisSafetyFacts
@@ -8,16 +9,58 @@ from steuerung3d.protocol.banner_estate import derive_banner_estate_from_word
 from steuerung3d.protocol.estop_bits import decode_estop_word
 
 
-def build_aggregate_inputs(*, state, router, axis_ids: List[str], dt: float) -> AggregateInputs:
-    stale_after_ms = int(
-        float(getattr(state, "densi_offline_after_ticks", 200)) * float(dt) * 1000.0
-    )
-    joy = getattr(state, "joy", None)
-    jf = extract_joy_facts(joy)
+class _RegistryEntryLike(Protocol):
+    last_seen_core_tick: int
+
+
+class _AggregateStateLike(Protocol):
+    tick: int
+    joy: object | None
+    densi_registry: Mapping[str, _RegistryEntryLike]
+    densi_offline_after_ticks: int
+
+    def axis_owner(self, axis_id: str) -> str | None: ...
+
+
+class _RouterLike(Protocol):
+    last_dev_estop_word_by_axis: Mapping[str, int]
+
+
+def _coerce_registry(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        return {}
+    out: dict[str, object] = {}
+    for key, item in value.items():
+        out[str(key)] = item
+    return out
+
+
+def _entry_age_ms(*, entry: object, now_tick: int, dt: float) -> int | None:
+    last_seen_raw = getattr(entry, "last_seen_core_tick", -1)
+    try:
+        last_seen_tick = int(last_seen_raw)
+    except Exception:
+        return None
+    if last_seen_tick < 0:
+        return None
+    age_ticks = now_tick - last_seen_tick
+    return int(max(0, age_ticks) * float(dt) * 1000.0)
+
+
+def build_aggregate_inputs(
+    *,
+    state: _AggregateStateLike,
+    router: _RouterLike,
+    axis_ids: Sequence[str],
+    dt: float,
+) -> AggregateInputs:
+    stale_after_ms = int(float(state.densi_offline_after_ticks) * float(dt) * 1000.0)
+    jf = extract_joy_facts(state.joy)
 
     facts: list[AxisSafetyFacts] = []
-    reg = dict(getattr(state, "densi_registry", {}) or {})
-    for axis_id in axis_ids:
+    reg = _coerce_registry(state.densi_registry)
+    for axis_id_raw in axis_ids:
+        axis_id = str(axis_id_raw)
         estop_word = router.last_dev_estop_word_by_axis.get(axis_id)
         estate = None
         if estop_word is not None:
@@ -41,23 +84,16 @@ def build_aggregate_inputs(*, state, router, axis_ids: List[str], dt: float) -> 
                 bits = None
                 axis_taster = None
 
-        # Prefer a single helper for claim/lease resolution.
         try:
-            owner = str(state.axis_owner(axis_id))
+            owner = str(state.axis_owner(axis_id) or "")
         except Exception:
             owner = ""
 
-        age_ms = None
-        d = reg.get(axis_id)
-        if d is not None:
-            last_seen_tick = int(getattr(d, "last_seen_core_tick", -1))
-            if last_seen_tick >= 0:
-                age_ticks = int(state.tick) - last_seen_tick
-                age_ms = int(max(0, age_ticks) * float(dt) * 1000.0)
+        age_ms = _entry_age_ms(entry=reg.get(axis_id), now_tick=int(state.tick), dt=dt)
 
         facts.append(
             AxisSafetyFacts(
-                axis_id=str(axis_id),
+                axis_id=axis_id,
                 in_scope=True,
                 estop_bits=bits,
                 axis_taster=axis_taster,

@@ -13,12 +13,20 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from PySide6.QtWidgets import QLineEdit, QWidget
+from PySide6.QtWidgets import QAbstractSlider, QComboBox, QLineEdit, QPushButton, QWidget
 
 from ..engines.densi.inputs import DensiInputs, DensiUiInputs
 from ..engines.densi.viewmodel import DensiViewModel
 from . import densi_qt_binder_support as _support
+
+if TYPE_CHECKING:
+    from ..panels.densi.densi_banner_render import DenSiBannerBindings
+    from ..panels.densi.densi_cut_markers_render import DenSiCutMarkersBindings
+    from ..panels.densi.densi_readouts_render import DenSiReadoutsBindings
+    from ..qtutil.param_widget_binder import ParamWidgetBinder
+    from ..qtutil.widget_cache import WidgetCache
 
 
 @dataclass
@@ -29,12 +37,45 @@ class DenSiQtBinder:
 
     _ui_actions: DensiUiInputs = field(default_factory=DensiUiInputs)
     _estop_cb_bindings: object | None = None
+    _wcache: WidgetCache = field(init=False)
+    _param_binder: ParamWidgetBinder = field(init=False)
+    _b_readouts: DenSiReadoutsBindings = field(init=False)
+    _b_banner: DenSiBannerBindings = field(init=False)
+    _b_cut_markers: DenSiCutMarkersBindings = field(init=False)
+    _txtTick: QLineEdit | None = None
+    _txt_hdr_banner_left: QLineEdit | None = None
+    _txt_hdr_banner_right: QLineEdit | None = None
+    _txtPos: QLineEdit | None = None
+    _txtVel: QLineEdit | None = None
+    _txtAmp: QLineEdit | None = None
+    _txtTemp: QLineEdit | None = None
+    _txtCutPos: QLineEdit | None = None
+    _txtCutVel: QLineEdit | None = None
+    _txtCutTime: QLineEdit | None = None
+    _txtPosdiff: QLineEdit | None = None
+    _txt_guider_range_min: QLineEdit | None = None
+    _txt_guider_range_max: QLineEdit | None = None
+    _txt_guider_range_val: QLineEdit | None = None
+    _txt_guider_speed: QLineEdit | None = None
+    _sld_vel_cmd: QAbstractSlider | None = None
+    _sld_limit_range: QAbstractSlider | None = None
+    _btn_diag_resync: QPushButton | None = None
+    _btn_es_start: QPushButton | None = None
+    _btn_estop_all_set: QPushButton | None = None
+    _btn_estop_all_clear: QPushButton | None = None
+    _cmbAxis: QComboBox | None = None
 
     def __post_init__(self) -> None:
         _support.post_init(self)
 
+    def _require_param_binder(self) -> ParamWidgetBinder:
+        binder = self._param_binder
+        if binder is None:
+            raise RuntimeError("DenSiQtBinder parameter binder is not initialized")
+        return binder
+
     def seed_params_from_ui(self) -> dict[str, float]:
-        return self._param_binder.read_all_values()
+        return self._require_param_binder().read_all_values()
 
     def lock_param_ui_device_side(self) -> None:
         btn_names = [
@@ -59,7 +100,7 @@ class DenSiQtBinder:
             if b is not None:
                 set_enabled(b, False)
         for _grp, _mapping in _PARAM_WIDGETS.items():
-            for _key, _wname, _obj, le in self._param_binder.iter_param_line_edits():
+            for _key, _wname, _obj, le in self._require_param_binder().iter_param_line_edits():
                 set_state_property(le, "true", prop="paramField")
                 set_enabled(le, False)
             break

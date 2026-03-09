@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Protocol, cast
 
 from transitions import Machine
 
@@ -28,6 +29,34 @@ class AxisFsmConfig:
     safe_modus: str = "E"  # in your legacy, 'E' seems “normal”
     idle_modus: str = "E"
     write_modus: str = "w"
+
+
+class _AxisFsmGeneratedApi(Protocol):
+    state: str
+
+    def on_link_up(self) -> bool | None: ...
+
+    def on_link_down(self) -> bool | None: ...
+
+    def on_estop(self) -> bool | None: ...
+
+    def on_fault(self) -> bool | None: ...
+
+    def on_estop_cleared(self) -> bool | None: ...
+
+    def on_recovered(self) -> bool | None: ...
+
+    def start_claim(self) -> bool | None: ...
+
+    def claim_ok(self) -> bool | None: ...
+
+    def enable_req(self) -> bool | None: ...
+
+    def enabled_ok(self) -> bool | None: ...
+
+    def disable_req(self) -> bool | None: ...
+
+    def fault_cleared(self) -> bool | None: ...
 
 
 class AxisFSM:
@@ -83,74 +112,78 @@ class AxisFSM:
         # --- fault recovery (placeholder) ---
         self.machine.add_transition("fault_cleared", ST_FAULT, ST_IDLE)
 
+    @property
+    def _fsm(self) -> _AxisFsmGeneratedApi:
+        return cast(_AxisFsmGeneratedApi, self)
+
     # ---------- public tick ----------
     def step(self, tel: AxisTelemetry, req: AxisRequest) -> AxisCommand:
         # 1) link gating
         if not tel.link_ok:
-            if self.state != ST_DISCONNECTED:
-                self.on_link_down()
+            if self._fsm.state != ST_DISCONNECTED:
+                self._fsm.on_link_down()
             return self._cmd_safe(req, intent=False, resync=False)
 
-        if self.state == ST_DISCONNECTED:
-            self.on_link_up()
+        if self._fsm.state == ST_DISCONNECTED:
+            self._fsm.on_link_up()
 
         # 2) hard safety/fault overrides
         if tel.estop_active:
-            if self.state != ST_ESTOP:
-                self.on_estop()
+            if self._fsm.state != ST_ESTOP:
+                self._fsm.on_estop()
             # while estop: force safe, allow estop reset + resync request only
             return self._cmd_estop(req)
 
         if tel.fault_active:
-            if self.state != ST_FAULT:
-                self.on_fault()
+            if self._fsm.state != ST_FAULT:
+                self._fsm.on_fault()
             return self._cmd_safe(req, intent=False, resync=False)
 
         # if we *were* in estop and now cleared: go recover
-        if self.state == ST_ESTOP and not tel.estop_active:
-            self.on_estop_cleared()
+        if self._fsm.state == ST_ESTOP and not tel.estop_active:
+            self._fsm.on_estop_cleared()
 
         # 3) state behaviors
-        if self.state == ST_IDLE:
+        if self._fsm.state == ST_IDLE:
             if req.want_claim:
-                self.start_claim()
+                self._fsm.start_claim()
             return self._cmd_idle(req, intent=req.want_claim)
 
-        if self.state == ST_CLAIMING:
+        if self._fsm.state == ST_CLAIMING:
             # define "claim ack": for now we treat it as "PLC echoes our PID in uplink field 0"
             # (in your ST uplink, field 0 is OwnPID; PLC sets OwnPID to '0000' on timeout)
             if tel.own_pid_rx == self.cfg.controller_pid:
-                self.claim_ok()
+                self._fsm.claim_ok()
             return self._cmd_idle(req, intent=True)
 
-        if self.state == ST_READY:
+        if self._fsm.state == ST_READY:
             if req.want_enable:
-                self.enable_req()
+                self._fsm.enable_req()
             return self._cmd_ready(req, intent=True)
 
-        if self.state == ST_ENABLING:
+        if self._fsm.state == ST_ENABLING:
             if tel.enabled:
-                self.enabled_ok()
+                self._fsm.enabled_ok()
             # keep enable request asserted until we see enabled
             return self._cmd_enable(req, intent=True)
 
-        if self.state == ST_ACTIVE:
+        if self._fsm.state == ST_ACTIVE:
             if not req.want_enable:
-                self.disable_req()
+                self._fsm.disable_req()
                 return self._cmd_ready(req, intent=True)
             return self._cmd_active(req, intent=True)
 
-        if self.state == ST_RECOVER:
+        if self._fsm.state == ST_RECOVER:
             # concrete recover sequence:
             #  - assert resync=1 for some ticks (req.want_resync may be set by controller policy)
             #  - once controller decides it's done, trigger on_recovered() and re-claim
             if req.want_resync:
                 return self._cmd_recover(req)
             # if higher layer stops requesting resync, we proceed to reclaim
-            self.on_recovered()
+            self._fsm.on_recovered()
             return self._cmd_idle(req, intent=True)
 
-        if self.state == ST_FAULT:
+        if self._fsm.state == ST_FAULT:
             # if fault cleared in telemetry we moved already; otherwise stay safe
             return self._cmd_safe(req, intent=False, resync=False)
 

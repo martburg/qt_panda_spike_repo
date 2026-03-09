@@ -16,9 +16,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import (
+    QAbstractSlider,
+    QCheckBox,
+    QComboBox,
     QFrame,
     QLineEdit,
     QPushButton,
+    QTabWidget,
     QWidget,
 )
 
@@ -40,6 +44,8 @@ if TYPE_CHECKING:
     from ..panels.hip.hip_readouts_render import HipReadoutsBindings
     from ..panels.hip.hip_sliders_render import HipSlidersBindings
     from ..qtutil.param_ui_apply import ParamUiBindings
+    from ..qtutil.param_widget_binder import ParamWidgetBinder
+    from ..qtutil.widget_cache import WidgetCache
 
 from . import hip_qt_binder_apply_impl as _apply_impl, hip_qt_binder_init_impl as _init_impl
 
@@ -66,12 +72,55 @@ class HipQtBinder:
     _sliders_bindings: HipSlidersBindings | None = None
     _modal_lock: ModalLock | None = None
     _param_ui_bindings: ParamUiBindings | None = None
+    _param_binder: ParamWidgetBinder = field(init=False)
+    _wcache: WidgetCache = field(init=False)
+    _widgets: HipQtWidgets | None = None
+    _estop_checks: dict[str, QCheckBox] = field(default_factory=dict)
+    _tabs_main: QTabWidget | None = None
+    _cmbAxis: QComboBox | None = None
     _frame_footer: QFrame | None = None
     _frame_header: QFrame | None = None
-    _widgets: HipQtWidgets | None = None
+    _txtTick: QLineEdit | None = None
+    _txt_hdr_banner_left: QLineEdit | None = None
+    _txt_hdr_banner_right: QLineEdit | None = None
+    _txt_main_amp_status: QLineEdit | None = None
+    _txt_slave_amp_status: QLineEdit | None = None
+    _txtPos: QLineEdit | None = None
+    _txtVel: QLineEdit | None = None
+    _txtAmp: QLineEdit | None = None
+    _txtTemp: QLineEdit | None = None
+    _txtLimitHardMin: QLineEdit | None = None
+    _txtLimitUserMin: QLineEdit | None = None
+    _txtLimitUserMax: QLineEdit | None = None
+    _txtLimitHardMax: QLineEdit | None = None
+    _txtCutPos: QLineEdit | None = None
+    _txtCutVel: QLineEdit | None = None
+    _txtCutTime: QLineEdit | None = None
+    _txtPosdiff: QLineEdit | None = None
+    _txt_guider_range_min: QLineEdit | None = None
+    _txt_guider_range_max: QLineEdit | None = None
+    _txt_guider_range_val: QLineEdit | None = None
+    _txt_guider_speed: QLineEdit | None = None
+    _txtGuiderPosMin: QLineEdit | None = None
+    _txtGuiderPosMax: QLineEdit | None = None
+    _txtGuiderPitch: QLineEdit | None = None
+    _sld_vel_cmd: QAbstractSlider | None = None
+    _sld_limit_range: QAbstractSlider | None = None
+    _sld_guider_range: QAbstractSlider | None = None
+    _sld_guider_speed: QAbstractSlider | None = None
+    _btn_estop_reset: QPushButton | None = None
+    _btn_diag_resync: QPushButton | None = None
+    _btn_main_reset: QPushButton | None = None
+    _btn_guider_reset: QPushButton | None = None
 
     def __post_init__(self) -> None:
         _init_impl.post_init(self)
+
+    def _require_param_binder(self) -> ParamWidgetBinder:
+        binder = self._param_binder
+        if binder is None:
+            raise RuntimeError("HipQtBinder parameter binder is not initialized")
+        return binder
 
     # ------------------------------------------------------------------
     # Signal wiring / input capture
@@ -131,7 +180,7 @@ class HipQtBinder:
 
         param_values: dict[str, dict[str, float]] = {}
         for group in _PARAM_WIDGETS.keys():
-            param_values[group] = self._param_binder.read_group_values(group)
+            param_values[group] = self._require_param_binder().read_group_values(group)
 
         return HipUiInputs(
             axis_selected=axis_selected,
@@ -160,7 +209,7 @@ class HipQtBinder:
     def apply_online_state(self, state: str | None) -> None:
         _apply_impl.apply_online_state(self, state)
 
-    def _apply_attach_combo(self, vm) -> None:
+    def _apply_attach_combo(self, vm: HipViewModel) -> None:
         _apply_impl._apply_attach_combo(self, vm)
 
     def _set_joy_properties(self, deadman: bool, select_hip: bool) -> None:
