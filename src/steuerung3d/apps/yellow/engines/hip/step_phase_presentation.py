@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from steuerung3d.core.telemetry import TelemetrySnapshot
@@ -68,7 +69,7 @@ def compute_presentation_phase(
     attach_combo: HipAttachCombo,
     attached: bool,
     axis_id: str,
-    axis_ids: list[str],
+    axis_ids: Sequence[str],
     snap: TelemetrySnapshot,
     now_ns: int,
     last_rx_ns: int | None,

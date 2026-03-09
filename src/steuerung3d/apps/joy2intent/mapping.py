@@ -15,8 +15,9 @@ JoyRig(winch_ids=[...]); we accept both for backward compatibility.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Dict, List, Protocol, Sequence, Set
+from typing import Protocol
 
 from steuerung3d.core.control_context import ControlContext
 
@@ -36,12 +37,12 @@ from .mapping_helpers import (
 
 @dataclass(frozen=True)
 class JoyBindings:
-    axes: Dict[str, int]
-    buttons: Dict[str, int | list[int]]
+    axes: dict[str, int]
+    buttons: dict[str, int | list[int]]
     deadzone: float
     expo: float
-    select_buttons: List[int] = field(default_factory=list)
-    invert: Dict[str, bool] = field(default_factory=dict)
+    select_buttons: list[int | list[int]] = field(default_factory=list)
+    invert: dict[str, bool] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -68,16 +69,18 @@ class JoyRig:
     If both are provided, `winches` wins.
     """
 
-    winches: List[str] = field(default_factory=list)
-    winch_ids: List[str] = field(default_factory=list)
+    winches: list[str] = field(default_factory=list)
+    winch_ids: list[str] = field(default_factory=list)
 
-    def ordered_winch_ids(self) -> List[str]:
+    def ordered_winch_ids(self) -> list[str]:
         return self.winches if self.winches else self.winch_ids
 
 
 class JoyStateLike(Protocol):
     prev_deadman: bool
-    prev_active_winch_idxs: Set[int]
+    prev_active_winch_idxs: set[int]
+    deadman_prev: bool
+    enabled_winch_ids: set[str]
 
 
 class JoyReportLike(Protocol):
@@ -93,9 +96,9 @@ def synthesize_intents(
     lim: JoyLimits,
     hip_id: str = "hip",
     control_context: ControlContext | None = None,
-) -> List[object]:
+) -> list[object]:
     """Convert a joystick report into a list of core intents."""
-    intents: List[object] = []
+    intents: list[object] = []
     rig_ids = rig.ordered_winch_ids()
     facts = collect_input_facts(rc=rc, bind=bind, rig_ids=rig_ids, control_context=control_context)
 

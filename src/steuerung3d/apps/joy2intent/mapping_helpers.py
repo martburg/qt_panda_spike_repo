@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol, Sequence, Set
+from typing import Any, Protocol
 
 from steuerung3d.core.control_context import ControlContext
 from steuerung3d.core.intents import (
@@ -15,12 +16,12 @@ from steuerung3d.core.joy_state import clamp_soll_speed
 
 
 class _JoyBindingsLike(Protocol):
-    axes: dict[str, int]
-    buttons: dict[str, int | list[int]]
+    axes: Mapping[str, int]
+    buttons: Mapping[str, int | list[int]]
     deadzone: float
     expo: float
-    select_buttons: list[int | list[int]]
-    invert: dict[str, bool]
+    select_buttons: Sequence[int | list[int]]
+    invert: Mapping[str, bool]
 
 
 class _JoyLimitsLike(Protocol):
@@ -31,9 +32,9 @@ class _JoyLimitsLike(Protocol):
 
 class _JoyStateLike(Protocol):
     prev_deadman: bool
-    prev_active_winch_idxs: Set[int]
+    prev_active_winch_idxs: set[int]
     deadman_prev: bool
-    enabled_winch_ids: Set[str]
+    enabled_winch_ids: set[str]
 
 
 class _JoyReportLike(Protocol):
@@ -97,7 +98,7 @@ def apply_deadzone_only(x: float, deadzone: float) -> float:
     return x
 
 
-def pressed_buttons(rc: Any) -> Set[int]:
+def pressed_buttons(rc: Any) -> set[int]:
     if hasattr(rc, "pressed"):
         try:
             return set(rc.pressed)
@@ -159,7 +160,7 @@ def collect_input_facts(
     *,
     rc: _JoyReportLike,
     bind: _JoyBindingsLike,
-    rig_ids: list[str],
+    rig_ids: Sequence[str],
     control_context: ControlContext | None,
 ) -> JoyInputFacts:
     deadman_btn = button_aliases(bind.buttons.get("deadman"))

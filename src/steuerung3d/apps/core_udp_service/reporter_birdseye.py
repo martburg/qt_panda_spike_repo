@@ -35,6 +35,7 @@ class _BirdsEyeStateLike(Protocol):
     axis_claims: Mapping[str, str]
     estop_reset_denied_count_by_axis: Mapping[str, int]
     core_motion_allowed: bool
+    core_axis_gate: Mapping[str, Mapping[str, object]]
 
 
 class _BirdsEyeSnapLike(Protocol):

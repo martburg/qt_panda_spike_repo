@@ -2,19 +2,30 @@
 
 from __future__ import annotations
 
+from typing import cast
+
+from .engine_host_protocols import DenSiEngineHost
+
 
 class DenSiMetaMixin:
+    def _host(self) -> DenSiEngineHost:
+        return cast(DenSiEngineHost, self)
+
     def step_lifetick(self) -> None:
         """Update legacy device_tick/lifetick meta fields."""
-        inc_ms = max(1, int(round(self.tb.dt_s * 1000.0)))
-        echo_map = {}
-        if self.last_cmd is not None:
+        host = self._host()
+        inc_ms = max(1, int(round(host.tb.dt_s * 1000.0)))
+        echo_map: dict[str, int] = {}
+        if host.last_cmd is not None:
             try:
-                echo_map = dict(getattr(self.last_cmd, "lifetick_echo", {}) or {})
+                echo_map = {
+                    str(k): int(v)
+                    for k, v in dict(getattr(host.last_cmd, "lifetick_echo", {}) or {}).items()
+                }
             except Exception:
                 echo_map = {}
 
-        for axis_id, ax in self.state.axes.items():
+        for axis_id, ax in host.state.axes.items():
             prev = int(ax.meta.get("device_tick", 0)) & 0xFFFF
             dev_tick = (prev + inc_ms) & 0xFFFF
             ax.meta["device_tick"] = int(dev_tick)

@@ -17,6 +17,7 @@ from typing import Callable
 from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
 from steuerung3d.adapters.sim.device import SimDevice
 from steuerung3d.common.timebase import Timebase
+from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.state import MachineState
 
 from .engine_core_clock import DenSiClockMixin
@@ -24,6 +25,7 @@ from .engine_core_cut import DenSiCutMarkersMixin
 from .engine_core_inj_estop import DenSiInjectedEStopMixin
 from .engine_core_meta import DenSiMetaMixin
 from .engine_core_pipeline import DenSiPipelineMixin
+from .types import EStopState, L0Sub, L0Top
 
 
 @dataclass
@@ -47,10 +49,10 @@ class DenSiEngine(
     # connection
     disconnect_after_s: float = 2.0
     seen_first_cmd: bool = False
-    last_cmd: object | None = None  # CommandFrame (imported lazily in mixins)
+    last_cmd: CommandFrame | None = None
     last_cmd_ns: int | None = None
-    l0_top: object = None  # L0Top (set in build_default)
-    l0_sub: object = None  # L0Sub (set in build_default)
+    l0_top: L0Top = L0Top.START
+    l0_sub: L0Sub = L0Sub.IDLE
 
     # injected estop
     inj_bits: dict[str, bool] | None = None
@@ -64,7 +66,7 @@ class DenSiEngine(
     taster_prev_disp: bool = False
     taster_pressed_s: float | None = None
     drive_ready: bool = False
-    estate: object = None  # EStopState (set in build_default/reset)
+    estate: EStopState = EStopState.ESTOP
     brake_switch_s: float = 1.5
     brake_handoff_grace_s: float = 2.0
     es_start_armed: bool = False

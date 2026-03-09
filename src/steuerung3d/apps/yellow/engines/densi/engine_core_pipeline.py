@@ -158,5 +158,5 @@ class DenSiPipelineMixin:
         host.state.t_s += float(host.tb.dt_s)
         host.prev_estop_state = bool(host.state.estop)
 
-    def step(self, *, frames: list[CommandFrame], now_ns: int):
+    def step(self, *, frames: list[CommandFrame], now_ns: int) -> object:
         return _step(engine=self, frames=frames, now_ns=now_ns)
