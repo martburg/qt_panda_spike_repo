@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from steuerung3d.adapters.links.base import Link
+from steuerung3d.adapters.plc.plc_codec import PlcCodec
+from steuerung3d.adapters.plc.plc_config import PlcWireSpec
 from steuerung3d.apps.plc_stack.builder import build_plc_device
 from steuerung3d.config.plc_stack_config import load_plc_stack_config
 
@@ -26,11 +29,11 @@ class FakeUdpLink:
 
 
 class FakeCodec:
-    def __init__(self, *, spec):
+    def __init__(self, *, spec: PlcWireSpec):
         self.spec = spec
 
     # Minimal PlcCodec surface (not used by this test)
-    def encode_command_frame(self, _cmd) -> bytes:  # pragma: no cover
+    def encode_command_frame(self, _cmd: object) -> bytes:  # pragma: no cover
         return b""
 
     def try_decode_telemetry(self, _payload: bytes):  # pragma: no cover
@@ -66,24 +69,38 @@ axis_ids = ["Y"]
 
     cfg = load_plc_stack_config(toml_path)
 
+    def make_link(*, bind: tuple[str, int], target: tuple[str, int]) -> Link:
+        return FakeUdpLink(bind=bind, target=target)
+
+    def make_codec(*, spec: PlcWireSpec) -> PlcCodec:
+        return FakeCodec(spec=spec)
+
     device, endpoints = build_plc_device(
         cfg,
-        link_factory=lambda *, bind, target: FakeUdpLink(bind=bind, target=target),
-        codec_factory=lambda *, spec: FakeCodec(spec=spec),
+        link_factory=make_link,
+        codec_factory=make_codec,
     )
 
     assert len(endpoints) == 2
     assert endpoints[0].name == "Anton"
     assert endpoints[0].axis_ids == ["X"]
-    assert endpoints[0].link.bind == ("0.0.0.0", 51001)
-    assert endpoints[0].link.target == ("172.16.17.1", 50001)
-    assert endpoints[0].codec.spec.axis_ids == ["X"]
+    link0 = endpoints[0].link
+    codec0 = endpoints[0].codec
+    assert isinstance(link0, FakeUdpLink)
+    assert isinstance(codec0, FakeCodec)
+    assert link0.bind == ("0.0.0.0", 51001)
+    assert link0.target == ("172.16.17.1", 50001)
+    assert codec0.spec.axis_ids == ["X"]
 
     assert endpoints[1].name == "Burt"
     assert endpoints[1].axis_ids == ["Y"]
-    assert endpoints[1].link.bind == ("0.0.0.0", 51002)
-    assert endpoints[1].link.target == ("172.16.17.2", 50001)
-    assert endpoints[1].codec.spec.axis_ids == ["Y"]
+    link1 = endpoints[1].link
+    codec1 = endpoints[1].codec
+    assert isinstance(link1, FakeUdpLink)
+    assert isinstance(codec1, FakeCodec)
+    assert link1.bind == ("0.0.0.0", 51002)
+    assert link1.target == ("172.16.17.2", 50001)
+    assert codec1.spec.axis_ids == ["Y"]
 
     # MultiPlcDevice should expose endpoint names (smoke check)
     assert hasattr(device, "endpoints")

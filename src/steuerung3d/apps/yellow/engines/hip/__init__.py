@@ -23,17 +23,16 @@ def __getattr__(name: str):
 
     from .engine import (  # type: ignore
         HipAttachInputs,
-        HipAttachState,
         HipBannerInputs,
         HipEngine,
         HipParamAction,
-        HipParamCommitDialog,
         HipState,
         HipStepInputs,
         HipStepResult,
         HipUiInputs,
         HipViewModel,
     )
+    from .types import HipAttachState, HipParamCommitDialog  # type: ignore
 
     if name == "HipEngine":
         return HipEngine

@@ -39,6 +39,8 @@ def test_axis_router_fanout_publishes_full_snapshot_to_every_sink() -> None:
         },
     )
     assert router.publish_ui_snapshot(snap) == 2
+    assert s1.snaps is not None
+    assert s2.snaps is not None
     assert set(s1.snaps[0].axes.keys()) == {"Anton", "Debby"}
     assert set(s2.snaps[0].axes.keys()) == {"Anton", "Debby"}
 
@@ -74,6 +76,7 @@ def test_axis_router_fanout_includes_axis_scoped_device_caches() -> None:
         },
     )
     router.publish_ui_snapshot(core_snap)
+    assert s.snaps is not None
     got = s.snaps[0]
     assert got.axis_estop_status_word.get("Anton") == 0x55
     assert got.axis_params.get("Anton") == {"P": 6.3}

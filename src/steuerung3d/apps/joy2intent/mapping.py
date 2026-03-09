@@ -15,7 +15,7 @@ JoyRig(winch_ids=[...]); we accept both for backward compatibility.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -81,6 +81,26 @@ class JoyStateLike(Protocol):
     prev_active_winch_idxs: set[int]
 
 
+class _JoyBindingsLike(Protocol):
+    @property
+    def axes(self) -> Mapping[str, int]: ...
+
+    @property
+    def buttons(self) -> Mapping[str, int | list[int]]: ...
+
+    @property
+    def deadzone(self) -> float: ...
+
+    @property
+    def expo(self) -> float: ...
+
+    @property
+    def select_buttons(self) -> Sequence[int | list[int]]: ...
+
+    @property
+    def invert(self) -> Mapping[str, bool]: ...
+
+
 class JoyReportLike(Protocol):
     @property
     def axes(self) -> Sequence[float]: ...
@@ -92,7 +112,7 @@ class JoyReportLike(Protocol):
 def synthesize_intents(
     st: JoyStateLike,
     rc: JoyReportLike,
-    bind: JoyBindings,
+    bind: _JoyBindingsLike,
     rig: JoyRig,
     lim: JoyLimits,
     hip_id: str = "hip",

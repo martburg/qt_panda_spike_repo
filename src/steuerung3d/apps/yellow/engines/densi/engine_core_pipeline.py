@@ -159,4 +159,4 @@ class DenSiPipelineMixin:
         host.prev_estop_state = bool(host.state.estop)
 
     def step(self, *, frames: list[CommandFrame], now_ns: int) -> object:
-        return _step(engine=self, frames=frames, now_ns=now_ns)
+        return _step(engine=self._host(), frames=frames, now_ns=now_ns)

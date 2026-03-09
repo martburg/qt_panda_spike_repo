@@ -1,60 +1,16 @@
-"""Rig workflow tests (SYNC/RECOVER) are deferred.
+"""Rig workflow tests are deferred for this milestone.
 
-This repo currently targets the milestone:
-  - UDP telemetry discovery -> axes appear
-  - HiP auto-claims an axis on cmb selection
-  - manual jog is enforced by claims
-
-The full rig workflow (participating set, anchors, arm/enter sync, recover/resync)
-will be implemented later. When that lands, this test module should be re-enabled.
+The current repo scope stops short of the older rig-intent API that this test
+module targeted. We keep the module as an explicit deferred placeholder, but we
+skip it at import time so static checkers do not need stale intent symbols.
 """
 
 from __future__ import annotations
 
 import pytest
 
-# NOTE: this module is intentionally skipped in this milestone. Keep the import
-# surface dynamic so static type-checkers don't fail on missing symbols.
-try:
-    import steuerung3d.core.intents as _intents
-    from steuerung3d.core.rig_logic import note_densi_seen
-    from steuerung3d.core.rig_types import RigMode
-
-    ArmSync = _intents.ArmSync
-    EnterSync = _intents.EnterSync
-    SetDensiAnchor = _intents.SetDensiAnchor
-    SetDensiParticipating = _intents.SetDensiParticipating
-    SetRigMode = _intents.SetRigMode
-except Exception:  # noqa: BLE001
-    pytest.skip(
-        "Rig workflow not available in this milestone (deferred). "
-        "Re-enable once rig intents + rig_logic are implemented.",
-        allow_module_level=True,
-    )
-
-from steuerung3d.core.core_mode import CoreMode
-from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.state import MachineState
-
-
-def test_arm_sync_and_enter_sync() -> None:
-    st = MachineState()
-    st.core_mode = CoreMode.LIVE
-
-    # Two densis online
-    st.ensure_axis("A").pos = 1.0
-    st.ensure_axis("B").pos = 2.0
-    note_densi_seen(st, "A")
-    note_densi_seen(st, "B")
-
-    apply_intent(st, SetRigMode(rig_mode="SETUP_MANUAL"))
-    apply_intent(st, SetDensiParticipating(device_id="A", participating=True))
-    apply_intent(st, SetDensiParticipating(device_id="B", participating=True))
-    apply_intent(st, SetDensiAnchor(device_id="A", x=0, y=0, z=0))
-    apply_intent(st, SetDensiAnchor(device_id="B", x=1, y=0, z=0))
-
-    apply_intent(st, ArmSync())
-    assert st.rig_mode == RigMode.ARMED_SYNC
-
-    apply_intent(st, EnterSync())
-    assert st.rig_mode == RigMode.SYNC_ACTIVE
+pytest.skip(
+    "Rig workflow not available in this milestone (deferred). "
+    "Re-enable once rig intents + rig_logic workflow API are implemented.",
+    allow_module_level=True,
+)
