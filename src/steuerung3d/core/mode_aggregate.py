@@ -74,6 +74,40 @@ class AggregateResult:
     motion_allowed: bool = False
 
 
+@dataclass(frozen=True)
+class _AxisGateFacts:
+    axis: AxisSafetyFacts
+    missing: list[str]
+    stale: bool
+    key_mode: str | None
+    hard_estop_active: bool | None
+    fault_estop_active: bool | None
+
+    def as_gate_dict(self) -> dict[str, object]:
+        return {
+            "in_scope": bool(self.axis.in_scope),
+            "key_mode": self.key_mode,
+            "missing": bool(self.missing),
+            "stale": bool(self.stale),
+            "hard_estop_active": self.hard_estop_active,
+            "fault_estop_active": self.fault_estop_active,
+            "taster": self.axis.axis_taster,
+            "armed": self.axis.axis_armed,
+            "ready": self.axis.axis_ready,
+            "owner": self.axis.axis_owner,
+            "age_ms": self.axis.axis_age_ms,
+        }
+
+
+@dataclass(frozen=True)
+class _EligibleAxisState:
+    in_scope: list[AxisSafetyFacts]
+    eligible: list[AxisSafetyFacts]
+    blocked_by: list[BlockedReason]
+    axis_gate: dict[str, dict[str, object]]
+    has_missing_or_stale: bool
+
+
 def _missing_fields(axis: AxisSafetyFacts) -> list[str]:
     missing: list[str] = []
     if axis.estop_bits is None:
@@ -133,157 +167,187 @@ def _effective_estops(
     return hard_active, (ok_fault or other_fault)
 
 
-def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
-    def _finish(
-        *,
-        core_mode: CoreMode,
-        blocked_by: list[BlockedReason],
-        axis_gate: dict[str, dict[str, object]],
-        motion_allowed: bool = False,
-    ) -> AggregateResult:
-        """Return a validated AggregateResult.
+def _build_axis_gate_facts(axis: AxisSafetyFacts, *, stale_after_ms: int) -> _AxisGateFacts:
+    missing = _missing_fields(axis) if axis.in_scope else []
+    stale = False
+    if axis.in_scope and not missing:
+        try:
+            stale = int(axis.axis_age_ms or 0) >= stale_after_ms
+        except Exception:
+            stale = True
+    key_mode = _key_mode(axis.estop_bits)
+    hard_estop_active, fault_estop_active = _effective_estops(axis.estop_bits, key_mode=key_mode)
+    return _AxisGateFacts(
+        axis=axis,
+        missing=missing,
+        stale=stale,
+        key_mode=key_mode,
+        hard_estop_active=hard_estop_active,
+        fault_estop_active=fault_estop_active,
+    )
 
-        Contract invariants (must always hold):
-          - motion_allowed can only be True when core_mode == LIVE
-          - non-LIVE modes must never allow motion
-        """
 
-        if bool(motion_allowed) and core_mode != CoreMode.LIVE:
-            raise AssertionError(
-                "aggregate_core_mode contract violated: motion_allowed=True is only valid when core_mode==LIVE "
-                f"(got core_mode={core_mode})"
-            )
-        if core_mode != CoreMode.LIVE:
-            motion_allowed = False
-
-        # LIVE may still be "blocked" from motion (e.g. no Select while moving),
-        # but it must never be blocked by hard safety reasons once it reaches LIVE.
-        if core_mode == CoreMode.LIVE:
-            allowed_live_codes = {"NO_SELECT_FOR_MOTION"}
-            bad = [r for r in blocked_by if getattr(r, "code", None) not in allowed_live_codes]
-            if bad:
-                raise AssertionError(
-                    "aggregate_core_mode contract violated: LIVE must not carry hard blocked_by reasons "
-                    f"(bad={[getattr(r, 'code', None) for r in bad]})"
-                )
-
-        return AggregateResult(
-            core_mode=core_mode,
-            blocked_by=blocked_by,
-            axis_gate=axis_gate,
-            motion_allowed=bool(motion_allowed),
-        )
-
+def _build_eligible_axis_state(inputs: AggregateInputs) -> _EligibleAxisState:
     axes = list(inputs.axes or [])
     in_scope = [axis for axis in axes if bool(axis.in_scope)]
-
     blocked_by: list[BlockedReason] = []
     axis_gate: dict[str, dict[str, object]] = {}
+    has_missing_or_stale = False
     stale_after_ms = int(inputs.stale_after_ms)
 
-    has_missing_or_stale = False
     for axis in axes:
-        missing = _missing_fields(axis) if axis.in_scope else []
-        stale = False
-        if axis.in_scope and not missing:
-            try:
-                stale = int(axis.axis_age_ms or 0) >= stale_after_ms
-            except Exception:
-                stale = True
-
-        key_mode = _key_mode(axis.estop_bits)
-        hard_estop_active, fault_estop_active = _effective_estops(
-            axis.estop_bits,
-            key_mode=key_mode,
-        )
-
-        axis_gate[axis.axis_id] = {
-            "in_scope": bool(axis.in_scope),
-            "key_mode": key_mode,
-            "missing": bool(missing),
-            "stale": bool(stale),
-            "hard_estop_active": hard_estop_active,
-            "fault_estop_active": fault_estop_active,
-            "taster": axis.axis_taster,
-            "armed": axis.axis_armed,
-            "ready": axis.axis_ready,
-            "owner": axis.axis_owner,
-            "age_ms": axis.axis_age_ms,
-        }
-
+        gate_facts = _build_axis_gate_facts(axis, stale_after_ms=stale_after_ms)
+        axis_gate[axis.axis_id] = gate_facts.as_gate_dict()
         if not axis.in_scope:
             continue
 
-        eligible = (key_mode == KEY0) or (key_mode is None)
-        if missing and eligible:
-            blocked_by.append(BlockedReason("MISSING", axis.axis_id, ",".join(missing)))
+        eligible = (gate_facts.key_mode == KEY0) or (gate_facts.key_mode is None)
+        if gate_facts.missing and eligible:
+            blocked_by.append(BlockedReason("MISSING", axis.axis_id, ",".join(gate_facts.missing)))
             has_missing_or_stale = True
             continue
-        if stale and eligible:
+        if gate_facts.stale and eligible:
             blocked_by.append(BlockedReason("STALE", axis.axis_id, None))
             has_missing_or_stale = True
 
     eligible_axes = [
         axis for axis in in_scope if axis_gate.get(axis.axis_id, {}).get("key_mode") == KEY0
     ]
+    return _EligibleAxisState(
+        in_scope=in_scope,
+        eligible=eligible_axes,
+        blocked_by=blocked_by,
+        axis_gate=axis_gate,
+        has_missing_or_stale=has_missing_or_stale,
+    )
 
-    if not eligible_axes:
+
+def _finish_result(
+    *,
+    core_mode: CoreMode,
+    blocked_by: list[BlockedReason],
+    axis_gate: dict[str, dict[str, object]],
+    motion_allowed: bool = False,
+) -> AggregateResult:
+    if bool(motion_allowed) and core_mode != CoreMode.LIVE:
+        raise AssertionError(
+            "aggregate_core_mode contract violated: motion_allowed=True is only valid when core_mode==LIVE "
+            f"(got core_mode={core_mode})"
+        )
+    if core_mode != CoreMode.LIVE:
+        motion_allowed = False
+
+    if core_mode == CoreMode.LIVE:
+        allowed_live_codes = {"NO_SELECT_FOR_MOTION"}
+        bad = [r for r in blocked_by if getattr(r, "code", None) not in allowed_live_codes]
+        if bad:
+            raise AssertionError(
+                "aggregate_core_mode contract violated: LIVE must not carry hard blocked_by reasons "
+                f"(bad={[getattr(r, 'code', None) for r in bad]})"
+            )
+
+    return AggregateResult(
+        core_mode=core_mode,
+        blocked_by=blocked_by,
+        axis_gate=axis_gate,
+        motion_allowed=bool(motion_allowed),
+    )
+
+
+def _finish_with_axes(
+    eligible_state: _EligibleAxisState,
+    *,
+    core_mode: CoreMode,
+    blocked_by: list[BlockedReason] | None = None,
+    motion_allowed: bool = False,
+) -> AggregateResult:
+    return _finish_result(
+        core_mode=core_mode,
+        blocked_by=list(eligible_state.blocked_by if blocked_by is None else blocked_by),
+        axis_gate=eligible_state.axis_gate,
+        motion_allowed=motion_allowed,
+    )
+
+
+def _append_blocked_reasons(
+    blocked_by: list[BlockedReason],
+    code: str,
+    axes: list[AxisSafetyFacts],
+) -> list[BlockedReason]:
+    if not axes:
+        return blocked_by
+    blocked_by.extend(BlockedReason(code, axis.axis_id, None) for axis in axes)
+    return blocked_by
+
+
+def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
+    eligible_state = _build_eligible_axis_state(inputs)
+
+    if not eligible_state.eligible:
+        blocked_by = list(eligible_state.blocked_by)
         blocked_by.append(BlockedReason("NO_KEY0_AXES", None, None))
-        return _finish(core_mode=CoreMode.FAULT, blocked_by=blocked_by, axis_gate=axis_gate)
+        return _finish_with_axes(eligible_state, core_mode=CoreMode.FAULT, blocked_by=blocked_by)
 
-    if has_missing_or_stale:
-        return _finish(core_mode=CoreMode.FAULT, blocked_by=blocked_by, axis_gate=axis_gate)
+    if eligible_state.has_missing_or_stale:
+        return _finish_with_axes(eligible_state, core_mode=CoreMode.FAULT)
 
     estop_axes = [
         axis
-        for axis in eligible_axes
-        if bool(axis_gate.get(axis.axis_id, {}).get("hard_estop_active", False))
+        for axis in eligible_state.eligible
+        if bool(eligible_state.axis_gate.get(axis.axis_id, {}).get("hard_estop_active", False))
     ]
     if estop_axes:
-        blocked_by.extend([BlockedReason("ESTOP", axis.axis_id, None) for axis in estop_axes])
-        return _finish(core_mode=CoreMode.ESTOP, blocked_by=blocked_by, axis_gate=axis_gate)
+        blocked_by = _append_blocked_reasons(list(eligible_state.blocked_by), "ESTOP", estop_axes)
+        return _finish_with_axes(eligible_state, core_mode=CoreMode.ESTOP, blocked_by=blocked_by)
 
     fault_axes = [
         axis
-        for axis in eligible_axes
-        if bool(axis_gate.get(axis.axis_id, {}).get("fault_estop_active", False))
+        for axis in eligible_state.eligible
+        if bool(eligible_state.axis_gate.get(axis.axis_id, {}).get("fault_estop_active", False))
     ]
     if fault_axes:
-        blocked_by.extend([BlockedReason("FAULT", axis.axis_id, None) for axis in fault_axes])
-        return _finish(core_mode=CoreMode.FAULT, blocked_by=blocked_by, axis_gate=axis_gate)
+        blocked_by = _append_blocked_reasons(list(eligible_state.blocked_by), "FAULT", fault_axes)
+        return _finish_with_axes(eligible_state, core_mode=CoreMode.FAULT, blocked_by=blocked_by)
 
-    not_armed = [axis for axis in eligible_axes if not bool(axis.axis_armed)]
+    not_armed = [axis for axis in eligible_state.eligible if not bool(axis.axis_armed)]
     if not_armed:
-        blocked_by.extend([BlockedReason("NOT_ARMED", axis.axis_id, None) for axis in not_armed])
-        return _finish(core_mode=CoreMode.IDLE, blocked_by=blocked_by, axis_gate=axis_gate)
+        blocked_by = _append_blocked_reasons(
+            list(eligible_state.blocked_by), "NOT_ARMED", not_armed
+        )
+        return _finish_with_axes(
+            eligible_state,
+            core_mode=CoreMode.IDLE,
+            blocked_by=blocked_by,
+            motion_allowed=False,
+        )
 
-    not_ready = [axis for axis in eligible_axes if not bool(axis.axis_ready)]
+    not_ready = [axis for axis in eligible_state.eligible if not bool(axis.axis_ready)]
     if not_ready:
-        blocked_by.extend([BlockedReason("NOT_READY", axis.axis_id, None) for axis in not_ready])
-        return _finish(
+        blocked_by = _append_blocked_reasons(
+            list(eligible_state.blocked_by), "NOT_READY", not_ready
+        )
+        return _finish_with_axes(
+            eligible_state,
             core_mode=CoreMode.ARMED,
             blocked_by=blocked_by,
-            axis_gate=axis_gate,
             motion_allowed=False,
         )
 
     if not inputs.joy_deadman:
-        return _finish(
+        return _finish_with_axes(
+            eligible_state,
             core_mode=CoreMode.READY,
-            blocked_by=blocked_by,
-            axis_gate=axis_gate,
             motion_allowed=False,
         )
 
-    core_mode = CoreMode.LIVE
+    blocked_by = list(eligible_state.blocked_by)
     motion_allowed = True
     if (abs(float(inputs.joy_soll_speed)) > 1e-6) and (not inputs.joy_select_hip):
         blocked_by.append(BlockedReason("NO_SELECT_FOR_MOTION", None, None))
-        # In current system, NO_SELECT_FOR_MOTION blocks motion even if core_mode is LIVE
         motion_allowed = False
-    return _finish(
-        core_mode=core_mode,
+    return _finish_with_axes(
+        eligible_state,
+        core_mode=CoreMode.LIVE,
         blocked_by=blocked_by,
-        axis_gate=axis_gate,
         motion_allowed=motion_allowed,
     )
