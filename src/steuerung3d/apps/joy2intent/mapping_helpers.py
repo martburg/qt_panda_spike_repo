@@ -32,6 +32,8 @@ class _JoyLimitsLike(Protocol):
 class _JoyStateLike(Protocol):
     prev_deadman: bool
     prev_active_winch_idxs: Set[int]
+    deadman_prev: bool
+    enabled_winch_ids: Set[str]
 
 
 class _JoyReportLike(Protocol):

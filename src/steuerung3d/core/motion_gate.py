@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Protocol
+
 from steuerung3d.core.axis_ids import normalize_axis_id
-from steuerung3d.core.state import MachineState
 
 
-def axis_local_motion_allowed(state: MachineState, axis_id: str) -> bool:
+class _AxisGateStateLike(Protocol):
+    core_axis_gate: Mapping[str, Mapping[str, object]]
+
+
+def axis_local_motion_allowed(state: _AxisGateStateLike, axis_id: str) -> bool:
     """Return whether *axis_id* may perform local/manual motion.
 
     This is intentionally **per-axis** and is used as an exception to the
@@ -23,8 +29,8 @@ def axis_local_motion_allowed(state: MachineState, axis_id: str) -> bool:
     if not axis_id:
         return False
 
-    gate = dict(getattr(state, "core_axis_gate", {}) or {}).get(axis_id)
-    if not isinstance(gate, dict):
+    gate = state.core_axis_gate.get(axis_id)
+    if gate is None:
         return False
 
     key_mode = str(gate.get("key_mode") or "").upper()

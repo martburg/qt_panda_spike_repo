@@ -20,13 +20,12 @@ from steuerung3d.core.intents import (
     RequestMainReset,
     RequestResync,
 )
-from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
 
 from .intent_policy import gate_motion_intents
 from .param_ui import ParamTxnResult, run_param_txn
 from .step_context import build_step_context
-from .step_phase_motion import compute_motion_phase, project_local_joy
+from .step_phase_motion import HipJoyProjectionState, compute_motion_phase, project_local_joy
 from .step_phase_presentation import HipPresentationPhase, compute_presentation_phase
 from .types import HipAttachCombo, HipPresentationData, HipStepInputs, HipStepResult, HipUiInputs
 
@@ -52,7 +51,7 @@ class _StepState:
 class _PreMotionResult:
     param_result: ParamTxnResult
     presentation_phase: HipPresentationPhase
-    joy_state: JoyState
+    joy_state: HipJoyProjectionState
 
 
 @dataclass(frozen=True)
@@ -134,7 +133,7 @@ def _run_pre_motion_phases(
         update_state=True,
     )
     joy_state = project_local_joy(
-        joy=inputs.joy if isinstance(inputs.joy, JoyState) else JoyState(),
+        joy=inputs.joy,
         display_axis_id=str(step_state.display_axis_id or ""),
     )
     return _PreMotionResult(

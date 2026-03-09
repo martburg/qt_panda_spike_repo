@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 from steuerung3d.core.intents import EnableAxis, Intent, JogWinch
 
@@ -35,7 +36,7 @@ def build_jog_active_intents(
     hip_id: str,
     motion_axis_id: str,
     speed: float,
-    params: dict[str, Any],
+    params: Mapping[str, object],
 ) -> float:
     try:
         vel_max_mps = float(params.get("VelMax", 0.0) or 0.0)

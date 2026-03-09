@@ -5,6 +5,7 @@ Most semantics live in :mod:`step_impl` and are invoked via :meth:`DenSiEngine.s
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import cast
 
 from steuerung3d.core.command_frame import CommandFrame
@@ -17,6 +18,16 @@ from .resync import handle_resync_cmd as _handle_resync_cmd
 from .setpoint_semantics import normalize_cmd_for_plant
 from .step_impl import step as _step
 from .types import L0Sub, L0Top
+
+ParamValue = float | str
+
+
+def _identity_param_map(values: Mapping[str, float]) -> dict[str, float]:
+    return {str(k): float(v) for k, v in values.items()}
+
+
+def _state_params_store(host: DenSiEngineHost) -> dict[str, ParamValue]:
+    return cast(dict[str, ParamValue], host.state.params)
 
 
 class DenSiPipelineMixin:
@@ -66,8 +77,9 @@ class DenSiPipelineMixin:
                 host.l0_top = L0Top.CONNECTED
 
         try:
-            host.state.params["DenSiL0Top"] = host.l0_top.name
-            host.state.params["DenSiL0Sub"] = host.l0_sub.name
+            params = _state_params_store(host)
+            params["DenSiL0Top"] = host.l0_top.name
+            params["DenSiL0Sub"] = host.l0_sub.name
         except Exception:
             pass
 
@@ -92,14 +104,19 @@ class DenSiPipelineMixin:
             host.l0_top == L0Top.CONNECTED and (not bool(ready_for_sollvel)) and (not bool(moving))
         )
 
+        normalize_pos_chain = host.normalize_pos_chain or _identity_param_map
+        normalize_guider_range = host.normalize_guider_range or _identity_param_map
+        enforce_pos_chain = host.enforce_pos_chain or _identity_param_map
+        enforce_guider_minmax = host.enforce_guider_minmax or _identity_param_map
+
         res = apply_densi_param_ops(
             state=host.state,
             param_ops=getattr(cmd, "param_ops", []) or [],
             allow=allow_param_ops,
-            normalize_pos_chain=host.normalize_pos_chain,
-            normalize_guider_range=host.normalize_guider_range,
-            enforce_pos_chain=host.enforce_pos_chain,
-            enforce_guider_minmax=host.enforce_guider_minmax,
+            normalize_pos_chain=normalize_pos_chain,
+            normalize_guider_range=normalize_guider_range,
+            enforce_pos_chain=enforce_pos_chain,
+            enforce_guider_minmax=enforce_guider_minmax,
         )
         return dict(res.applied_values or {})
 

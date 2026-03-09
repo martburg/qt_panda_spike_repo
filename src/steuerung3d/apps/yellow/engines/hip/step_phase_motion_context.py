@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from steuerung3d.core.axis_selection import resolve_motion_axis_id
 
@@ -32,9 +33,9 @@ def resolve_axis_context(
     snap: object,
     hip_id: str,
     axis_id: str,
-    axis_ids: list[str],
+    axis_ids: Sequence[str],
     joy: "HipJoyProjectionState",
-    axes: dict[str, Any],
+    axes: Mapping[str, object],
 ) -> AxisContext:
     motion_axis_id = resolve_motion_axis_id(
         axis_id=str(axis_id or ""),

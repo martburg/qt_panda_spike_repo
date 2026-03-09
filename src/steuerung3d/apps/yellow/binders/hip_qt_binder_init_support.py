@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 from PySide6.QtWidgets import QLineEdit, QPushButton, QWidget
 
@@ -26,6 +26,22 @@ if TYPE_CHECKING:
     from .hip_qt_binder import HipQtBinder
 
 
+_W = TypeVar("_W", bound=QWidget)
+
+
+def _require_widget(widget: _W | None, *, name: str) -> _W:
+    if widget is None:
+        raise RuntimeError(f"HiP Qt binder missing required widget: {name}")
+    return widget
+
+
+def _require_widgets(self: "HipQtBinder") -> HipQtWidgets:
+    widgets = self._widgets
+    if widgets is None:
+        raise RuntimeError("HiP Qt binder widgets are not initialized")
+    return widgets
+
+
 def setup_widget_cache(self: "HipQtBinder") -> None:
     self._wcache = WidgetCache(self.win)
     self._widgets = HipQtWidgets.from_cache(self._wcache)
@@ -39,11 +55,12 @@ def setup_widget_cache(self: "HipQtBinder") -> None:
 
 
 def discover_widgets(self: "HipQtBinder") -> None:
-    self._tabs_main = self._widgets.tabs_main
-    self._cmbAxis = self._widgets.cmb_axis
-    self._frame_footer = self._widgets.frame_footer
-    self._frame_header = self._widgets.frame_header
-    self._txtTick = self._widgets.txt_tick
+    widgets = _require_widgets(self)
+    self._tabs_main = widgets.tabs_main
+    self._cmbAxis = widgets.cmb_axis
+    self._frame_footer = widgets.frame_footer
+    self._frame_header = widgets.frame_header
+    self._txtTick = widgets.txt_tick
     self._txt_hdr_banner_left = self._wcache.line_edit("txtHdrBannerLeft")
     self._txt_hdr_banner_right = self._wcache.line_edit("txtHdrBannerRight")
     self._txt_main_amp_status = self._wcache.line_edit("txtMainAmpStatus")
@@ -67,12 +84,12 @@ def discover_widgets(self: "HipQtBinder") -> None:
     self._txtGuiderPosMin = self._wcache.line_edit("txtGPosMin_3")
     self._txtGuiderPosMax = self._wcache.line_edit("txtGPosMax_2")
     self._txtGuiderPitch = self._wcache.line_edit("txtPitch_2")
-    self._sld_vel_cmd = self._widgets.sld_vel_cmd
+    self._sld_vel_cmd = widgets.sld_vel_cmd
     self._sld_limit_range = self._wcache.slider("sldLimitRange")
     self._sld_guider_range = self._wcache.slider("sldGuiderRange")
     self._sld_guider_speed = self._wcache.slider("sldGuiderSpeed")
-    self._btn_estop_reset = self._widgets.btn_estop_reset
-    self._btn_diag_resync = self._widgets.btn_diag_resync
+    self._btn_estop_reset = widgets.btn_estop_reset
+    self._btn_diag_resync = widgets.btn_diag_resync
     self._btn_main_reset = self._wcache.button("btnMainReset")
     self._btn_guider_reset = self._wcache.button("btnGuiderReset")
 
@@ -100,6 +117,7 @@ def disable_action_buttons(self: "HipQtBinder") -> None:
 
 
 def setup_modal_and_params(self: "HipQtBinder") -> None:
+    tabs_main = self._tabs_main
     try:
         modal_widgets = [
             w for w in self.win.findChildren(QWidget) if isinstance(w, (QPushButton, QLineEdit))
@@ -108,7 +126,7 @@ def setup_modal_and_params(self: "HipQtBinder") -> None:
         modal_widgets = []
     self._modal_lock = ModalLock(
         widgets=modal_widgets,
-        tabs=self._tabs_main,
+        tabs=tabs_main,
         enable_widget=set_enabled,
         enable_line_edit=set_enabled_repolish,
     )
@@ -124,6 +142,18 @@ def setup_modal_and_params(self: "HipQtBinder") -> None:
 
 
 def build_bindings(self: "HipQtBinder") -> None:
+    txt_pos = _require_widget(self._txtPos, name="txtPos")
+    txt_vel = _require_widget(self._txtVel, name="txtVel")
+    txt_amp = _require_widget(self._txtAmp, name="txtAmp")
+    txt_temp = _require_widget(self._txtTemp, name="txtTemp")
+    txt_gr_min = _require_widget(self._txt_guider_range_min, name="txtGuiderRangeMin")
+    txt_gr_max = _require_widget(self._txt_guider_range_max, name="txtGuiderRangeMax")
+    txt_gr_val = _require_widget(self._txt_guider_range_val, name="txtGuiderRangeValue")
+    txt_gr_speed = _require_widget(self._txt_guider_speed, name="txtGuiderSpeed")
+    sld_vel_cmd = _require_widget(self._sld_vel_cmd, name="sldVelCmd")
+    sld_limit_range = _require_widget(self._sld_limit_range, name="sldLimitRange")
+    sld_guider_range = _require_widget(self._sld_guider_range, name="sldGuiderRange")
+    sld_guider_speed = _require_widget(self._sld_guider_speed, name="sldGuiderSpeed")
     self._banner_bindings = HipBannerBindings(
         txt_hdr_banner_left=self._txt_hdr_banner_left,
         txt_hdr_banner_right=self._txt_hdr_banner_right,
@@ -151,14 +181,14 @@ def build_bindings(self: "HipQtBinder") -> None:
         txt_slave_amp_status=self._txt_slave_amp_status,
     )
     self._readouts_bindings = HipReadoutsBindings(
-        txt_pos=self._txtPos,
-        txt_vel=self._txtVel,
-        txt_amp=self._txtAmp,
-        txt_temp=self._txtTemp,
-        txt_guider_range_min=self._txt_guider_range_min,
-        txt_guider_range_max=self._txt_guider_range_max,
-        txt_guider_range_val=self._txt_guider_range_val,
-        txt_guider_speed=self._txt_guider_speed,
+        txt_pos=txt_pos,
+        txt_vel=txt_vel,
+        txt_amp=txt_amp,
+        txt_temp=txt_temp,
+        txt_guider_range_min=txt_gr_min,
+        txt_guider_range_max=txt_gr_max,
+        txt_guider_range_val=txt_gr_val,
+        txt_guider_speed=txt_gr_speed,
     )
     self.log.info(
         "hi_p: dbg bindings readouts txt_pos=%s txt_vel=%s",
@@ -166,10 +196,10 @@ def build_bindings(self: "HipQtBinder") -> None:
         self._readouts_bindings.txt_vel if self._readouts_bindings else None,
     )
     self._sliders_bindings = HipSlidersBindings(
-        sld_vel_cmd=self._sld_vel_cmd,
-        sld_limit_range=self._sld_limit_range,
-        sld_guider_range=self._sld_guider_range,
-        sld_guider_speed=self._sld_guider_speed,
+        sld_vel_cmd=sld_vel_cmd,
+        sld_limit_range=sld_limit_range,
+        sld_guider_range=sld_guider_range,
+        sld_guider_speed=sld_guider_speed,
     )
 
 

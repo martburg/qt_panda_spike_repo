@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Mapping, Sequence
 
 from steuerung3d.core.intents import Intent
 
@@ -79,7 +79,7 @@ def _run_motion_branch(
     display_axis_id: str,
     joy: HipJoyProjectionState,
     decision: MotionDecision,
-    params: dict[str, Any],
+    params: Mapping[str, object],
 ) -> float:
     apply_axis_change_behavior(
         intents=intents,
@@ -117,16 +117,16 @@ def compute_motion_phase(
     snap: object,
     hip_id: str,
     axis_id: str,
-    axis_ids: list[str],
+    axis_ids: Sequence[str],
     display_axis_id: str,
     mode_now: str,
     estop: bool,
     fault: bool,
-    axes: dict[str, Any],
+    axes: Mapping[str, object],
     joy: HipJoyProjectionState,
-    logical: dict[str, Any],
+    logical: Mapping[str, object],
     estate: str,
-    params: dict[str, Any],
+    params: Mapping[str, object],
 ) -> HipMotionPhaseResult:
     axis_ctx = resolve_axis_context(
         snap=snap,
