@@ -20,7 +20,6 @@ from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 from steuerung3d.util.ratelimit import RateLimiter
 
-# Optional structured status heartbeat (used by stack supervisor birds-eye)
 try:
     from steuerung3d.core.status import StatusEmitter  # type: ignore
 except Exception:  # pragma: no cover
@@ -109,52 +108,35 @@ class HipRuntime:
         self._lock_axis_combo = bool(lock_combo)
 
     def collect_inputs(
-        self,
-        *,
-        snaps: list[TelemetrySnapshot],
-        now_ns: int,
-        ui: HipUiInputs,
+        self, *, snaps: list[TelemetrySnapshot], now_ns: int, ui: HipUiInputs
     ) -> HipRuntimeInputs:
         return HipRuntimeInputs(snaps=list(snaps or []), now_ns=int(now_ns), ui=ui)
 
-    def tick(self, *, inputs: HipRuntimeInputs) -> HipRuntimeResult:
-        snaps = list(inputs.snaps or [])
-        now_ns = int(inputs.now_ns)
+    def _handle_no_snapshots(self, *, now_ns: int) -> HipRuntimeResult:
         apply_startup = False
+        if self._last_rx_ns is not None:
+            age_ms = (now_ns - int(self._last_rx_ns)) / 1_000_000.0
+            if age_ms >= float(self._stale_after_ms):
+                self._last_rx_ns = None
+                apply_startup = True
+        self._emit_status(now_ns)
+        return HipRuntimeResult(
+            snap=None,
+            engine_result=None,
+            view_model=None,
+            intents=[],
+            txn_events=[],
+            resync_ignored=False,
+            resync_block_reason="",
+            apply_startup_state=apply_startup,
+            rx_count=0,
+        )
 
-        if not snaps:
-            if self._last_rx_ns is not None:
-                age_ms = (now_ns - int(self._last_rx_ns)) / 1_000_000.0
-                if age_ms >= float(self._stale_after_ms):
-                    self._last_rx_ns = None
-                    apply_startup = True
-            self._emit_status(now_ns)
-            return HipRuntimeResult(
-                snap=None,
-                engine_result=None,
-                view_model=None,
-                intents=[],
-                txn_events=[],
-                resync_ignored=False,
-                resync_block_reason="",
-                apply_startup_state=apply_startup,
-                rx_count=0,
-            )
-
-        snap = snaps[-1]
+    def _run_engine_step(
+        self, *, snap: TelemetrySnapshot, now_ns: int, ui: HipUiInputs
+    ) -> HipStepResult:
         self._last_rx_ns = now_ns
-
-        if not self._seen_first_telem:
-            self._log.info(
-                "rx first telemetry: tick=%s core_mode=%s estop=%s fault=%s",
-                getattr(snap, "tick", None),
-                getattr(snap, "core_mode", None),
-                getattr(snap, "estop", None),
-                getattr(snap, "fault", None),
-            )
-            self._seen_first_telem = True
-
-        engine_result = self.engine.step(
+        return self.engine.step(
             HipStepInputs(
                 snap=snap,
                 hip_id=self._hip_id,
@@ -165,59 +147,87 @@ class HipRuntime:
                 lock_axis_combo=bool(self._lock_axis_combo),
                 last_mode=str(self._last_mode or ""),
                 last_estate=str(self._last_estate or ""),
-                ui=inputs.ui,
+                ui=ui,
                 core_acks=list(getattr(snap, "core_acks", []) or []),
                 joy=getattr(snap, "joy", JoyState()),
             )
         )
 
-        vm = self._assemble_view_model(engine_result.presentation)
-        legacy_vm = self._assemble_legacy_view_model(engine_result.presentation)
-        intents = list(engine_result.intents or [])
-        txn_events = list(getattr(engine_result, "txn_events", []) or [])
-
-        self._hb.inc("rx_telem", len(snaps))
-        mode_v = str(getattr(snap, "core_mode", ""))
-        estop_v = bool(getattr(snap, "estop", False))
-        fault_v = bool(getattr(snap, "fault", False))
-        self._last_mode = mode_v
-        self._last_estop = estop_v
-        self._last_fault = fault_v
+    def _update_runtime_state_from_snap(self, *, snap: TelemetrySnapshot, vm: HipViewModel) -> None:
+        self._hb.inc("rx_telem", 1)
+        self._last_mode = str(getattr(snap, "core_mode", ""))
+        self._last_estop = bool(getattr(snap, "estop", False))
+        self._last_fault = bool(getattr(snap, "fault", False))
         try:
             self._last_estate = str(getattr(vm.banner, "estate", "ESTOP") or "ESTOP")
         except Exception:
             self._last_estate = "ESTOP"
 
-        if self._shadow_mode == "shadow":
-            self._diff_shadow(engine_vm=vm, legacy_vm=legacy_vm)
+    def _emit_motion_debug(self, *, snap: TelemetrySnapshot) -> None:
+        if not self._dbg_rl.allow("hip_motion_dbg"):
+            return
+        motion_dbg = build_hip_motion_debug_snapshot(runtime=self, snap=snap)
+        self._log.info(
+            "hip motion axis=%s mode=%s legacy=%s owner=%s enabled=%s dm=%s sel=%s sp=%.3f",
+            motion_dbg.motion_axis or "-",
+            motion_dbg.core_mode or "-",
+            motion_dbg.legacy_mode or "-",
+            motion_dbg.owner or "-",
+            int(motion_dbg.motion_enabled),
+            int(motion_dbg.joy_deadman),
+            int(motion_dbg.joy_select_hip),
+            motion_dbg.joy_soll_speed,
+        )
 
-        if self._dbg_rl.allow("hip_motion_dbg"):
-            motion_dbg = build_hip_motion_debug_snapshot(runtime=self, snap=snap)
-            self._log.info(
-                "hip motion axis=%s mode=%s legacy=%s owner=%s enabled=%s dm=%s sel=%s sp=%.3f",
-                motion_dbg.motion_axis or "-",
-                motion_dbg.core_mode or "-",
-                motion_dbg.legacy_mode or "-",
-                motion_dbg.owner or "-",
-                int(motion_dbg.motion_enabled),
-                int(motion_dbg.joy_deadman),
-                int(motion_dbg.joy_select_hip),
-                motion_dbg.joy_soll_speed,
-            )
-
-        self._emit_status(now_ns)
-
+    def _build_tick_result(
+        self,
+        *,
+        snap: TelemetrySnapshot,
+        engine_result: HipStepResult,
+        vm: HipViewModel,
+        snaps: list[TelemetrySnapshot],
+    ) -> HipRuntimeResult:
         return HipRuntimeResult(
             snap=snap,
             engine_result=engine_result,
             view_model=vm,
-            intents=intents,
-            txn_events=txn_events,
+            intents=list(engine_result.intents or []),
+            txn_events=list(getattr(engine_result, "txn_events", []) or []),
             resync_ignored=bool(getattr(engine_result, "resync_ignored", False)),
             resync_block_reason=str(getattr(engine_result, "resync_block_reason", "") or ""),
             apply_startup_state=False,
             rx_count=len(snaps),
         )
+
+    def tick(self, *, inputs: HipRuntimeInputs) -> HipRuntimeResult:
+        snaps = list(inputs.snaps or [])
+        now_ns = int(inputs.now_ns)
+
+        if not snaps:
+            return self._handle_no_snapshots(now_ns=now_ns)
+
+        snap = snaps[-1]
+        if not self._seen_first_telem:
+            self._log.info(
+                "rx first telemetry: tick=%s core_mode=%s estop=%s fault=%s",
+                getattr(snap, "tick", None),
+                getattr(snap, "core_mode", None),
+                getattr(snap, "estop", None),
+                getattr(snap, "fault", None),
+            )
+            self._seen_first_telem = True
+
+        engine_result = self._run_engine_step(snap=snap, now_ns=now_ns, ui=inputs.ui)
+        vm = self._assemble_view_model(engine_result.presentation)
+        legacy_vm = self._assemble_legacy_view_model(engine_result.presentation)
+        self._update_runtime_state_from_snap(snap=snap, vm=vm)
+
+        if self._shadow_mode == "shadow":
+            self._diff_shadow(engine_vm=vm, legacy_vm=legacy_vm)
+
+        self._emit_motion_debug(snap=snap)
+        self._emit_status(now_ns)
+        return self._build_tick_result(snap=snap, engine_result=engine_result, vm=vm, snaps=snaps)
 
     def _shadow_log(self, key: str, msg: str) -> None:
         if str(self._shadow_mode) != "shadow":
@@ -243,10 +253,7 @@ class HipRuntime:
         legacy_subset = {k: legacy_vm_norm.get(k) for k in keys}
         engine_subset = {k: engine_vm_norm.get(k) for k in keys}
         if legacy_subset != engine_subset:
-            self._shadow_log(
-                "view_model",
-                f"legacy={legacy_subset} engine={engine_subset}",
-            )
+            self._shadow_log("view_model", f"legacy={legacy_subset} engine={engine_subset}")
 
     @staticmethod
     def _assemble_legacy_view_model(pres: HipPresentationData) -> HipViewModel:
@@ -254,7 +261,6 @@ class HipRuntime:
 
     @staticmethod
     def _assemble_view_model(pres: HipPresentationData) -> HipViewModel:
-        # Keep local import of infer_estop_profile in this module for stability.
         _ = infer_estop_profile
         return assemble_view_model(pres)
 
@@ -288,8 +294,6 @@ class HipRuntime:
         )
 
     def _emit_status(self, now_ns: int) -> None:
-        # Status emitters may legitimately be falsey (e.g. a test stub that
-        # defines __bool__). Only skip emission when we truly don't have one.
         if getattr(self, "_status", None) is None:
             return
 

@@ -46,6 +46,19 @@ class HipAxisSelectionSnapshot:
     attached: bool
 
 
+@dataclass(frozen=True)
+class HipRuntimeStatusFacts:
+    axis: str
+    attached: bool
+    core_mode: str
+    legacy_mode: str
+    owner: str
+    joy_deadman: bool
+    joy_select_hip: bool
+    joy_soll_speed: float
+    raw_soll_speed: float
+
+
 def resolve_hip_axis_selection(
     *, runtime: object, snap: object | None = None
 ) -> HipAxisSelectionSnapshot:
@@ -58,38 +71,64 @@ def resolve_hip_axis_selection(
     return HipAxisSelectionSnapshot(axis=str(axis_sel.axis or ""), attached=bool(axis_sel.attached))
 
 
-def build_hip_motion_debug_snapshot(*, runtime: object, snap: object) -> HipMotionDebugSnapshot:
-    axes = getattr(snap, "axes", {}) or {}
-    axis_ids = sorted(list(axes.keys()))
+def build_runtime_status_facts(
+    *, runtime: object, snap: object | None = None
+) -> HipRuntimeStatusFacts:
     axis_sel = resolve_hip_axis_selection(runtime=runtime, snap=snap)
-    motion_axis = axis_sel.axis
-    if not motion_axis and len(axis_ids) == 1:
-        motion_axis = axis_ids[0]
+    axis = axis_sel.axis
+    if snap is not None:
+        axis_ids = sorted(list((getattr(snap, "axes", {}) or {}).keys()))
+        if not axis and len(axis_ids) == 1:
+            axis = axis_ids[0]
 
-    owner = get_claim_owner(snap, motion_axis) if motion_axis else ""
-    core_mode = str(getattr(snap, "core_mode", ""))
-    legacy_mode = str(getattr(snap, "mode", ""))
-    joy = getattr(snap, "joy", JoyState())
+    core_mode = str(getattr(snap, "core_mode", getattr(runtime, "_last_mode", "")) or "")
+    legacy_mode = str(getattr(snap, "mode", getattr(runtime, "_last_estate", "")) or "")
+
+    engine = getattr(runtime, "engine", None)
+    engine_state = getattr(engine, "state", None)
+    joy = getattr(engine_state, "joy", None)
+    if joy is None:
+        joy = getattr(snap, "joy", JoyState()) if snap is not None else JoyState()
+    try:
+        raw_soll_speed = float(getattr(joy, "soll_speed", 0.0) or 0.0)
+    except Exception:
+        raw_soll_speed = 0.0
     joy_facts = extract_joy_facts(joy)
-    joy_select_hip = joy_selected_for_axis(joy=joy, axis_id=motion_axis)
-    joy_soll_speed = joy_speed_for_axis(joy=joy, axis_id=motion_axis)
+    joy_select_hip = joy_selected_for_axis(joy=joy, axis_id=axis)
+    joy_soll_speed = joy_speed_for_axis(joy=joy, axis_id=axis)
 
-    motion_enabled = (
-        bool(motion_axis)
-        and core_mode.upper() == "LIVE"
-        and owner == str(getattr(runtime, "_hip_id", "") or "")
-        and bool(joy_facts.deadman)
-        and bool(joy_select_hip)
-    )
-    return HipMotionDebugSnapshot(
+    owner = get_claim_owner(snap, axis) if (snap is not None and axis) else ""
+    return HipRuntimeStatusFacts(
+        axis=str(axis or ""),
+        attached=bool(axis_sel.attached),
         core_mode=core_mode,
         legacy_mode=legacy_mode,
-        motion_axis=motion_axis,
-        owner=owner,
-        motion_enabled=motion_enabled,
+        owner=str(owner or ""),
         joy_deadman=bool(joy_facts.deadman),
         joy_select_hip=bool(joy_select_hip),
         joy_soll_speed=float(joy_soll_speed),
+        raw_soll_speed=float(raw_soll_speed),
+    )
+
+
+def build_hip_motion_debug_snapshot(*, runtime: object, snap: object) -> HipMotionDebugSnapshot:
+    facts = build_runtime_status_facts(runtime=runtime, snap=snap)
+    motion_enabled = (
+        bool(facts.axis)
+        and facts.core_mode.upper() == "LIVE"
+        and facts.owner == str(getattr(runtime, "_hip_id", "") or "")
+        and facts.joy_deadman
+        and facts.joy_select_hip
+    )
+    return HipMotionDebugSnapshot(
+        core_mode=facts.core_mode,
+        legacy_mode=facts.legacy_mode,
+        motion_axis=facts.axis,
+        owner=facts.owner,
+        motion_enabled=motion_enabled,
+        joy_deadman=facts.joy_deadman,
+        joy_select_hip=facts.joy_select_hip,
+        joy_soll_speed=facts.joy_soll_speed,
     )
 
 
@@ -102,44 +141,36 @@ def build_hip_status_payload(*, runtime: object, now_ns: int) -> HipStatusPayloa
         estop=bool(getattr(runtime, "_last_estop", False)),
         fault=bool(getattr(runtime, "_last_fault", False)),
     )
-    axis_sel = resolve_hip_axis_selection(runtime=runtime)
-    axis = axis_sel.axis
+    facts = build_runtime_status_facts(runtime=runtime)
     estate = str(getattr(runtime, "_last_estate", "") or "")
-    mode = str(getattr(runtime, "_last_mode", "") or "")
     armed = bool(str(estate or "").upper() in ("ARMED", "READY"))
     ready = bool(str(estate or "").upper() == "READY")
     age_disp = str(getattr(h, "age_disp", "") or "")
-    engine = getattr(runtime, "engine", None)
-    engine_state = getattr(engine, "state", None)
-    joy = getattr(engine_state, "joy", JoyState())
-    joy_facts = extract_joy_facts(joy)
-    joy_select_hip = joy_selected_for_axis(joy=joy, axis_id=axis)
-    joy_soll_speed = joy_speed_for_axis(joy=joy, axis_id=axis)
-    dm = 1 if joy_facts.deadman else 0
-    sel = 1 if joy_select_hip else 0
+    dm = 1 if facts.joy_deadman else 0
+    sel = 1 if facts.joy_select_hip else 0
     summary = (
-        f"axis={axis or '-'} core_mode={mode or '-'} legacy_mode={estate or '-'} "
-        f"age_ms={age_disp} JOY dm={dm} sel={sel} sp={joy_soll_speed:+.2f}"
+        f"axis={facts.axis or '-'} core_mode={facts.core_mode or '-'} legacy_mode={estate or '-'} "
+        f"age_ms={age_disp} JOY dm={dm} sel={sel} sp={facts.joy_soll_speed:+.2f}"
     )
     fields = with_health_fields(
         {
-            "axis": axis,
-            "attached": bool(axis_sel.attached),
-            "mode": mode,
+            "axis": facts.axis,
+            "attached": bool(facts.attached),
+            "mode": facts.core_mode,
             "estate": str(estate or ""),
             "armed": bool(armed),
             "ready": bool(ready),
-            "joy_deadman": bool(joy_facts.deadman),
-            "joy_select_hip": bool(joy_select_hip),
-            "joy_soll_speed": float(joy_soll_speed),
+            "joy_deadman": bool(facts.joy_deadman),
+            "joy_select_hip": bool(facts.joy_select_hip),
+            "joy_soll_speed": float(facts.joy_soll_speed),
             "debug": {
-                "axis_selected": axis,
-                "attached": bool(axis_sel.attached),
-                "core_mode": mode,
+                "axis_selected": facts.axis,
+                "attached": bool(facts.attached),
+                "core_mode": facts.core_mode,
                 "legacy_mode": str(estate or ""),
-                "joy_deadman": bool(joy_facts.deadman),
-                "joy_select_hip": bool(joy_select_hip),
-                "joy_soll_speed": float(joy_soll_speed),
+                "joy_deadman": bool(facts.joy_deadman),
+                "joy_select_hip": bool(facts.joy_select_hip),
+                "joy_soll_speed": float(facts.joy_soll_speed),
                 "last_rx_ns": getattr(runtime, "_last_rx_ns", None),
             },
         },
@@ -148,9 +179,7 @@ def build_hip_status_payload(*, runtime: object, now_ns: int) -> HipStatusPayloa
         fault=bool(getattr(runtime, "_last_fault", False)),
     )
     return HipStatusPayload(
-        level=str(getattr(h, "level", "") or ""),
-        summary=summary,
-        fields=fields,
+        level=str(getattr(h, "level", "") or ""), summary=summary, fields=fields
     )
 
 
@@ -162,19 +191,7 @@ def build_hip_birdseye_payload(
     estate: str,
     soft_errors: dict[str, int] | None = None,
 ) -> HipBirdseyePayload:
-    axis_sel = resolve_hip_axis_selection(runtime=runtime, snap=snap)
-    axis = axis_sel.axis
-    joy = getattr(getattr(runtime, "engine", None), "state", None)
-    joy = getattr(joy, "joy", None) or getattr(snap, "joy", JoyState())
-
-    try:
-        raw_sp = float(getattr(joy, "soll_speed", 0.0) or 0.0)
-    except Exception:
-        raw_sp = 0.0
-    joy_facts = extract_joy_facts(joy)
-    sel = joy_selected_for_axis(joy=joy, axis_id=axis)
-    joy_soll_speed_norm = joy_speed_for_axis(joy=joy, axis_id=axis)
-
+    facts = build_runtime_status_facts(runtime=runtime, snap=snap)
     velmax = 0.0
     try:
         params = getattr(snap, "params", {}) or {}
@@ -184,17 +201,16 @@ def build_hip_birdseye_payload(
     if velmax < 0.0:
         velmax = 0.0
 
-    joy_rate_mps = joy_soll_speed_norm * velmax if velmax > 0.0 else 0.0
+    joy_rate_mps = facts.joy_soll_speed * velmax if velmax > 0.0 else 0.0
     estop = bool(getattr(snap, "estop", False))
     fault = bool(getattr(snap, "fault", False))
-    core_mode = str(getattr(snap, "core_mode", "") or "")
     armed = bool(str(estate or "").upper() in ("ARMED", "READY"))
     ready = bool(str(estate or "").upper() == "READY")
 
     enable: bool | None = None
     try:
-        if axis:
-            ax = getattr(snap, "axes", {}).get(axis)
+        if facts.axis:
+            ax = getattr(snap, "axes", {}).get(facts.axis)
             if ax is not None:
                 enable = (
                     bool(ax.enable_cmd)
@@ -209,30 +225,30 @@ def build_hip_birdseye_payload(
     intents_out_count = int(len(intents or []))
 
     summary = (
-        f"hip axis={axis or '-'} core_mode={core_mode or '-'} "
-        f"legacy_mode={estate or '-'} dm={int(bool(joy_facts.deadman))} sel={int(bool(sel))} "
+        f"hip axis={facts.axis or '-'} core_mode={facts.core_mode or '-'} "
+        f"legacy_mode={estate or '-'} dm={int(bool(facts.joy_deadman))} sel={int(bool(facts.joy_select_hip))} "
         f"estop={int(estop)} v={joy_rate_mps:+.2f}m/s out=[{intents_out_types}]"
     )
 
     fields: dict[str, Any] = {
         "component": "hip",
-        "axis_selected": str(axis or ""),
-        "deadman": bool(joy_facts.deadman),
-        "select_hip": bool(sel),
-        "joy_soll_speed_norm": float(joy_soll_speed_norm),
-        "raw_soll_speed": float(raw_sp),
+        "axis_selected": str(facts.axis or ""),
+        "deadman": bool(facts.joy_deadman),
+        "select_hip": bool(facts.joy_select_hip),
+        "joy_soll_speed_norm": float(facts.joy_soll_speed),
+        "raw_soll_speed": float(facts.raw_soll_speed),
         "velmax": float(velmax),
         "joy_rate_mps": float(joy_rate_mps),
         "intents_out_types": str(intents_out_types),
         "intents_out_count": int(intents_out_count),
         "estop": bool(estop),
         "fault": bool(fault),
-        "mode": str(core_mode),
+        "mode": str(facts.core_mode),
         "estate": str(estate or ""),
         "armed": bool(armed),
         "ready": bool(ready),
-        "sel": bool(sel),
-        "dm": bool(joy_facts.deadman),
+        "sel": bool(facts.joy_select_hip),
+        "dm": bool(facts.joy_deadman),
     }
     if soft_errors:
         try:
