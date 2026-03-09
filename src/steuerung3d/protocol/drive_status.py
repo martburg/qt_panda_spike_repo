@@ -1,30 +1,11 @@
-# src/steuerung3d/protocol/drive_status.py
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-# Legacy bit meanings (from your Decoder.py):
-# bit0: Output powered
-# bit1: AMP ready
-# bit2: Referenced
-# bit3: In Position
-# bit4: Brake lifted
-# bit5: Fault bit (1 = fault)
-# bit6: Right end switch contacted
-# bit7: Left end switch contacted
-# bits8..: Zustand (state / error code)  => value >> 8
-#
-# Special legacy input strings:
-#  - "SIMUL": force everything "SIMUL"
-#  - "0": treat as NoConn
-#
-# Source: your legacy decoder snippet. :contentReference[oaicite:0]{index=0}
 
 
 @dataclass(frozen=True)
 class DriveStatus:
     raw: int
-    # base bits
     output_powered: bool
     amp_ready: bool
     referenced: bool
@@ -33,21 +14,16 @@ class DriveStatus:
     fault: bool
     right_end_switch: bool
     left_end_switch: bool
-
-    # derived
-    zustand: int  # raw >> 8
-    label: str  # human-ish text
+    zustand: int
+    label: str
     is_simul: bool = False
     is_noconn: bool = False
 
     def summary(self) -> str:
-        """Compact text for the legacy 'AmpStatus' line edits."""
         if self.is_simul:
             return "SIMUL"
         if self.is_noconn:
             return "NoConn"
-        # Keep this short; you already show age separately in banner.
-        # Example: "Ready | Ref | OK"
         parts: list[str] = []
         parts.append("Pwr" if self.output_powered else "NoPwr")
         parts.append("Ready" if self.amp_ready else "NotReady")
@@ -57,13 +33,11 @@ class DriveStatus:
             parts.append("InPos")
         if self.fault:
             parts.append("FAULT")
-        # Zustand label last (helps to read quickly)
         if self.label:
             parts.append(self.label)
         return " ".join(parts)
 
 
-# --- Legacy Zustand mappings (no-fault branch) ---
 _ZUSTAND_OK_LABELS: dict[int, str] = {
     0: "Not Ready",
     1: "Locked",
@@ -85,8 +59,6 @@ _ZUSTAND_OK_LABELS: dict[int, str] = {
     17: "Save Stop",
 }
 
-# --- Legacy error codes (fault branch) ---
-# NOTE: your original code sometimes compares to str(Zustand); we normalize to int keys here.
 _ZUSTAND_ERR_LABELS: dict[int, str] = {
     1: "-Ueberstrom",
     3: "-Erdschluss",
@@ -169,109 +141,108 @@ _ZUSTAND_ERR_LABELS: dict[int, str] = {
 }
 
 
-def decode_drive_status(word: int | str | None) -> DriveStatus:
-    """
-    Decode the legacy amplifier status word into a structured object.
+def _noconn_status() -> DriveStatus:
+    return DriveStatus(
+        raw=0,
+        output_powered=False,
+        amp_ready=False,
+        referenced=False,
+        in_position=False,
+        brake_lifted=False,
+        fault=False,
+        right_end_switch=False,
+        left_end_switch=False,
+        zustand=0,
+        label="NoConn",
+        is_simul=False,
+        is_noconn=True,
+    )
 
-    Accepts:
-      - int (normal)
-      - str (legacy UI sometimes passed strings: "SIMUL", "0", "1234")
-      - None (treated as NoConn)
-    """
+
+def _simul_status() -> DriveStatus:
+    return DriveStatus(
+        raw=0,
+        output_powered=True,
+        amp_ready=True,
+        referenced=True,
+        in_position=True,
+        brake_lifted=True,
+        fault=False,
+        right_end_switch=True,
+        left_end_switch=True,
+        zustand=0,
+        label="SIMUL",
+        is_simul=True,
+        is_noconn=False,
+    )
+
+
+def _coerce_word(word: int | str | None) -> int | None:
     if word is None:
-        return DriveStatus(
-            raw=0,
-            output_powered=False,
-            amp_ready=False,
-            referenced=False,
-            in_position=False,
-            brake_lifted=False,
-            fault=False,
-            right_end_switch=False,
-            left_end_switch=False,
-            zustand=0,
-            label="NoConn",
-            is_simul=False,
-            is_noconn=True,
-        )
-
+        return None
     if isinstance(word, str):
         w = word.strip()
         if w.upper() == "SIMUL":
-            return DriveStatus(
-                raw=0,
-                output_powered=True,
-                amp_ready=True,
-                referenced=True,
-                in_position=True,
-                brake_lifted=True,
-                fault=False,
-                right_end_switch=True,
-                left_end_switch=True,
-                zustand=0,
-                label="SIMUL",
-                is_simul=True,
-                is_noconn=False,
-            )
+            return -1
         if w == "0" or w == "":
-            return DriveStatus(
-                raw=0,
-                output_powered=False,
-                amp_ready=False,
-                referenced=False,
-                in_position=False,
-                brake_lifted=False,
-                fault=False,
-                right_end_switch=False,
-                left_end_switch=False,
-                zustand=0,
-                label="NoConn",
-                is_simul=False,
-                is_noconn=True,
-            )
+            return None
         try:
-            word_i = int(w, 0)  # allow "123", "0x10"
+            return int(w, 0)
         except Exception:
-            word_i = 0
-        word = word_i
+            return 0
+    return int(word)
 
-    raw = int(word) & 0xFFFFFFFF
 
-    # bits
-    b0 = bool(raw & (1 << 0))
-    b1 = bool(raw & (1 << 1))
-    b2 = bool(raw & (1 << 2))
-    b3 = bool(raw & (1 << 3))
-    b4 = bool(raw & (1 << 4))
-    b5 = bool(raw & (1 << 5))  # fault
-    b6 = bool(raw & (1 << 6))
-    b7 = bool(raw & (1 << 7))
+def _decode_bit_fields(raw: int) -> dict[str, object]:
+    return {
+        "raw": raw,
+        "output_powered": bool(raw & (1 << 0)),
+        "amp_ready": bool(raw & (1 << 1)),
+        "referenced": bool(raw & (1 << 2)),
+        "in_position": bool(raw & (1 << 3)),
+        "brake_lifted": bool(raw & (1 << 4)),
+        "fault": bool(raw & (1 << 5)),
+        "right_end_switch": bool(raw & (1 << 6)),
+        "left_end_switch": bool(raw & (1 << 7)),
+        "zustand": int(raw >> 8),
+    }
 
-    zustand = int(raw >> 8)
 
-    if not b5:
-        label = _ZUSTAND_OK_LABELS.get(zustand, "Unknown")
-    else:
-        label = _ZUSTAND_ERR_LABELS.get(zustand, "-Unknown Error")
+def _decode_label(*, fault: bool, zustand: int) -> str:
+    if not fault:
+        return _ZUSTAND_OK_LABELS.get(zustand, "Unknown")
+    return _ZUSTAND_ERR_LABELS.get(zustand, "-Unknown Error")
 
+
+def _build_drive_status(fields: dict[str, object]) -> DriveStatus:
     return DriveStatus(
-        raw=raw,
-        output_powered=b0,
-        amp_ready=b1,
-        referenced=b2,
-        in_position=b3,
-        brake_lifted=b4,
-        fault=b5,
-        right_end_switch=b6,
-        left_end_switch=b7,
-        zustand=zustand,
-        label=label,
+        raw=int(fields["raw"]),
+        output_powered=bool(fields["output_powered"]),
+        amp_ready=bool(fields["amp_ready"]),
+        referenced=bool(fields["referenced"]),
+        in_position=bool(fields["in_position"]),
+        brake_lifted=bool(fields["brake_lifted"]),
+        fault=bool(fields["fault"]),
+        right_end_switch=bool(fields["right_end_switch"]),
+        left_end_switch=bool(fields["left_end_switch"]),
+        zustand=int(fields["zustand"]),
+        label=str(fields["label"]),
         is_simul=False,
         is_noconn=False,
     )
 
 
-# --------------------------------------------------------------------
-# Drop-in note for HiPController:
-#   from steuerung3d.protocol.drive_status import decode_drive_status
-# --------------------------------------------------------------------
+def decode_drive_status(word: int | str | None) -> DriveStatus:
+    coerced = _coerce_word(word)
+    if coerced is None:
+        return _noconn_status()
+    if coerced == -1:
+        return _simul_status()
+
+    raw = int(coerced) & 0xFFFFFFFF
+    fields = _decode_bit_fields(raw)
+    fields["label"] = _decode_label(
+        fault=bool(fields["fault"]),
+        zustand=int(fields["zustand"]),
+    )
+    return _build_drive_status(fields)

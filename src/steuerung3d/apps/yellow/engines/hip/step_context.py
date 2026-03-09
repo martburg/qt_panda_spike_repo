@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Mapping
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    # Only needed for type checking; avoids runtime import cycles.
     from .engine import HipEngine
 
 from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.axis_selection import authoritative_selected_axis, visible_axis_ids_for_hip
 from steuerung3d.core.intents import ClaimAxis, Intent, ReleaseAxis
 from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
-from steuerung3d.core.telemetry import DensiTelemetry, TelemetrySnapshot
+from steuerung3d.core.telemetry import TelemetrySnapshot
 
 from .attach_state import NOT_ATTACHED, build_attach_combo
 from .types import HipAttachCombo, HipStepInputs, HipUiInputs
@@ -29,76 +28,77 @@ class StepContext:
     intents: list[Intent]
 
 
-def _densis_dbg(densis: Mapping[str, DensiTelemetry]) -> dict[str, dict[str, object]]:
-    out: dict[str, dict[str, object]] = {}
-    for k, d in densis.items():
-        out[str(k)] = {
-            "online": bool(getattr(d, "online", False)),
-            "owner": str(getattr(d, "claimed_by_hip", "") or ""),
-        }
-    return out
-
-
-def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepContext:
-    """Normalize HiP step inputs into a small, testable context object."""
-    self = engine
-
-    snap = inputs.snap
-    ui = inputs.ui
-    hip_id = str(inputs.hip_id or "")
-
-    joy_in = inputs.joy if isinstance(inputs.joy, JoyState) else JoyState()
-    self.state.joy = JoyState(
+def _sync_joy_state(engine: "HipEngine", hip_id: str, joy: JoyState | object) -> None:
+    joy_in = joy if isinstance(joy, JoyState) else JoyState()
+    engine.state.joy = JoyState(
         deadman=bool(getattr(joy_in, "deadman", False)),
         select_hip=bool(getattr(joy_in, "select_hip", False)),
         soll_speed=clamp_soll_speed(getattr(joy_in, "soll_speed", 0.0)),
     )
-    if getattr(self._param_txn, "hip_id", "") != hip_id:
-        self._param_txn.hip_id = hip_id
+    if getattr(engine._param_txn, "hip_id", "") != hip_id:
+        engine._param_txn.hip_id = hip_id
 
-    densis = snap.densis
 
-    prev_selected = str(self.state.selected_axis or "")
+def _visible_axis_context(
+    *, snap: TelemetrySnapshot, hip_id: str, prev_selected: str
+) -> tuple[list[str], dict[str, str]]:
     axis_ids = visible_axis_ids_for_hip(
-        densis=densis,
-        hip_id=hip_id,
-        prev_selected=prev_selected,
+        densis=snap.densis, hip_id=hip_id, prev_selected=prev_selected
     )
     axis_norm_to_canon = {normalize_axis_id(a): a for a in (axis_ids or []) if a}
+    return list(axis_ids), axis_norm_to_canon
 
+
+def _resolve_ui_axis(
+    *, engine: "HipEngine", ui: HipUiInputs, axis_norm_to_canon: dict[str, str]
+) -> str:
     ui_axis = str(ui.axis_selected or "").strip()
     ui_axis_norm = normalize_axis_id(ui_axis)
     if ui.axis_selection_changed:
-        self.state.last_ui_axis_selected = ui_axis
-    elif self.state.last_ui_axis_selected:
-        ui_axis = self.state.last_ui_axis_selected
-        ui_axis_norm = normalize_axis_id(ui_axis)
-    else:
-        if not (
-            self.state.joy.select_hip and ui_axis_norm and (ui_axis_norm in axis_norm_to_canon)
-        ):
-            ui_axis = ""
-            ui_axis_norm = ""
+        engine.state.last_ui_axis_selected = ui_axis
+        return ui_axis
+    if engine.state.last_ui_axis_selected:
+        return str(engine.state.last_ui_axis_selected)
+    if not (engine.state.joy.select_hip and ui_axis_norm and (ui_axis_norm in axis_norm_to_canon)):
+        return ""
+    return ui_axis
 
+
+def _build_attach_context(
+    *,
+    engine: "HipEngine",
+    inputs: HipStepInputs,
+    axis_ids: list[str],
+    ui_axis: str,
+    prev_selected: str,
+) -> tuple[HipAttachCombo, str, bool]:
     fixed_axis = normalize_axis_id(inputs.fixed_axis)
-    fixed_applied = bool(self.state.fixed_axis_applied)
-
-    attach_combo, selected_axis, fixed_applied = build_attach_combo(
+    return build_attach_combo(
         axis_ids=list(axis_ids),
         ui_axis=str(ui_axis or ""),
         fixed_axis=str(fixed_axis or ""),
         prev_selected=str(prev_selected or ""),
-        fixed_applied=bool(fixed_applied),
+        fixed_applied=bool(engine.state.fixed_axis_applied),
         lock_axis_combo=bool(inputs.lock_axis_combo),
     )
 
+
+def _apply_authoritative_selection(
+    *,
+    snap: TelemetrySnapshot,
+    hip_id: str,
+    ui: HipUiInputs,
+    axis_ids: list[str],
+    prev_selected: str,
+    attach_combo: HipAttachCombo,
+    selected_axis: str,
+) -> tuple[HipAttachCombo, str]:
     authoritative_axis = authoritative_selected_axis(
-        densis=densis,
+        densis=snap.densis,
         hip_id=hip_id,
         selected_axis=selected_axis,
         prev_selected=prev_selected,
     )
-
     if ui.axis_selection_changed:
         requested = str(ui.axis_selected or "").strip()
         illegal_foreign_request = bool(
@@ -106,28 +106,66 @@ def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepCon
         )
         if illegal_foreign_request:
             selected_axis = authoritative_axis
-            attach_combo = HipAttachCombo(
-                items=list(attach_combo.items),
-                current=str(selected_axis or NOT_ATTACHED),
-                enabled=bool(attach_combo.enabled),
-                fixed_axis_applied=bool(attach_combo.fixed_axis_applied),
-            )
     else:
         selected_axis = authoritative_axis
-        attach_combo = HipAttachCombo(
-            items=list(attach_combo.items),
-            current=str(selected_axis or NOT_ATTACHED),
-            enabled=bool(attach_combo.enabled),
-            fixed_axis_applied=bool(attach_combo.fixed_axis_applied),
-        )
+    attach_combo = HipAttachCombo(
+        items=list(attach_combo.items),
+        current=str(selected_axis or NOT_ATTACHED),
+        enabled=bool(attach_combo.enabled),
+        fixed_axis_applied=bool(attach_combo.fixed_axis_applied),
+    )
+    return attach_combo, str(selected_axis or "")
 
+
+def _build_selection_intents(
+    *, ui: HipUiInputs, prev_selected: str, selected_axis: str, hip_id: str
+) -> list[Intent]:
     intents: list[Intent] = []
-    if ui.axis_selection_changed:
-        if prev_selected and (not selected_axis or prev_selected != selected_axis):
-            intents.append(ReleaseAxis(axis_id=prev_selected, hip_id=hip_id))
-        if selected_axis and selected_axis != prev_selected:
-            intents.append(ClaimAxis(axis_id=selected_axis, hip_id=hip_id))
+    if not ui.axis_selection_changed:
+        return intents
+    if prev_selected and (not selected_axis or prev_selected != selected_axis):
+        intents.append(ReleaseAxis(axis_id=prev_selected, hip_id=hip_id))
+    if selected_axis and selected_axis != prev_selected:
+        intents.append(ClaimAxis(axis_id=selected_axis, hip_id=hip_id))
+    return intents
 
+
+def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepContext:
+    """Normalize HiP step inputs into a small, testable context object."""
+    snap = inputs.snap
+    ui = inputs.ui
+    hip_id = str(inputs.hip_id or "")
+
+    _sync_joy_state(engine, hip_id, inputs.joy)
+    prev_selected = str(engine.state.selected_axis or "")
+    axis_ids, axis_norm_to_canon = _visible_axis_context(
+        snap=snap,
+        hip_id=hip_id,
+        prev_selected=prev_selected,
+    )
+    ui_axis = _resolve_ui_axis(engine=engine, ui=ui, axis_norm_to_canon=axis_norm_to_canon)
+    attach_combo, selected_axis, fixed_applied = _build_attach_context(
+        engine=engine,
+        inputs=inputs,
+        axis_ids=axis_ids,
+        ui_axis=ui_axis,
+        prev_selected=prev_selected,
+    )
+    attach_combo, selected_axis = _apply_authoritative_selection(
+        snap=snap,
+        hip_id=hip_id,
+        ui=ui,
+        axis_ids=axis_ids,
+        prev_selected=prev_selected,
+        attach_combo=attach_combo,
+        selected_axis=selected_axis,
+    )
+    intents = _build_selection_intents(
+        ui=ui,
+        prev_selected=prev_selected,
+        selected_axis=selected_axis,
+        hip_id=hip_id,
+    )
     return StepContext(
         snap=snap,
         ui=ui,

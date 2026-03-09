@@ -55,12 +55,10 @@ class DeviceStepper:
 
     t_last_report: float = field(default_factory=time.monotonic)
 
-    def __call__(self, state: MachineState, cmd_frame: Any, dt: float) -> None:
-        # Per-axis command routing (no broadcast).
+    def _publish_commands(self, state: MachineState, cmd_frame: Any) -> None:
         estop_reset_by_axis, param_ops_by_axis = self.compute_one_shots_by_axis(
             state, self.axis_ids
         )
-
         sent = self.router.publish_command_frames(
             cmd_frame,
             estop_reset_by_axis=estop_reset_by_axis,
@@ -69,13 +67,12 @@ class DeviceStepper:
         self.stats["cmd_out"] += max(1, sent)
         self.last_seen["cmd_ts"] = time.monotonic()
 
+    def _ingest_device_telemetry(self, state: MachineState) -> None:
         snaps = self.dev_telem_in.drain_telemetry(limit=50)
         if snaps:
             self.stats["dev_telem_in"] += len(snaps)
             self.last_seen["dev_telem_ts"] = time.monotonic()
-            # Update axis-scoped caches from all received device snapshots.
             self.router.ingest_device_telemetry(snaps)
-            # Apply *all* snapshots so each axis gets updated.
             for snap in snaps:
                 apply_measured_snapshot(state, snap)
             self.log.debug(
@@ -85,23 +82,16 @@ class DeviceStepper:
                 snaps[-1].fault,
                 snaps[-1].tick,
             )
-        else:
-            self.log.debug("rx dev telem: 0")
+            return
+        self.log.debug("rx dev telem: 0")
 
-        # Aggregate core mode (single source of truth for birds-eye).
+    def _apply_mode(self, state: MachineState, dt: float) -> None:
         try:
             self.apply_mode_aggregation(state, router=self.router, axis_ids=self.axis_ids, dt=dt)
         except Exception:
             self.log.exception("core mode aggregation failed")
 
-        self.log.debug(
-            "tx cmd frame: tick=%s estop=%s fault=%s core_mode=%s",
-            cmd_frame.tick,
-            cmd_frame.estop,
-            cmd_frame.fault,
-            cmd_frame.core_mode,
-        )
-
+    def _emit_heartbeat(self, state: MachineState) -> None:
         now = time.monotonic()
         if now - self.t_last_report >= 1.0:
             log_periodic_heartbeat(
@@ -113,6 +103,19 @@ class DeviceStepper:
                 last_seen=self.last_seen,
             )
             self.t_last_report = now
+
+    def __call__(self, state: MachineState, cmd_frame: Any, dt: float) -> None:
+        self._publish_commands(state, cmd_frame)
+        self._ingest_device_telemetry(state)
+        self._apply_mode(state, dt)
+        self.log.debug(
+            "tx cmd frame: tick=%s estop=%s fault=%s core_mode=%s",
+            cmd_frame.tick,
+            cmd_frame.estop,
+            cmd_frame.fault,
+            cmd_frame.core_mode,
+        )
+        self._emit_heartbeat(state)
 
 
 @dataclass
@@ -134,8 +137,7 @@ class SnapshotHandler:
     lt_last_ui_log_s_by_axis: dict[str, float] = field(default_factory=dict)
     context_seq: int = 0
 
-    def __call__(self, snap: TelemetrySnapshot) -> None:
-        # Log key state changes once (helps a lot during field debugging).
+    def _log_state_changes(self, snap: TelemetrySnapshot) -> None:
         try:
             mode_v = str(getattr(snap, "core_mode", ""))
             estop_v = bool(getattr(snap, "estop", False))
@@ -154,11 +156,9 @@ class SnapshotHandler:
                     fault_v,
                     rig_v,
                 )
-
             claims = tuple(sorted(dict(getattr(self.state, "axis_claims", {}) or {}).items()))
             if self.state_ch.changed("claims", claims):
                 self.log.info("claims: %s", dict(claims))
-
             pe = bool(getattr(self.state, "param_edit_active", False))
             pg = str(getattr(self.state, "param_edit_group", ""))
             if self.state_ch.changed("param_edit", (pe, pg)):
@@ -166,16 +166,15 @@ class SnapshotHandler:
         except Exception:
             pass
 
+    def _publish_ui_and_c2(self, snap: TelemetrySnapshot) -> None:
         if not self.args.ui_telem_disable:
-            # One HiP per axis: send a *sliced* snapshot to each UI target.
             self.router.publish_ui_snapshot(snap)
-
         if self.c2_fanout is not None:
             self.c2_fanout.publish_telemetry(snap)
             self.stats["c2_telem_out"] += max(1, len(self.c2_telem_outs))
             self.last_seen["c2_telem_ts"] = time.monotonic()
 
-        # LIFETICK trace: Core -> HiP (TelemetrySnapshot.axes[axis].device_tick)
+    def _log_lifetick(self, snap: TelemetrySnapshot) -> None:
         for axis_id in self.axis_ids:
             try:
                 ax = dict(getattr(snap, "axes", {}) or {}).get(axis_id)
@@ -190,21 +189,20 @@ class SnapshotHandler:
             except Exception:
                 pass
 
-        if not self.args.ui_telem_disable:
-            ui_mode = (
-                str(getattr(self.args, "ui_telem_mode", "per_axis") or "per_axis").strip().lower()
-            )
-            n_ui = (
-                len(getattr(self.router, "ui_telem_fanout", []) or [])
-                if ui_mode == "fanout"
-                else len(self.axis_ids)
-            )
-            self.stats["ui_telem_out"] += max(1, n_ui)
-            self.last_seen["ui_telem_ts"] = time.monotonic()
-            self.log.debug(
-                "tx ui telem: tick=%s estop=%s fault=%s", snap.tick, snap.estop, snap.fault
-            )
+    def _update_ui_stats(self, snap: TelemetrySnapshot) -> None:
+        if self.args.ui_telem_disable:
+            return
+        ui_mode = str(getattr(self.args, "ui_telem_mode", "per_axis") or "per_axis").strip().lower()
+        n_ui = (
+            len(getattr(self.router, "ui_telem_fanout", []) or [])
+            if ui_mode == "fanout"
+            else len(self.axis_ids)
+        )
+        self.stats["ui_telem_out"] += max(1, n_ui)
+        self.last_seen["ui_telem_ts"] = time.monotonic()
+        self.log.debug("tx ui telem: tick=%s estop=%s fault=%s", snap.tick, snap.estop, snap.fault)
 
+    def _publish_control_context(self) -> None:
         self.context_seq += 1
         mode = str(getattr(self.state, "control_mode", "") or "independent_axes")
         input_mapping = {
@@ -225,7 +223,7 @@ class SnapshotHandler:
             )
         )
 
-        # Structured heartbeat for supervisor birds-eye (PLC telemetry remains unchanged).
+    def _emit_birds_eye(self, snap: TelemetrySnapshot) -> None:
         emit_birds_eye_status(
             status=self.status,
             snap=snap,
@@ -235,3 +233,11 @@ class SnapshotHandler:
             last_intents_meta=self.last_intents_meta,
             last_seen=self.last_seen,
         )
+
+    def __call__(self, snap: TelemetrySnapshot) -> None:
+        self._log_state_changes(snap)
+        self._publish_ui_and_c2(snap)
+        self._log_lifetick(snap)
+        self._update_ui_stats(snap)
+        self._publish_control_context()
+        self._emit_birds_eye(snap)
