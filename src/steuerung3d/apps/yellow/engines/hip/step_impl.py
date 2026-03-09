@@ -6,7 +6,7 @@ No semantic changes intended; this is a mechanical extraction from `engine.py`.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Mapping
 
 if TYPE_CHECKING:
     # Only needed for type checking; avoids runtime import cycles.
@@ -21,23 +21,24 @@ from steuerung3d.core.intents import (
     RequestResync,
 )
 from steuerung3d.core.joy_state import JoyState
+from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
 
 from .intent_policy import gate_motion_intents
-from .param_ui import run_param_txn
+from .param_ui import ParamTxnResult, run_param_txn
 from .step_context import build_step_context
 from .step_phase_motion import compute_motion_phase, project_local_joy
 from .step_phase_presentation import HipPresentationPhase, compute_presentation_phase
-from .types import HipStepInputs, HipStepResult
+from .types import HipAttachCombo, HipPresentationData, HipStepInputs, HipStepResult, HipUiInputs
 
 
 @dataclass(frozen=True)
 class _StepState:
-    snap: object
-    ui: object
+    snap: TelemetrySnapshot
+    ui: HipUiInputs
     hip_id: str
     axis_ids: list[str]
-    axes: object
-    attach_combo: object
+    axes: Mapping[str, AxisTelemetry]
+    attach_combo: HipAttachCombo
     selected_axis: str
     fixed_applied: bool
     intents: list[Intent]
@@ -49,7 +50,7 @@ class _StepState:
 
 @dataclass(frozen=True)
 class _PreMotionResult:
-    param_result: object
+    param_result: ParamTxnResult
     presentation_phase: HipPresentationPhase
     joy_state: JoyState
 
@@ -59,7 +60,7 @@ class _CommandPhaseResult:
     intents: list[Intent]
     resync_ignored: bool
     resync_reason: str
-    presentation: object
+    presentation: HipPresentationData
     echo_map: dict[str, int]
 
 
@@ -146,7 +147,7 @@ def _append_reset_and_resync_intents(
     axis_id: str,
     hip_id: str,
     presentation_phase: HipPresentationPhase,
-    ui: object,
+    ui: HipUiInputs,
     intents: list[Intent],
 ) -> tuple[bool, str]:
     if ui.estop_reset_clicked and axis_id:
@@ -242,7 +243,7 @@ def _apply_post_step_state(
 
 
 def _build_step_result(
-    *, command_phase: _CommandPhaseResult, param_result: object
+    *, command_phase: _CommandPhaseResult, param_result: ParamTxnResult
 ) -> HipStepResult:
     return HipStepResult(
         view_model=None,

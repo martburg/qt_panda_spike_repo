@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
+from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
 from steuerung3d.core.telemetry_axis_view import axis_scoped_snapshot
 from steuerung3d.protocol.estop_bits import decode_estop_word
 
@@ -19,6 +20,18 @@ from .presentation import (
     read_axis_pos_vel,
 )
 from .viewmodel import HipDriveStatusState
+
+
+class _HipPresentationState(Protocol):
+    prev_device_tick: int | None
+
+
+class _HipPresentationEngine(Protocol):
+    state: _HipPresentationState
+
+    def _update_taster_edge(self, axis_id: str, taster: bool, now_s: float) -> None: ...
+    def _within_brake_grace(self, axis_id: str, now_s: float, grace_s: float) -> bool: ...
+    def compute_attach_state(self, inputs: Any) -> Any: ...
 
 
 @dataclass(frozen=True)
@@ -52,8 +65,8 @@ class DriveAndReadoutFacts:
 
 
 def build_snap_context(
-    *, attached: bool, axis_id: str, snap: object
-) -> tuple[str, object, dict[str, Any], dict[str, Any], str]:
+    *, attached: bool, axis_id: str, snap: TelemetrySnapshot
+) -> tuple[str, TelemetrySnapshot, dict[str, float], dict[str, AxisTelemetry], str]:
     axes = getattr(snap, "axes", {}) or {}
     mode_now = str(getattr(snap, "core_mode", "") or "")
     presentation_axis_id = axis_id if attached else ""
@@ -63,7 +76,12 @@ def build_snap_context(
 
 
 def derive_estop_facts(
-    *, engine: object, axis_id_for_estate: str, now_ns: int, snap_view: object, update_state: bool
+    *,
+    engine: _HipPresentationEngine,
+    axis_id_for_estate: str,
+    now_ns: int,
+    snap_view: TelemetrySnapshot,
+    update_state: bool,
 ) -> EstopFacts:
     estop_word = int(parse_estop_word_from_snapshot(snap_view))
     logical = decode_estop_word(estop_word)
@@ -94,9 +112,9 @@ def derive_transport_facts(
     last_rx_ns: int | None,
     now_ns: int,
     stale_after_ms: int,
-    snap: object,
-    snap_view: object,
-    state: object,
+    snap: TelemetrySnapshot,
+    snap_view: TelemetrySnapshot,
+    state: _HipPresentationState,
 ) -> TransportFacts:
     prev_device_tick = getattr(state, "prev_device_tick", None)
     tick_text, new_prev = compute_tick_text(
@@ -122,12 +140,12 @@ def derive_drive_and_readout_facts(
     *,
     attached: bool,
     axis_id: str,
-    axes: dict[str, Any],
+    axes: dict[str, AxisTelemetry],
     estate: str,
     mode_now: str,
-    params: dict[str, Any],
-    snap: object,
-    snap_view: object,
+    params: dict[str, float],
+    snap: TelemetrySnapshot,
+    snap_view: TelemetrySnapshot,
 ) -> DriveAndReadoutFacts:
     main_text, slave_text = compute_drive_status_texts(snap=snap, axis_id=axis_id)
     drive_status_summary = f"{main_text}|{slave_text}" if (main_text or slave_text) else ""
@@ -165,7 +183,12 @@ def derive_drive_and_readout_facts(
 
 
 def derive_attach_state(
-    *, engine: object, attached: bool, mode_now: str, estate: str, param_result: object | None
+    *,
+    engine: _HipPresentationEngine,
+    attached: bool,
+    mode_now: str,
+    estate: str,
+    param_result: object | None,
 ) -> tuple[Any, Any]:
     from .types import HipAttachInputs
 

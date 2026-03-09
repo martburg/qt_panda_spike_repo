@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Callable, Iterable
 
 from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS
@@ -36,6 +36,9 @@ DYNAMIC_EXCLUDE = {
 
 KEY1_IGNORES = {"network", *TWINSAFE_KEYS}
 KEY2_IGNORES = {"network", "guider", "dcs_ok", *TWINSAFE_KEYS}
+
+
+BlockedReasonFactory = Callable[[str, str | None, str | None], object]
 
 
 @dataclass(frozen=True)
@@ -110,7 +113,7 @@ def effective_estops(
 
 
 def scan_axes(
-    *, axes: Iterable[object], stale_after_ms: int, make_blocked_reason: object
+    *, axes: Iterable[object], stale_after_ms: int, make_blocked_reason: BlockedReasonFactory
 ) -> _AxisScan:
     blocked_by: list[object] = []
     axis_gate: dict[str, dict[str, object]] = {}
@@ -177,7 +180,7 @@ def decision_from_eligible_axes(
     joy_deadman: bool,
     joy_select_hip: bool,
     joy_soll_speed: float,
-    make_blocked_reason: object,
+    make_blocked_reason: BlockedReasonFactory,
 ) -> _AggregateDecision:
     if not eligible_axes:
         blocked_by.append(make_blocked_reason("NO_KEY0_AXES", None, None))

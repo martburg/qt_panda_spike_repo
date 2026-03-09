@@ -1,26 +1,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
+from steuerung3d.core.telemetry import TelemetrySnapshot
+
+from .param_ui import ParamTxnResult
 from .step_phase_presentation_build import build_presentation
 from .step_phase_presentation_facts import (
     EstopFacts,
+    _HipPresentationEngine,
     build_snap_context,
     derive_attach_state,
     derive_drive_and_readout_facts,
     derive_estop_facts,
     derive_transport_facts,
 )
-from .types import HipPresentationData
+from .types import HipAttachCombo, HipPresentationData
 
 
 @dataclass(frozen=True)
 class HipPresentationPhase:
     presentation: HipPresentationData
-    snap_view: object
-    params: dict[str, Any]
-    logical: dict[str, Any]
+    snap_view: TelemetrySnapshot
+    params: dict[str, float]
+    logical: dict[str, bool]
     estop_word: int
     estate: str
     estop: bool
@@ -35,8 +38,8 @@ class HipPresentationPhase:
 def _build_phase_result(
     *,
     presentation: HipPresentationData,
-    snap_view: object,
-    params: dict[str, Any],
+    snap_view: TelemetrySnapshot,
+    params: dict[str, float],
     estop_facts: EstopFacts,
     mode_now: str,
     estop: bool,
@@ -61,16 +64,16 @@ def _build_phase_result(
 
 def compute_presentation_phase(
     *,
-    engine: object,
-    attach_combo: object,
+    engine: _HipPresentationEngine,
+    attach_combo: HipAttachCombo,
     attached: bool,
     axis_id: str,
     axis_ids: list[str],
-    snap: object,
+    snap: TelemetrySnapshot,
     now_ns: int,
     last_rx_ns: int | None,
     stale_after_ms: int,
-    param_result: object | None = None,
+    param_result: ParamTxnResult | None = None,
     update_state: bool = True,
 ) -> HipPresentationPhase:
     mode_now, snap_view, params, axes, _presentation_axis_id = build_snap_context(
