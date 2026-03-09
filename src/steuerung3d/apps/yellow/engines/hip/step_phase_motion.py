@@ -83,6 +83,92 @@ def _resolve_axis_context(
     )
 
 
+@dataclass(frozen=True)
+class _MotionDecision:
+    jog_allowed: bool
+    stop_reason: str
+    speed: float
+
+
+def _compute_motion_decision(
+    *,
+    axis_ctx: _AxisContext,
+    mode_now: str,
+    estop: bool,
+    fault: bool,
+    taster: bool,
+    armed_ok: bool,
+    ready_ok: bool,
+    joy: HipJoyProjectionState,
+) -> _MotionDecision:
+    speed = float(joy.joy_soll_speed)
+    speed_active = abs(speed) > 1e-3
+    jog_allowed = _compute_jog_allowed(
+        axis_ctx=axis_ctx,
+        mode_now=mode_now,
+        estop=estop,
+        fault=fault,
+        taster=taster,
+        armed_ok=armed_ok,
+        ready_ok=ready_ok,
+        joy=joy,
+        speed_active=speed_active,
+    )
+    stop_reason = ""
+    if not jog_allowed:
+        stop_reason = _compute_jog_block_reason(
+            axis_ctx=axis_ctx,
+            mode_now=mode_now,
+            estop=estop,
+            fault=fault,
+            taster=taster,
+            armed_ok=armed_ok,
+            ready_ok=ready_ok,
+            joy=joy,
+            speed_active=speed_active,
+        )
+    return _MotionDecision(
+        jog_allowed=bool(jog_allowed), stop_reason=str(stop_reason or ""), speed=float(speed)
+    )
+
+
+def _apply_axis_change_behavior(
+    *,
+    intents: list[Intent],
+    state: object,
+    hip_id: str,
+    prev_jog_active: bool,
+    prev_jog_axis: str,
+    axis_ctx: _AxisContext,
+) -> None:
+    if prev_jog_active:
+        _append_axis_change_stop_intent(
+            intents=intents,
+            state=state,
+            prev_jog_axis=prev_jog_axis,
+            motion_axis_id=axis_ctx.motion_axis_id,
+            hip_id=hip_id,
+        )
+
+
+def _build_motion_result(
+    *,
+    intents: list[Intent],
+    joy: HipJoyProjectionState,
+    decision: _MotionDecision,
+    jog_rate: float,
+    motion_axis_id: str,
+) -> HipMotionPhaseResult:
+    return HipMotionPhaseResult(
+        intents=intents,
+        joy=joy,
+        jog_allowed=bool(decision.jog_allowed),
+        jog_rate=float(jog_rate),
+        motion_axis_id=str(motion_axis_id or ""),
+        stop_reason=str(decision.stop_reason or ""),
+    )
+
+
 def _compute_jog_allowed(
     *,
     axis_ctx: _AxisContext,
@@ -291,13 +377,11 @@ def compute_motion_phase(
     prev_jog_active = bool(getattr(state, "joy_jog_active", False))
     prev_jog_axis = str(getattr(state, "joy_jog_axis", "") or "")
 
-    speed = float(joy.joy_soll_speed)
-    speed_active = abs(speed) > 1e-3
     armed_ok = str(estate or "").upper() in ("ARMED", "READY")
     ready_ok = bool(logical.get("ready", False))
     taster = bool(logical.get("taster", False))
 
-    jog_allowed = _compute_jog_allowed(
+    decision = _compute_motion_decision(
         axis_ctx=axis_ctx,
         mode_now=mode_now,
         estop=estop,
@@ -306,28 +390,26 @@ def compute_motion_phase(
         armed_ok=armed_ok,
         ready_ok=ready_ok,
         joy=joy,
-        speed_active=speed_active,
     )
 
     intents: list[Intent] = []
-    if prev_jog_active:
-        _append_axis_change_stop_intent(
-            intents=intents,
-            state=state,
-            prev_jog_axis=prev_jog_axis,
-            motion_axis_id=axis_ctx.motion_axis_id,
-            hip_id=hip_id,
-        )
+    _apply_axis_change_behavior(
+        intents=intents,
+        state=state,
+        hip_id=hip_id,
+        prev_jog_active=prev_jog_active,
+        prev_jog_axis=prev_jog_axis,
+        axis_ctx=axis_ctx,
+    )
 
     jog_rate = 0.0
-    stop_reason = ""
-    if jog_allowed:
+    if decision.jog_allowed:
         jog_rate = _build_jog_active_intents(
             intents=intents,
             state=state,
             hip_id=hip_id,
             motion_axis_id=axis_ctx.motion_axis_id,
-            speed=speed,
+            speed=decision.speed,
             params=params,
         )
     else:
@@ -341,32 +423,20 @@ def compute_motion_phase(
             display_axis_id=display_axis_id,
             joy=joy,
         )
-        stop_reason = _compute_jog_block_reason(
-            axis_ctx=axis_ctx,
-            mode_now=mode_now,
-            estop=estop,
-            fault=fault,
-            taster=taster,
-            armed_ok=armed_ok,
-            ready_ok=ready_ok,
-            joy=joy,
-            speed_active=speed_active,
-        )
 
     _emit_motion_transition_logs(
         prev_jog_active=prev_jog_active,
         prev_jog_axis=prev_jog_axis,
-        jog_allowed=jog_allowed,
+        jog_allowed=decision.jog_allowed,
         motion_axis_id=axis_ctx.motion_axis_id,
-        stop_reason=stop_reason,
+        stop_reason=decision.stop_reason,
         jog_rate=jog_rate,
     )
 
-    return HipMotionPhaseResult(
+    return _build_motion_result(
         intents=intents,
         joy=joy,
-        jog_allowed=bool(jog_allowed),
-        jog_rate=float(jog_rate),
-        motion_axis_id=str(axis_ctx.motion_axis_id or ""),
-        stop_reason=str(stop_reason or ""),
+        decision=decision,
+        jog_rate=jog_rate,
+        motion_axis_id=axis_ctx.motion_axis_id,
     )

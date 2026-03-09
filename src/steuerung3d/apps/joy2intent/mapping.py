@@ -16,31 +16,31 @@ JoyRig(winch_ids=[...]); we accept both for backward compatibility.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Protocol, Sequence, Set
+from typing import Dict, List, Protocol, Sequence, Set
 
 from steuerung3d.core.control_context import ControlContext
-from steuerung3d.core.intents import (
-    ClaimAxis,
-    EnableAxis,
-    JogWinch,
-    JoyStateUpdate,
-    LocalAxisManualRequest,
+
+# Compatibility re-exports for older tests/imports.
+from .mapping_helpers import (
+    build_active_enable_intents,
+    build_joy_state_update,
+    build_motion_intents,
+    build_release_intents,
+    clear_active_selection_state,
+    collect_input_facts,
+    compute_manual_rate,
+    previous_activity,
+    update_state_active_selection,
 )
-from steuerung3d.core.joy_state import clamp_soll_speed
 
 
 @dataclass(frozen=True)
 class JoyBindings:
-    # Mapping from logical axis name -> index in rc.axes
     axes: Dict[str, int]
-    # Mapping from logical button name -> button index or alias list
     buttons: Dict[str, int | list[int]]
-    # Required (non-default) settings must appear before defaulted fields (dataclasses rule)
     deadzone: float
     expo: float
-    # Button indices used to select winches by position (0..N-1)
     select_buttons: List[int] = field(default_factory=list)
-    # Optional axis inversion by logical axis name
     invert: Dict[str, bool] = field(default_factory=dict)
 
 
@@ -76,106 +76,13 @@ class JoyRig:
 
 
 class JoyStateLike(Protocol):
-    """Structural contract for joy2intent policy state.
-
-    There are (at least) two JoyState dataclasses in this repo:
-      - steuerung3d.apps.joy2intent.state.JoyState (policy state used by app/tests)
-      - (legacy) a small JoyState shape used in earlier mapping iterations
-
-    Runtime code uses getattr to stay compatible; this Protocol gives Pyright a
-    stable surface so tests can pass their JoyState without nominal-type clashes.
-    """
-
     prev_deadman: bool
     prev_active_winch_idxs: Set[int]
 
 
 class JoyReportLike(Protocol):
-    """Structural contract for raw controller input.
-
-    Tests pass RawControls (axes: list[float], buttons: list[int]).
-    Some call sites may pass a JoyReport-like object with .pressed.
-    """
-
     axes: Sequence[float]
     buttons: Sequence[int]
-
-
-def _apply_deadzone_and_expo(x: float, deadzone: float, expo: float) -> float:
-    """Map x in [-1,1] through deadzone+expo curve."""
-    if deadzone < 0:
-        deadzone = 0.0
-    if deadzone > 0.95:
-        deadzone = 0.95
-
-    ax = abs(x)
-    if ax <= deadzone:
-        return 0.0
-
-    # Normalize remaining range to [0,1]
-    y = (ax - deadzone) / (1.0 - deadzone)
-    if expo <= 0:
-        expo = 1.0
-    y = y**expo
-    return y if x >= 0 else -y
-
-
-def _apply_deadzone_only(x: float, deadzone: float) -> float:
-    if deadzone < 0:
-        deadzone = 0.0
-    if deadzone > 0.95:
-        deadzone = 0.95
-    if abs(x) <= deadzone:
-        return 0.0
-    return x
-
-
-def _pressed_buttons(rc: Any) -> Set[int]:
-    """Return set of pressed button indices for different rc types."""
-    if hasattr(rc, "pressed"):
-        try:
-            return set(rc.pressed)
-        except Exception:
-            return set()
-    if hasattr(rc, "buttons"):
-        try:
-            return {i for i, v in enumerate(rc.buttons) if v}
-        except Exception:
-            return set()
-    return set()
-
-
-def _button_aliases(value: int | list[int] | None) -> set[int]:
-    if value is None:
-        return set()
-    if isinstance(value, int):
-        return {value}
-    out: set[int] = set()
-    if isinstance(value, list):
-        for item in value:
-            if isinstance(item, int):
-                out.add(item)
-    return out
-
-
-def _select_aliases(entry: int | list[int]) -> set[int]:
-    if isinstance(entry, int):
-        return {entry}
-    out: set[int] = set()
-    if isinstance(entry, list):
-        for item in entry:
-            if isinstance(item, int):
-                out.add(item)
-    return out
-
-
-def _axes(rc: Any) -> List[float]:
-    if hasattr(rc, "axes"):
-        try:
-            return list(rc.axes)
-        except Exception:
-            return []
-    return []
 
 
 def synthesize_intents(
@@ -184,159 +91,63 @@ def synthesize_intents(
     bind: JoyBindings,
     rig: JoyRig,
     lim: JoyLimits,
-    # Must match the claim owner (HiP) to avoid the core treating motion intents as stale.
     hip_id: str = "hip",
     control_context: ControlContext | None = None,
 ) -> List[object]:
-    """Convert a joystick report into a list of core intents.
-
-    This function is designed to satisfy tests in tests/test_joy2intent_gamepad.py.
-    """
+    """Convert a joystick report into a list of core intents."""
     intents: List[object] = []
-
-    deadman_btn = _button_aliases(bind.buttons.get("deadman"))
-    fine_btn = _button_aliases(bind.buttons.get("fine"))
-    pressed = _pressed_buttons(rc)
-    axes = _axes(rc)
-
-    deadman = bool(deadman_btn & pressed)
-    fine = bool(fine_btn & pressed)
-
-    soll_speed = 0.0
-    soll_axis = bind.axes.get("soll_speed")
-    if soll_axis is not None and 0 <= soll_axis < len(axes):
-        soll_speed = float(axes[soll_axis])
-        if bind.invert.get("soll_speed", False):
-            soll_speed = -soll_speed
-        soll_speed = _apply_deadzone_only(soll_speed, bind.deadzone)
-    soll_speed = clamp_soll_speed(soll_speed)
-
     rig_ids = rig.ordered_winch_ids()
+    facts = collect_input_facts(rc=rc, bind=bind, rig_ids=rig_ids, control_context=control_context)
 
-    # Determine which winches are selected (by select_buttons index).
-    selected: List[str] = []
-    for i, entry in enumerate(bind.select_buttons or []):
-        aliases = _select_aliases(entry)
-        if aliases & pressed and i < len(rig_ids):
-            selected.append(rig_ids[i])
+    intents.append(build_joy_state_update(facts))
 
-    selected_set = set(selected)
-
-    intents.append(
-        JoyStateUpdate(
-            deadman=bool(deadman),
-            select_hip=bool(selected_set),
-            soll_speed=float(soll_speed),
-            selected_axes=tuple(sorted(selected_set)),
-        )
-    )
-
-    use_contextual_local_manual = bool(
-        control_context is not None
-        and str(getattr(control_context, "mode", "")) == "independent_axes"
-        and str(getattr(control_context, "input_mapping", "")) == "axis_rate"
-    )
-    motion_enabled = bool(getattr(control_context, "motion_enabled", True))
-
-    # Deadman released: disable any previously enabled winches.
-    if not deadman:
-        prev_deadman = bool(getattr(st, "prev_deadman", getattr(st, "deadman_prev", False)))
-        prev_active = set(
-            getattr(st, "prev_active_winch_idxs", getattr(st, "enabled_winch_ids", set()))
-        )
-
-        active_ids: Set[str] = set()
-        if prev_active and all(isinstance(x, int) for x in prev_active):
-            active_ids = {rig_ids[i] for i in prev_active if 0 <= i < len(rig_ids)}
-        else:
-            active_ids = {str(x) for x in prev_active}
-
-        if prev_deadman and active_ids:
-            if use_contextual_local_manual:
-                intents.append(
-                    LocalAxisManualRequest(
-                        axis_ids=tuple(sorted(active_ids)), enable=False, rate=0.0
-                    )
+    if not facts.deadman:
+        prev = previous_activity(st=st, rig_ids=rig_ids)
+        if prev.prev_deadman and prev.active_ids:
+            intents.extend(
+                build_release_intents(
+                    active_ids=prev.active_ids,
+                    hip_id=hip_id,
+                    use_contextual_local_manual=facts.use_contextual_local_manual,
                 )
-            else:
-                for wid in sorted(active_ids):
-                    intents.append(EnableAxis(axis_id=wid, enable=False, hip_id=hip_id))
-        if hasattr(st, "prev_active_winch_idxs"):
-            st.prev_active_winch_idxs.clear()
-        elif hasattr(st, "enabled_winch_ids"):
-            st.enabled_winch_ids.clear()
-        if hasattr(st, "prev_deadman"):
-            st.prev_deadman = False
-        else:
-            st.deadman_prev = False
+            )
+        clear_active_selection_state(st)
         return intents
 
-    if use_contextual_local_manual and not motion_enabled:
-        if hasattr(st, "prev_active_winch_idxs"):
-            st.prev_active_winch_idxs = {rig_ids.index(w) for w in selected_set if w in rig_ids}
-        elif hasattr(st, "enabled_winch_ids"):
-            st.enabled_winch_ids = set(selected_set)
-        if hasattr(st, "prev_deadman"):
-            st.prev_deadman = True
-        else:
-            st.deadman_prev = True
+    if facts.use_contextual_local_manual and not facts.motion_enabled:
+        update_state_active_selection(
+            st=st,
+            selected_set=facts.selected_set,
+            rig_ids=rig_ids,
+            deadman=True,
+        )
         return intents
 
-    # Deadman pressed: enable selected winches and issue jogs.
-    current_active_raw = set(
-        getattr(st, "prev_active_winch_idxs", getattr(st, "enabled_winch_ids", set()))
-    )
-    if current_active_raw and all(isinstance(x, int) for x in current_active_raw):
-        current_active = {rig_ids[i] for i in current_active_raw if 0 <= i < len(rig_ids)}
-    else:
-        current_active = {str(x) for x in current_active_raw}
-    # Important:
-    # - ClaimAxis is only needed on the transition (avoid spam).
-    # - EnableAxis(True) is safe/idempotent, and we intentionally *repeat it*
-    #   while deadman is held.
-    #
-    # Rationale: the core may temporarily be in FAULT/IDLE while deadman+select
-    # are already pressed (e.g. fault/ESTOP clearing and legacy READY coming in).
-    # If EnableAxis(True) is only emitted on the first transition, it can be
-    # dropped by core safety gating and never re-sent, leaving cmd_en=0 even
-    # though JogWinch continues to stream.
-    if not use_contextual_local_manual:
-        for wid in sorted(selected_set):
-            if wid not in current_active:
-                intents.append(ClaimAxis(axis_id=wid, hip_id=hip_id))
-            intents.append(EnableAxis(axis_id=wid, enable=True, hip_id=hip_id))
-
-    # Compute jog rate
-    axis_idx = bind.axes.get("manual_jog")
-    raw = 0.0
-    # axes already fetched above
-    if axis_idx is not None and 0 <= axis_idx < len(axes):
-        raw = float(axes[axis_idx])
-    if bind.invert.get("manual_jog", False):
-        raw = -raw
-
-    shaped = _apply_deadzone_and_expo(raw, bind.deadzone, bind.expo)
-    rate = shaped * lim.max_speed()
-    if fine:
-        rate *= float(lim.fine_scale)
-
-    if use_contextual_local_manual:
-        intents.append(
-            LocalAxisManualRequest(
-                axis_ids=tuple(sorted(selected_set)), enable=bool(deadman), rate=float(rate)
+    prev = previous_activity(st=st, rig_ids=rig_ids)
+    current_active = prev.active_ids
+    if not facts.use_contextual_local_manual:
+        intents.extend(
+            build_active_enable_intents(
+                selected_set=facts.selected_set,
+                current_active=current_active,
+                hip_id=hip_id,
             )
         )
-    elif rate != 0.0:
-        for wid in sorted(selected_set):
-            intents.append(JogWinch(winch_id=wid, rate=rate, hip_id=hip_id))
-    if hasattr(st, "prev_active_winch_idxs"):
-        # tests expect indices; derive from rig order
-        st.prev_active_winch_idxs = {rig_ids.index(w) for w in selected_set if w in rig_ids}
-    elif hasattr(st, "enabled_winch_ids"):
-        st.enabled_winch_ids = set(selected_set)
 
-    if hasattr(st, "prev_deadman"):
-        st.prev_deadman = True
-    else:
-        st.deadman_prev = True
+    rate = compute_manual_rate(axes=facts.axes, bind=bind, lim=lim, fine=facts.fine)
+    intents.extend(
+        build_motion_intents(
+            selected_set=facts.selected_set,
+            hip_id=hip_id,
+            use_contextual_local_manual=facts.use_contextual_local_manual,
+            deadman=facts.deadman,
+            rate=rate,
+        )
+    )
+    update_state_active_selection(
+        st=st,
+        selected_set=facts.selected_set,
+        rig_ids=rig_ids,
+        deadman=True,
+    )
     return intents

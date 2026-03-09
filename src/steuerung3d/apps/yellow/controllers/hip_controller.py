@@ -171,6 +171,102 @@ class HiPController:
             soft_errors=dict(getattr(self, "_soft_errors", {}) or {}),
         )
 
+    def _read_ui_inputs(self) -> HipUiInputs:
+        ui_inputs = HipUiInputs(
+            axis_selected="",
+            axis_selection_changed=False,
+            estop_reset_clicked=False,
+            resync_clicked=False,
+            param_actions=[],
+            param_values={},
+        )
+        if getattr(self, "_binder", None) is not None:
+            try:
+                ui_inputs = self._binder.read_inputs()
+            except Exception:
+                self._soft_errors["binder.read_inputs"] = (
+                    int(self._soft_errors.get("binder.read_inputs", 0)) + 1
+                )
+        return ui_inputs
+
+    def _log_runtime_result(self, *, ui_inputs: HipUiInputs, rt_result: object) -> None:
+        log.info(
+            "hi_p: ui axis=%r changed=%s attached=%s intents=%d",
+            ui_inputs.axis_selected,
+            ui_inputs.axis_selection_changed,
+            getattr(rt_result.view_model.attach_state, "attached", None)
+            if rt_result.view_model
+            else None,
+            len(rt_result.intents) if hasattr(rt_result, "intents") else -1,
+        )
+
+        vm = rt_result.view_model
+        if vm is not None and not getattr(self, "_dbg_vm_keys_once", False):
+            self._dbg_vm_keys_once = True
+            log.info("hi_p: dbg vm_type=%s keys=%s", type(vm).__name__, sorted(vars(vm).keys()))
+
+        now_s = time.time()
+        if now_s >= getattr(self, "_dbg_next_s", 0.0):
+            self._dbg_next_s = now_s + 1.0
+            ast = getattr(vm, "attach_state", None)
+            log.info(
+                "hi_p: dbg axis=%r attached=%s modal_locked=%s tabs_enabled=%s lifetick_age=%r drive_main=%r pos=%r vel=%r",
+                ui_inputs.axis_selected,
+                getattr(ast, "attached", None),
+                getattr(ui_inputs, "modal_locked", None),
+                getattr(ast, "tabs_enabled", None),
+                getattr(vm, "lifetick_age", None),
+                getattr(vm, "main_drive_status_text", None),
+                getattr(vm, "pos_text", None),
+                getattr(vm, "vel_text", None),
+            )
+
+    def _apply_runtime_result(self, *, rt_result: object) -> bool:
+        if rt_result.apply_startup_state:
+            if getattr(self, "_binder", None) is not None:
+                try:
+                    self._binder.apply_startup_state()
+                except Exception:
+                    self._soft_errors["binder.apply_startup_state"] = (
+                        int(self._soft_errors.get("binder.apply_startup_state", 0)) + 1
+                    )
+            return False
+
+        if rt_result.view_model is None:
+            return False
+
+        if getattr(self, "_binder", None) is not None:
+            try:
+                self._binder.apply(rt_result.view_model)
+            except Exception:
+                self._soft_errors["binder.apply"] = (
+                    int(self._soft_errors.get("binder.apply", 0)) + 1
+                )
+                now_s = time.time()
+                last = getattr(self, "_binder_apply_err_last_s", 0.0)
+                if now_s - last > 1.0:
+                    self._binder_apply_err_last_s = now_s
+                    log.exception("hi_p: binder.apply crashed (continuing).")
+        return True
+
+    def _emit_runtime_outputs(self, *, rt_result: object) -> None:
+        if rt_result.snap is not None:
+            estate = ""
+            try:
+                estate = str(
+                    getattr(getattr(rt_result.view_model, "banner", None), "estate", "") or ""
+                )
+            except Exception:
+                estate = ""
+            self._emit_birdseye_motion(
+                snap=rt_result.snap,
+                intents=list(rt_result.intents or []),
+                estate=estate,
+            )
+
+        for intent in list(rt_result.intents or []):
+            self._publish_intent(intent)
+
     # -------------------------------------------------------------------------
     # Polling
     # -------------------------------------------------------------------------
@@ -185,110 +281,18 @@ class HiPController:
                 self._wd.mark("rx")
                 now_ns = time.monotonic_ns()
 
-                ui_inputs = HipUiInputs(
-                    axis_selected="",
-                    axis_selection_changed=False,
-                    estop_reset_clicked=False,
-                    resync_clicked=False,
-                    param_actions=[],
-                    param_values={},
-                )
-                if getattr(self, "_binder", None) is not None:
-                    try:
-                        ui_inputs = self._binder.read_inputs()
-                    except Exception:
-                        self._soft_errors["binder.read_inputs"] = (
-                            int(self._soft_errors.get("binder.read_inputs", 0)) + 1
-                        )
-
+                ui_inputs = self._read_ui_inputs()
                 rt_inputs = self._hip_runtime.collect_inputs(
                     snaps=snaps, now_ns=now_ns, ui=ui_inputs
                 )
                 rt_result = self._hip_runtime.tick(inputs=rt_inputs)
 
-                log.info(
-                    "hi_p: ui axis=%r changed=%s attached=%s intents=%d",
-                    ui_inputs.axis_selected,
-                    ui_inputs.axis_selection_changed,
-                    getattr(rt_result.view_model.attach_state, "attached", None)
-                    if rt_result.view_model
-                    else None,
-                    len(rt_result.intents) if hasattr(rt_result, "intents") else -1,
-                )
-
-                vm = rt_result.view_model
-                if vm is not None and not getattr(self, "_dbg_vm_keys_once", False):
-                    self._dbg_vm_keys_once = True
-                    log.info(
-                        "hi_p: dbg vm_type=%s keys=%s", type(vm).__name__, sorted(vars(vm).keys())
-                    )
-
-                now_s = time.time()
-                if now_s >= getattr(self, "_dbg_next_s", 0.0):
-                    self._dbg_next_s = now_s + 1.0
-
-                    vm = rt_result.view_model
-                    ast = getattr(vm, "attach_state", None)
-
-                    log.info(
-                        "hi_p: dbg axis=%r attached=%s modal_locked=%s tabs_enabled=%s "
-                        "lifetick_age=%r drive_main=%r pos=%r vel=%r",
-                        ui_inputs.axis_selected,
-                        getattr(ast, "attached", None),
-                        getattr(ui_inputs, "modal_locked", None),
-                        getattr(ast, "tabs_enabled", None),
-                        getattr(vm, "lifetick_age", None),
-                        getattr(vm, "main_drive_status_text", None),
-                        getattr(vm, "pos_text", None),
-                        getattr(vm, "vel_text", None),
-                    )
-
-                if rt_result.apply_startup_state:
-                    if getattr(self, "_binder", None) is not None:
-                        try:
-                            self._binder.apply_startup_state()
-                        except Exception:
-                            self._soft_errors["binder.apply_startup_state"] = (
-                                int(self._soft_errors.get("binder.apply_startup_state", 0)) + 1
-                            )
+                self._log_runtime_result(ui_inputs=ui_inputs, rt_result=rt_result)
+                if not self._apply_runtime_result(rt_result=rt_result):
                     return
-
-                if rt_result.view_model is None:
-                    return
-
-                if getattr(self, "_binder", None) is not None:
-                    try:
-                        self._binder.apply(rt_result.view_model)
-                    except Exception:
-                        self._soft_errors["binder.apply"] = (
-                            int(self._soft_errors.get("binder.apply", 0)) + 1
-                        )
-                        now_s = time.time()
-                        last = getattr(self, "_binder_apply_err_last_s", 0.0)
-                        if now_s - last > 1.0:  # rate-limit so logs don't explode
-                            self._binder_apply_err_last_s = now_s
-                            log.exception("hi_p: binder.apply crashed (continuing).")
 
                 self._wd.mark("render")
-
-                if rt_result.snap is not None:
-                    estate = ""
-                    try:
-                        estate = str(
-                            getattr(getattr(rt_result.view_model, "banner", None), "estate", "")
-                            or ""
-                        )
-                    except Exception:
-                        estate = ""
-                    self._emit_birdseye_motion(
-                        snap=rt_result.snap,
-                        intents=list(rt_result.intents or []),
-                        estate=estate,
-                    )
-
-                for intent in list(rt_result.intents or []):
-                    self._publish_intent(intent)
-
+                self._emit_runtime_outputs(rt_result=rt_result)
                 self._wd.mark("hb")
 
         run_guarded(
