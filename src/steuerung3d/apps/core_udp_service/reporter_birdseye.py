@@ -1,15 +1,44 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Protocol
 
 from steuerung3d.core.core_mode import core_mode_value
 from steuerung3d.core.joy_facts import extract_joy_facts
 from steuerung3d.core.motion_gate import axis_local_motion_allowed
 
 from .reporter_axis_detail import build_blocked_and_axes_snapshot
+
+
+class _CommandAxisLike(Protocol):
+    vel: float
+
+
+class _CommandFrameLike(Protocol):
+    axes: Mapping[object, _CommandAxisLike]
+    estop_reset: bool
+    resync: bool
+
+
+class _BirdsEyeStatusLike(Protocol):
+    def emit_every(self, *, level: str, summary: str, fields: dict[str, object]) -> None: ...
+
+
+class _BirdsEyeStateLike(Protocol):
+    joy: object | None
+    axis_claims: Mapping[object, object]
+    estop_reset_denied_count_by_axis: Mapping[object, object]
+    core_motion_allowed: bool
+
+
+class _BirdsEyeSnapLike(Protocol):
+    estop: bool
+    fault: bool
+    core_mode: str
+    tick: int
+    densis: Mapping[object, object]
 
 
 @dataclass(frozen=True)
@@ -27,7 +56,7 @@ class _BirdsEyeMotionFacts:
     axes_snapshot: list[dict[str, object]]
     blocked_by: list[str]
     blocked_payload: list[dict[str, object]]
-    cmd_frame: Any
+    cmd_frame: _CommandFrameLike | None
     selected_lanes: list[str]
     attached_lanes: list[str]
     resolved_moving_targets: list[str]
@@ -59,11 +88,9 @@ def _as_optional_float(value: object) -> float | None:
 def _as_str_list(value: object) -> list[str]:
     if isinstance(value, (str, bytes, bytearray)):
         return []
-    try:
-        items = tuple(value)  # type: ignore[arg-type]
-    except Exception:
+    if not isinstance(value, Sequence):
         return []
-    return sorted([str(item) for item in items if str(item).strip()])
+    return sorted([str(item) for item in value if str(item).strip()])
 
 
 def _as_mapping(value: object) -> Mapping[object, object]:
@@ -96,7 +123,9 @@ def _compute_age_facts(*, last_seen: dict[str, object]) -> _BirdsEyeAgeFacts:
     )
 
 
-def _compute_level(*, snap: Any, age_facts: _BirdsEyeAgeFacts) -> tuple[str, bool, bool, str]:
+def _compute_level(
+    *, snap: _BirdsEyeSnapLike, age_facts: _BirdsEyeAgeFacts
+) -> tuple[str, bool, bool, str]:
     estop_v = bool(getattr(snap, "estop", False))
     fault_v = bool(getattr(snap, "fault", False))
     mode_v = core_mode_value(getattr(snap, "core_mode", "")) or str(getattr(snap, "core_mode", ""))
@@ -104,7 +133,7 @@ def _compute_level(*, snap: Any, age_facts: _BirdsEyeAgeFacts) -> tuple[str, boo
     return level, estop_v, fault_v, mode_v
 
 
-def _compute_reset_denied(*, state: Any) -> tuple[dict[str, object], int]:
+def _compute_reset_denied(*, state: _BirdsEyeStateLike) -> tuple[dict[str, object], int]:
     reset_denied_by_axis = dict(
         _as_mapping(getattr(state, "estop_reset_denied_count_by_axis", {}) or {})
     )
@@ -117,10 +146,10 @@ def _compute_reset_denied(*, state: Any) -> tuple[dict[str, object], int]:
 
 def _build_motion_facts(
     *,
-    snap: Any,
-    state: Any,
-    router: Any,
-    axis_ids: list[str],
+    snap: _BirdsEyeSnapLike,
+    state: _BirdsEyeStateLike,
+    router: object,
+    axis_ids: Sequence[str],
     last_intents_meta: dict[str, object],
 ) -> _BirdsEyeMotionFacts:
     intents_types = last_intents_meta.get("types", []) or []
@@ -158,7 +187,7 @@ def _build_motion_facts(
 
     resolved_moving_targets = []
     if cmd_frame is not None:
-        cmd_axes = _as_mapping(getattr(cmd_frame, "axes", {}) or {})
+        cmd_axes = dict(_as_mapping(getattr(cmd_frame, "axes", {}) or {}))
         resolved_moving_targets = sorted(
             [
                 str(axis_id)
@@ -200,7 +229,7 @@ def _build_motion_facts(
 def _build_summary(
     *,
     mode_v: str,
-    state: Any,
+    state: _BirdsEyeStateLike,
     motion_facts: _BirdsEyeMotionFacts,
     last_intents_meta: dict[str, object],
 ) -> str:
@@ -221,8 +250,8 @@ def _age_ms(age: float | None) -> float | None:
 
 def _build_fields(
     *,
-    snap: Any,
-    state: Any,
+    snap: _BirdsEyeSnapLike,
+    state: _BirdsEyeStateLike,
     mode_v: str,
     estop_v: bool,
     fault_v: bool,
@@ -273,7 +302,7 @@ def emit_birds_eye_status(
     snap,
     state,
     router,
-    axis_ids: list[str],
+    axis_ids: Sequence[str],
     last_intents_meta: dict[str, object],
     last_seen: dict[str, object],
 ) -> None:

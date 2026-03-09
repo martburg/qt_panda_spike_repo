@@ -22,15 +22,17 @@ from PySide6.QtWidgets import QWidget
 
 from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.intents import Intent
+from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 from steuerung3d.util.ratelimit import rl_log_exc
 
 from ..binders.hip_qt_binder import HipQtBinder
 from ..engines.hip.engine import HipEngine, HipUiInputs
+from ..engines.hip.viewmodel import HipViewModel
 from ..ports import IntentOut, TelemetryIn
 from ..qtutil.bindings import YellowBindings
 from ..qtutil.perf_watchdog import PerfWatchdog
-from ..runtimes.hip_runtime import HipRuntime
+from ..runtimes.hip_runtime import HipRuntime, HipRuntimeResult
 from .controller_utils import StatusEmitterLike, init_observability, run_guarded, start_poll_timer
 
 _StatusEmitterCls: type[object] | None
@@ -59,7 +61,7 @@ class HiPController:
     # If we stop receiving telemetry for this long, we go back to UNKNOWN
     stale_after_ms: int = 500
 
-    _dbg_next_s = 0.0
+    _dbg_next_s: float = 0.0
     _dbg_vm_keys_once: bool = False
 
     # Binder apply throttling (avoid log spam on repeated UI update errors)
@@ -74,6 +76,16 @@ class HiPController:
     # Qt-free runtime/engine
     _hip_engine: HipEngine = field(init=False)
     _hip_runtime: HipRuntime = field(init=False)
+    _binder: HipQtBinder = field(init=False)
+    _soft_errors: dict[str, int] = field(init=False, default_factory=dict)
+    _wd: PerfWatchdog = field(init=False)
+    _fixed_axis: str = field(init=False, default="")
+    _lock_axis_combo: bool = field(init=False, default=False)
+    _last_mode: str = field(init=False, default="")
+    _last_estop: bool = field(init=False, default=False)
+    _last_fault: bool = field(init=False, default=False)
+    _last_estate: str = field(init=False, default="ESTOP")
+    _hip_id: str = field(init=False, default="")
 
     def __post_init__(self) -> None:
         self.ui = YellowBindings.from_window(self.win)
@@ -163,7 +175,9 @@ class HiPController:
     def _publish_intent(self, intent: Intent) -> None:
         self.intent_out.publish_intent(intent)
 
-    def _emit_birdseye_motion(self, *, snap: object, intents: list[Intent], estate: str) -> None:
+    def _emit_birdseye_motion(
+        self, *, snap: TelemetrySnapshot, intents: list[Intent], estate: str
+    ) -> None:
         self._hip_runtime.emit_birdseye_motion(
             snap=snap,
             intents=list(intents or []),
@@ -189,7 +203,7 @@ class HiPController:
                 )
         return ui_inputs
 
-    def _log_runtime_result(self, *, ui_inputs: HipUiInputs, rt_result: object) -> None:
+    def _log_runtime_result(self, *, ui_inputs: HipUiInputs, rt_result: HipRuntimeResult) -> None:
         log.info(
             "hi_p: ui axis=%r changed=%s attached=%s intents=%d",
             ui_inputs.axis_selected,
@@ -200,7 +214,7 @@ class HiPController:
             len(rt_result.intents) if hasattr(rt_result, "intents") else -1,
         )
 
-        vm = rt_result.view_model
+        vm: HipViewModel | None = rt_result.view_model
         if vm is not None and not getattr(self, "_dbg_vm_keys_once", False):
             self._dbg_vm_keys_once = True
             log.info("hi_p: dbg vm_type=%s keys=%s", type(vm).__name__, sorted(vars(vm).keys()))
@@ -221,7 +235,7 @@ class HiPController:
                 getattr(vm, "vel_text", None),
             )
 
-    def _apply_runtime_result(self, *, rt_result: object) -> bool:
+    def _apply_runtime_result(self, *, rt_result: HipRuntimeResult) -> bool:
         if rt_result.apply_startup_state:
             if getattr(self, "_binder", None) is not None:
                 try:
@@ -249,7 +263,7 @@ class HiPController:
                     log.exception("hi_p: binder.apply crashed (continuing).")
         return True
 
-    def _emit_runtime_outputs(self, *, rt_result: object) -> None:
+    def _emit_runtime_outputs(self, *, rt_result: HipRuntimeResult) -> None:
         if rt_result.snap is not None:
             estate = ""
             try:

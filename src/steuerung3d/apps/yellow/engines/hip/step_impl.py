@@ -6,7 +6,7 @@ No semantic changes intended; this is a mechanical extraction from `engine.py`.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Mapping
+from typing import TYPE_CHECKING, Mapping, Sequence
 
 if TYPE_CHECKING:
     # Only needed for type checking; avoids runtime import cycles.
@@ -36,7 +36,7 @@ class _StepState:
     snap: TelemetrySnapshot
     ui: HipUiInputs
     hip_id: str
-    axis_ids: list[str]
+    axis_ids: Sequence[str]
     axes: Mapping[str, AxisTelemetry]
     attach_combo: HipAttachCombo
     selected_axis: str
@@ -101,7 +101,7 @@ def _run_pre_motion_phases(
         attach_combo=step_state.attach_combo,
         attached=bool(step_state.attached),
         axis_id=str(step_state.axis_id or ""),
-        axis_ids=list(step_state.axis_ids),
+        axis_ids=step_state.axis_ids,
         snap=step_state.snap,
         now_ns=int(inputs.now_ns),
         last_rx_ns=inputs.last_rx_ns,
@@ -125,7 +125,7 @@ def _run_pre_motion_phases(
         attach_combo=step_state.attach_combo,
         attached=bool(step_state.attached),
         axis_id=str(step_state.axis_id or ""),
-        axis_ids=list(step_state.axis_ids),
+        axis_ids=step_state.axis_ids,
         snap=step_state.snap,
         now_ns=int(inputs.now_ns),
         last_rx_ns=inputs.last_rx_ns,
@@ -183,7 +183,7 @@ def _run_motion_and_command_phases(
         snap=step_state.snap,
         hip_id=step_state.hip_id,
         axis_id=str(step_state.axis_id or ""),
-        axis_ids=list(step_state.axis_ids),
+        axis_ids=step_state.axis_ids,
         display_axis_id=str(step_state.display_axis_id or ""),
         mode_now=str(pre_motion.presentation_phase.mode_now or ""),
         estop=bool(pre_motion.presentation_phase.estop),

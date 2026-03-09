@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TypedDict
 
 
 @dataclass(frozen=True)
@@ -193,7 +194,21 @@ def _coerce_word(word: int | str | None) -> int | None:
     return int(word)
 
 
-def _decode_bit_fields(raw: int) -> dict[str, object]:
+class _DriveStatusFields(TypedDict):
+    raw: int
+    output_powered: bool
+    amp_ready: bool
+    referenced: bool
+    in_position: bool
+    brake_lifted: bool
+    fault: bool
+    right_end_switch: bool
+    left_end_switch: bool
+    zustand: int
+    label: str
+
+
+def _decode_bit_fields(raw: int) -> _DriveStatusFields:
     return {
         "raw": raw,
         "output_powered": bool(raw & (1 << 0)),
@@ -205,6 +220,7 @@ def _decode_bit_fields(raw: int) -> dict[str, object]:
         "right_end_switch": bool(raw & (1 << 6)),
         "left_end_switch": bool(raw & (1 << 7)),
         "zustand": int(raw >> 8),
+        "label": "",
     }
 
 
@@ -214,7 +230,7 @@ def _decode_label(*, fault: bool, zustand: int) -> str:
     return _ZUSTAND_ERR_LABELS.get(zustand, "-Unknown Error")
 
 
-def _build_drive_status(fields: dict[str, object]) -> DriveStatus:
+def _build_drive_status(fields: _DriveStatusFields) -> DriveStatus:
     return DriveStatus(
         raw=int(fields["raw"]),
         output_powered=bool(fields["output_powered"]),

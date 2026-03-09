@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import TypedDict
 
 
 def birdseye_multiline_default() -> bool:
@@ -30,7 +30,7 @@ def _wrap_line(text: str, width: int) -> list[str]:
 
 
 def format_birds_eye(
-    parts: List[str],
+    parts: list[str],
     *,
     multiline: bool = True,
     max_entries: int = 6,
@@ -61,27 +61,68 @@ def _flag(value: object) -> str:
     return "?"
 
 
+def _as_int(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    return None
+
+
+def _as_float(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
 def _age_ms(value: object) -> str:
-    if value is None:
-        return "?"
-    try:
-        return str(int(value))
-    except Exception:
-        return "?"
+    parsed = _as_int(value)
+    return "?" if parsed is None else str(parsed)
 
 
 def _fmt_vel(value: object) -> str:
     if value is None:
         return "?"
-    try:
-        return f"{float(value):.3f}"
-    except Exception:
-        return "?"
+    parsed = _as_float(value)
+    return "?" if parsed is None else f"{parsed:.3f}"
 
 
-def build_frederik_panel_lines(fields: Dict[str, object], *, max_blocked: int = 3) -> list[str]:
-    if not isinstance(fields, dict):
-        return []
+class _BirdAxisFields(TypedDict, total=False):
+    axis_id: str
+    code: str
+    in_scope: bool
+    estop: bool
+    fault: bool
+    started: bool
+    cmd_enable: bool
+    cmd_vel: float
+    taster_enabled: bool
+    armed: bool
+    ready: bool
+    owner_hip_id: str
+    age_ms: int | float
+
+
+class BirdsEyeFields(TypedDict, total=False):
+    core_mode: str
+    mode: str
+    blocked_by: list[_BirdAxisFields | str]
+    joy_dm: bool
+    joy_sel: bool
+    live_req_seen: bool
+    reset_denied_total: int
+    live_denied_count: int
+    live_denied_reason: str
+    cmd_estop_reset: bool
+    cmd_resync: bool
+    axes: list[_BirdAxisFields]
+
+
+def build_frederik_panel_lines(fields: BirdsEyeFields, *, max_blocked: int = 3) -> list[str]:
 
     core_mode = str(fields.get("core_mode", fields.get("mode", "")) or "")
 
@@ -105,8 +146,8 @@ def build_frederik_panel_lines(fields: Dict[str, object], *, max_blocked: int = 
     joy_sel = _flag(fields.get("joy_sel"))
     live_req_seen = _flag(fields.get("live_req_seen"))
 
-    reset_denied = int(fields.get("reset_denied_total", 0) or 0)
-    live_denied = int(fields.get("live_denied_count", 0) or 0)
+    reset_denied = _as_int(fields.get("reset_denied_total", 0)) or 0
+    live_denied = _as_int(fields.get("live_denied_count", 0)) or 0
     live_denied_reason = str(fields.get("live_denied_reason", "") or "")
     cmd_estop_reset = _flag(fields.get("cmd_estop_reset"))
     cmd_resync = _flag(fields.get("cmd_resync"))
@@ -123,12 +164,8 @@ def build_frederik_panel_lines(fields: Dict[str, object], *, max_blocked: int = 
         lines.append(
             "Frederik axes: axis in_scope estop fault started cmd_en cmd_vel taster_enabled armed ready owner age_ms"
         )
-        axes_sorted = sorted(
-            axes, key=lambda a: str(a.get("axis_id", "")) if isinstance(a, dict) else str(a)
-        )
+        axes_sorted = sorted(axes, key=lambda a: str(a.get("axis_id", "")))
         for ax in axes_sorted:
-            if not isinstance(ax, dict):
-                continue
             axis_id = str(ax.get("axis_id", ""))
             in_scope = _flag(ax.get("in_scope"))
             estop = _flag(ax.get("estop"))
@@ -169,7 +206,7 @@ class LogTailer:
     _pos: int = 0
     last_line: str = ""
 
-    def poll(self) -> Optional[str]:
+    def poll(self) -> str | None:
         if not self.path.exists():
             return None
         try:
