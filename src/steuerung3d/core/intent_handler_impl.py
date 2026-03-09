@@ -2,18 +2,16 @@
 
 This module applies high-level Intents to the in-memory MachineState.
 
-Refactor note (Lane 1):
-The previous implementation used one large match/case block.
-We now route intents through small domain modules under
-`steuerung3d.core.intent_routes`.
-
-Semantics are preserved.
+Refactor note (Lane 2, small and declared):
+The previous implementation stored subtype-specific handlers in broad
+callable dispatch tables. This version keeps the ungated/live-only split,
+but performs explicit narrowing before calling subtype handlers so the
+intent boundary is statically clear while preserving runtime behavior.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Callable, Dict, Type
 
 from steuerung3d.core.core_mode import CoreMode, core_mode_value
 from steuerung3d.core.intent_handlers.claims import (
@@ -83,44 +81,90 @@ from steuerung3d.core.state import MachineState
 
 log = logging.getLogger("core")
 
-Handler = Callable[[MachineState, Intent], None]
+
+def _apply_ungated_intent(state: MachineState, intent: Intent) -> bool:
+    if isinstance(intent, SetControlMode):
+        handle_set_control_mode(state, intent)
+        return True
+    if isinstance(intent, SmoothStop):
+        handle_smooth_stop(state, intent)
+        return True
+    if isinstance(intent, ClaimAxis):
+        _claim_axis(state, intent.axis_id, intent.hip_id, intent.req_id)
+        return True
+    if isinstance(intent, ReleaseAxis):
+        _release_axis(state, intent.axis_id, intent.hip_id, intent.req_id)
+        return True
+    if isinstance(intent, RequestRigLease):
+        handle_request_rig_lease(state, intent)
+        return True
+    if isinstance(intent, ReleaseRigLease):
+        handle_release_rig_lease(state, intent)
+        return True
+    if isinstance(intent, RequestAxisLease):
+        handle_request_axis_lease(state, intent)
+        return True
+    if isinstance(intent, ReleaseAxisLease):
+        handle_release_axis_lease(state, intent)
+        return True
+    if isinstance(intent, EchoLifeTick):
+        handle_echo_lifetick(state, intent)
+        return True
+    if isinstance(intent, JoyStateUpdate):
+        handle_joy_state_update(state, intent)
+        return True
+    if isinstance(intent, LocalAxisManualRequest):
+        handle_local_axis_manual(state, intent)
+        return True
+    if isinstance(intent, SetEstop):
+        handle_set_estop(state, intent)
+        return True
+    if isinstance(intent, RequestEstopReset):
+        handle_request_estop_reset(state, intent)
+        return True
+    if isinstance(intent, RequestResync):
+        handle_request_resync(state, intent)
+        return True
+    if isinstance(intent, RequestMainReset):
+        handle_request_main_reset(state, intent)
+        return True
+    if isinstance(intent, RequestGuiderReset):
+        handle_request_guider_reset(state, intent)
+        return True
+    if isinstance(intent, ParamEditBegin):
+        handle_param_edit_begin(state, intent)
+        return True
+    if isinstance(intent, ParamWrite):
+        handle_param_write(state, intent)
+        return True
+    if isinstance(intent, ParamCancel):
+        handle_param_cancel(state, intent)
+        return True
+    return False
 
 
-UNGATED_DISPATCH: Dict[Type[Intent], Handler] = {
-    # Operator control (non-safety)
-    SetControlMode: lambda s, i: handle_set_control_mode(s, i),
-    SmoothStop: lambda s, i: handle_smooth_stop(s, i),
-    # Claims
-    ClaimAxis: lambda s, i: _claim_axis(s, i.axis_id, i.hip_id, i.req_id),
-    ReleaseAxis: lambda s, i: _release_axis(s, i.axis_id, i.hip_id, i.req_id),
-    # Leases
-    RequestRigLease: lambda s, i: handle_request_rig_lease(s, i),
-    ReleaseRigLease: lambda s, i: handle_release_rig_lease(s, i),
-    RequestAxisLease: lambda s, i: handle_request_axis_lease(s, i),
-    ReleaseAxisLease: lambda s, i: handle_release_axis_lease(s, i),
-    # UI livetick echo + joy
-    EchoLifeTick: lambda s, i: handle_echo_lifetick(s, i),
-    JoyStateUpdate: lambda s, i: handle_joy_state_update(s, i),
-    LocalAxisManualRequest: lambda s, i: handle_local_axis_manual(s, i),
-    # Safety / global requests
-    SetEstop: lambda s, i: handle_set_estop(s, i),
-    RequestEstopReset: lambda s, i: handle_request_estop_reset(s, i),
-    RequestResync: lambda s, i: handle_request_resync(s, i),
-    RequestMainReset: lambda s, i: handle_request_main_reset(s, i),
-    RequestGuiderReset: lambda s, i: handle_request_guider_reset(s, i),
-    # Params
-    ParamEditBegin: lambda s, i: handle_param_edit_begin(s, i),
-    ParamWrite: lambda s, i: handle_param_write(s, i),
-    ParamCancel: lambda s, i: handle_param_cancel(s, i),
-}
+def _motion_axis_id(intent: Intent) -> str:
+    if isinstance(intent, (EnableAxis, JogAxis)):
+        return str(intent.axis_id or "")
+    if isinstance(intent, JogWinch):
+        return str(intent.winch_id or "")
+    return ""
 
 
-LIVE_ONLY_DISPATCH: Dict[Type[Intent], Handler] = {
-    EnableAxis: lambda s, i: handle_enable_axis(s, i),
-    JogAxis: lambda s, i: handle_jog_axis(s, i),
-    JogWinch: lambda s, i: handle_jog_winch(s, i),
-    JogCartesian: lambda s, i: handle_jog_cartesian(s, i),
-}
+def _apply_live_only_intent(state: MachineState, intent: Intent) -> bool:
+    if isinstance(intent, EnableAxis):
+        handle_enable_axis(state, intent)
+        return True
+    if isinstance(intent, JogAxis):
+        handle_jog_axis(state, intent)
+        return True
+    if isinstance(intent, JogWinch):
+        handle_jog_winch(state, intent)
+        return True
+    if isinstance(intent, JogCartesian):
+        handle_jog_cartesian(state, intent)
+        return True
+    return False
 
 
 def apply_intent(state: MachineState, intent: Intent) -> None:
@@ -133,39 +177,27 @@ def apply_intent(state: MachineState, intent: Intent) -> None:
       - Motion/control intents only apply in LIVE.
     """
 
-    handler = UNGATED_DISPATCH.get(type(intent))
-    if handler is not None:
-        handler(state, intent)
+    if _apply_ungated_intent(state, intent):
         return
 
-    # --- MODE-GATED INTENTS ---
     core_mode = core_mode_value(getattr(state, "core_mode", "")).upper()
     is_live = bool(core_mode) and (core_mode == CoreMode.LIVE.value)
 
-    handler = LIVE_ONLY_DISPATCH.get(type(intent))
-    if handler is not None:
-        if bool(state.estop):
-            enforce_core_mode_actions(state)
-            return
+    is_live_only = isinstance(intent, (EnableAxis, JogAxis, JogWinch, JogCartesian))
+    if not is_live_only:
+        return
 
-        if is_live:
-            handler(state, intent)
-            return
-
-        axis_id = ""
-        if isinstance(intent, EnableAxis):
-            axis_id = str(getattr(intent, "axis_id", "") or "")
-        elif isinstance(intent, JogAxis):
-            axis_id = str(getattr(intent, "axis_id", "") or "")
-        elif isinstance(intent, JogWinch):
-            axis_id = str(getattr(intent, "winch_id", "") or "")
-
-        if axis_id and axis_local_motion_allowed(state, axis_id):
-            handler(state, intent)
-            return
-
+    if bool(state.estop):
         enforce_core_mode_actions(state)
         return
 
-    # Unknown / intentionally ignored intents are a no-op.
-    return
+    if is_live:
+        _apply_live_only_intent(state, intent)
+        return
+
+    axis_id = _motion_axis_id(intent)
+    if axis_id and axis_local_motion_allowed(state, axis_id):
+        _apply_live_only_intent(state, intent)
+        return
+
+    enforce_core_mode_actions(state)

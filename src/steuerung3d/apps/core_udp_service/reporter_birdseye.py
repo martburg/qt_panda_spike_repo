@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any
 
 from steuerung3d.core.core_mode import core_mode_value
 from steuerung3d.core.joy_facts import extract_joy_facts
@@ -39,15 +40,51 @@ class _BirdsEyeMotionFacts:
     devices: list[str]
 
 
-def _compute_age_facts(*, last_seen: Dict[str, object]) -> _BirdsEyeAgeFacts:
+def _as_float(value: object, default: float = 0.0) -> float:
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, (int, float)):
+        return float(value)
+    return default
+
+
+def _as_optional_float(value: object) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
+def _as_str_list(value: object) -> list[str]:
+    if isinstance(value, (str, bytes, bytearray)):
+        return []
+    try:
+        items = tuple(value)  # type: ignore[arg-type]
+    except Exception:
+        return []
+    return sorted([str(item) for item in items if str(item).strip()])
+
+
+def _as_mapping(value: object) -> Mapping[object, object]:
+    if isinstance(value, Mapping):
+        return value
+    return {}
+
+
+def _compute_age_facts(*, last_seen: dict[str, object]) -> _BirdsEyeAgeFacts:
     now = time.monotonic()
-    age_int = None if last_seen["intent_ts"] is None else (now - float(last_seen["intent_ts"]))
-    age_dev = (
-        None if last_seen["dev_telem_ts"] is None else (now - float(last_seen["dev_telem_ts"]))
-    )
-    age_cmd = None if last_seen["cmd_ts"] is None else (now - float(last_seen["cmd_ts"]))
-    age_ui = None if last_seen["ui_telem_ts"] is None else (now - float(last_seen["ui_telem_ts"]))
-    age_c2 = None if last_seen["c2_telem_ts"] is None else (now - float(last_seen["c2_telem_ts"]))
+    age_int_ts = _as_optional_float(last_seen.get("intent_ts"))
+    age_dev_ts = _as_optional_float(last_seen.get("dev_telem_ts"))
+    age_cmd_ts = _as_optional_float(last_seen.get("cmd_ts"))
+    age_ui_ts = _as_optional_float(last_seen.get("ui_telem_ts"))
+    age_c2_ts = _as_optional_float(last_seen.get("c2_telem_ts"))
+
+    age_int = None if age_int_ts is None else (now - age_int_ts)
+    age_dev = None if age_dev_ts is None else (now - age_dev_ts)
+    age_cmd = None if age_cmd_ts is None else (now - age_cmd_ts)
+    age_ui = None if age_ui_ts is None else (now - age_ui_ts)
+    age_c2 = None if age_c2_ts is None else (now - age_c2_ts)
     stale = any(age is not None and age > 2.0 for age in (age_int, age_dev))
     return _BirdsEyeAgeFacts(
         age_int=age_int,
@@ -68,7 +105,9 @@ def _compute_level(*, snap: Any, age_facts: _BirdsEyeAgeFacts) -> tuple[str, boo
 
 
 def _compute_reset_denied(*, state: Any) -> tuple[dict[str, object], int]:
-    reset_denied_by_axis = dict(getattr(state, "estop_reset_denied_count_by_axis", {}) or {})
+    reset_denied_by_axis = dict(
+        _as_mapping(getattr(state, "estop_reset_denied_count_by_axis", {}) or {})
+    )
     try:
         reset_denied_total = sum(int(v) for v in reset_denied_by_axis.values())
     except Exception:
@@ -81,8 +120,8 @@ def _build_motion_facts(
     snap: Any,
     state: Any,
     router: Any,
-    axis_ids: List[str],
-    last_intents_meta: Dict[str, object],
+    axis_ids: list[str],
+    last_intents_meta: dict[str, object],
 ) -> _BirdsEyeMotionFacts:
     intents_types = last_intents_meta.get("types", []) or []
     intents_types_str = ",".join([str(t) for t in intents_types])
@@ -106,28 +145,28 @@ def _build_motion_facts(
     joy_dm = bool(jf.deadman)
     joy_sel = bool(jf.select_hip)
     selected_lanes = (
-        sorted([str(x) for x in tuple(getattr(joy, "selected_axes", ()) or ()) if str(x).strip()])
-        if joy is not None
-        else []
+        _as_str_list(getattr(joy, "selected_axes", ()) or ()) if joy is not None else []
     )
+
     attached_lanes = sorted(
         [
             f"{axis_id}:{owner}"
-            for axis_id, owner in dict(getattr(state, "axis_claims", {}) or {}).items()
+            for axis_id, owner in dict(_as_mapping(getattr(state, "axis_claims", {}) or {})).items()
             if str(owner or "")
         ]
     )
-    resolved_moving_targets = (
-        sorted(
+
+    resolved_moving_targets = []
+    if cmd_frame is not None:
+        cmd_axes = _as_mapping(getattr(cmd_frame, "axes", {}) or {})
+        resolved_moving_targets = sorted(
             [
                 str(axis_id)
-                for axis_id, sp in dict(getattr(cmd_frame, "axes", {}) or {}).items()
-                if abs(float(getattr(sp, "vel", 0.0) or 0.0)) > 1e-9
+                for axis_id, sp in cmd_axes.items()
+                if abs(_as_float(getattr(sp, "vel", 0.0) or 0.0)) > 1e-9
             ]
         )
-        if cmd_frame is not None
-        else []
-    )
+
     local_manual_axes = [
         axis_id
         for axis_id in selected_lanes
@@ -135,7 +174,7 @@ def _build_motion_facts(
     ]
 
     try:
-        densis = getattr(snap, "densis", {}) or {}
+        densis = _as_mapping(getattr(snap, "densis", {}) or {})
         devices = sorted([str(k) for k in densis.keys()])
     except Exception:
         devices = []
@@ -163,7 +202,7 @@ def _build_summary(
     mode_v: str,
     state: Any,
     motion_facts: _BirdsEyeMotionFacts,
-    last_intents_meta: Dict[str, object],
+    last_intents_meta: dict[str, object],
 ) -> str:
     blocked_summary = ",".join(motion_facts.blocked_by)
     motion_allowed_i = int(bool(getattr(state, "core_motion_allowed", False)))
@@ -189,7 +228,7 @@ def _build_fields(
     fault_v: bool,
     age_facts: _BirdsEyeAgeFacts,
     motion_facts: _BirdsEyeMotionFacts,
-    last_intents_meta: Dict[str, object],
+    last_intents_meta: dict[str, object],
 ) -> dict[str, object]:
     cmd_frame = motion_facts.cmd_frame
     return {
@@ -234,9 +273,9 @@ def emit_birds_eye_status(
     snap,
     state,
     router,
-    axis_ids: List[str],
-    last_intents_meta: Dict[str, object],
-    last_seen: Dict[str, object],
+    axis_ids: list[str],
+    last_intents_meta: dict[str, object],
+    last_seen: dict[str, object],
 ) -> None:
     if status is None:
         return

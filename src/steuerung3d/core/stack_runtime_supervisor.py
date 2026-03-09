@@ -39,11 +39,23 @@ def spawn_process(rt: "StackRuntime", p: "ProcessSpec") -> None:
         )
     env.update(p.env or {})
 
-    popen_kwargs = dict(stdout=log_f, stderr=subprocess.STDOUT, cwd=str(rt.spec.base_dir), env=env)
     if rt.new_console and os.name == "nt":
-        popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
-
-    proc = subprocess.Popen(p.argv, **popen_kwargs)
+        proc = subprocess.Popen(
+            p.argv,
+            stdout=log_f,
+            stderr=subprocess.STDOUT,
+            cwd=str(rt.spec.base_dir),
+            env=env,
+            creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0),
+        )
+    else:
+        proc = subprocess.Popen(
+            p.argv,
+            stdout=log_f,
+            stderr=subprocess.STDOUT,
+            cwd=str(rt.spec.base_dir),
+            env=env,
+        )
     proc._stack_log_fh = log_f  # type: ignore[attr-defined]
     from .stack_runtime_impl import RunningProcess
 

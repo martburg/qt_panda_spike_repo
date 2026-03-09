@@ -1,88 +1,226 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 from steuerung3d.config.toml_loader import load_toml
 
 
-def _hostport(s: str) -> Tuple[str, int]:
+def _hostport(s: str) -> tuple[str, int]:
     host, port = s.rsplit(":", 1)
     return host.strip(), int(port)
 
 
-def _require(mapping: dict, key: str, *, ctx: str) -> object:
+def _require_value(mapping: Mapping[str, object], key: str, *, ctx: str) -> object:
     if key not in mapping or mapping[key] is None:
         raise ValueError(f"Missing required config key '{ctx}.{key}' in joy2intent config")
     return mapping[key]
 
 
+def _require_section(mapping: Mapping[str, object], key: str, *, ctx: str) -> Mapping[str, object]:
+    value = _require_value(mapping, key, ctx=ctx)
+    if not isinstance(value, Mapping):
+        raise ValueError(f"Config key '{ctx}.{key}' must be a table in joy2intent config")
+    return value
+
+
+def _require_str(mapping: Mapping[str, object], key: str, *, ctx: str) -> str:
+    value = _require_value(mapping, key, ctx=ctx)
+    if not isinstance(value, str):
+        raise ValueError(f"Config key '{ctx}.{key}' must be a string in joy2intent config")
+    return value
+
+
+def _require_float(mapping: Mapping[str, object], key: str, *, ctx: str) -> float:
+    value = _require_value(mapping, key, ctx=ctx)
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise ValueError(f"Config key '{ctx}.{key}' must be numeric in joy2intent config")
+    return float(value)
+
+
+def _require_int(mapping: Mapping[str, object], key: str, *, ctx: str) -> int:
+    value = _require_value(mapping, key, ctx=ctx)
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError(f"Config key '{ctx}.{key}' must be an integer in joy2intent config")
+    return int(value)
+
+
+def _require_list_str(mapping: Mapping[str, object], key: str, *, ctx: str) -> list[str]:
+    value = _require_value(mapping, key, ctx=ctx)
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        raise ValueError(f"Config key '{ctx}.{key}' must be a list of strings in joy2intent config")
+    result: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError(
+                f"Config key '{ctx}.{key}' must be a list of strings in joy2intent config"
+            )
+        result.append(item)
+    return result
+
+
+def _require_list_int(mapping: Mapping[str, object], key: str, *, ctx: str) -> list[int]:
+    value = _require_value(mapping, key, ctx=ctx)
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        raise ValueError(
+            f"Config key '{ctx}.{key}' must be a list of integers in joy2intent config"
+        )
+    result: list[int] = []
+    for item in value:
+        if not isinstance(item, int) or isinstance(item, bool):
+            raise ValueError(
+                f"Config key '{ctx}.{key}' must be a list of integers in joy2intent config"
+            )
+        result.append(int(item))
+    return result
+
+
+def _require_dict_str_int_or_int_list(
+    mapping: Mapping[str, object], key: str, *, ctx: str
+) -> dict[str, int | list[int]]:
+    value = _require_value(mapping, key, ctx=ctx)
+    if not isinstance(value, Mapping):
+        raise ValueError(
+            f"Config key '{ctx}.{key}' must be a table of button bindings in joy2intent config"
+        )
+    result: dict[str, int | list[int]] = {}
+    for name, raw_value in value.items():
+        if not isinstance(name, str):
+            raise ValueError(f"Config key '{ctx}.{key}' must use string keys in joy2intent config")
+        if isinstance(raw_value, int) and not isinstance(raw_value, bool):
+            result[name] = int(raw_value)
+            continue
+        if isinstance(raw_value, Sequence) and not isinstance(raw_value, (str, bytes, bytearray)):
+            ints: list[int] = []
+            for item in raw_value:
+                if not isinstance(item, int) or isinstance(item, bool):
+                    raise ValueError(
+                        f"Config key '{ctx}.{key}.{name}' must be an int or list[int] in joy2intent config"
+                    )
+                ints.append(int(item))
+            result[name] = ints
+            continue
+        raise ValueError(
+            f"Config key '{ctx}.{key}.{name}' must be an int or list[int] in joy2intent config"
+        )
+    return result
+
+
+def _require_dict_str_int(mapping: Mapping[str, object], key: str, *, ctx: str) -> dict[str, int]:
+    value = _require_value(mapping, key, ctx=ctx)
+    if not isinstance(value, Mapping):
+        raise ValueError(f"Config key '{ctx}.{key}' must be a table in joy2intent config")
+    result: dict[str, int] = {}
+    for name, raw_value in value.items():
+        if (
+            not isinstance(name, str)
+            or not isinstance(raw_value, int)
+            or isinstance(raw_value, bool)
+        ):
+            raise ValueError(
+                f"Config key '{ctx}.{key}' must be a table[str, int] in joy2intent config"
+            )
+        result[name] = int(raw_value)
+    return result
+
+
+def _require_dict_str_bool(mapping: Mapping[str, object], key: str, *, ctx: str) -> dict[str, bool]:
+    value = _require_value(mapping, key, ctx=ctx)
+    if not isinstance(value, Mapping):
+        raise ValueError(f"Config key '{ctx}.{key}' must be a table in joy2intent config")
+    result: dict[str, bool] = {}
+    for name, raw_value in value.items():
+        if not isinstance(name, str) or not isinstance(raw_value, bool):
+            raise ValueError(
+                f"Config key '{ctx}.{key}' must be a table[str, bool] in joy2intent config"
+            )
+        result[name] = raw_value
+    return result
+
+
+def _optional_dict_str_float(mapping: Mapping[str, object], key: str) -> dict[str, float]:
+    raw_value = mapping.get(key)
+    if raw_value is None:
+        return {}
+    if not isinstance(raw_value, Mapping):
+        raise ValueError(f"Config key '{key}' must be a table[str, float] in joy2intent config")
+    result: dict[str, float] = {}
+    for name, item in raw_value.items():
+        if (
+            not isinstance(name, str)
+            or not isinstance(item, (int, float))
+            or isinstance(item, bool)
+        ):
+            raise ValueError(f"Config key '{key}' must be a table[str, float] in joy2intent config")
+        result[name] = float(item)
+    return result
+
+
 @dataclass(frozen=True)
 class Joy2IntentConfig:
-    # --- required ---
-    raw_in: Tuple[str, int]
-    intent_out: Tuple[str, int]
-    context_in: Tuple[str, int]
+    raw_in: tuple[str, int]
+    intent_out: tuple[str, int]
+    context_in: tuple[str, int]
     tick_hz: float
     stale_after_ms: int
-
-    winches: List[str]
-    # Physical button indices (0..N-1) used to select winches by position.
-    select_buttons: List[int]
+    winches: list[str]
+    select_buttons: list[int]
     default_mode: str
-
     max_winch_mps: float
     fine_scale: float
-
-    axes: Dict[str, int]
-    buttons: Dict[str, int | list[int]]
-
+    axes: dict[str, int]
+    buttons: dict[str, int | list[int]]
     deadzone: float
     expo: float
-    invert: Dict[str, bool]
+    invert: dict[str, bool]
     hip_id: str
-    sync_max_v: Dict[str, float] = field(default_factory=dict)
-
-    # Identity stamped into motion intents. Must match the claim owner (HiP).
+    sync_max_v: dict[str, float] = field(default_factory=dict)
 
 
 def load_joy2intent_config(path: Path) -> Joy2IntentConfig:
     raw = load_toml(path)
+    if not isinstance(raw, Mapping):
+        raise ValueError("joy2intent config root must be a TOML table")
 
-    io = raw.get("io", {}) or {}
-    ident = raw.get("identity", {}) or {}
-    rig = raw.get("rig", {}) or {}
-    mode = raw.get("mode", {}) or {}
-    limits = raw.get("limits", {}) or {}
-    lim_m = limits.get("manual", {}) or {}
-    lim_s = limits.get("sync", {}) or {}
-    bindings = raw.get("bindings", {}) or {}
-    f = raw.get("filters", {}) or {}
+    io = _require_section(raw, "io", ctx="<root>")
+    ident = _require_section(raw, "identity", ctx="<root>")
+    rig = _require_section(raw, "rig", ctx="<root>")
+    mode = _require_section(raw, "mode", ctx="<root>")
+    limits = _require_section(raw, "limits", ctx="<root>")
+    lim_m = _require_section(limits, "manual", ctx="limits")
+    bindings = _require_section(raw, "bindings", ctx="<root>")
+    filters = _require_section(raw, "filters", ctx="<root>")
 
-    # Tightened config: avoid silent fallbacks. Fail fast on missing keys.
-    # Basic sanity: require at least one winch and at least one select button.
-    if not (rig.get("winches") or []):
+    winches = _require_list_str(rig, "winches", ctx="rig")
+    if not winches:
         raise ValueError("Missing or empty config key 'rig.winches' in joy2intent config")
-    if not (rig.get("select_buttons") or []):
+
+    select_buttons = _require_list_int(rig, "select_buttons", ctx="rig")
+    if not select_buttons:
         raise ValueError("Missing or empty config key 'rig.select_buttons' in joy2intent config")
 
+    lim_s = limits.get("sync")
+    if lim_s is not None and not isinstance(lim_s, Mapping):
+        raise ValueError("Config key 'limits.sync' must be a table in joy2intent config")
+    sync_max_v = _optional_dict_str_float(lim_s, "max_v") if isinstance(lim_s, Mapping) else {}
+
     return Joy2IntentConfig(
-        raw_in=_hostport(str(_require(io, "raw_in", ctx="io"))),
-        intent_out=_hostport(str(_require(io, "intent_out", ctx="io"))),
-        context_in=_hostport(str(_require(io, "context_in", ctx="io"))),
-        tick_hz=float(_require(io, "tick_hz", ctx="io")),
-        stale_after_ms=int(_require(io, "stale_after_ms", ctx="io")),
-        winches=list(_require(rig, "winches", ctx="rig")),
-        default_mode=str(_require(mode, "default", ctx="mode")),
-        select_buttons=list(_require(rig, "select_buttons", ctx="rig")),
-        max_winch_mps=float(_require(lim_m, "max_winch_mps", ctx="limits.manual")),
-        fine_scale=float(_require(lim_m, "fine_scale", ctx="limits.manual")),
-        sync_max_v=dict((lim_s.get("max_v") or {})),
-        axes=dict(_require(bindings, "axes", ctx="bindings")),
-        buttons=dict(_require(bindings, "buttons", ctx="bindings")),
-        deadzone=float(_require(f, "deadzone", ctx="filters")),
-        expo=float(_require(f, "expo", ctx="filters")),
-        invert=dict((f.get("invert") or {})),
-        hip_id=str(_require(ident, "hip_id", ctx="identity")),
+        raw_in=_hostport(_require_str(io, "raw_in", ctx="io")),
+        intent_out=_hostport(_require_str(io, "intent_out", ctx="io")),
+        context_in=_hostport(_require_str(io, "context_in", ctx="io")),
+        tick_hz=_require_float(io, "tick_hz", ctx="io"),
+        stale_after_ms=_require_int(io, "stale_after_ms", ctx="io"),
+        winches=winches,
+        default_mode=_require_str(mode, "default", ctx="mode"),
+        select_buttons=select_buttons,
+        max_winch_mps=_require_float(lim_m, "max_winch_mps", ctx="limits.manual"),
+        fine_scale=_require_float(lim_m, "fine_scale", ctx="limits.manual"),
+        sync_max_v=sync_max_v,
+        axes=_require_dict_str_int(bindings, "axes", ctx="bindings"),
+        buttons=_require_dict_str_int_or_int_list(bindings, "buttons", ctx="bindings"),
+        deadzone=_require_float(filters, "deadzone", ctx="filters"),
+        expo=_require_float(filters, "expo", ctx="filters"),
+        invert=_require_dict_str_bool(filters, "invert", ctx="filters"),
+        hip_id=_require_str(ident, "hip_id", ctx="identity"),
     )
