@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, TypedDict, cast
 
 from steuerung3d.core.core_mode import core_mode_value
 from steuerung3d.core.joy_facts import extract_joy_facts
@@ -17,7 +17,7 @@ class _CommandAxisLike(Protocol):
 
 
 class _CommandFrameLike(Protocol):
-    axes: Mapping[object, _CommandAxisLike]
+    axes: Mapping[str, _CommandAxisLike]
     estop_reset: bool
     resync: bool
 
@@ -26,10 +26,14 @@ class _BirdsEyeStatusLike(Protocol):
     def emit_every(self, *, level: str, summary: str, fields: dict[str, object]) -> None: ...
 
 
+class _BirdsEyeJoyLike(Protocol):
+    selected_axes: Sequence[str]
+
+
 class _BirdsEyeStateLike(Protocol):
-    joy: object | None
-    axis_claims: Mapping[object, object]
-    estop_reset_denied_count_by_axis: Mapping[object, object]
+    joy: _BirdsEyeJoyLike | None
+    axis_claims: Mapping[str, str]
+    estop_reset_denied_count_by_axis: Mapping[str, int]
     core_motion_allowed: bool
 
 
@@ -38,7 +42,20 @@ class _BirdsEyeSnapLike(Protocol):
     fault: bool
     core_mode: str
     tick: int
-    densis: Mapping[object, object]
+    densis: Mapping[str, object]
+
+
+class _LastSeenLike(TypedDict, total=False):
+    intent_ts: float
+    dev_telem_ts: float
+    cmd_ts: float
+    ui_telem_ts: float
+    c2_telem_ts: float
+
+
+class _LastIntentsMetaLike(TypedDict, total=False):
+    count: int
+    types: list[str]
 
 
 @dataclass(frozen=True)
@@ -64,7 +81,7 @@ class _BirdsEyeMotionFacts:
     joy_dm: bool
     joy_sel: bool
     intents_types_str: str
-    reset_denied_by_axis: dict[str, object]
+    reset_denied_by_axis: dict[str, int]
     reset_denied_total: int
     devices: list[str]
 
@@ -93,13 +110,7 @@ def _as_str_list(value: object) -> list[str]:
     return sorted([str(item) for item in value if str(item).strip()])
 
 
-def _as_mapping(value: object) -> Mapping[object, object]:
-    if isinstance(value, Mapping):
-        return value
-    return {}
-
-
-def _compute_age_facts(*, last_seen: dict[str, object]) -> _BirdsEyeAgeFacts:
+def _compute_age_facts(*, last_seen: _LastSeenLike) -> _BirdsEyeAgeFacts:
     now = time.monotonic()
     age_int_ts = _as_optional_float(last_seen.get("intent_ts"))
     age_dev_ts = _as_optional_float(last_seen.get("dev_telem_ts"))
@@ -126,21 +137,20 @@ def _compute_age_facts(*, last_seen: dict[str, object]) -> _BirdsEyeAgeFacts:
 def _compute_level(
     *, snap: _BirdsEyeSnapLike, age_facts: _BirdsEyeAgeFacts
 ) -> tuple[str, bool, bool, str]:
-    estop_v = bool(getattr(snap, "estop", False))
-    fault_v = bool(getattr(snap, "fault", False))
-    mode_v = core_mode_value(getattr(snap, "core_mode", "")) or str(getattr(snap, "core_mode", ""))
+    estop_v = bool(snap.estop)
+    fault_v = bool(snap.fault)
+    mode_v = core_mode_value(snap.core_mode) or str(snap.core_mode)
     level = "ERR" if (estop_v or fault_v) else ("WARN" if age_facts.stale else "OK")
     return level, estop_v, fault_v, mode_v
 
 
-def _compute_reset_denied(*, state: _BirdsEyeStateLike) -> tuple[dict[str, object], int]:
-    reset_denied_by_axis = dict(
-        _as_mapping(getattr(state, "estop_reset_denied_count_by_axis", {}) or {})
-    )
-    try:
-        reset_denied_total = sum(int(v) for v in reset_denied_by_axis.values())
-    except Exception:
-        reset_denied_total = 0
+def _compute_reset_denied(*, state: _BirdsEyeStateLike) -> tuple[dict[str, int], int]:
+    reset_denied_by_axis = {
+        str(axis_id): int(count)
+        for axis_id, count in state.estop_reset_denied_count_by_axis.items()
+        if str(axis_id).strip()
+    }
+    reset_denied_total = sum(reset_denied_by_axis.values())
     return reset_denied_by_axis, reset_denied_total
 
 
@@ -150,50 +160,40 @@ def _build_motion_facts(
     state: _BirdsEyeStateLike,
     router: object,
     axis_ids: Sequence[str],
-    last_intents_meta: dict[str, object],
+    last_intents_meta: _LastIntentsMetaLike,
 ) -> _BirdsEyeMotionFacts:
     intents_types = last_intents_meta.get("types", []) or []
-    intents_types_str = ",".join([str(t) for t in intents_types])
+    intents_types_str = ",".join(str(t) for t in intents_types)
     reset_denied_by_axis, reset_denied_total = _compute_reset_denied(state=state)
 
     try:
-        axes_snapshot, blocked_by, blocked_payload, cmd_frame = build_blocked_and_axes_snapshot(
+        axes_snapshot, blocked_by, blocked_payload, cmd_frame_raw = build_blocked_and_axes_snapshot(
             snap=snap,
             state=state,
             router=router,
-            axis_ids=axis_ids,
+            axis_ids=list(axis_ids),
         )
+        cmd_frame = cast(_CommandFrameLike | None, cmd_frame_raw)
     except Exception:
         axes_snapshot = []
         blocked_by = []
         blocked_payload = []
         cmd_frame = None
 
-    joy = getattr(state, "joy", None)
+    joy = state.joy
     jf = extract_joy_facts(joy)
     joy_dm = bool(jf.deadman)
     joy_sel = bool(jf.select_hip)
-    selected_lanes = (
-        _as_str_list(getattr(joy, "selected_axes", ()) or ()) if joy is not None else []
-    )
+    selected_lanes = _as_str_list(joy.selected_axes) if joy is not None else []
 
     attached_lanes = sorted(
-        [
-            f"{axis_id}:{owner}"
-            for axis_id, owner in dict(_as_mapping(getattr(state, "axis_claims", {}) or {})).items()
-            if str(owner or "")
-        ]
+        f"{axis_id}:{owner}" for axis_id, owner in state.axis_claims.items() if str(owner).strip()
     )
 
-    resolved_moving_targets = []
+    resolved_moving_targets: list[str] = []
     if cmd_frame is not None:
-        cmd_axes = dict(_as_mapping(getattr(cmd_frame, "axes", {}) or {}))
         resolved_moving_targets = sorted(
-            [
-                str(axis_id)
-                for axis_id, sp in cmd_axes.items()
-                if abs(_as_float(getattr(sp, "vel", 0.0) or 0.0)) > 1e-9
-            ]
+            str(axis_id) for axis_id, sp in cmd_frame.axes.items() if abs(_as_float(sp.vel)) > 1e-9
         )
 
     local_manual_axes = [
@@ -202,11 +202,7 @@ def _build_motion_facts(
         if axis_id in axis_ids and axis_local_motion_allowed(state, axis_id)
     ]
 
-    try:
-        densis = _as_mapping(getattr(snap, "densis", {}) or {})
-        devices = sorted([str(k) for k in densis.keys()])
-    except Exception:
-        devices = []
+    devices = sorted(str(k) for k in snap.densis.keys())
 
     return _BirdsEyeMotionFacts(
         axes_snapshot=axes_snapshot,
@@ -231,10 +227,10 @@ def _build_summary(
     mode_v: str,
     state: _BirdsEyeStateLike,
     motion_facts: _BirdsEyeMotionFacts,
-    last_intents_meta: dict[str, object],
+    last_intents_meta: _LastIntentsMetaLike,
 ) -> str:
     blocked_summary = ",".join(motion_facts.blocked_by)
-    motion_allowed_i = int(bool(getattr(state, "core_motion_allowed", False)))
+    motion_allowed_i = int(bool(state.core_motion_allowed))
     return (
         f"core_mode={mode_v} motion_allowed={motion_allowed_i} blocked_by=[{blocked_summary}] "
         f"local_manual=[{','.join(motion_facts.local_manual_axes)}] dm={int(motion_facts.joy_dm)} "
@@ -257,7 +253,7 @@ def _build_fields(
     fault_v: bool,
     age_facts: _BirdsEyeAgeFacts,
     motion_facts: _BirdsEyeMotionFacts,
-    last_intents_meta: dict[str, object],
+    last_intents_meta: _LastIntentsMetaLike,
 ) -> dict[str, object]:
     cmd_frame = motion_facts.cmd_frame
     return {
@@ -270,19 +266,17 @@ def _build_fields(
         "selected_lanes": list(motion_facts.selected_lanes),
         "attached_lanes": list(motion_facts.attached_lanes),
         "resolved_moving_targets": list(motion_facts.resolved_moving_targets),
-        "motion_allowed": bool(getattr(state, "core_motion_allowed", False)),
+        "motion_allowed": bool(state.core_motion_allowed),
         "local_manual_axes": list(motion_facts.local_manual_axes),
         "local_manual_allowed": bool(motion_facts.local_manual_axes),
-        "tick": int(getattr(snap, "tick", 0) or 0),
+        "tick": int(snap.tick or 0),
         "mode": str(mode_v),
         "estop": estop_v,
         "fault": fault_v,
         "intents_in_count": int(last_intents_meta.get("count", 0)),
         "intents_in_types": motion_facts.intents_types_str,
-        "cmd_estop_reset": bool(getattr(cmd_frame, "estop_reset", False))
-        if cmd_frame is not None
-        else False,
-        "cmd_resync": bool(getattr(cmd_frame, "resync", False)) if cmd_frame is not None else False,
+        "cmd_estop_reset": bool(cmd_frame.estop_reset) if cmd_frame is not None else False,
+        "cmd_resync": bool(cmd_frame.resync) if cmd_frame is not None else False,
         "axes": motion_facts.axes_snapshot,
         "reset_denied_total": int(motion_facts.reset_denied_total),
         "reset_denied_by_axis": dict(motion_facts.reset_denied_by_axis),
@@ -298,13 +292,13 @@ def _build_fields(
 
 def emit_birds_eye_status(
     *,
-    status,
-    snap,
-    state,
-    router,
+    status: _BirdsEyeStatusLike | None,
+    snap: _BirdsEyeSnapLike,
+    state: _BirdsEyeStateLike,
+    router: object,
     axis_ids: Sequence[str],
-    last_intents_meta: dict[str, object],
-    last_seen: dict[str, object],
+    last_intents_meta: _LastIntentsMetaLike,
+    last_seen: _LastSeenLike,
 ) -> None:
     if status is None:
         return

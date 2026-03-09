@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import TypeAlias, TypedDict
 
 
 @dataclass(frozen=True)
@@ -178,7 +178,10 @@ def _simul_status() -> DriveStatus:
     )
 
 
-def _coerce_word(word: int | str | None) -> int | None:
+DriveStatusWord: TypeAlias = int | str | None
+
+
+def _coerce_word(word: DriveStatusWord) -> int | None:
     if word is None:
         return None
     if isinstance(word, str):
@@ -248,7 +251,7 @@ def _build_drive_status(fields: _DriveStatusFields) -> DriveStatus:
     )
 
 
-def decode_drive_status(word: int | str | None) -> DriveStatus:
+def decode_drive_status(word: DriveStatusWord) -> DriveStatus:
     coerced = _coerce_word(word)
     if coerced is None:
         return _noconn_status()

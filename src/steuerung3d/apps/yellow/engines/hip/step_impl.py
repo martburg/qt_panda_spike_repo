@@ -133,8 +133,10 @@ def _run_pre_motion_phases(
         param_result=param_result,
         update_state=True,
     )
-    joy = getattr(step_state.snap, "joy", None) or JoyState()
-    joy_state = project_local_joy(joy=joy, display_axis_id=str(step_state.display_axis_id or ""))
+    joy_state = project_local_joy(
+        joy=inputs.joy if isinstance(inputs.joy, JoyState) else JoyState(),
+        display_axis_id=str(step_state.display_axis_id or ""),
+    )
     return _PreMotionResult(
         param_result=param_result,
         presentation_phase=presentation_phase,

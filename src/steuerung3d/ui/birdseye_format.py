@@ -1,4 +1,4 @@
-"""Birds-eye formatting helpers for the stack supervisor.
+"""Bird's-eye formatting helpers for the stack supervisor.
 
 These utilities are UI-ish (presentation only) but intentionally have no UI
 framework dependencies.
@@ -53,7 +53,7 @@ def format_birds_eye(
     return "\n".join(lines)
 
 
-def _flag(value: object) -> str:
+def _flag(value: bool | None) -> str:
     if value is True:
         return "1"
     if value is False:
@@ -79,12 +79,12 @@ def _as_float(value: object) -> float | None:
     return None
 
 
-def _age_ms(value: object) -> str:
+def _age_ms(value: int | float | None) -> str:
     parsed = _as_int(value)
     return "?" if parsed is None else str(parsed)
 
 
-def _fmt_vel(value: object) -> str:
+def _fmt_vel(value: int | float | None) -> str:
     if value is None:
         return "?"
     parsed = _as_float(value)
@@ -107,10 +107,16 @@ class _BirdAxisFields(TypedDict, total=False):
     age_ms: int | float
 
 
+class _BirdBlockedCode(TypedDict, total=False):
+    axis_id: str
+    code: str
+    detail: object
+
+
 class BirdsEyeFields(TypedDict, total=False):
     core_mode: str
     mode: str
-    blocked_by: list[_BirdAxisFields | str]
+    blocked_by: list[_BirdBlockedCode | str]
     joy_dm: bool
     joy_sel: bool
     live_req_seen: bool
@@ -122,25 +128,33 @@ class BirdsEyeFields(TypedDict, total=False):
     axes: list[_BirdAxisFields]
 
 
-def build_frederik_panel_lines(fields: BirdsEyeFields, *, max_blocked: int = 3) -> list[str]:
+def _normalize_blocked_codes(
+    blocked_in: list[_BirdBlockedCode | str] | object, *, max_blocked: int
+) -> str:
+    if not isinstance(blocked_in, list):
+        return ""
 
-    core_mode = str(fields.get("core_mode", fields.get("mode", "")) or "")
-
-    blocked_in = fields.get("blocked_by", [])
     blocked_codes: list[str] = []
-    if isinstance(blocked_in, list):
-        for item in blocked_in:
-            if isinstance(item, dict):
-                code = str(item.get("code", ""))
-                axis_id = str(item.get("axis_id", ""))
-                if axis_id:
-                    blocked_codes.append(f"{axis_id}:{code}" if code else axis_id)
-                else:
-                    blocked_codes.append(code)
-            else:
-                blocked_codes.append(str(item))
-    blocked_codes = [b for b in blocked_codes if b]
-    blocked_summary = ",".join(blocked_codes[: int(max_blocked)])
+    for item in blocked_in:
+        if isinstance(item, dict):
+            code = str(item.get("code", "") or "")
+            axis_id = str(item.get("axis_id", "") or "")
+            if axis_id:
+                blocked_codes.append(f"{axis_id}:{code}" if code else axis_id)
+            elif code:
+                blocked_codes.append(code)
+        else:
+            value = str(item).strip()
+            if value:
+                blocked_codes.append(value)
+    return ",".join(blocked_codes[: int(max_blocked)])
+
+
+def build_frederik_panel_lines(fields: BirdsEyeFields, *, max_blocked: int = 3) -> list[str]:
+    core_mode = str(fields.get("core_mode", fields.get("mode", "")) or "")
+    blocked_summary = _normalize_blocked_codes(
+        fields.get("blocked_by", []), max_blocked=max_blocked
+    )
 
     joy_dm = _flag(fields.get("joy_dm"))
     joy_sel = _flag(fields.get("joy_sel"))
@@ -166,7 +180,7 @@ def build_frederik_panel_lines(fields: BirdsEyeFields, *, max_blocked: int = 3) 
         )
         axes_sorted = sorted(axes, key=lambda a: str(a.get("axis_id", "")))
         for ax in axes_sorted:
-            axis_id = str(ax.get("axis_id", ""))
+            axis_id = str(ax.get("axis_id", "") or "")
             in_scope = _flag(ax.get("in_scope"))
             estop = _flag(ax.get("estop"))
             fault = _flag(ax.get("fault"))

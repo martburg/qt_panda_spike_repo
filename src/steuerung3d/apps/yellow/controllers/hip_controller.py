@@ -68,6 +68,8 @@ class HiPController:
     _binder_apply_err_last_s: float = 0.0
 
     # Late-initialized internal members (kept out of __init__ signature)
+    ui: YellowBindings = field(init=False)
+
     _hb: Heartbeat = field(init=False)
     _ch: ChangeTracker = field(init=False)
     _status: StatusEmitterLike | None = field(init=False, default=None)
@@ -101,7 +103,7 @@ class HiPController:
         self._wd = PerfWatchdog(log, name="hi_p")
 
         # --- HiP runtime (Qt-free orchestration)
-        self._hip_engine = HipEngine(hip_id=str(getattr(self, "_hip_id", "") or ""))
+        self._hip_engine = HipEngine(hip_id=self._hip_id)
         self._hip_runtime = HipRuntime(
             engine=self._hip_engine,
             hb=self._hb,
@@ -109,7 +111,7 @@ class HiPController:
             status=self._status,
             stale_after_ms=self.stale_after_ms,
             log=log,
-            hip_id=str(getattr(self, "_hip_id", "") or ""),
+            hip_id=self._hip_id,
             shadow_mode=self.shadow_mode,
         )
 
@@ -182,7 +184,7 @@ class HiPController:
             snap=snap,
             intents=list(intents or []),
             estate=str(estate or ""),
-            soft_errors=dict(getattr(self, "_soft_errors", {}) or {}),
+            soft_errors=dict(self._soft_errors),
         )
 
     def _read_ui_inputs(self) -> HipUiInputs:
@@ -194,13 +196,12 @@ class HiPController:
             param_actions=[],
             param_values={},
         )
-        if getattr(self, "_binder", None) is not None:
-            try:
-                ui_inputs = self._binder.read_inputs()
-            except Exception:
-                self._soft_errors["binder.read_inputs"] = (
-                    int(self._soft_errors.get("binder.read_inputs", 0)) + 1
-                )
+        try:
+            ui_inputs = self._binder.read_inputs()
+        except Exception:
+            self._soft_errors["binder.read_inputs"] = (
+                int(self._soft_errors.get("binder.read_inputs", 0)) + 1
+            )
         return ui_inputs
 
     def _log_runtime_result(self, *, ui_inputs: HipUiInputs, rt_result: HipRuntimeResult) -> None:
@@ -208,68 +209,65 @@ class HiPController:
             "hi_p: ui axis=%r changed=%s attached=%s intents=%d",
             ui_inputs.axis_selected,
             ui_inputs.axis_selection_changed,
-            getattr(rt_result.view_model.attach_state, "attached", None)
-            if rt_result.view_model
+            rt_result.view_model.attach_state.attached
+            if (rt_result.view_model is not None and rt_result.view_model.attach_state is not None)
             else None,
-            len(rt_result.intents) if hasattr(rt_result, "intents") else -1,
+            len(rt_result.intents),
         )
 
         vm: HipViewModel | None = rt_result.view_model
-        if vm is not None and not getattr(self, "_dbg_vm_keys_once", False):
+        if vm is not None and not self._dbg_vm_keys_once:
             self._dbg_vm_keys_once = True
             log.info("hi_p: dbg vm_type=%s keys=%s", type(vm).__name__, sorted(vars(vm).keys()))
 
         now_s = time.time()
-        if now_s >= getattr(self, "_dbg_next_s", 0.0):
+        if now_s >= self._dbg_next_s:
             self._dbg_next_s = now_s + 1.0
-            ast = getattr(vm, "attach_state", None)
+            ast = vm.attach_state if vm is not None else None
             log.info(
                 "hi_p: dbg axis=%r attached=%s modal_locked=%s tabs_enabled=%s lifetick_age=%r drive_main=%r pos=%r vel=%r",
                 ui_inputs.axis_selected,
-                getattr(ast, "attached", None),
-                getattr(ui_inputs, "modal_locked", None),
-                getattr(ast, "tabs_enabled", None),
-                getattr(vm, "lifetick_age", None),
-                getattr(vm, "main_drive_status_text", None),
-                getattr(vm, "pos_text", None),
-                getattr(vm, "vel_text", None),
+                ast.attached if ast is not None else None,
+                None,
+                ast.tabs_enabled if ast is not None else None,
+                vm.lifetick_age if vm is not None else None,
+                vm.drive_status.main_text
+                if (vm is not None and vm.drive_status is not None)
+                else None,
+                vm.readouts.pos_text if (vm is not None and vm.readouts is not None) else None,
+                vm.readouts.vel_text if (vm is not None and vm.readouts is not None) else None,
             )
 
     def _apply_runtime_result(self, *, rt_result: HipRuntimeResult) -> bool:
         if rt_result.apply_startup_state:
-            if getattr(self, "_binder", None) is not None:
-                try:
-                    self._binder.apply_startup_state()
-                except Exception:
-                    self._soft_errors["binder.apply_startup_state"] = (
-                        int(self._soft_errors.get("binder.apply_startup_state", 0)) + 1
-                    )
+            try:
+                self._binder.apply_startup_state()
+            except Exception:
+                self._soft_errors["binder.apply_startup_state"] = (
+                    int(self._soft_errors.get("binder.apply_startup_state", 0)) + 1
+                )
             return False
 
         if rt_result.view_model is None:
             return False
 
-        if getattr(self, "_binder", None) is not None:
-            try:
-                self._binder.apply(rt_result.view_model)
-            except Exception:
-                self._soft_errors["binder.apply"] = (
-                    int(self._soft_errors.get("binder.apply", 0)) + 1
-                )
-                now_s = time.time()
-                last = getattr(self, "_binder_apply_err_last_s", 0.0)
-                if now_s - last > 1.0:
-                    self._binder_apply_err_last_s = now_s
-                    log.exception("hi_p: binder.apply crashed (continuing).")
+        try:
+            self._binder.apply(rt_result.view_model)
+        except Exception:
+            self._soft_errors["binder.apply"] = int(self._soft_errors.get("binder.apply", 0)) + 1
+            now_s = time.time()
+            last = self._binder_apply_err_last_s
+            if now_s - last > 1.0:
+                self._binder_apply_err_last_s = now_s
+                log.exception("hi_p: binder.apply crashed (continuing).")
         return True
 
     def _emit_runtime_outputs(self, *, rt_result: HipRuntimeResult) -> None:
         if rt_result.snap is not None:
             estate = ""
             try:
-                estate = str(
-                    getattr(getattr(rt_result.view_model, "banner", None), "estate", "") or ""
-                )
+                banner = rt_result.view_model.banner if rt_result.view_model is not None else None
+                estate = str(banner.estate if banner is not None else "")
             except Exception:
                 estate = ""
             self._emit_birdseye_motion(
