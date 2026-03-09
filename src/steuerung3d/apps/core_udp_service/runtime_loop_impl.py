@@ -87,7 +87,7 @@ def run_core_udp_service(*, args: CoreUdpServiceArgs, status: object) -> int:
         base_host=args.ui_telem_host,
         default_target=None if args.ui_telem_disable else ("127.0.0.1", 51002),
     )
-    op_telem_outs = [UdpTelemetryOut.connect(t) for t in ui_telem_targets]
+    op_telem_outs: list[UdpTelemetryOut] = [UdpTelemetryOut.connect(t) for t in ui_telem_targets]
 
     c2_telem_targets: List[Tuple[str, int]] = []
     c2_telem_targets = _expand_targets(

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Protocol, Tuple
 
 from steuerung3d.core.net import parse_hostport
 from steuerung3d.protocol.udp_channels import UdpIntentIn, UdpTelemetryFanout, UdpTelemetryOut
@@ -12,6 +12,25 @@ from .targets import (
     expand_dev_cmd_targets as _expand_dev_cmd_targets,
     expand_targets as _expand_targets,
 )
+
+
+class CoreUdpServiceArgs(Protocol):
+    intent_in: str
+    ui_telem_disable: bool
+    ui_telem_target: list[str]
+    ui_telem_host: str
+    ui_telem_base: str | None
+    ui_telem_count: int
+    c2_telem_target: list[str]
+    c2_telem_host: str
+    c2_telem_base: str | None
+    c2_telem_count: int
+    dev_telem_in: str
+    dev_cmd_target: list[str]
+    dev_cmd_host: str
+    dev_cmd_base: str | None
+    dev_cmd_count: int
+    axis: list[str]
 
 
 @dataclass(frozen=True)
@@ -37,7 +56,7 @@ class UdpPlan:
     dev_cmd_outs: List[UdpPlcCommandOut]
 
 
-def build_udp_plan(*, args) -> UdpPlan | int:
+def build_udp_plan(*, args: CoreUdpServiceArgs) -> UdpPlan | int:
     """Build UDP binds/connects from CLI args.
 
     Structural helper: extracted from runtime_loop to keep the main loop readable.
@@ -60,7 +79,7 @@ def build_udp_plan(*, args) -> UdpPlan | int:
         base_host=args.ui_telem_host,
         default_target=None if args.ui_telem_disable else ("127.0.0.1", 51002),
     )
-    op_telem_outs = [UdpTelemetryOut.connect(t) for t in ui_telem_targets]
+    op_telem_outs: List[UdpTelemetryOut] = [UdpTelemetryOut.connect(t) for t in ui_telem_targets]
 
     c2_telem_targets: List[Tuple[str, int]] = _expand_targets(
         args.c2_telem_target,

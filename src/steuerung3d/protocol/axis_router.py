@@ -18,6 +18,10 @@ class TelemetrySink(Protocol):
     def publish_telemetry(self, snap: TelemetrySnapshot) -> None: ...
 
 
+def _empty_telemetry_sinks() -> list[TelemetrySink]:
+    return []
+
+
 def _make_snapshot(**kwargs: Any) -> TelemetrySnapshot:
     ctor = cast(Any, TelemetrySnapshot)
     return ctor(**kwargs)
@@ -42,7 +46,7 @@ class AxisRouter:
     axis_ids: Sequence[str]
     dev_cmd_out_by_axis: Mapping[str, CommandFrameSink]
     ui_telem_out_by_axis: Mapping[str, TelemetrySink]
-    ui_telem_fanout: list[TelemetrySink] = field(default_factory=list)
+    ui_telem_fanout: list[TelemetrySink] = field(default_factory=_empty_telemetry_sinks)
 
     # --- device-scoped caches (multi-axis runs must pin these per axis) ---
     last_dev_params_by_axis: dict[str, dict[str, float]] = field(default_factory=lambda: {})
