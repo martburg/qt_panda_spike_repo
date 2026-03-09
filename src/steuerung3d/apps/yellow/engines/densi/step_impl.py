@@ -5,20 +5,15 @@ No semantic changes intended; this is a mechanical extraction from `engine.py`.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    # Only needed for type checking; avoids runtime import cycles.
-    from .engine import DenSiEngine
-
 from steuerung3d.core.command_frame import CommandFrame
 
 from .drive_status import update_drive_status_words
+from .engine_host_protocols import DenSiEngineHost
 from .engine_types import DenSiTickResult
 from .types import L0Top
 
 
-def step(*, engine: "DenSiEngine", frames: list[CommandFrame], now_ns: int) -> DenSiTickResult:
+def step(*, engine: DenSiEngineHost, frames: list[CommandFrame], now_ns: int) -> DenSiTickResult:
     """Run one DenSi engine tick."""
     self = engine
 

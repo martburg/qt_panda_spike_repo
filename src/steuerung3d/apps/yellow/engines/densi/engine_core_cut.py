@@ -11,6 +11,12 @@ from .cut_markers import (
 from .engine_host_protocols import DenSiEngineHost
 from .types import EStopState
 
+ParamValue = float | str
+
+
+def _state_params_store(host: DenSiEngineHost) -> dict[str, ParamValue]:
+    return cast(dict[str, ParamValue], host.state.params)
+
 
 class DenSiCutMarkersMixin:
     def _host(self) -> DenSiEngineHost:
@@ -64,12 +70,13 @@ class DenSiCutMarkersMixin:
         host.cause_edge = False
 
         try:
-            host.state.params["SystemTime"] = host.systemtime_tok
-            host.state.params["CutPos"] = float(host.cut_pos_m)
-            host.state.params["CutVel"] = float(host.cut_vel_mps)
-            host.state.params["CutTime"] = float(host.cut_time_s)
-            host.state.params["PosDiffFor"] = 0.0
-            host.state.params["PosDiffStop"] = 0.0
+            params = _state_params_store(host)
+            params["SystemTime"] = host.systemtime_tok
+            params["CutPos"] = float(host.cut_pos_m)
+            params["CutVel"] = float(host.cut_vel_mps)
+            params["CutTime"] = float(host.cut_time_s)
+            params["PosDiffFor"] = 0.0
+            params["PosDiffStop"] = 0.0
         except Exception:
             pass
 
@@ -93,10 +100,11 @@ class DenSiCutMarkersMixin:
         host.systemtime_tok = host._now_token()
 
         try:
-            host.state.params["SystemTime"] = host.systemtime_tok
-            host.state.params["CutPos"] = float(host.cut_pos_m)
-            host.state.params["CutVel"] = float(host.cut_vel_mps)
-            host.state.params["CutTime"] = float(host.cut_time_s)
+            params = _state_params_store(host)
+            params["SystemTime"] = host.systemtime_tok
+            params["CutPos"] = float(host.cut_pos_m)
+            params["CutVel"] = float(host.cut_vel_mps)
+            params["CutTime"] = float(host.cut_time_s)
         except Exception:
             pass
 
@@ -142,7 +150,8 @@ class DenSiCutMarkersMixin:
         host.posdiff_stop_m = float(host.stop_pos_m) - float(host.cut_pos_m)
 
         try:
-            host.state.params["PosDiffStop"] = float(host.posdiff_stop_m)
-            host.state.params["PosDiffFor"] = float(host.posdiff_stop_m)
+            params = _state_params_store(host)
+            params["PosDiffStop"] = float(host.posdiff_stop_m)
+            params["PosDiffFor"] = float(host.posdiff_stop_m)
         except Exception:
             pass

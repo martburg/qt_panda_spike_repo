@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from steuerung3d.apps.joy2intent.config import load_joy2intent_config
 from steuerung3d.apps.joy2intent.mapping import JoyBindings, JoyLimits, JoyRig, synthesize_intents
@@ -12,13 +13,24 @@ from steuerung3d.core.intents import EnableAxis, JogWinch, JoyStateUpdate, Local
 from steuerung3d.protocol.raw_controls import RawControls
 
 
-def _rc(*, axes: list[float] | None = None, pressed: Iterable[int] = ()) -> RawControls:
+@dataclass(frozen=True)
+class _JoyReport:
+    axes: Sequence[float]
+    buttons: Sequence[int]
+
+
+class _TestJoyState(JoyState):
+    pass
+
+
+def _rc(*, axes: list[float] | None = None, pressed: Iterable[int] = ()) -> _JoyReport:
     axes = axes or []
     btns = [0] * 16
     for i in pressed:
         if 0 <= i < len(btns):
             btns[i] = 1
-    return RawControls(t_ns=123, src="test", axes=axes, buttons=btns)
+    _ = RawControls(t_ns=123, src="test", axes=axes, buttons=btns)
+    return _JoyReport(axes=tuple(axes), buttons=tuple(btns))
 
 
 def _bind() -> JoyBindings:
@@ -68,7 +80,7 @@ def _lim_from_config(tmp_path: Path) -> JoyLimits:
 
 
 def test_single_winch_without_explicit_select_emits_no_enable_or_jog(tmp_path: Path) -> None:
-    st = JoyState()
+    st = _TestJoyState()
     bind = JoyBindings(
         axes={"manual_jog": 1},
         buttons={"deadman": 5, "select_hip": 3},
@@ -90,7 +102,7 @@ def test_single_winch_without_explicit_select_emits_no_enable_or_jog(tmp_path: P
 
 
 def test_setup_manual_multi_select_targets_all_selected_lanes(tmp_path: Path) -> None:
-    st = JoyState()
+    st = _TestJoyState()
     bind = _bind()
     rig = _rig()
     lim = _lim_from_config(tmp_path)
@@ -115,7 +127,7 @@ def test_setup_manual_multi_select_targets_all_selected_lanes(tmp_path: Path) ->
 
 
 def test_deadman_release_disables_previously_enabled_winches(tmp_path: Path) -> None:
-    st = JoyState()
+    st = _TestJoyState()
     bind = _bind()
     rig = _rig()
     lim = _lim_from_config(tmp_path)
@@ -141,7 +153,7 @@ def test_deadman_hold_repeats_enable_keepalive(tmp_path: Path) -> None:
     will still become enabled once the core transitions to LIVE.
     """
 
-    st = JoyState()
+    st = _TestJoyState()
     bind = _bind()
     rig = _rig()
     lim = _lim_from_config(tmp_path)
@@ -156,7 +168,7 @@ def test_deadman_hold_repeats_enable_keepalive(tmp_path: Path) -> None:
 
 
 def test_fine_button_scales_rate(tmp_path: Path) -> None:
-    st = JoyState()
+    st = _TestJoyState()
     bind = _bind()
     rig = _rig()
     lim = _lim_from_config(tmp_path)
@@ -178,7 +190,7 @@ def test_fine_button_scales_rate(tmp_path: Path) -> None:
 
 
 def test_contextual_independent_axes_emits_local_axis_manual_request(tmp_path: Path) -> None:
-    st = JoyState()
+    st = _TestJoyState()
     bind = _bind()
     rig = _rig()
     lim = _lim_from_config(tmp_path)
@@ -196,7 +208,7 @@ def test_contextual_independent_axes_emits_local_axis_manual_request(tmp_path: P
 
 
 def test_contextual_independent_axes_deadman_release_emits_only_local_stop(tmp_path: Path) -> None:
-    st = JoyState()
+    st = _TestJoyState()
     bind = _bind()
     rig = _rig()
     lim = _lim_from_config(tmp_path)

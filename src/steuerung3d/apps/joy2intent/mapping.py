@@ -79,13 +79,14 @@ class JoyRig:
 class JoyStateLike(Protocol):
     prev_deadman: bool
     prev_active_winch_idxs: set[int]
-    deadman_prev: bool
-    enabled_winch_ids: set[str]
 
 
 class JoyReportLike(Protocol):
-    axes: Sequence[float]
-    buttons: Sequence[int]
+    @property
+    def axes(self) -> Sequence[float]: ...
+
+    @property
+    def buttons(self) -> Sequence[int]: ...
 
 
 def synthesize_intents(

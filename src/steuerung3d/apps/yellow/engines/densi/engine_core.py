@@ -11,8 +11,9 @@ Semantics note:
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, cast
 
 from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
 from steuerung3d.adapters.sim.device import SimDevice
@@ -26,6 +27,12 @@ from .engine_core_inj_estop import DenSiInjectedEStopMixin
 from .engine_core_meta import DenSiMetaMixin
 from .engine_core_pipeline import DenSiPipelineMixin
 from .types import EStopState, L0Sub, L0Top
+
+ParamValue = float | str
+
+
+def _state_params_store(state: MachineState) -> dict[str, ParamValue]:
+    return cast(dict[str, ParamValue], state.params)
 
 
 @dataclass
@@ -101,10 +108,10 @@ class DenSiEngine(
     posdiff_stop_m: float = 0.0
 
     # param ops hooks (controller supplies: keep semantics)
-    normalize_pos_chain: Callable[[dict[str, float]], dict[str, float]] | None = None
-    normalize_guider_range: Callable[[dict[str, float]], dict[str, float]] | None = None
-    enforce_pos_chain: Callable[[dict[str, float]], dict[str, float]] | None = None
-    enforce_guider_minmax: Callable[[dict[str, float]], dict[str, float]] | None = None
+    normalize_pos_chain: Callable[[Mapping[str, float]], dict[str, float]] | None = None
+    normalize_guider_range: Callable[[Mapping[str, float]], dict[str, float]] | None = None
+    enforce_pos_chain: Callable[[Mapping[str, float]], dict[str, float]] | None = None
+    enforce_guider_minmax: Callable[[Mapping[str, float]], dict[str, float]] | None = None
 
     # PLC-faithful vel_cmd behavior tuning
     lifetick_stale_after_ticks_active: int = 50
@@ -163,7 +170,8 @@ class DenSiEngine(
         from .param_defaults import apply_densi_param_defaults
 
         try:
-            self.state.params["SystemTime"] = self._now_token()
+            params = _state_params_store(self.state)
+            params["SystemTime"] = self._now_token()
         except Exception:
             pass
 
@@ -172,7 +180,8 @@ class DenSiEngine(
 
         # Reflect initial L0 state
         try:
-            self.state.params["DenSiL0Top"] = getattr(self.l0_top, "name", str(self.l0_top))
-            self.state.params["DenSiL0Sub"] = getattr(self.l0_sub, "name", str(self.l0_sub))
+            params = _state_params_store(self.state)
+            params["DenSiL0Top"] = getattr(self.l0_top, "name", str(self.l0_top))
+            params["DenSiL0Sub"] = getattr(self.l0_sub, "name", str(self.l0_sub))
         except Exception:
             pass

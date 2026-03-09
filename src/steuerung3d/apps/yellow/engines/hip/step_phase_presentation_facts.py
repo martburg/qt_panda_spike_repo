@@ -23,11 +23,13 @@ from .viewmodel import HipDriveStatusState
 
 
 class _HipPresentationState(Protocol):
-    prev_device_tick: int | None
+    @property
+    def prev_device_tick(self) -> int | None: ...
 
 
 class _HipPresentationEngine(Protocol):
-    state: _HipPresentationState
+    @property
+    def state(self) -> _HipPresentationState: ...
 
     def _update_taster_edge(self, axis_id: str, taster: bool, now_s: float) -> None: ...
     def _within_brake_grace(self, axis_id: str, now_s: float, grace_s: float) -> bool: ...
