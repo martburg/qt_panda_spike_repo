@@ -17,10 +17,10 @@ from steuerung3d.core.joy_state import clamp_soll_speed
 
 class _JoyBindingsLike(Protocol):
     axes: Mapping[str, int]
-    buttons: Mapping[str, int | list[int]]
+    buttons: Mapping[str, int | Sequence[int]]
     deadzone: float
     expo: float
-    select_buttons: Sequence[int | list[int]]
+    select_buttons: Sequence[int | Sequence[int]]
     invert: Mapping[str, bool]
 
 
@@ -31,9 +31,17 @@ class _JoyLimitsLike(Protocol):
     def max_speed(self) -> float: ...
 
 
-class _JoyStateLike(Protocol):
+class _IndexedJoyStateLike(Protocol):
     prev_deadman: bool
     prev_active_winch_idxs: set[int]
+
+
+class _NamedJoyStateLike(Protocol):
+    deadman_prev: bool
+    enabled_winch_ids: set[str]
+
+
+_JoyStateLike = _IndexedJoyStateLike | _NamedJoyStateLike
 
 
 class _JoyReportLike(Protocol):
@@ -114,24 +122,24 @@ def pressed_buttons(rc: Any) -> set[int]:
     return set()
 
 
-def button_aliases(value: int | list[int] | None) -> set[int]:
+def button_aliases(value: int | Sequence[int] | None) -> set[int]:
     if value is None:
         return set()
     if isinstance(value, int):
         return {value}
     out: set[int] = set()
-    if isinstance(value, list):
+    if isinstance(value, Sequence) and not isinstance(value, str | bytes):
         for item in value:
             if isinstance(item, int):
                 out.add(item)
     return out
 
 
-def select_aliases(entry: int | list[int]) -> set[int]:
+def select_aliases(entry: int | Sequence[int]) -> set[int]:
     if isinstance(entry, int):
         return {entry}
     out: set[int] = set()
-    if isinstance(entry, list):
+    if isinstance(entry, Sequence) and not isinstance(entry, str | bytes):
         for item in entry:
             if isinstance(item, int):
                 out.add(item)
@@ -148,7 +156,7 @@ def axes_list(rc: Any) -> list[float]:
 
 
 def selected_winch_ids(
-    *, select_buttons: Sequence[int | list[int]], pressed: set[int], rig_ids: Sequence[str]
+    *, select_buttons: Sequence[int | Sequence[int]], pressed: set[int], rig_ids: Sequence[str]
 ) -> set[str]:
     selected: list[str] = []
     for i, entry in enumerate(select_buttons or []):

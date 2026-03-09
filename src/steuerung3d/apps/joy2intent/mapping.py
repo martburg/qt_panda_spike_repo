@@ -15,7 +15,7 @@ JoyRig(winch_ids=[...]); we accept both for backward compatibility.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -23,6 +23,7 @@ from steuerung3d.core.control_context import ControlContext
 
 # Compatibility re-exports for older tests/imports.
 from .mapping_helpers import (
+    _JoyBindingsLike,
     build_active_enable_intents,
     build_joy_state_update,
     build_motion_intents,
@@ -38,10 +39,10 @@ from .mapping_helpers import (
 @dataclass(frozen=True)
 class JoyBindings:
     axes: dict[str, int]
-    buttons: dict[str, int | list[int]]
+    buttons: dict[str, int | Sequence[int]]
     deadzone: float
     expo: float
-    select_buttons: list[int | list[int]] = field(default_factory=list)
+    select_buttons: list[int | Sequence[int]] = field(default_factory=list)
     invert: dict[str, bool] = field(default_factory=dict)
 
 
@@ -79,26 +80,6 @@ class JoyRig:
 class JoyStateLike(Protocol):
     prev_deadman: bool
     prev_active_winch_idxs: set[int]
-
-
-class _JoyBindingsLike(Protocol):
-    @property
-    def axes(self) -> Mapping[str, int]: ...
-
-    @property
-    def buttons(self) -> Mapping[str, int | list[int]]: ...
-
-    @property
-    def deadzone(self) -> float: ...
-
-    @property
-    def expo(self) -> float: ...
-
-    @property
-    def select_buttons(self) -> Sequence[int | list[int]]: ...
-
-    @property
-    def invert(self) -> Mapping[str, bool]: ...
 
 
 class JoyReportLike(Protocol):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
 from steuerung3d.protocol.axis_router import AxisRouter
@@ -8,11 +8,7 @@ from steuerung3d.protocol.axis_router import AxisRouter
 
 @dataclass
 class _Sink:
-    snaps: list[TelemetrySnapshot] | None = None
-
-    def __post_init__(self) -> None:
-        if self.snaps is None:
-            self.snaps = []
+    snaps: list[TelemetrySnapshot] = field(default_factory=list)
 
     def publish_telemetry(self, snap: TelemetrySnapshot) -> None:
         self.snaps.append(snap)
@@ -39,8 +35,6 @@ def test_axis_router_fanout_publishes_full_snapshot_to_every_sink() -> None:
         },
     )
     assert router.publish_ui_snapshot(snap) == 2
-    assert s1.snaps is not None
-    assert s2.snaps is not None
     assert set(s1.snaps[0].axes.keys()) == {"Anton", "Debby"}
     assert set(s2.snaps[0].axes.keys()) == {"Anton", "Debby"}
 
@@ -76,7 +70,6 @@ def test_axis_router_fanout_includes_axis_scoped_device_caches() -> None:
         },
     )
     router.publish_ui_snapshot(core_snap)
-    assert s.snaps is not None
     got = s.snaps[0]
     assert got.axis_estop_status_word.get("Anton") == 0x55
     assert got.axis_params.get("Anton") == {"P": 6.3}

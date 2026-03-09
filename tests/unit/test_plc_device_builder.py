@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 from steuerung3d.adapters.links.base import Link
 from steuerung3d.adapters.plc.plc_codec import PlcCodec
 from steuerung3d.adapters.plc.plc_config import PlcWireSpec
 from steuerung3d.apps.plc_stack.builder import build_plc_device
 from steuerung3d.config.plc_stack_config import load_plc_stack_config
+from steuerung3d.core.command_frame import CommandFrame
+from steuerung3d.core.telemetry import TelemetrySnapshot
 
 
 class FakeUdpLink:
@@ -28,15 +31,17 @@ class FakeUdpLink:
         return []
 
 
-class FakeCodec:
+class FakeCodec(PlcCodec):
     def __init__(self, *, spec: PlcWireSpec):
-        self.spec = spec
+        super().__init__(spec=spec)
 
     # Minimal PlcCodec surface (not used by this test)
-    def encode_command_frame(self, _cmd: object) -> bytes:  # pragma: no cover
+    def encode_command_frame(self, _cmd: CommandFrame) -> bytes:  # pragma: no cover
         return b""
 
-    def try_decode_telemetry(self, _payload: bytes):  # pragma: no cover
+    def try_decode_telemetry(
+        self, _payload: bytes
+    ) -> Optional[TelemetrySnapshot]:  # pragma: no cover
         return None
 
 
