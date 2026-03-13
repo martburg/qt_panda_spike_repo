@@ -194,3 +194,48 @@ This file records *declared* semantic changes (RefOS Lane 2) made during stabili
 ### Expected impact
 - No intended runtime behavior change.
 - Same claim/release, control-mode, motion gating, estop, reset, and resync behavior; clearer and safer dispatch structure for future refactors.
+
+## 2026-03-12 — Supervisor read-model slice for pair phases and generic control inputs
+
+**Lane:** 2 (Declared Semantic Fix)
+
+### Change
+- Introduced a first Supervisor subsystem slice under `apps/yellow/engines/supervisor/`.
+- Added explicit Supervisor read-model/domain types for:
+  - pair identity and membership
+  - pair phases
+  - interaction mode
+  - action surface
+  - generic control inputs (`estop_reset_input`, `estart_input`, `chk_es_taster_input`)
+  - simple supervisor pose (`position`, `velocity`, `dofs`)
+- Added phase derivation that uses structured facts rather than deriving primarily from `banner_estate`.
+- Added a first one-pair-one-DOF kinematics implementation.
+- Added structured debug snapshot output for supervisor state.
+
+### Motivation
+- Establish a clean semantic foundation for the new Supervisor layer over DenSi↔HiP pairs.
+- Keep pair lifecycle, parameter editing, and control inputs separate and explicit.
+- Prepare the codebase for future GUI wiring, Frederik integration, richer kinematics, and nested supervisors.
+
+### Files
+- `src/steuerung3d/apps/yellow/engines/supervisor/__init__.py`
+- `src/steuerung3d/apps/yellow/engines/supervisor/control_model.py`
+- `src/steuerung3d/apps/yellow/engines/supervisor/debug.py`
+- `src/steuerung3d/apps/yellow/engines/supervisor/kinematics.py`
+- `src/steuerung3d/apps/yellow/engines/supervisor/kinematics_simple.py`
+- `src/steuerung3d/apps/yellow/engines/supervisor/models.py`
+- `src/steuerung3d/apps/yellow/engines/supervisor/pair_derivation.py`
+- `src/steuerung3d/apps/yellow/engines/supervisor/runtime.py`
+- `tests/unit/test_supervisor_action_surface.py`
+- `tests/unit/test_supervisor_debug_snapshot.py`
+- `tests/unit/test_supervisor_kinematics_simple.py`
+- `tests/unit/test_supervisor_pair_derivation.py`
+
+### Expected impact
+- Introduces a new supervisor read-model with intentionally new semantics.
+- No intended changes to existing HiP/DenSi runtime behavior in this slice.
+- Future slices can add GUI control wiring and external producers without replacing the phase/action/pose model.
+
+- 2026-03-12: Added Supervisor Slice 2 GUI scaffolding: Qt-free presenter/table/detail/node view-models, membership add/remove helpers, and runtime VM builders. Deferred concrete Qt widgets and Frederik wiring.
+
+- 2026-03-12: Added Supervisor reset-estop/clear-fault command slice: pair-level eligibility, single/batch issuance, ATTACHED action-surface refinement (reset first, EStart next), and debug helpers. Deferred external safety integration and request-vs-actual split.

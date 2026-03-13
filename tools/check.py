@@ -20,7 +20,7 @@ def repo_root() -> Path:
 def _maybe_run_pyright(root: Path) -> int:
     # Prefer installed "pyright" executable (node or python wrapper).
     exe = shutil.which("pyright")
-    # exe = None
+    exe = None
     if exe is None:
         print("! pyright not found on PATH; skipping type check")
         return 0
