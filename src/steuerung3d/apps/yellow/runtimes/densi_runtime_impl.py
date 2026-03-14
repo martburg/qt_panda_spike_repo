@@ -44,6 +44,7 @@ class DensiRuntime:
         axis_ids: list[str],
         stale_after_ms: int,
         log: logging.Logger,
+        action_in=None,
     ) -> None:
         self.engine = engine
         self.command_in = command_in
@@ -55,6 +56,7 @@ class DensiRuntime:
         self._axis_ids = list(axis_ids or [])
         self._stale_after_ms = int(stale_after_ms)
         self._log = log
+        self.action_in = action_in
 
         self._last_cmd: CommandFrame | None = None
         self._last_cmd_ns: int | None = None
@@ -68,8 +70,27 @@ class DensiRuntime:
         self._lt_last_echo_by_axis: dict[str, int | None] = {}
 
     def collect_inputs(self, *, now_ns: int) -> DensiInputs:
+        from ..engines.densi.inputs import DensiEstopToggle, DensiUiInputs
+
         frames = self.command_in.drain_command_frames(limit=100)
-        return DensiInputs(frames=list(frames), now_ns=int(now_ns))
+        ui = DensiUiInputs()
+        if self.action_in is not None:
+            try:
+                for action in list(self.action_in.drain_actions(limit=100) or []):
+                    name = str(getattr(action, "action", "") or "")
+                    if name == "estart":
+                        ui.es_start_clicked = True
+                    elif name == "resync":
+                        ui.diag_resync_clicked = True
+                    elif name == "chk_es_taster":
+                        ui.estop_bit_toggles.append(
+                            DensiEstopToggle(
+                                key="taster", checked=bool(getattr(action, "value", False))
+                            )
+                        )
+            except Exception:
+                self._log.debug("remote actions drain failed", exc_info=True)
+        return DensiInputs(frames=list(frames), now_ns=int(now_ns), ui=ui)
 
     def tick(self, *, inputs: DensiInputs) -> DensiRuntimeResult:
         frames = list(inputs.frames or [])

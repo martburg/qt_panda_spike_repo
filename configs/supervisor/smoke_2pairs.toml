@@ -1,0 +1,28 @@
+[supervisor]
+id = "sup_smoke_2pairs"
+title = "Supervisor Smoke 2 Pairs"
+cycle_ms = 50
+telem_in = "127.0.0.1:51002"
+intent_out = "127.0.0.1:51001"
+stale_after_ms = 800
+gui = true
+
+[[pairs]]
+pair_id = "anton"
+axis_id = "Anton"
+densi_id = "Anton"
+hip_id = "hip_anton"
+selected = true
+densi_action_out = "127.0.0.1:53001"
+hip_launch = ""  # smoke path: no HiP launch; current UDP telemetry is single-consumer
+densi_launch = "python -m steuerung3d.apps.den_si --axis Anton --cmd-in 127.0.0.1:52011 --telem-out 127.0.0.1:51002 --action-in 127.0.0.1:53001 --wire-proto json --headless"
+
+[[pairs]]
+pair_id = "debby"
+axis_id = "Debby"
+densi_id = "Debby"
+hip_id = "hip_debby"
+selected = true
+densi_action_out = "127.0.0.1:53002"
+hip_launch = ""  # smoke path: no HiP launch; current UDP telemetry is single-consumer
+densi_launch = "python -m steuerung3d.apps.den_si --axis Debby --cmd-in 127.0.0.1:52012 --telem-out 127.0.0.1:51002 --action-in 127.0.0.1:53002 --wire-proto json --headless"

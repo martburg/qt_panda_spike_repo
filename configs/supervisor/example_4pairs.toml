@@ -1,0 +1,22 @@
+[supervisor]
+id = "sup_main"
+title = "Supervisor"
+cycle_ms = 50
+telem_in = "127.0.0.1:51002"
+intent_out = "127.0.0.1:51001"
+
+[[pairs]]
+pair_id = "anton"
+axis_id = "Anton"
+densi_id = "Anton"
+hip_id = "hip_anton"
+selected = true
+densi_action_out = "127.0.0.1:53001"
+
+[[pairs]]
+pair_id = "debby"
+axis_id = "Debby"
+densi_id = "Debby"
+hip_id = "hip_debby"
+selected = true
+densi_action_out = "127.0.0.1:53002"

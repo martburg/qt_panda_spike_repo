@@ -6,11 +6,10 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
+from steuerung3d.apps.supervisor.actions_transport import UdpDensiActionIn
 from steuerung3d.apps.yellow.controllers.densi_controller import DenSiController
 from steuerung3d.apps.yellow.ui_shell import build_yellow_window
 from steuerung3d.core.net import parse_hostport
-
-# Default JSON channels (core/UI style)
 from steuerung3d.protocol.udp_channels import UdpCommandIn, UdpTelemetryOut
 from steuerung3d.util.app_bootstrap import bootstrap_logging
 
@@ -34,7 +33,16 @@ def main() -> int:
         default="127.0.0.1:52002",
         help="UDP target for TelemetryOut as host:port (default 127.0.0.1:52002).",
     )
-    # NEW: explicit device wire protocol selector
+    ap.add_argument(
+        "--action-in",
+        default="",
+        help="Optional UDP bind for supervisor action input as host:port.",
+    )
+    ap.add_argument(
+        "--headless",
+        action="store_true",
+        help="Start without showing the Qt window.",
+    )
     ap.add_argument(
         "--wire-proto",
         choices=("plc", "json"),
@@ -42,7 +50,6 @@ def main() -> int:
         help="Device wire protocol for DenSi I/O. 'plc' = ; delimited telegrams, 'json' = internal snapshots.",
     )
     ap.add_argument("--config", default="", help="TOML config path for DenSi runtime.")
-
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
     args = ap.parse_args()
 
@@ -76,7 +83,6 @@ def main() -> int:
     except Exception:
         pass
 
-    # Choose channel implementations based on wire protocol.
     if args.wire_proto == "plc":
         from steuerung3d.protocol.udp_plc_channels import UdpPlcCommandIn, UdpPlcTelemetryOut
 
@@ -86,14 +92,20 @@ def main() -> int:
         command_in = UdpCommandIn.bind(cmd_in_addr)
         telemetry_out = UdpTelemetryOut.connect(telem_out_addr)
 
+    action_in = (
+        UdpDensiActionIn.bind(parse_hostport(args.action_in))
+        if str(args.action_in).strip()
+        else None
+    )
+
     ctl = DenSiController(
         win=win,
         command_in=command_in,
         telemetry_out=telemetry_out,
         axis_ids=axis_ids,
         dt_s=args.dt,
+        action_in=action_in,
     )
-    # Start controller (timer + IO loop)
     if hasattr(ctl, "start"):
         ctl.start()
     elif hasattr(ctl, "run"):
@@ -101,7 +113,8 @@ def main() -> int:
     else:
         raise AttributeError(f"DenSiController has no start/run method: {type(ctl).__name__}")
 
-    win.show()
+    if not args.headless:
+        win.show()
     return app.exec()
 
 
