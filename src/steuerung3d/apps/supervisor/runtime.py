@@ -85,9 +85,7 @@ class SupervisorRuntime(QObject):
         cmd_text = str(axis.hip_launch).strip()
         if not cmd_text:
             try:
-                self.window.status_label.setText(
-                    f"{self.engine.snapshot().status_text} | hip: no launch for {axis.axis_id}"
-                )
+                self.window.status_label.setText(f"{self.engine.snapshot().status_text} | hip: no launch for {axis.axis_id}")
             except Exception:
                 pass
             return

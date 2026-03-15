@@ -51,8 +51,7 @@ def _visible_axis_context(
         # in the current snapshot, even before claim ownership is established.
         axis_norm_to_canon_all = {
             normalize_axis_id(str(a)): str(a)
-            for a in list((getattr(snap, "axes", {}) or {}).keys())
-            + list((getattr(snap, "densis", {}) or {}).keys())
+            for a in list((getattr(snap, 'axes', {}) or {}).keys()) + list((getattr(snap, 'densis', {}) or {}).keys())
             if str(a).strip()
         }
         canon = axis_norm_to_canon_all.get(fixed_norm)

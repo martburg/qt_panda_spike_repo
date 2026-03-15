@@ -214,6 +214,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 0
 
 
+
 def cmd_sup(args: argparse.Namespace) -> int:
     from steuerung3d.apps.supervisor.cli import run_supervisor
 
