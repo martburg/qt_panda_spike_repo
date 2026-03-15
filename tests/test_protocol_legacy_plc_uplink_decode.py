@@ -4,7 +4,7 @@ from steuerung3d.protocol.legacy_plc import encode_uplink
 from steuerung3d.protocol.plc_codec_uplink_support import decode_snapshot_from_payload
 
 
-def test_decode_snapshot_carries_livetick_diff_from_geartoui() -> None:
+def test_decode_snapshot_does_not_treat_geartoui_as_livetick_echo() -> None:
     payload = encode_uplink(
         fields={
             "LifetickUItx": 1235,
@@ -19,5 +19,5 @@ def test_decode_snapshot_carries_livetick_diff_from_geartoui() -> None:
     assert snap is not None
     ax = snap.axes["Anton"]
     assert ax.device_tick == 1235
-    assert ax.lifetick_rx == 1200
-    assert ax.lifetick_age == 35
+    assert ax.lifetick_rx == 0
+    assert ax.lifetick_age == 0

@@ -202,30 +202,26 @@ class HipEngine:
         *,
         snap: TelemetrySnapshot,
         hip_id: str,
-        selected_axis: str = "",
         last_lifetick_echo_sent: dict[str, int],
     ) -> tuple[list[Intent], dict[str, int]]:
         axes = getattr(snap, "axes", None)
         if not isinstance(axes, dict) or not axes:
             return [], last_lifetick_echo_sent
 
-        axis_id = str(selected_axis or "").strip()
-        if not axis_id:
-            return [], last_lifetick_echo_sent
-        ax = axes.get(axis_id)
-        if ax is None:
-            return [], last_lifetick_echo_sent
-        try:
-            v = int(getattr(ax, "device_tick", 0)) & 0xFFFF
-        except Exception:
-            v = 0
+        intents: list[Intent] = []
+        for axis_id, ax in axes.items():
+            try:
+                v = int(getattr(ax, "device_tick", 0)) & 0xFFFF
+            except Exception:
+                v = 0
 
-        prev = last_lifetick_echo_sent.get(axis_id)
-        if prev is not None and int(prev) == v:
-            return [], last_lifetick_echo_sent
+            prev = last_lifetick_echo_sent.get(axis_id)
+            if prev is not None and int(prev) == v:
+                continue
 
-        last_lifetick_echo_sent[axis_id] = v
-        intents: list[Intent] = [EchoLifeTick(axis_id=axis_id, value=v, hip_id=str(hip_id or ""))]
+            last_lifetick_echo_sent[axis_id] = v
+            intents.append(EchoLifeTick(axis_id=axis_id, value=v, hip_id=str(hip_id or "")))
+
         return intents, last_lifetick_echo_sent
 
 

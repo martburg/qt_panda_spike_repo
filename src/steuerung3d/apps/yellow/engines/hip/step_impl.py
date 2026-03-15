@@ -211,7 +211,6 @@ def _run_motion_and_command_phases(
     lifetick_intents, echo_map = engine._compute_lifetick_echo_intents(
         snap=step_state.snap,
         hip_id=step_state.hip_id,
-        selected_axis=step_state.axis_id,
         last_lifetick_echo_sent=dict(engine.state.last_lifetick_echo_sent or {}),
     )
     intents.extend(lifetick_intents)
