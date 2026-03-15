@@ -48,7 +48,7 @@ class SupervisorWindow(QMainWindow):
         lay.addLayout(toolbar)
         self.table = QTableWidget(0, 8)
         self.table.setHorizontalHeaderLabels(
-            ["axis", "selected", "phase(state)", "estop", "livetick", "pos", "vel", "hip"]
+            ["axis", "selected", "phase(state)", "estop", "diff", "pos", "vel", "hip"]
         )
         lay.addWidget(self.table)
         self.setCentralWidget(root)
@@ -80,7 +80,7 @@ class SupervisorWindow(QMainWindow):
                 chk.blockSignals(False)
                 self._set_text(row_idx, 2, row.phase.value)
                 self._set_text(row_idx, 3, "yes" if row.estop else "no")
-                self._set_text(row_idx, 4, str(int(row.livetick)))
+                self._set_text(row_idx, 4, str(int(row.livetick_diff)))
                 self._set_text(row_idx, 5, f"{row.pos:.3f}")
                 self._set_text(row_idx, 6, f"{row.vel:.3f}")
                 btn = self.table.cellWidget(row_idx, 7)

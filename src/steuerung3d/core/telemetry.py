@@ -112,8 +112,14 @@ class TelemetrySnapshot:
                 vel_cmd=float(getattr(state.axis_cmd.get(axis_id, None), "vel", 0.0)),
                 enable_cmd=bool(getattr(state.axis_cmd.get(axis_id, None), "enable", False)),
                 device_tick=int(getattr(ax, "meta", {}).get("device_tick", 0)) & 0xFFFF,
-                lifetick_rx=int(getattr(ax, "meta", {}).get("lifetick_rx", 0)) & 0xFFFF,
-                lifetick_age=int(getattr(ax, "meta", {}).get("lifetick_age", 0)) & 0xFFFF,
+                lifetick_rx=(
+                    int(getattr(state, "lifetick_echo_by_axis", {}).get(axis_id, getattr(ax, "meta", {}).get("lifetick_rx", 0))) & 0xFFFF
+                ),
+                lifetick_age=(
+                    (int(getattr(ax, "meta", {}).get("device_tick", 0))
+                    - int(getattr(state, "lifetick_echo_by_axis", {}).get(axis_id, getattr(ax, "meta", {}).get("lifetick_rx", 0))))
+                    & 0xFFFF
+                ),
                 status_word=int(getattr(ax, "meta", {}).get("status_word", 0)),
                 guide_status_word=int(getattr(ax, "meta", {}).get("guide_status_word", 0)),
             )

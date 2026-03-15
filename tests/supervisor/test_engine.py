@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from steuerung3d.apps.supervisor.engine import SupervisorEngine
 from steuerung3d.apps.supervisor.models import PairConfig, PairPhase, SupervisorProfile
+from steuerung3d.core.intents import EchoLifeTick, JoyStateUpdate
 from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, JoyState, TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import (
     ESTOP_CAUSE_KEYS,
@@ -68,7 +69,7 @@ def _snap(
                 enabled=True,
                 fault=False,
                 device_tick=12,
-                lifetick_age=0,
+                lifetick_age=7,
             )
         },
         densis={
@@ -142,3 +143,28 @@ def test_hip_open_blocks_synchronized_motion_and_status_line() -> None:
     assert snap.hip_open_total == 1
     assert snap.rows[0].hip_open_count == 1
     assert "hip: 1 open" in snap.status_text
+
+
+def test_supervisor_row_uses_lifetick_diff_not_raw_tick() -> None:
+    eng = SupervisorEngine(_profile())
+    eng.ingest(_snap(estop_word=(1 << 11)))
+    row = eng.snapshot().rows[0]
+    assert row.livetick == 12
+    assert row.livetick_diff == 7
+
+
+def test_supervisor_emits_echo_for_attached_axis_and_suppresses_when_hip_open() -> None:
+    eng = SupervisorEngine(_profile())
+    eng.ingest(_snap(estop_word=(1 << 11)))
+    batch = eng.consume_outbound()
+    echoes = [i for i in batch.intents if isinstance(i, EchoLifeTick)]
+    joys = [i for i in batch.intents if isinstance(i, JoyStateUpdate)]
+    assert len(echoes) == 1
+    assert echoes[0].axis_id == "Anton"
+    assert echoes[0].hip_id == "sup"
+    assert len(joys) == 1
+
+    eng.set_hip_open_count("anton", 1)
+    batch = eng.consume_outbound()
+    echoes = [i for i in batch.intents if isinstance(i, EchoLifeTick)]
+    assert echoes == []

@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from steuerung3d.apps.yellow.engines.hip.presentation_extract import (
     parse_estop_word_from_snapshot,
 )
-from steuerung3d.core.intents import JoyStateUpdate, RequestEstopReset, RequestResync
+from steuerung3d.core.intents import EchoLifeTick, JoyStateUpdate, RequestEstopReset, RequestResync
 from steuerung3d.core.telemetry import JoyState, TelemetrySnapshot
 from steuerung3d.core.telemetry_axis_view import axis_scoped_snapshot
 from steuerung3d.protocol.banner_estate import BANNER_DYNAMIC_EXCLUDE
@@ -35,6 +35,7 @@ class SupervisorEngine:
         self._chk_requested = False
         self._joy_sent: JoyState | None = None
         self._hip_open_counts: dict[str, int] = {}
+        self._echo_tick: int = 0
 
     def ingest(self, snap: TelemetrySnapshot) -> None:
         self._last_snapshot = snap
@@ -94,6 +95,7 @@ class SupervisorEngine:
                         phase=row.phase,
                         estop=row.estop,
                         livetick=row.livetick,
+                        livetick_diff=row.livetick_diff,
                         pos=row.pos,
                         vel=row.vel,
                         stale=row.stale,
@@ -152,6 +154,19 @@ class SupervisorEngine:
             for axis in self.profile.axes
             if axis.unit_id in self._rows and self._selected.get(axis.unit_id, True)
         )
+        for axis in self.profile.axes:
+            if axis.unit_id not in self._rows:
+                continue
+            if int(self._hip_open_counts.get(axis.unit_id, 0)) > 0:
+                continue
+            self._echo_tick = (int(self._echo_tick) + 1) & 0xFFFF
+            intents.append(
+                EchoLifeTick(
+                    axis_id=axis.axis_id,
+                    value=int(self._echo_tick),
+                    hip_id=str(self.profile.supervisor_id),
+                )
+            )
         motion_blocked = self.hip_open_total > 0
         joy_update = JoyState(
             deadman=(False if motion_blocked else bool(joy.deadman)),
@@ -200,6 +215,7 @@ class SupervisorEngine:
             phase=phase,
             estop=(phase == AxisPhase.ESTOP),
             livetick=int(getattr(ax, "device_tick", 0) or 0),
+            livetick_diff=int(getattr(ax, "lifetick_age", 0) or 0),
             pos=float(getattr(ax, "pos", 0.0) or 0.0),
             vel=float(getattr(ax, "vel", 0.0) or 0.0),
             stale=stale,

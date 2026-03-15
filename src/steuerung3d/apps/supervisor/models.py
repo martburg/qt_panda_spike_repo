@@ -120,6 +120,7 @@ class AxisRow:
     phase: AxisPhase
     estop: bool
     livetick: int
+    livetick_diff: int = 0
     pos: float
     vel: float
     stale: bool = False
@@ -137,6 +138,7 @@ class AxisRow:
         phase: AxisPhase,
         estop: bool,
         livetick: int,
+        livetick_diff: int = 0,
         pos: float,
         vel: float,
         stale: bool = False,
@@ -150,6 +152,7 @@ class AxisRow:
         object.__setattr__(self, "phase", phase)
         object.__setattr__(self, "estop", bool(estop))
         object.__setattr__(self, "livetick", int(livetick))
+        object.__setattr__(self, "livetick_diff", int(livetick_diff))
         object.__setattr__(self, "pos", float(pos))
         object.__setattr__(self, "vel", float(vel))
         object.__setattr__(self, "stale", bool(stale))
