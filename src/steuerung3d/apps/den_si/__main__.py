@@ -43,7 +43,9 @@ def main() -> int:
         help="Device wire protocol for DenSi I/O. 'plc' = ; delimited telegrams, 'json' = internal snapshots.",
     )
     ap.add_argument("--config", default="", help="TOML config path for DenSi runtime.")
-    ap.add_argument("--action-in", default="", help="Optional UDP bind for supervisor remote actions.")
+    ap.add_argument(
+        "--action-in", default="", help="Optional UDP bind for supervisor remote actions."
+    )
     ap.add_argument("--headless", action="store_true", help="Run without showing the Qt window.")
 
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
@@ -89,7 +91,11 @@ def main() -> int:
         command_in = UdpCommandIn.bind(cmd_in_addr)
         telemetry_out = UdpTelemetryOut.connect(telem_out_addr)
 
-    action_in = UdpDensiActionIn.bind(parse_hostport(args.action_in)) if str(args.action_in).strip() else None
+    action_in = (
+        UdpDensiActionIn.bind(parse_hostport(args.action_in))
+        if str(args.action_in).strip()
+        else None
+    )
 
     ctl = DenSiController(
         win=win,

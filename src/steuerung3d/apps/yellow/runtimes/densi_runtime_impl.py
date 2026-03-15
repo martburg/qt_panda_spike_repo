@@ -84,7 +84,9 @@ class DensiRuntime:
                         ui.diag_resync_clicked = True
                     elif name == "chk_es_taster":
                         ui.estop_bit_toggles.append(
-                            DensiEstopToggle(key="taster", checked=bool(getattr(action, "value", False)))
+                            DensiEstopToggle(
+                                key="taster", checked=bool(getattr(action, "value", False))
+                            )
                         )
             except Exception:
                 self._log.debug("remote actions drain failed", exc_info=True)
