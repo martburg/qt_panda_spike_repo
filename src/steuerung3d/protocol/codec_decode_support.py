@@ -122,14 +122,7 @@ def _decode_str_map(value: Any) -> Dict[str, str]:
 
 
 def _decode_str_float_map(value: Any) -> Dict[str, float]:
-    out: Dict[str, float] = {}
-    if isinstance(value, dict):
-        for k, v in value.items():
-            try:
-                out[str(k)] = float(v)
-            except Exception:
-                continue
-    return out
+    return {str(k): float(v) for k, v in dict(value).items()}
 
 
 def _decode_bool_map(value: Any) -> Dict[str, bool]:
@@ -141,19 +134,11 @@ def _decode_int_map(value: Any) -> Dict[str, int]:
 
 
 def _decode_nested_float_map(value: Any) -> Dict[str, Dict[str, float]]:
-    out: Dict[str, Dict[str, float]] = {}
-    if isinstance(value, dict):
-        for k, v in value.items():
-            if not isinstance(v, dict):
-                continue
-            inner: Dict[str, float] = {}
-            for pk, pv in v.items():
-                try:
-                    inner[str(pk)] = float(pv)
-                except Exception:
-                    continue
-            out[str(k)] = inner
-    return out
+    return {
+        str(k): {str(pk): float(pv) for pk, pv in dict(v).items()}
+        for k, v in dict(value).items()
+        if isinstance(v, dict)
+    }
 
 
 def _decode_nested_str_map(value: Any) -> Dict[str, Dict[str, str]]:

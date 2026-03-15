@@ -24,6 +24,7 @@ class SupervisorWindow(QMainWindow):
     recover_clicked = Signal()
     chk_es_taster_changed = Signal(bool)
     pair_selected_changed = Signal(str, bool)
+    open_hip_clicked = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
@@ -45,9 +46,9 @@ class SupervisorWindow(QMainWindow):
         toolbar.addWidget(self.chk_taster)
         toolbar.addStretch(1)
         lay.addLayout(toolbar)
-        self.table = QTableWidget(0, 7)
+        self.table = QTableWidget(0, 8)
         self.table.setHorizontalHeaderLabels(
-            ["pair", "selected", "phase(state)", "estop", "livetick", "pos", "vel"]
+            ["axis", "selected", "phase(state)", "estop", "livetick", "pos", "vel", "hip"]
         )
         lay.addWidget(self.table)
         self.setCentralWidget(root)
@@ -66,14 +67,12 @@ class SupervisorWindow(QMainWindow):
             rows = list(snap.rows)
             self.table.setRowCount(len(rows))
             for row_idx, row in enumerate(rows):
-                self._set_text(row_idx, 0, row.pair_id)
+                self._set_text(row_idx, 0, row.axis_id)
                 chk = self.table.cellWidget(row_idx, 1)
                 if not isinstance(chk, QCheckBox):
                     chk = QCheckBox()
                     chk.toggled.connect(
-                        lambda checked, pair_id=row.pair_id: self._emit_pair_selected(
-                            pair_id, checked
-                        )
+                        lambda checked, unit_id=row.unit_id: self._emit_pair_selected(unit_id, checked)
                     )
                     self.table.setCellWidget(row_idx, 1, chk)
                 chk.blockSignals(True)
@@ -84,6 +83,12 @@ class SupervisorWindow(QMainWindow):
                 self._set_text(row_idx, 4, str(int(row.livetick)))
                 self._set_text(row_idx, 5, f"{row.pos:.3f}")
                 self._set_text(row_idx, 6, f"{row.vel:.3f}")
+                btn = self.table.cellWidget(row_idx, 7)
+                if not isinstance(btn, QPushButton):
+                    btn = QPushButton()
+                    btn.clicked.connect(lambda _checked=False, unit_id=row.unit_id: self.open_hip_clicked.emit(unit_id))
+                    self.table.setCellWidget(row_idx, 7, btn)
+                btn.setText(self._hip_button_text(int(row.hip_open_count)))
             while self.table.rowCount() > len(rows):
                 self.table.removeRow(self.table.rowCount() - 1)
         finally:
@@ -96,6 +101,12 @@ class SupervisorWindow(QMainWindow):
         if self._updating:
             return
         self.pair_selected_changed.emit(str(pair_id), bool(checked))
+
+    @staticmethod
+    def _hip_button_text(open_count: int) -> str:
+        if int(open_count) <= 0:
+            return "Open HiP"
+        return f"Open HiP ({int(open_count)})"
 
     def _set_text(self, row: int, col: int, text: str) -> None:
         item = self.table.item(row, col)

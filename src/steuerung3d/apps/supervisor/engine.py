@@ -14,9 +14,9 @@ from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS, dec
 from .models import (
     DensiRemoteAction,
     OutboundBatch,
-    PairConfig,
-    PairPhase,
-    PairRow,
+    AxisConfig,
+    AxisPhase,
+    AxisRow,
     SupervisorProfile,
     SupervisorSnapshot,
 )
@@ -25,23 +25,24 @@ from .models import (
 class SupervisorEngine:
     def __init__(self, profile: SupervisorProfile) -> None:
         self.profile = profile
-        self._selected: dict[str, bool] = {p.pair_id: bool(p.selected) for p in profile.pairs}
+        self._selected: dict[str, bool] = {axis.unit_id: bool(axis.selected) for axis in profile.axes}
         self._last_snapshot: TelemetrySnapshot | None = None
-        self._rows: dict[str, PairRow] = {}
+        self._rows: dict[str, AxisRow] = {}
         self._pending_reset_estop = False
         self._pending_estart = False
         self._pending_resync = False
         self._pending_recover = False
         self._chk_requested = False
         self._joy_sent: JoyState | None = None
+        self._hip_open_counts: dict[str, int] = {}
 
     def ingest(self, snap: TelemetrySnapshot) -> None:
         self._last_snapshot = snap
-        rows: dict[str, PairRow] = {}
-        for pair in self.profile.pairs:
-            row = self._build_row(pair, snap)
+        rows: dict[str, AxisRow] = {}
+        for axis in self.profile.axes:
+            row = self._build_row(axis, snap)
             if row is not None:
-                rows[pair.pair_id] = row
+                rows[axis.unit_id] = row
         self._rows = rows
 
     def set_selected(self, pair_id: str, selected: bool) -> None:
@@ -62,6 +63,17 @@ class SupervisorEngine:
     def set_chk_requested(self, checked: bool) -> None:
         self._chk_requested = bool(checked)
 
+    def set_hip_open_count(self, unit_id: str, count: int) -> None:
+        value = max(0, int(count))
+        if value <= 0:
+            self._hip_open_counts.pop(str(unit_id), None)
+            return
+        self._hip_open_counts[str(unit_id)] = value
+
+    @property
+    def hip_open_total(self) -> int:
+        return sum(int(v) for v in self._hip_open_counts.values())
+
     @property
     def recover_requested(self) -> bool:
         return self._pending_recover
@@ -70,7 +82,28 @@ class SupervisorEngine:
         self._pending_recover = False
 
     def snapshot(self) -> SupervisorSnapshot:
-        rows = tuple(sorted(self._rows.values(), key=lambda r: r.pair_id))
+        rows = tuple(
+            sorted(
+                (
+                    AxisRow(
+                        unit_id=row.unit_id,
+                        axis_id=row.axis_id,
+                        densi_id=row.densi_id,
+                        hip_id=row.hip_id,
+                        selected=row.selected,
+                        phase=row.phase,
+                        estop=row.estop,
+                        livetick=row.livetick,
+                        pos=row.pos,
+                        vel=row.vel,
+                        stale=row.stale,
+                        hip_open_count=int(self._hip_open_counts.get(row.unit_id, 0)),
+                    )
+                    for row in self._rows.values()
+                ),
+                key=lambda r: r.unit_id,
+            )
+        )
         joy = (
             getattr(self._last_snapshot, "joy", JoyState())
             if self._last_snapshot is not None
@@ -81,30 +114,31 @@ class SupervisorEngine:
             status_text=self._build_status_text(rows=rows, joy=joy),
             rows=rows,
             joy=joy,
+            hip_open_total=self.hip_open_total,
         )
 
     def consume_outbound(self) -> OutboundBatch:
         intents = []
         densi_actions: dict[str, list[DensiRemoteAction]] = {}
         if self._pending_reset_estop:
-            for pair in self.profile.pairs:
-                if pair.pair_id in self._rows:
-                    intents.append(RequestEstopReset(axis_id=pair.axis_id, hip_id=pair.hip_id))
+            for axis in self.profile.axes:
+                if axis.unit_id in self._rows:
+                    intents.append(RequestEstopReset(axis_id=axis.axis_id, hip_id=axis.hip_id))
             self._pending_reset_estop = False
         if self._pending_resync:
-            for pair in self.profile.pairs:
-                if pair.pair_id in self._rows:
-                    intents.append(RequestResync(axis_id=pair.axis_id, hip_id=pair.hip_id))
+            for axis in self.profile.axes:
+                if axis.unit_id in self._rows:
+                    intents.append(RequestResync(axis_id=axis.axis_id, hip_id=axis.hip_id))
             self._pending_resync = False
         if self._pending_estart:
-            for pair in self.profile.pairs:
-                if pair.pair_id in self._rows and pair.densi_action_out:
-                    densi_actions.setdefault(pair.pair_id, []).append(DensiRemoteAction("estart"))
+            for axis in self.profile.axes:
+                if axis.unit_id in self._rows and axis.densi_action_out:
+                    densi_actions.setdefault(axis.unit_id, []).append(DensiRemoteAction("estart"))
             self._pending_estart = False
 
-        for pair in self.profile.pairs:
-            if pair.pair_id in self._rows and pair.densi_action_out:
-                densi_actions.setdefault(pair.pair_id, []).append(
+        for axis in self.profile.axes:
+            if axis.unit_id in self._rows and axis.densi_action_out:
+                densi_actions.setdefault(axis.unit_id, []).append(
                     DensiRemoteAction("chk_es_taster", value=bool(self._chk_requested))
                 )
 
@@ -114,14 +148,15 @@ class SupervisorEngine:
             else JoyState()
         )
         selected_axes = tuple(
-            pair.axis_id
-            for pair in self.profile.pairs
-            if pair.pair_id in self._rows and self._selected.get(pair.pair_id, True)
+            axis.axis_id
+            for axis in self.profile.axes
+            if axis.unit_id in self._rows and self._selected.get(axis.unit_id, True)
         )
+        motion_blocked = self.hip_open_total > 0
         joy_update = JoyState(
-            deadman=bool(joy.deadman),
-            soll_speed=float(joy.soll_speed),
-            selected_axes=selected_axes,
+            deadman=(False if motion_blocked else bool(joy.deadman)),
+            soll_speed=(0.0 if motion_blocked else float(joy.soll_speed)),
+            selected_axes=(() if motion_blocked else selected_axes),
         )
         changed = self._joy_sent != joy_update
         if changed:
@@ -139,35 +174,36 @@ class SupervisorEngine:
             joy_update_changed=changed,
         )
 
-    def _build_row(self, pair: PairConfig, snap: TelemetrySnapshot) -> PairRow | None:
-        ax = snap.axes.get(pair.axis_id)
-        densi = snap.densis.get(pair.densi_id)
+    def _build_row(self, axis: AxisConfig, snap: TelemetrySnapshot) -> AxisRow | None:
+        ax = snap.axes.get(axis.axis_id)
+        densi = snap.densis.get(axis.densi_id)
         if ax is None and densi is None:
             return None
         attached = bool(densi.online) if densi is not None else ax is not None
         if not attached:
             return None
-        scoped = axis_scoped_snapshot(snap, pair.axis_id)
+        scoped = axis_scoped_snapshot(snap, axis.axis_id)
         estop_word = int(parse_estop_word_from_snapshot(scoped))
         estate = self._estate_from_word(estop_word)
-        stale = self._is_stale(snap=snap, axis_id=pair.axis_id, densi=densi)
+        stale = self._is_stale(snap=snap, axis_id=axis.axis_id, densi=densi)
         phase = self._phase_from(
             estate=estate,
             stale=stale,
             live_motion=self._is_live(ax=ax, joy=getattr(snap, "joy", JoyState())),
         )
-        return PairRow(
-            pair_id=pair.pair_id,
-            axis_id=pair.axis_id,
-            densi_id=pair.densi_id,
-            hip_id=pair.hip_id,
-            selected=bool(self._selected.get(pair.pair_id, True)),
+        return AxisRow(
+            unit_id=axis.unit_id,
+            axis_id=axis.axis_id,
+            densi_id=axis.densi_id,
+            hip_id=axis.hip_id,
+            selected=bool(self._selected.get(axis.unit_id, True)),
             phase=phase,
-            estop=(phase == PairPhase.ESTOP),
+            estop=(phase == AxisPhase.ESTOP),
             livetick=int(getattr(ax, "device_tick", 0) or 0),
             pos=float(getattr(ax, "pos", 0.0) or 0.0),
             vel=float(getattr(ax, "vel", 0.0) or 0.0),
             stale=stale,
+            hip_open_count=int(self._hip_open_counts.get(axis.unit_id, 0)),
         )
 
     def _is_stale(self, *, snap: TelemetrySnapshot, axis_id: str, densi) -> bool:
@@ -204,19 +240,19 @@ class SupervisorEngine:
         return "READY" if brk_ok else "ARMED"
 
     @staticmethod
-    def _phase_from(*, estate: str, stale: bool, live_motion: bool) -> PairPhase:
+    def _phase_from(*, estate: str, stale: bool, live_motion: bool) -> AxisPhase:
         if stale:
-            return PairPhase.STALE
+            return AxisPhase.STALE
         if live_motion:
-            return PairPhase.LIVE
+            return AxisPhase.LIVE
         estate_s = str(estate or "").upper()
         if estate_s == "READY":
-            return PairPhase.READY
+            return AxisPhase.READY
         if estate_s == "ARMED":
-            return PairPhase.ARMED
+            return AxisPhase.ARMED
         if estate_s == "IDLE":
-            return PairPhase.IDLE
-        return PairPhase.ESTOP
+            return AxisPhase.IDLE
+        return AxisPhase.ESTOP
 
     @staticmethod
     def _is_live(*, ax, joy: JoyState) -> bool:
@@ -228,22 +264,25 @@ class SupervisorEngine:
             abs(float(getattr(ax, "vel", 0.0) or 0.0)) > 1e-6 or abs(float(joy.soll_speed)) > 1e-6
         )
 
-    def _build_status_text(self, *, rows: Iterable[PairRow], joy: JoyState) -> str:
+    def _build_status_text(self, *, rows: Iterable[AxisRow], joy: JoyState) -> str:
         rows_t = tuple(rows)
         phases = {row.phase for row in rows_t}
         if not rows_t:
-            state = "NO PAIRS"
-        elif PairPhase.ESTOP in phases:
+            state = "NO AXES"
+        elif AxisPhase.ESTOP in phases:
             state = "ESTOP"
-        elif PairPhase.STALE in phases:
+        elif AxisPhase.STALE in phases:
             state = "DEGRADED"
-        elif PairPhase.LIVE in phases:
+        elif AxisPhase.LIVE in phases:
             state = "LIVE"
-        elif rows_t and all(row.phase == PairPhase.READY for row in rows_t):
+        elif rows_t and all(row.phase == AxisPhase.READY for row in rows_t):
             state = "READY"
-        elif PairPhase.ARMED in phases:
+        elif AxisPhase.ARMED in phases:
             state = "ARMING"
         else:
             state = "IDLE"
-        joy_state = "active" if bool(joy.deadman) else "online"
-        return f"System: {state} | pairs: {len(rows_t)} | joystick: {joy_state}"
+        joy_state = "active" if bool(joy.deadman) and self.hip_open_total <= 0 else "online"
+        status = f"System: {state} | axes: {len(rows_t)} | joystick: {joy_state}"
+        if self.hip_open_total > 0:
+            status += f" | hip: {self.hip_open_total} open"
+        return status

@@ -133,3 +133,24 @@ def test_hip_runtime_attach_combo_hides_targets_claimed_by_other_hips() -> None:
     assert res.view_model is not None
     assert res.view_model.attach_combo is not None
     assert res.view_model.attach_combo.items == ["NotAttached", "Anton", "Cecil"]
+
+
+def test_hip_runtime_fixed_axis_surfaces_and_selects_axis() -> None:
+    rt = _runtime()
+    rt.set_fixed_axis("Anton", lock_combo=True)
+    ui = HipUiInputs(
+        axis_selected="",
+        axis_selection_changed=False,
+        estop_reset_clicked=False,
+        resync_clicked=False,
+        main_reset_clicked=False,
+        guider_reset_clicked=False,
+        param_actions=[],
+        param_values={},
+    )
+    res = rt.tick(inputs=HipRuntimeInputs(snaps=[_snap("Anton")], now_ns=10_000_000, ui=ui))
+    assert res.view_model is not None
+    assert res.view_model.attach_combo is not None
+    assert res.view_model.attach_combo.current == "Anton"
+    assert res.view_model.attach_combo.enabled is False
+    assert any(isinstance(intent, ClaimAxis) and intent.axis_id == "Anton" for intent in res.intents)

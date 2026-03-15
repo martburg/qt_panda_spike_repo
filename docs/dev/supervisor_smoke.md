@@ -1,6 +1,6 @@
-# Supervisor smoke path
+# Supervisor smoke path (proper core fanout)
 
-Use this when you want a quick manual bring-up of the first supervisor slice.
+This is the recommended local smoke path for the current supervisor snapshot.
 
 ## Command
 
@@ -8,35 +8,52 @@ Use this when you want a quick manual bring-up of the first supervisor slice.
 python -m steuerung3d sup --profile configs/supervisor/smoke_2pairs.toml
 ```
 
-## What it does
+## What it launches
 
-- starts the supervisor GUI/runtime
-- launches two headless HiP processes (`Anton`, `Debby`)
-- launches two headless DenSi runtimes in JSON wire mode
-- binds supervisor group actions to per-DenSi UDP action inputs
+The supervisor launches a **core+densi stack** via:
 
-## Expected first checks
+- `configs/stacks/supervisor_2axes_core_fanout.toml`
 
-- the window appears with a global status line
-- both pairs show up in the table
-- `livetick` changes over time
-- `selected` checkboxes can be toggled
-- `Recover` shows the placeholder message
+That stack starts:
 
-## Basic interaction checks
+- `core_udp_service`
+- two headless DenSis (`Anton`, `Debby`)
 
-1. Press **Reset EStop** and verify no crash / continued livetick updates.
-2. Toggle **chkEsTaster** and verify the pairs remain alive.
-3. Press **Resync** and verify no crash / continued updates.
-4. Toggle one pair's **selected** checkbox and verify the row reflects the change.
+It does **not** pre-launch HiPs.
+
+HiPs are opened **on demand** from the supervisor row buttons.
+
+## Telemetry topology
+
+Core runs with UI telemetry fanout:
+
+- `51002` → supervisor
+- `51003` → Anton HiP
+- `51004` → Debby HiP
+
+This means the opened HiPs receive telemetry from core in the same fanout style as the existing stack profiles.
+
+## HiP hook
+
+Each row has an **Open HiP** button.
+
+- Anton opens with `--telem-in 127.0.0.1:51003`
+- Debby opens with `--telem-in 127.0.0.1:51004`
+
+While any HiP launched from the supervisor is still open, synchronized supervisor motion is blocked.
+
+## Expected checks
+
+1. Start the supervisor.
+2. Two stable rows appear: `Anton`, `Debby`.
+3. `livetick` increases.
+4. Press **Open HiP** on one row.
+5. The corresponding HiP window opens.
+6. Supervisor indicates a HiP-open condition and blocks synchronized motion.
+7. Close the HiP and verify the block is removed.
 
 ## Notes
 
-- This is a smoke path, not a full semantic acceptance test.
-- It depends on a local Qt environment.
-- The DenSi launches use `--wire-proto json` to stay on the internal snapshot path during early supervisor testing.
-
-
-Notes:
-- The smoke profile intentionally launches only DenSi participants for now. Launching multiple HiP processes against the same single-consumer telemetry UDP bind is not valid with the current transport.
-- The telemetry decoder now tolerates non-numeric DenSi params such as SystemTime and enum-name fields.
+- This is the proper **core fanout** setup for the current snapshot.
+- It keeps the supervisor axis-centric.
+- HiP is treated as an optional single-axis detail tool, not as a mandatory half of the supervised entity.

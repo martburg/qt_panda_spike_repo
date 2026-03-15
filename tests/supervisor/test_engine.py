@@ -127,3 +127,18 @@ def test_status_line_uses_arming_when_pair_is_armed() -> None:
     assert snap.rows[0].phase in (PairPhase.ARMED, PairPhase.READY)
     if snap.rows[0].phase == PairPhase.ARMED:
         assert "System: ARMING" in snap.status_text
+
+
+def test_hip_open_blocks_synchronized_motion_and_status_line() -> None:
+    eng = SupervisorEngine(_profile())
+    eng.ingest(_snap(estop_word=(1 << 11), joy_deadman=True, soll_speed=0.5))
+    eng.set_hip_open_count("anton", 1)
+    batch = eng.consume_outbound()
+    joy_update = batch.intents[-1]
+    assert joy_update.deadman is False
+    assert joy_update.soll_speed == 0.0
+    assert joy_update.selected_axes == ()
+    snap = eng.snapshot()
+    assert snap.hip_open_total == 1
+    assert snap.rows[0].hip_open_count == 1
+    assert "hip: 1 open" in snap.status_text

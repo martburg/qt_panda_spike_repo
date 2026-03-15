@@ -87,3 +87,28 @@ def test_hip_presentation_uses_attached_axis_surface() -> None:
     )
     assert res.presentation is not None
     assert res.presentation.param_values.get("VelMax") == 2.2
+
+
+def test_hip_fixed_axis_auto_attaches_and_claims() -> None:
+    eng = HipEngine(hip_id="hip-test")
+    res = eng.step(
+        HipStepInputs(
+            snap=_snap(),
+            hip_id="hip-test",
+            last_rx_ns=0,
+            now_ns=0,
+            stale_after_ms=500,
+            fixed_axis="Anton",
+            lock_axis_combo=True,
+            last_mode="IDLE",
+            last_estate="IDLE",
+            ui=_ui(),
+            core_acks=[],
+            joy=None,
+        )
+    )
+    assert res.presentation is not None
+    assert res.presentation.attach_combo is not None
+    assert res.presentation.attach_combo.current == "Anton"
+    assert res.presentation.attach_combo.enabled is False
+    assert any(getattr(intent, "axis_id", "") == "Anton" for intent in res.intents)

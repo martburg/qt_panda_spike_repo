@@ -4,7 +4,7 @@ from pathlib import Path
 
 from steuerung3d.config.toml_loader import load_toml
 
-from .models import PairConfig, SupervisorProfile
+from .models import AxisConfig, SupervisorProfile
 
 
 def _as_bool(value: object, default: bool = False) -> bool:
@@ -26,30 +26,37 @@ def _as_str(value: object, default: str = "") -> str:
     return str(value)
 
 
+def _axis_entries(raw: dict) -> list[dict]:
+    axis_items = list(raw.get("axes", []) or [])
+    if axis_items:
+        return [dict(item or {}) for item in axis_items]
+    pair_items = list(raw.get("pairs", []) or [])
+    return [dict(item or {}) for item in pair_items]
+
+
 def load_profile(path: str | Path) -> SupervisorProfile:
     raw = dict(load_toml(Path(path)))
     sup = dict(raw.get("supervisor", {}) or {})
-    pair_items = list(raw.get("pairs", []) or [])
-    pairs: list[PairConfig] = []
-    seen_pair_ids: set[str] = set()
+    axis_items = _axis_entries(raw)
+    axes: list[AxisConfig] = []
+    seen_unit_ids: set[str] = set()
     seen_axis_ids: set[str] = set()
-    for item in pair_items:
-        d = dict(item or {})
-        pair_id = _as_str(d.get("pair_id")).strip()
-        axis_id = _as_str(d.get("axis_id", pair_id)).strip()
+    for d in axis_items:
+        unit_id = _as_str(d.get("unit_id", d.get("pair_id", d.get("axis_id", "")))).strip()
+        axis_id = _as_str(d.get("axis_id", unit_id)).strip()
         densi_id = _as_str(d.get("densi_id", axis_id)).strip()
-        hip_id = _as_str(d.get("hip_id", f"hip_{pair_id}")).strip()
-        if not pair_id or not axis_id:
-            raise ValueError(f"invalid pair entry: {d!r}")
-        if pair_id in seen_pair_ids:
-            raise ValueError(f"duplicate supervisor pair_id: {pair_id}")
+        hip_id = _as_str(d.get("hip_id", f"hip_{unit_id or axis_id}")).strip()
+        if not unit_id or not axis_id:
+            raise ValueError(f"invalid axis entry: {d!r}")
+        if unit_id in seen_unit_ids:
+            raise ValueError(f"duplicate supervisor unit_id: {unit_id}")
         if axis_id in seen_axis_ids:
             raise ValueError(f"duplicate supervisor axis_id: {axis_id}")
-        seen_pair_ids.add(pair_id)
+        seen_unit_ids.add(unit_id)
         seen_axis_ids.add(axis_id)
-        pairs.append(
-            PairConfig(
-                pair_id=pair_id,
+        axes.append(
+            AxisConfig(
+                unit_id=unit_id,
                 axis_id=axis_id,
                 densi_id=densi_id,
                 hip_id=hip_id,
@@ -69,8 +76,8 @@ def load_profile(path: str | Path) -> SupervisorProfile:
         gui=_as_bool(sup.get("gui"), True),
         stale_after_ms=max(200, _as_int(sup.get("stale_after_ms", 800), 800)),
         launch_stack=_as_str(launch.get("stack_profile", "")).strip(),
-        pairs=tuple(pairs),
+        axes=tuple(axes),
     )
-    if not profile.pairs:
-        raise ValueError("supervisor profile must define at least one pair")
+    if not profile.axes:
+        raise ValueError("supervisor profile must define at least one axis")
     return profile

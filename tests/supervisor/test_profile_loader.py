@@ -31,8 +31,33 @@ densi_action_out = "127.0.0.1:53001"
     prof = load_profile(p)
     assert prof.supervisor_id == "sup_main"
     assert prof.title == "Main Supervisor"
+    assert prof.axes[0].unit_id == "anton"
+    assert prof.axes[0].densi_action_out == "127.0.0.1:53001"
     assert prof.pairs[0].pair_id == "anton"
-    assert prof.pairs[0].densi_action_out == "127.0.0.1:53001"
+
+
+def test_load_profile_parses_axes(tmp_path: Path) -> None:
+    p = tmp_path / "sup.toml"
+    p.write_text(
+        """
+[supervisor]
+id = "sup_main"
+
+[[axes]]
+unit_id = "anton"
+axis_id = "Anton"
+selected = true
+
+[[axes]]
+unit_id = "debby"
+axis_id = "Debby"
+selected = false
+""",
+        encoding="utf-8",
+    )
+    prof = load_profile(p)
+    assert [axis.unit_id for axis in prof.axes] == ["anton", "debby"]
+    assert [axis.axis_id for axis in prof.axes] == ["Anton", "Debby"]
 
 
 def test_load_profile_rejects_duplicate_pair_ids(tmp_path: Path) -> None:
@@ -52,7 +77,7 @@ axis_id = "Debby"
 """,
         encoding="utf-8",
     )
-    with pytest.raises(ValueError, match="duplicate supervisor pair_id"):
+    with pytest.raises(ValueError, match="duplicate supervisor unit_id"):
         load_profile(p)
 
 
@@ -63,12 +88,12 @@ def test_load_profile_rejects_duplicate_axis_ids(tmp_path: Path) -> None:
 [supervisor]
 id = "sup_main"
 
-[[pairs]]
-pair_id = "anton"
+[[axes]]
+unit_id = "anton"
 axis_id = "Anton"
 
-[[pairs]]
-pair_id = "debby"
+[[axes]]
+unit_id = "debby"
 axis_id = "Anton"
 """,
         encoding="utf-8",

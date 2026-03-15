@@ -29,9 +29,9 @@ class SupervisorRuntime(QObject):
         self.telemetry_in = UdpTelemetryIn.bind(parse_hostport(profile.telem_in))
         self.intent_out = UdpIntentOut.connect(parse_hostport(profile.intent_out))
         self.action_outs = {
-            pair.pair_id: UdpDensiActionOut.connect(parse_hostport(pair.densi_action_out))
-            for pair in profile.pairs
-            if pair.densi_action_out
+            axis.unit_id: UdpDensiActionOut.connect(parse_hostport(axis.densi_action_out))
+            for axis in profile.axes
+            if axis.densi_action_out
         }
         self.window = SupervisorWindow()
         self._merged_snapshot = None
@@ -41,9 +41,11 @@ class SupervisorRuntime(QObject):
         self.window.recover_clicked.connect(self._on_recover_clicked)
         self.window.chk_es_taster_changed.connect(self.engine.set_chk_requested)
         self.window.pair_selected_changed.connect(self.engine.set_selected)
+        self.window.open_hip_clicked.connect(self.open_hip_for_axis)
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.tick)
         self._children: list[subprocess.Popen[str]] = []
+        self._hip_children: dict[str, list[subprocess.Popen[str]]] = {}
 
     def start(self) -> int:
         self._launch_children()
@@ -53,6 +55,7 @@ class SupervisorRuntime(QObject):
         return 0
 
     def tick(self) -> None:
+        self._refresh_hip_processes()
         snaps = self.telemetry_in.drain_telemetry(limit=50)
         if snaps:
             self._merged_snapshot = merge_snapshots(self._merged_snapshot, snaps)
@@ -75,12 +78,44 @@ class SupervisorRuntime(QObject):
                 except Exception:
                     log.exception("failed to publish densi action %s -> %s", pair_id, action)
 
+    def open_hip_for_axis(self, unit_id: str) -> None:
+        axis = next((axis for axis in self.profile.axes if axis.unit_id == str(unit_id)), None)
+        if axis is None:
+            return
+        cmd_text = str(axis.hip_launch).strip()
+        if not cmd_text:
+            try:
+                self.window.status_label.setText(f"{self.engine.snapshot().status_text} | hip: no launch for {axis.axis_id}")
+            except Exception:
+                pass
+            return
+        env = dict(os.environ)
+        argv = shlex.split(cmd_text)
+        child = subprocess.Popen(argv, cwd=os.getcwd(), env=env, text=True)
+        self._hip_children.setdefault(axis.unit_id, []).append(child)
+        self.engine.set_hip_open_count(axis.unit_id, len(self._hip_children.get(axis.unit_id, [])))
+
+    def _refresh_hip_processes(self) -> None:
+        for unit_id, children in list(self._hip_children.items()):
+            alive = [child for child in children if child.poll() is None]
+            if alive:
+                self._hip_children[unit_id] = alive
+            else:
+                self._hip_children.pop(unit_id, None)
+            self.engine.set_hip_open_count(unit_id, len(alive))
+
     def shutdown(self) -> None:
         for child in self._children:
             try:
                 child.terminate()
             except Exception:
                 pass
+        for children in self._hip_children.values():
+            for child in children:
+                try:
+                    child.terminate()
+                except Exception:
+                    pass
 
     def _launch_children(self) -> None:
         if self.profile.launch_stack:
@@ -96,8 +131,8 @@ class SupervisorRuntime(QObject):
             return
         env = dict(os.environ)
         env.setdefault("QT_QPA_PLATFORM", "offscreen")
-        for pair in self.profile.pairs:
-            for cmd_text in (pair.hip_launch, pair.densi_launch):
+        for axis in self.profile.axes:
+            for cmd_text in (axis.hip_launch, axis.densi_launch):
                 if not cmd_text:
                     continue
                 argv = shlex.split(cmd_text)

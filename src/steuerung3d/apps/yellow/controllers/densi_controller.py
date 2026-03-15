@@ -45,7 +45,6 @@ class DenSiController:
     wire_proto: str = "json"  # json|plc
     dt_s: float = 0.01
     stale_after_ms: int = 500
-    action_in: object | None = None
 
     def __post_init__(self) -> None:
         # Soft-error counters for swallowed exceptions (binder/UI)
@@ -66,7 +65,6 @@ class DenSiController:
             axis_ids=list(self.axis_ids),
             stale_after_ms=int(self.stale_after_ms),
             log=log,
-            action_in=self.action_in,
         )
         self._wd = PerfWatchdog(log, name="den_si")
 

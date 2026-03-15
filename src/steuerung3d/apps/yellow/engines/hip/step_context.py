@@ -40,11 +40,24 @@ def _sync_joy_state(engine: "HipEngine", hip_id: str, joy: JoyState | object) ->
 
 
 def _visible_axis_context(
-    *, snap: TelemetrySnapshot, hip_id: str, prev_selected: str
+    *, snap: TelemetrySnapshot, hip_id: str, prev_selected: str, fixed_axis: str
 ) -> tuple[list[str], dict[str, str]]:
     axis_ids = visible_axis_ids_for_hip(
         densis=snap.densis, hip_id=hip_id, prev_selected=prev_selected
     )
+    fixed_norm = normalize_axis_id(fixed_axis)
+    if fixed_norm:
+        # For supervisor-opened HiPs, always surface the fixed axis if it exists
+        # in the current snapshot, even before claim ownership is established.
+        axis_norm_to_canon_all = {
+            normalize_axis_id(str(a)): str(a)
+            for a in list((getattr(snap, 'axes', {}) or {}).keys()) + list((getattr(snap, 'densis', {}) or {}).keys())
+            if str(a).strip()
+        }
+        canon = axis_norm_to_canon_all.get(fixed_norm)
+        if canon and canon not in axis_ids:
+            axis_ids.append(canon)
+    axis_ids = sorted({str(a) for a in (axis_ids or []) if str(a).strip()})
     axis_norm_to_canon = {normalize_axis_id(a): a for a in (axis_ids or []) if a}
     return list(axis_ids), axis_norm_to_canon
 
@@ -92,6 +105,7 @@ def _apply_authoritative_selection(
     prev_selected: str,
     attach_combo: HipAttachCombo,
     selected_axis: str,
+    fixed_axis: str,
 ) -> tuple[HipAttachCombo, str]:
     authoritative_axis = authoritative_selected_axis(
         densis=snap.densis,
@@ -99,15 +113,18 @@ def _apply_authoritative_selection(
         selected_axis=selected_axis,
         prev_selected=prev_selected,
     )
+    fixed_norm = normalize_axis_id(fixed_axis)
+    selected_norm = normalize_axis_id(selected_axis)
+    preserve_fixed_selection = bool(fixed_norm and selected_norm and fixed_norm == selected_norm)
     if ui.axis_selection_changed:
         requested = str(ui.axis_selected or "").strip()
         illegal_foreign_request = bool(
             requested and requested != NOT_ATTACHED and requested not in axis_ids
         )
         if illegal_foreign_request:
-            selected_axis = authoritative_axis
+            selected_axis = selected_axis if preserve_fixed_selection else authoritative_axis
     else:
-        selected_axis = authoritative_axis
+        selected_axis = selected_axis if preserve_fixed_selection else authoritative_axis
     attach_combo = HipAttachCombo(
         items=list(attach_combo.items),
         current=str(selected_axis or NOT_ATTACHED),
@@ -118,10 +135,12 @@ def _apply_authoritative_selection(
 
 
 def _build_selection_intents(
-    *, ui: HipUiInputs, prev_selected: str, selected_axis: str, hip_id: str
+    *, ui: HipUiInputs, prev_selected: str, selected_axis: str, hip_id: str, fixed_axis: str
 ) -> list[Intent]:
     intents: list[Intent] = []
-    if not ui.axis_selection_changed:
+    fixed_norm = normalize_axis_id(fixed_axis)
+    auto_claim_fixed = bool(fixed_norm and normalize_axis_id(selected_axis) == fixed_norm)
+    if not ui.axis_selection_changed and not auto_claim_fixed:
         return intents
     if prev_selected and (not selected_axis or prev_selected != selected_axis):
         intents.append(ReleaseAxis(axis_id=prev_selected, hip_id=hip_id))
@@ -142,6 +161,7 @@ def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepCon
         snap=snap,
         hip_id=hip_id,
         prev_selected=prev_selected,
+        fixed_axis=inputs.fixed_axis,
     )
     ui_axis = _resolve_ui_axis(engine=engine, ui=ui, axis_norm_to_canon=axis_norm_to_canon)
     attach_combo, selected_axis, fixed_applied = _build_attach_context(
@@ -159,12 +179,14 @@ def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepCon
         prev_selected=prev_selected,
         attach_combo=attach_combo,
         selected_axis=selected_axis,
+        fixed_axis=inputs.fixed_axis,
     )
     intents = _build_selection_intents(
         ui=ui,
         prev_selected=prev_selected,
         selected_axis=selected_axis,
         hip_id=hip_id,
+        fixed_axis=inputs.fixed_axis,
     )
     return StepContext(
         snap=snap,

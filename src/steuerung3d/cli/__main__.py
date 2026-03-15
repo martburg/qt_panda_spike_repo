@@ -22,7 +22,6 @@ from .commands import (
     cmd_plan,
     cmd_profiles,
     cmd_status,
-    cmd_sup,
     cmd_up,
     discover_stack_profiles,
 )
@@ -126,10 +125,6 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("doctor", help="sanity check a profile")
     add_profile_args(sp, with_overrides=True)
     sp.set_defaults(_fn=cmd_doctor)
-
-    sp = sub.add_parser("sup", help="start supervisor GUI/runtime")
-    sp.add_argument("--profile", required=True)
-    sp.set_defaults(_fn=cmd_sup)
 
     return p
 
