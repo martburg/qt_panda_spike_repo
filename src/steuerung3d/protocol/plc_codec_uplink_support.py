@@ -112,14 +112,18 @@ def decode_snapshot_from_payload(payload: bytes) -> Optional[TelemetrySnapshot]:
         guide_status_word = _to_int(upl.fields.get("GuideStatus", "0"), 0)
         estop_status_word = _to_int(upl.fields.get("EStopStatus", "0"), 0)
         estop_active = _decode_estop_active(estop_status_word)
+        lifetick_rx = (
+            _to_int(upl.fields.get("LifetickUIrx", upl.fields.get("GearToUI", "0")), 0) & 0xFFFF
+        )
+        lifetick_age = (int(device_tick) - int(lifetick_rx)) & 0xFFFF
         ax = AxisTelemetry(
             pos=_to_float(upl.fields.get("PosIst", "0"), 0.0),
             vel=_to_float(upl.fields.get("SpeedIstUI", "0"), 0.0),
             enabled=False,
             fault=False,
             device_tick=int(device_tick),
-            lifetick_rx=0,
-            lifetick_age=0,
+            lifetick_rx=int(lifetick_rx),
+            lifetick_age=int(lifetick_age),
             status_word=int(status_word),
             guide_status_word=int(guide_status_word),
         )

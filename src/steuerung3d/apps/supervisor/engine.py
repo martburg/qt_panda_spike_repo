@@ -12,11 +12,11 @@ from steuerung3d.protocol.banner_estate import BANNER_DYNAMIC_EXCLUDE
 from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS, decode_estop_word
 
 from .models import (
-    DensiRemoteAction,
-    OutboundBatch,
     AxisConfig,
     AxisPhase,
     AxisRow,
+    DensiRemoteAction,
+    OutboundBatch,
     SupervisorProfile,
     SupervisorSnapshot,
 )
@@ -25,7 +25,9 @@ from .models import (
 class SupervisorEngine:
     def __init__(self, profile: SupervisorProfile) -> None:
         self.profile = profile
-        self._selected: dict[str, bool] = {axis.unit_id: bool(axis.selected) for axis in profile.axes}
+        self._selected: dict[str, bool] = {
+            axis.unit_id: bool(axis.selected) for axis in profile.axes
+        }
         self._last_snapshot: TelemetrySnapshot | None = None
         self._rows: dict[str, AxisRow] = {}
         self._pending_reset_estop = False

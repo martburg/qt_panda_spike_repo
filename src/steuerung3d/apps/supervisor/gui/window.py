@@ -72,7 +72,9 @@ class SupervisorWindow(QMainWindow):
                 if not isinstance(chk, QCheckBox):
                     chk = QCheckBox()
                     chk.toggled.connect(
-                        lambda checked, unit_id=row.unit_id: self._emit_pair_selected(unit_id, checked)
+                        lambda checked, unit_id=row.unit_id: self._emit_pair_selected(
+                            unit_id, checked
+                        )
                     )
                     self.table.setCellWidget(row_idx, 1, chk)
                 chk.blockSignals(True)
@@ -86,7 +88,11 @@ class SupervisorWindow(QMainWindow):
                 btn = self.table.cellWidget(row_idx, 7)
                 if not isinstance(btn, QPushButton):
                     btn = QPushButton()
-                    btn.clicked.connect(lambda _checked=False, unit_id=row.unit_id: self.open_hip_clicked.emit(unit_id))
+                    btn.clicked.connect(
+                        lambda _checked=False, unit_id=row.unit_id: self.open_hip_clicked.emit(
+                            unit_id
+                        )
+                    )
                     self.table.setCellWidget(row_idx, 7, btn)
                 btn.setText(self._hip_button_text(int(row.hip_open_count)))
             while self.table.rowCount() > len(rows):
