@@ -6,6 +6,7 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
+from steuerung3d.apps.supervisor.actions_transport import UdpDensiActionIn
 from steuerung3d.apps.yellow.controllers.densi_controller import DenSiController
 from steuerung3d.apps.yellow.ui_shell import build_yellow_window
 from steuerung3d.core.net import parse_hostport
@@ -42,6 +43,8 @@ def main() -> int:
         help="Device wire protocol for DenSi I/O. 'plc' = ; delimited telegrams, 'json' = internal snapshots.",
     )
     ap.add_argument("--config", default="", help="TOML config path for DenSi runtime.")
+    ap.add_argument("--action-in", default="", help="Optional UDP bind for supervisor remote actions.")
+    ap.add_argument("--headless", action="store_true", help="Run without showing the Qt window.")
 
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
     args = ap.parse_args()
@@ -86,12 +89,15 @@ def main() -> int:
         command_in = UdpCommandIn.bind(cmd_in_addr)
         telemetry_out = UdpTelemetryOut.connect(telem_out_addr)
 
+    action_in = UdpDensiActionIn.bind(parse_hostport(args.action_in)) if str(args.action_in).strip() else None
+
     ctl = DenSiController(
         win=win,
         command_in=command_in,
         telemetry_out=telemetry_out,
         axis_ids=axis_ids,
         dt_s=args.dt,
+        action_in=action_in,
     )
     # Start controller (timer + IO loop)
     if hasattr(ctl, "start"):
@@ -101,7 +107,8 @@ def main() -> int:
     else:
         raise AttributeError(f"DenSiController has no start/run method: {type(ctl).__name__}")
 
-    win.show()
+    if not args.headless:
+        win.show()
     return app.exec()
 
 

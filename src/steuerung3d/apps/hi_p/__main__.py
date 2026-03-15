@@ -46,6 +46,7 @@ def main() -> int:
     ap.add_argument("--config", default="", help="TOML config path for HiP runtime.")
     ap.add_argument("--hip-id", default="", help="Stable HiP identity used for claim ownership.")
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
+    ap.add_argument("--headless", action="store_true", help="Start without showing the Qt window.")
     args = ap.parse_args()
 
     bootstrap_logging(role="hi_p", axis=(args.axis or ""), log_level=args.log_level)
@@ -85,7 +86,8 @@ def main() -> int:
         pass
     ctl.start_polling(period_ms=50)
 
-    win.show()
+    if not args.headless:
+        win.show()
     return app.exec()
 
 
