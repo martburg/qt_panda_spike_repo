@@ -113,10 +113,10 @@ class SupervisorWindow(QMainWindow):
     def show_recover_placeholder(self) -> None:
         QMessageBox.information(self, "Recover", "Recover not implemented yet.")
 
-    def _emit_pair_selected(self, pair_id: str, checked: bool) -> None:
+    def _emit_pair_selected(self, unit_id: str, checked: bool) -> None:
         if self._updating:
             return
-        self.pair_selected_changed.emit(str(pair_id), bool(checked))
+        self.pair_selected_changed.emit(str(unit_id), bool(checked))
 
     @staticmethod
     def _hip_button_text(open_count: int) -> str:

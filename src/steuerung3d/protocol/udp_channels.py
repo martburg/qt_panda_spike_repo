@@ -125,7 +125,6 @@ class UdpIntentOut:
 
 
 @dataclass
-@dataclass
 class UdpControlContextIn:
     rx: _UdpJsonRx[ControlContext]
 
