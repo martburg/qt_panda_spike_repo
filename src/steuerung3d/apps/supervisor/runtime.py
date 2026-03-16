@@ -9,6 +9,7 @@ import sys
 from PySide6.QtCore import QObject, QTimer
 from PySide6.QtWidgets import QApplication
 
+from steuerung3d.core.intents import ReleaseAxis, ReleaseAxisLease
 from steuerung3d.core.net import parse_hostport
 from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn
 
@@ -108,11 +109,18 @@ class SupervisorRuntime(QObject):
     def _refresh_hip_processes(self) -> None:
         for unit_id, children in list(self._hip_children.items()):
             alive = [child for child in children if child.poll() is None]
+            exited = len(children) - len(alive)
             if alive:
                 self._hip_children[unit_id] = alive
             else:
                 self._hip_children.pop(unit_id, None)
             self.engine.set_hip_open_count(unit_id, len(alive))
+            if exited > 0 and len(alive) == 0:
+                axis = next(
+                    (axis for axis in self.profile.axes if axis.unit_id == str(unit_id)), None
+                )
+                if axis is not None and axis.hip_id:
+                    self._release_hip_authority(axis.axis_id, axis.hip_id)
 
     def shutdown(self) -> None:
         for child in self._children:
@@ -169,6 +177,18 @@ class SupervisorRuntime(QObject):
         self.engine.queue_recover()
         self.window.show_recover_placeholder()
         self.engine.clear_recover_requested()
+
+    def _release_hip_authority(self, axis_id: str, hip_id: str) -> None:
+        try:
+            self.intent_out.publish_intent(ReleaseAxis(axis_id=str(axis_id), hip_id=str(hip_id)))
+        except Exception:
+            log.exception("failed to release axis claim for axis=%s hip=%s", axis_id, hip_id)
+        try:
+            self.intent_out.publish_intent(
+                ReleaseAxisLease(axis_id=str(axis_id), hip_id=str(hip_id))
+            )
+        except Exception:
+            log.exception("failed to release axis lease for axis=%s hip=%s", axis_id, hip_id)
 
 
 def run_app(profile: SupervisorProfile) -> int:

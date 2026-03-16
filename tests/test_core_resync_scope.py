@@ -47,3 +47,17 @@ def test_request_resync_denied_for_wrong_or_missing_owner() -> None:
     apply_intent(st, RequestResync(axis_id="", hip_id="hipA"))
     assert st.resync_req is False
     assert st.resync_req_by_axis == {}
+
+
+def test_request_resync_allowed_for_supervisor_when_axis_unowned() -> None:
+    st = MachineState()
+    st.ensure_axis("Anton")
+    apply_intent(st, RequestResync(axis_id="Anton", hip_id="sup", actor_kind="supervisor"))
+    assert st.resync_req_by_axis == {"Anton": True}
+
+
+def test_request_resync_denied_for_supervisor_when_axis_owned() -> None:
+    st = MachineState()
+    st.set_axis_claim("Anton", "hipA")
+    apply_intent(st, RequestResync(axis_id="Anton", hip_id="sup", actor_kind="supervisor"))
+    assert st.resync_req_by_axis == {}

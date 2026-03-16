@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from steuerung3d.apps.supervisor.engine import SupervisorEngine
 from steuerung3d.apps.supervisor.models import PairConfig, PairPhase, SupervisorProfile
-from steuerung3d.core.intents import EchoLifeTick, JoyStateUpdate
+from steuerung3d.core.intents import EchoLifeTick, JoyStateUpdate, RequestEstopReset, RequestResync
 from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, JoyState, TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import (
     ESTOP_CAUSE_KEYS,
@@ -175,3 +175,60 @@ def test_supervisor_emits_echo_using_current_axis_lifetick_and_suppresses_when_h
     echoes = [i for i in batch.intents if isinstance(i, EchoLifeTick)]
     assert len(echoes) == 1
     assert echoes[0].value == 12
+
+
+def test_supervisor_group_controls_and_checkbox_are_blocked_while_any_hip_is_open() -> None:
+    eng = SupervisorEngine(_profile())
+    eng.ingest(_snap(estop_word=(1 << 11)))
+    eng.set_chk_requested(True)
+    eng.queue_reset_estop()
+    eng.queue_estart()
+    eng.queue_resync()
+    eng.set_hip_open_count("anton", 1)
+
+    batch = eng.consume_outbound()
+
+    assert batch.densi_actions == {}
+    assert [i for i in batch.intents if isinstance(i, RequestEstopReset)] == []
+    assert [i for i in batch.intents if isinstance(i, RequestResync)] == []
+
+
+def test_chk_es_taster_is_forced_clear_when_first_hip_opens_and_stays_clear_after_unlock() -> None:
+    eng = SupervisorEngine(_profile())
+    eng.ingest(_snap(estop_word=(1 << 11)))
+    eng.set_chk_requested(True)
+    batch = eng.consume_outbound()
+    assert batch.densi_actions["anton"][0].action == "chk_es_taster"
+    assert batch.densi_actions["anton"][0].value is True
+
+    eng.set_hip_open_count("anton", 1)
+    batch = eng.consume_outbound()
+    assert batch.densi_actions == {}
+
+    eng.set_hip_open_count("anton", 0)
+    batch = eng.consume_outbound()
+    assert batch.densi_actions["anton"][0].action == "chk_es_taster"
+    assert batch.densi_actions["anton"][0].value is False
+
+
+def test_supervisor_reset_and_resync_use_supervisor_actor_and_selected_rows() -> None:
+    eng = SupervisorEngine(_profile())
+    eng.ingest(_snap(estop_word=(1 << 11)))
+    eng.queue_reset_estop()
+    eng.queue_resync()
+    batch = eng.consume_outbound()
+    resets = [i for i in batch.intents if isinstance(i, RequestEstopReset)]
+    resyncs = [i for i in batch.intents if isinstance(i, RequestResync)]
+    assert len(resets) == 1
+    assert resets[0].hip_id == "sup"
+    assert getattr(resets[0], "actor_kind", "") == "supervisor"
+    assert len(resyncs) == 1
+    assert resyncs[0].hip_id == "sup"
+    assert getattr(resyncs[0], "actor_kind", "") == "supervisor"
+
+    eng.set_selected("anton", False)
+    eng.queue_reset_estop()
+    eng.queue_resync()
+    batch = eng.consume_outbound()
+    assert [i for i in batch.intents if isinstance(i, RequestEstopReset)] == []
+    assert [i for i in batch.intents if isinstance(i, RequestResync)] == []

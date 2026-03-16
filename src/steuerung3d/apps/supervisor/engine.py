@@ -67,11 +67,18 @@ class SupervisorEngine:
         self._chk_requested = bool(checked)
 
     def set_hip_open_count(self, unit_id: str, count: int) -> None:
+        was_locked = self._lock_active()
         value = max(0, int(count))
         if value <= 0:
             self._hip_open_counts.pop(str(unit_id), None)
-            return
-        self._hip_open_counts[str(unit_id)] = value
+        else:
+            self._hip_open_counts[str(unit_id)] = value
+        now_locked = self._lock_active()
+        if now_locked and not was_locked:
+            self._chk_requested = False
+            self._pending_reset_estop = False
+            self._pending_estart = False
+            self._pending_resync = False
 
     @property
     def hip_open_total(self) -> int:
@@ -83,6 +90,20 @@ class SupervisorEngine:
 
     def clear_recover_requested(self) -> None:
         self._pending_recover = False
+
+    def _lock_active(self) -> bool:
+        return self.hip_open_total > 0
+
+    def _selected_units(self) -> tuple[str, ...]:
+        return tuple(
+            axis.unit_id
+            for axis in self.profile.axes
+            if axis.unit_id in self._rows and self._selected.get(axis.unit_id, True)
+        )
+
+    def _selected_axes(self) -> tuple[AxisConfig, ...]:
+        selected = set(self._selected_units())
+        return tuple(axis for axis in self.profile.axes if axis.unit_id in selected)
 
     def snapshot(self) -> SupervisorSnapshot:
         rows = tuple(
@@ -124,38 +145,51 @@ class SupervisorEngine:
     def consume_outbound(self) -> OutboundBatch:
         intents = []
         densi_actions: dict[str, list[DensiRemoteAction]] = {}
-        if self._pending_reset_estop:
-            for axis in self.profile.axes:
-                if axis.unit_id in self._rows:
-                    intents.append(RequestEstopReset(axis_id=axis.axis_id, hip_id=axis.hip_id))
-            self._pending_reset_estop = False
-        if self._pending_resync:
-            for axis in self.profile.axes:
-                if axis.unit_id in self._rows:
-                    intents.append(RequestResync(axis_id=axis.axis_id, hip_id=axis.hip_id))
-            self._pending_resync = False
-        if self._pending_estart:
-            for axis in self.profile.axes:
-                if axis.unit_id in self._rows and axis.densi_action_out:
-                    densi_actions.setdefault(axis.unit_id, []).append(DensiRemoteAction("estart"))
-            self._pending_estart = False
 
-        for axis in self.profile.axes:
-            if axis.unit_id in self._rows and axis.densi_action_out:
-                densi_actions.setdefault(axis.unit_id, []).append(
-                    DensiRemoteAction("chk_es_taster", value=bool(self._chk_requested))
+        locked = self._lock_active()
+        selected_axes = self._selected_axes()
+
+        if not locked and self._pending_reset_estop:
+            for axis in selected_axes:
+                intents.append(
+                    RequestEstopReset(
+                        axis_id=axis.axis_id,
+                        hip_id=str(self.profile.supervisor_id),
+                        actor_kind="supervisor",
+                    )
                 )
+        self._pending_reset_estop = False
+
+        if not locked and self._pending_resync:
+            for axis in selected_axes:
+                intents.append(
+                    RequestResync(
+                        axis_id=axis.axis_id,
+                        hip_id=str(self.profile.supervisor_id),
+                        actor_kind="supervisor",
+                    )
+                )
+        self._pending_resync = False
+
+        if not locked and self._pending_estart:
+            for axis in selected_axes:
+                if axis.densi_action_out:
+                    densi_actions.setdefault(axis.unit_id, []).append(DensiRemoteAction("estart"))
+        self._pending_estart = False
+
+        if not locked:
+            for axis in selected_axes:
+                if axis.densi_action_out:
+                    densi_actions.setdefault(axis.unit_id, []).append(
+                        DensiRemoteAction("chk_es_taster", value=bool(self._chk_requested))
+                    )
 
         joy = (
             getattr(self._last_snapshot, "joy", JoyState())
             if self._last_snapshot is not None
             else JoyState()
         )
-        selected_axes = tuple(
-            axis.axis_id
-            for axis in self.profile.axes
-            if axis.unit_id in self._rows and self._selected.get(axis.unit_id, True)
-        )
+        selected_axis_ids = tuple(axis.axis_id for axis in selected_axes)
         for axis in self.profile.axes:
             row = self._rows.get(axis.unit_id)
             if row is None:
@@ -169,11 +203,11 @@ class SupervisorEngine:
                     hip_id=str(self.profile.supervisor_id),
                 )
             )
-        motion_blocked = self.hip_open_total > 0
+        motion_blocked = locked
         joy_update = JoyState(
             deadman=(False if motion_blocked else bool(joy.deadman)),
             soll_speed=(0.0 if motion_blocked else float(joy.soll_speed)),
-            selected_axes=(() if motion_blocked else selected_axes),
+            selected_axes=(() if motion_blocked else selected_axis_ids),
         )
         changed = self._joy_sent != joy_update
         if changed:
@@ -302,5 +336,5 @@ class SupervisorEngine:
         joy_state = "active" if bool(joy.deadman) and self.hip_open_total <= 0 else "online"
         status = f"System: {state} | axes: {len(rows_t)} | joystick: {joy_state}"
         if self.hip_open_total > 0:
-            status += f" | hip: {self.hip_open_total} open"
+            status += f" | hip: {self.hip_open_total} open | supervisor: locked"
         return status

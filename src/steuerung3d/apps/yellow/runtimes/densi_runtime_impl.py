@@ -80,6 +80,8 @@ class DensiRuntime:
                     name = str(getattr(action, "action", "") or "")
                     if name == "estart":
                         ui.es_start_clicked = True
+                    elif name == "estop_reset":
+                        ui.estop_reset_clicked = True
                     elif name == "resync":
                         ui.diag_resync_clicked = True
                     elif name == "chk_es_taster":

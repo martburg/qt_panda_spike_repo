@@ -32,7 +32,8 @@ def handle_request_estop_reset(state: MachineState, intent: RequestEstopReset) -
     axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     hip_id = str(getattr(intent, "hip_id", "") or "")
 
-    allowed, _reason = axis_reset_allowed(state, axis_id, hip_id)
+    actor_kind = str(getattr(intent, "actor_kind", "hip") or "hip")
+    allowed, _reason = axis_reset_allowed(state, axis_id, hip_id, actor_kind)
     if not allowed:
         key = axis_id or "<none>"
         state.estop_reset_denied_count_by_axis[key] = (
@@ -56,7 +57,8 @@ def handle_request_resync(state: MachineState, intent: RequestResync) -> None:
     axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     hip_id = str(getattr(intent, "hip_id", "") or "")
 
-    allowed, _reason = axis_reset_allowed(state, axis_id, hip_id)
+    actor_kind = str(getattr(intent, "actor_kind", "hip") or "hip")
+    allowed, _reason = axis_reset_allowed(state, axis_id, hip_id, actor_kind)
     if not allowed:
         return
 

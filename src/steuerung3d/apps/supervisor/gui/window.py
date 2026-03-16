@@ -65,6 +65,15 @@ class SupervisorWindow(QMainWindow):
             self.setWindowTitle(str(snap.title))
             self.status_label.setText(str(snap.status_text))
             rows = list(snap.rows)
+            locked = int(getattr(snap, "hip_open_total", 0) or 0) > 0
+            self.btn_reset.setEnabled(not locked)
+            self.btn_estart.setEnabled(not locked)
+            self.btn_resync.setEnabled(not locked)
+            self.chk_taster.setEnabled(not locked)
+            if locked:
+                self.chk_taster.blockSignals(True)
+                self.chk_taster.setChecked(False)
+                self.chk_taster.blockSignals(False)
             self.table.setRowCount(len(rows))
             for row_idx, row in enumerate(rows):
                 self._set_text(row_idx, 0, row.axis_id)
@@ -79,6 +88,7 @@ class SupervisorWindow(QMainWindow):
                     self.table.setCellWidget(row_idx, 1, chk)
                 chk.blockSignals(True)
                 chk.setChecked(bool(row.selected))
+                chk.setEnabled(not locked)
                 chk.blockSignals(False)
                 self._set_text(row_idx, 2, row.phase.value)
                 self._set_text(row_idx, 3, "yes" if row.estop else "no")

@@ -21,6 +21,16 @@ def apply_ui_actions(rt: "DensiRuntime", inputs: DensiInputs) -> None:
         except Exception:
             pass
 
+    if ui.estop_reset_clicked:
+        try:
+            _word0, reset_able, _ready_for_sollvel = rt.engine.derive_estop_inputs()
+            if bool(reset_able):
+                rt.engine.apply_post_reset_state()
+                rt._log.info("EStop reset pressed")
+                rt._force_refresh_checkboxes = True
+        except Exception:
+            pass
+
     if ui.estop_all_set_clicked:
         try:
             rt.engine.set_all_estop_bits()

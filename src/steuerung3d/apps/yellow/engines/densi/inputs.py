@@ -17,6 +17,7 @@ class DensiEstopToggle:
 @dataclass
 class DensiUiInputs:
     es_start_clicked: bool = False
+    estop_reset_clicked: bool = False
     estop_all_set_clicked: bool = False
     estop_all_clear_clicked: bool = False
     diag_resync_clicked: bool = False

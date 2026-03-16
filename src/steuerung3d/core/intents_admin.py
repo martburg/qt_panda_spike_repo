@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+ActorKind = Literal["hip", "supervisor"]
+
 
 @dataclass(frozen=True)
 class ClaimAxis:
@@ -80,6 +82,7 @@ class RequestEstopReset:
     type: Literal["estop_reset"] = "estop_reset"
     axis_id: str = ""
     hip_id: str = ""
+    actor_kind: ActorKind = "hip"
 
 
 @dataclass(frozen=True)
@@ -89,6 +92,7 @@ class RequestResync:
     type: Literal["resync"] = "resync"
     axis_id: str = ""
     hip_id: str = ""
+    actor_kind: ActorKind = "hip"
 
 
 @dataclass(frozen=True)
