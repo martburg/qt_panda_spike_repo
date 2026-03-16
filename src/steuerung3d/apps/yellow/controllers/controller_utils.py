@@ -8,7 +8,7 @@ reason about observability objects and Qt timer parenting.
 
 from __future__ import annotations
 
-from typing import Callable, Protocol
+from typing import Callable, Protocol, TypeVar
 
 from PySide6.QtCore import QObject, QTimer
 
@@ -50,6 +50,9 @@ def start_poll_timer(win: QObject, *, period_ms: int, callback: Callable[[], Non
     return t
 
 
+_T = TypeVar("_T")
+
+
 def run_guarded(func: Callable[[], None], *, on_error: Callable[[], None] | None = None) -> None:
     if on_error is None:
         func()
@@ -58,6 +61,32 @@ def run_guarded(func: Callable[[], None], *, on_error: Callable[[], None] | None
         func()
     except Exception:
         on_error()
+
+
+def read_or_fallback(
+    func: Callable[[], _T],
+    *,
+    fallback: _T,
+    on_error: Callable[[], None] | None = None,
+) -> _T:
+    try:
+        return func()
+    except Exception:
+        if on_error is not None:
+            on_error()
+        return fallback
+
+
+def best_effort(
+    func: Callable[[], None],
+    *,
+    on_error: Callable[[], None] | None = None,
+) -> None:
+    try:
+        func()
+    except Exception:
+        if on_error is not None:
+            on_error()
 
 
 def bump_soft_error(counters: dict[str, int], key: str) -> None:

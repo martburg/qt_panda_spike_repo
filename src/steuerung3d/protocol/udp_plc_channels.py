@@ -17,85 +17,18 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from steuerung3d.adapters.links.udp_link import UdpLink
-from steuerung3d.protocol.parse_primitives import parse_bool, parse_float
-
-_PARAM_GROUP_DEFAULTS: Dict[str, List[str]] = {
-    "pos": ["HardMax", "UserMax", "UserMin", "HardMin", "PosWin"],
-    "vel": ["VelMax", "VelWin", "AccMax", "AccMove", "DccMax", "MaxAmp", "VelMaxMot"],
-    "filter": ["P", "I", "D", "IL", "RampForm"],
-    "guider": ["PosMax", "PosMin", "Pitch"],
-}
-
-
-def _axis_id_or_default(axis_id: Optional[str], default: str = "X") -> str:
-    value = str(axis_id or default).strip()
-    return value or default
-
-
-def _frame_axis_id(frame: Any, default: str = "X") -> str:
-    try:
-        axes = getattr(frame, "axes", {}) or {}
-    except Exception:
-        return default
-    if isinstance(axes, Mapping) and axes:
-        try:
-            return _axis_id_or_default(str(next(iter(axes.keys()))), default)
-        except Exception:
-            return default
-    return default
-
-
-def _frame_lifetick_ui_rx(frame: Any, axis_id: str) -> int:
-    try:
-        echo = getattr(frame, "lifetick_echo", {}) or {}
-    except Exception:
-        return 0
-    if isinstance(echo, Mapping) and axis_id in echo:
-        try:
-            return int(echo[axis_id])
-        except Exception:
-            return 0
-    return 0
-
-
-def _extract_param_write_values(
-    fields: Mapping[str, object],
-    *,
-    group_defaults: Mapping[str, List[str]],
-    param_keymap: Mapping[str, str],
-) -> List[tuple[str, Dict[str, float]]]:
-    out: List[tuple[str, Dict[str, float]]] = []
-    for grp, keys in group_defaults.items():
-        values: Dict[str, float] = {}
-        for key in keys:
-            plc_key = param_keymap.get(key)
-            if not plc_key or plc_key not in fields:
-                continue
-            values[str(key)] = _to_float(fields.get(plc_key, "0"), 0.0)
-        if values:
-            out.append((str(grp), values))
-    return out
-
-
-def _frame_param_map(frame: Any) -> Dict[str, float]:
-    params: Dict[str, float] = {}
-    try:
-        from steuerung3d.core.command_frame import ParamWriteOp, coerce_param_ops
-
-        for op in coerce_param_ops(getattr(frame, "param_ops", []) or []):
-            if not isinstance(op, ParamWriteOp):
-                continue
-            for key, value in dict(op.values or {}).items():
-                try:
-                    params[str(key)] = float(value)
-                except Exception:
-                    continue
-    except Exception:
-        return {}
-    return params
+from steuerung3d.protocol.udp_plc_coerce import to_bool_token, to_float, to_int
+from steuerung3d.protocol.udp_plc_frame_support import (
+    PARAM_GROUP_DEFAULTS,
+    axis_id_or_default,
+    extract_param_write_values,
+    frame_axis_id,
+    frame_lifetick_ui_rx,
+    frame_param_map,
+)
 
 
 def _to_bytes(line: str) -> bytes:
@@ -189,55 +122,6 @@ class UdpPlcTelemetryOut:
             self.publish_line(str(payload))
 
 
-def _to_int(x: object, default: int = 0) -> int:
-    """Tolerant int conversion for PLC tokens (accepts '1', '1.0', etc.)."""
-    try:
-        return int(float(str(x).strip()))
-    except Exception:
-        return int(default)
-
-
-def _to_float(x: object, default: float = 0.0) -> float:
-    """Tolerant float conversion for PLC tokens."""
-    return float(parse_float(x, default=default))
-
-
-def _to_bool_token(x: object, default: bool = False) -> bool:
-    """Parse legacy PLC-ish booleans.
-
-    ST truth (KommAnton__MAIN.st):
-      - `Intent` is compared against the *string* 'True' (case-sensitive).
-      - Other on-wire flags are typically numeric (WORD/INT/DWORD) where non-zero means true.
-
-    Policy here:
-      - empty token => False (even if default=True) (matches previous behavior)
-      - accept a broad token set (true/false/on/off/1/0/...) via :func:`parse_bool`
-      - accept numeric-ish tokens as well (e.g. DWORD bitfields): non-zero => True
-    """
-    try:
-        s = str(x).strip()
-    except Exception:
-        return bool(default)
-    if s == "":
-        return False
-
-    sl = s.lower()
-
-    # First accept the centralized token set (1/0, true/false, on/off, ...).
-    v = parse_bool(s, default=default)
-    if sl in ("1", "0", "true", "false", "t", "f", "yes", "no", "y", "n", "on", "off"):
-        return bool(v)
-
-    # Then accept legacy numeric-ish tokens as well (e.g. DWORD bitfields): non-zero => True.
-    try:
-        return int(sl, 10) != 0
-    except Exception:
-        try:
-            return float(sl) != 0.0
-        except Exception:
-            return bool(default)
-
-
 @dataclass
 class UdpPlcCommandIn:
     link: UdpLink
@@ -269,7 +153,7 @@ class UdpPlcCommandIn:
         except Exception:
             return out
 
-        axis_id = _axis_id_or_default(self.axis_id)
+        axis_id = axis_id_or_default(self.axis_id)
 
         for raw in self.link.poll(limit=limit):
             try:
@@ -280,20 +164,20 @@ class UdpPlcCommandIn:
                 if not isinstance(fields, dict):
                     continue
 
-                tick_ui_rx = _to_int(fields.get("LifetickUIrx", "0"), 0)
-                vel = _to_float(fields.get("SpeedSollIN", "0"), 0.0)
+                tick_ui_rx = to_int(fields.get("LifetickUIrx", "0"), 0)
+                vel = to_float(fields.get("SpeedSollIN", "0"), 0.0)
 
-                enable = _to_bool_token(fields.get("ControlIN", "False"), False)
-                intent = _to_bool_token(fields.get("Intent", "True"), True)
-                resync = _to_bool_token(fields.get("ReSync", "False"), False)
-                gui_not_halt = _to_bool_token(fields.get("GUINotHaltIN", "False"), False)
+                enable = to_bool_token(fields.get("ControlIN", "False"), False)
+                intent = to_bool_token(fields.get("Intent", "True"), True)
+                resync = to_bool_token(fields.get("ReSync", "False"), False)
+                gui_not_halt = to_bool_token(fields.get("GUINotHaltIN", "False"), False)
 
                 param_ops: List[Any] = []
                 modus = str(fields.get("Modus", "") or "").strip().lower()
                 if modus == "w":
-                    for group, values in _extract_param_write_values(
+                    for group, values in extract_param_write_values(
                         fields,
-                        group_defaults=_PARAM_GROUP_DEFAULTS,
+                        group_defaults=PARAM_GROUP_DEFAULTS,
                         param_keymap=_PARAM_KEYMAP,
                     ):
                         param_ops.append(ParamWriteOp(group=group, values=values))
@@ -308,7 +192,7 @@ class UdpPlcCommandIn:
                     intent=bool(intent),
                     resync=bool(resync),
                     gui_not_halt=bool(gui_not_halt),
-                    estop_reset=_to_bool_token(fields.get("EStopReset", "False"), False),
+                    estop_reset=to_bool_token(fields.get("EStopReset", "False"), False),
                     lifetick_echo={axis_id: tick_ui_rx},
                     resync_by_axis={axis_id: bool(resync)} if bool(resync) else {},
                     param_ops=param_ops,
@@ -345,9 +229,9 @@ class UdpPlcCommandOut:
             self.publish_line(str(frame))
             return
 
-        axis_id = _frame_axis_id(frame)
-        lifetick_ui_rx = _frame_lifetick_ui_rx(frame, axis_id)
-        params = _frame_param_map(frame)
+        axis_id = frame_axis_id(frame)
+        lifetick_ui_rx = frame_lifetick_ui_rx(frame, axis_id)
+        params = frame_param_map(frame)
 
         try:
             payload = encode_downlink(

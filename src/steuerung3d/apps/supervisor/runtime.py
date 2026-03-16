@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
-import shlex
 import subprocess
 import sys
 
@@ -10,14 +8,28 @@ from PySide6.QtCore import QObject, QTimer
 from PySide6.QtWidgets import QApplication
 
 from steuerung3d.core.intents import ReleaseAxis, ReleaseAxisLease
-from steuerung3d.core.net import parse_hostport
-from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn
+from steuerung3d.protocol.udp_channels import (
+    UdpIntentOut as UdpIntentOut,
+    UdpTelemetryIn as UdpTelemetryIn,
+)
 
-from .actions_transport import UdpDensiActionOut
+from .actions_transport import UdpDensiActionOut as UdpDensiActionOut
 from .engine import SupervisorEngine
 from .gui.window import SupervisorWindow
-from .merge import merge_snapshots
 from .models import SupervisorProfile
+from .runtime_process_support import (
+    launch_children,
+    launch_hip_child,
+    refresh_hip_processes,
+    terminate_children,
+    terminate_hip_children,
+)
+from .runtime_transport_support import (
+    close_transports,
+    ingest_telemetry,
+    init_transports,
+    publish_outbound,
+)
 
 log = logging.getLogger("supervisor")
 
@@ -63,27 +75,17 @@ class SupervisorRuntime(QObject):
                 pass
             return
 
-        env = dict(os.environ)
-        argv = shlex.split(cmd_text)
-        child = subprocess.Popen(argv, cwd=os.getcwd(), env=env, text=True)
+        child = launch_hip_child(cmd_text=cmd_text)
         self._hip_children.setdefault(axis.unit_id, []).append(child)
         self.engine.set_hip_open_count(axis.unit_id, len(self._hip_children.get(axis.unit_id, [])))
 
     def _refresh_hip_processes(self) -> None:
-        for unit_id, children in list(self._hip_children.items()):
-            alive = [child for child in children if child.poll() is None]
-            exited = len(children) - len(alive)
-            if alive:
-                self._hip_children[unit_id] = alive
-            else:
-                self._hip_children.pop(unit_id, None)
-            self.engine.set_hip_open_count(unit_id, len(alive))
-            if exited > 0 and len(alive) == 0:
-                axis = next(
-                    (axis for axis in self.profile.axes if axis.unit_id == str(unit_id)), None
-                )
-                if axis is not None and axis.hip_id:
-                    self._release_hip_authority(axis.axis_id, axis.hip_id)
+        refresh_hip_processes(
+            profile=self.profile,
+            hip_children=self._hip_children,
+            set_hip_open_count=self.engine.set_hip_open_count,
+            release_hip_authority=self._release_hip_authority,
+        )
 
     def shutdown(self) -> None:
         self._terminate_children()
@@ -91,13 +93,7 @@ class SupervisorRuntime(QObject):
         self._close_transports()
 
     def _init_transports(self) -> None:
-        self.telemetry_in = UdpTelemetryIn.bind(parse_hostport(self.profile.telem_in))
-        self.intent_out = UdpIntentOut.connect(parse_hostport(self.profile.intent_out))
-        self.action_outs = {
-            axis.unit_id: UdpDensiActionOut.connect(parse_hostport(axis.densi_action_out))
-            for axis in self.profile.axes
-            if axis.densi_action_out
-        }
+        self.telemetry_in, self.intent_out, self.action_outs = init_transports(profile=self.profile)
 
     def _init_window_and_signals(self) -> None:
         self.window = SupervisorWindow()
@@ -114,10 +110,12 @@ class SupervisorRuntime(QObject):
         self._timer.timeout.connect(self.tick)
 
     def _ingest_telemetry(self) -> None:
-        snaps = self.telemetry_in.drain_telemetry(limit=50)
-        if not snaps:
+        merged = ingest_telemetry(
+            telemetry_in=self.telemetry_in, merged_snapshot=self._merged_snapshot
+        )
+        if merged is self._merged_snapshot:
             return
-        self._merged_snapshot = merge_snapshots(self._merged_snapshot, snaps)
+        self._merged_snapshot = merged
         self.engine.ingest(self._merged_snapshot)
 
     def _apply_window_snapshot(self) -> None:
@@ -125,75 +123,27 @@ class SupervisorRuntime(QObject):
         self.window.apply_snapshot(snapshot)
 
     def _publish_outbound(self) -> None:
-        outbound = self.engine.consume_outbound()
-        for intent in outbound.intents:
-            try:
-                self.intent_out.publish_intent(intent)
-            except Exception:
-                log.exception("failed to publish intent %r", intent)
-
-        for pair_id, actions in outbound.densi_actions.items():
-            tx = self.action_outs.get(pair_id)
-            if tx is None:
-                continue
-            for action in actions:
-                try:
-                    tx.publish_action(action)
-                except Exception:
-                    log.exception("failed to publish densi action %s -> %s", pair_id, action)
+        publish_outbound(
+            outbound=self.engine.consume_outbound(),
+            intent_out=self.intent_out,
+            action_outs=self.action_outs,
+        )
 
     def _terminate_children(self) -> None:
-        for child in self._children:
-            try:
-                child.terminate()
-            except Exception:
-                pass
+        terminate_children(children=self._children)
 
     def _terminate_hip_children(self) -> None:
-        for children in self._hip_children.values():
-            for child in children:
-                try:
-                    child.terminate()
-                except Exception:
-                    pass
+        terminate_hip_children(hip_children=self._hip_children)
 
     def _close_transports(self) -> None:
-        try:
-            self.telemetry_in.rx.link.close()
-        except Exception:
-            pass
-
-        try:
-            self.intent_out.tx.link.close()
-        except Exception:
-            pass
-
-        for tx in self.action_outs.values():
-            try:
-                tx.tx.link.close()
-            except Exception:
-                pass
+        close_transports(
+            telemetry_in=self.telemetry_in,
+            intent_out=self.intent_out,
+            action_outs=self.action_outs,
+        )
 
     def _launch_children(self) -> None:
-        if self.profile.launch_stack:
-            cmd = [
-                sys.executable,
-                "-m",
-                "steuerung3d",
-                "up",
-                "--profile",
-                self.profile.launch_stack,
-            ]
-            self._children.append(subprocess.Popen(cmd, cwd=os.getcwd(), text=True))
-            return
-
-        env = dict(os.environ)
-        for axis in self.profile.axes:
-            for cmd_text in (axis.hip_launch, axis.densi_launch):
-                if not cmd_text:
-                    continue
-                argv = shlex.split(cmd_text)
-                self._children.append(subprocess.Popen(argv, cwd=os.getcwd(), env=env, text=True))
+        self._children.extend(launch_children(profile=self.profile))
 
     def _on_recover_clicked(self) -> None:
         self.engine.queue_recover()

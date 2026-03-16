@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, replace
+from typing import Callable
 
 from PySide6.QtWidgets import QWidget
 
@@ -31,7 +32,13 @@ from ..ports import CommandIn, TelemetryOut
 from ..qtutil.bindings import YellowBindings
 from ..qtutil.perf_watchdog import PerfWatchdog
 from ..runtimes.densi_runtime import DensiRuntime
-from .controller_utils import bump_soft_error, init_observability, start_poll_timer
+from .controller_utils import (
+    best_effort,
+    bump_soft_error,
+    init_observability,
+    read_or_fallback,
+    start_poll_timer,
+)
 
 log = logging.getLogger("den_si")
 
@@ -78,17 +85,35 @@ class DenSiController:
         self._binder.reset_ui_startup()
 
         # Seed params from UI if available (merge into defaults)
-        try:
-            seed = self._binder.seed_params_from_ui()
-            if seed:
-                self.state.params.update(dict(seed))
-        except Exception:
-            bump_soft_error(self._soft_errors, "binder.seed_params_from_ui")
+        seed = self._read_or_fallback(
+            "binder.seed_params_from_ui",
+            self._binder.seed_params_from_ui,
+            fallback=None,
+        )
+        if seed:
+            self.state.params.update(dict(seed))
 
-        try:
-            self._binder.init_estop_checkboxes(estop_word=int(self.engine.inj_estop_word))
-        except Exception:
-            bump_soft_error(self._soft_errors, "binder.init_estop_checkboxes")
+        self._best_effort(
+            "binder.init_estop_checkboxes",
+            lambda: self._binder.init_estop_checkboxes(estop_word=int(self.engine.inj_estop_word)),
+        )
+
+    # ------------------------------------------------------------------
+    # Guard helpers
+    # ------------------------------------------------------------------
+
+    def _bump_soft_error(self, key: str) -> None:
+        bump_soft_error(self._soft_errors, key)
+
+    def _best_effort(self, key: str, func: Callable[[], None]) -> None:
+        best_effort(func, on_error=lambda: self._bump_soft_error(key))
+
+    def _read_or_fallback(
+        self, key: str, func: Callable[[], object], *, fallback: object
+    ) -> object:
+        return read_or_fallback(
+            func, fallback=fallback, on_error=lambda: self._bump_soft_error(key)
+        )
 
     # ------------------------------------------------------------------
     # Initialization helpers
@@ -137,18 +162,17 @@ class DenSiController:
         with self._wd.tick():
             now_ns = int(time.monotonic_ns())
             inputs = self._runtime.collect_inputs(now_ns=now_ns)
-            try:
-                ui_inputs = self._binder.read_inputs()
-                merged_ui = self._merge_ui_inputs(inputs.ui, ui_inputs.ui)
+            ui_result = self._read_or_fallback(
+                "binder.read_inputs",
+                self._binder.read_inputs,
+                fallback=None,
+            )
+            if ui_result is not None:
+                merged_ui = self._merge_ui_inputs(inputs.ui, ui_result.ui)
                 inputs = replace(inputs, ui=merged_ui)
-            except Exception:
-                bump_soft_error(self._soft_errors, "binder.read_inputs")
             runtime_res = self._runtime.tick(inputs=inputs)
 
-            try:
-                self._binder.apply(runtime_res.view_model)
-            except Exception:
-                bump_soft_error(self._soft_errors, "binder.apply")
+            self._best_effort("binder.apply", lambda: self._binder.apply(runtime_res.view_model))
 
             self._emit_birdseye(runtime_res)
 

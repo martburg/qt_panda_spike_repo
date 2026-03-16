@@ -15,7 +15,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
-from typing import cast
+from typing import Callable, cast
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QWidget
@@ -35,8 +35,10 @@ from ..qtutil.perf_watchdog import PerfWatchdog
 from ..runtimes.hip_runtime import HipRuntime, HipRuntimeResult
 from .controller_utils import (
     StatusEmitterLike,
+    best_effort,
     bump_soft_error,
     init_observability,
+    read_or_fallback,
     run_guarded,
     start_poll_timer,
 )
@@ -131,10 +133,24 @@ class HiPController:
         self._lock_axis_combo: bool = False
 
         # Paint an explicit startup state (unknown dots, no tick, etc.)
-        try:
-            self._binder.apply_startup_state()
-        except Exception:
-            bump_soft_error(self._soft_errors, "binder.apply_startup_state")
+        self._best_effort("binder.apply_startup_state", self._binder.apply_startup_state)
+
+    # -------------------------------------------------------------------------
+    # Guard helpers
+    # -------------------------------------------------------------------------
+
+    def _bump_soft_error(self, key: str) -> None:
+        bump_soft_error(self._soft_errors, key)
+
+    def _best_effort(self, key: str, func: Callable[[], None]) -> None:
+        best_effort(func, on_error=lambda: self._bump_soft_error(key))
+
+    def _read_or_fallback(
+        self, key: str, func: Callable[[], object], *, fallback: object
+    ) -> object:
+        return read_or_fallback(
+            func, fallback=fallback, on_error=lambda: self._bump_soft_error(key)
+        )
 
     # -------------------------------------------------------------------------
     # Initialization helpers
@@ -166,15 +182,13 @@ class HiPController:
     def set_fixed_axis(self, axis_id: str, *, lock_combo: bool = True) -> None:
         self._fixed_axis = normalize_axis_id(axis_id)
         self._lock_axis_combo = bool(lock_combo)
-        try:
-            self._hip_runtime.set_fixed_axis(self._fixed_axis, lock_combo=self._lock_axis_combo)
-        except Exception:
-            pass
+        best_effort(
+            lambda: self._hip_runtime.set_fixed_axis(
+                self._fixed_axis, lock_combo=self._lock_axis_combo
+            )
+        )
         if self._fixed_axis:
-            try:
-                self.win.setWindowTitle(f"HMI – HiP ({self._fixed_axis})")
-            except Exception:
-                pass
+            best_effort(lambda: self.win.setWindowTitle(f"HMI – HiP ({self._fixed_axis})"))
 
     # -------------------------------------------------------------------------
     # Internal helpers
@@ -194,19 +208,18 @@ class HiPController:
         )
 
     def _read_ui_inputs(self) -> HipUiInputs:
-        ui_inputs = HipUiInputs(
-            axis_selected="",
-            axis_selection_changed=False,
-            estop_reset_clicked=False,
-            resync_clicked=False,
-            param_actions=[],
-            param_values={},
+        return self._read_or_fallback(
+            "binder.read_inputs",
+            self._binder.read_inputs,
+            fallback=HipUiInputs(
+                axis_selected="",
+                axis_selection_changed=False,
+                estop_reset_clicked=False,
+                resync_clicked=False,
+                param_actions=[],
+                param_values={},
+            ),
         )
-        try:
-            ui_inputs = self._binder.read_inputs()
-        except Exception:
-            bump_soft_error(self._soft_errors, "binder.read_inputs")
-        return ui_inputs
 
     def _log_runtime_result(self, *, ui_inputs: HipUiInputs, rt_result: HipRuntimeResult) -> None:
         vm: HipViewModel | None = rt_result.view_model
@@ -254,26 +267,24 @@ class HiPController:
 
     def _apply_runtime_result(self, *, rt_result: HipRuntimeResult) -> bool:
         if rt_result.apply_startup_state:
-            try:
-                self._binder.apply_startup_state()
-            except Exception:
-                self._soft_errors["binder.apply_startup_state"] = (
-                    int(self._soft_errors.get("binder.apply_startup_state", 0)) + 1
-                )
+            self._best_effort("binder.apply_startup_state", self._binder.apply_startup_state)
             return False
 
         if rt_result.view_model is None:
             return False
 
-        try:
+        def _apply_vm() -> None:
             self._binder.apply(rt_result.view_model)
-        except Exception:
-            bump_soft_error(self._soft_errors, "binder.apply")
+
+        def _on_apply_error() -> None:
+            self._bump_soft_error("binder.apply")
             now_s = time.time()
             last = self._binder_apply_err_last_s
             if now_s - last > 1.0:
                 self._binder_apply_err_last_s = now_s
                 log.exception("hi_p: binder.apply crashed (continuing).")
+
+        best_effort(_apply_vm, on_error=_on_apply_error)
         return True
 
     def _emit_runtime_outputs(self, *, rt_result: HipRuntimeResult) -> None:
