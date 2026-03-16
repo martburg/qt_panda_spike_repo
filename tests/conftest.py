@@ -1,5 +1,6 @@
 import importlib.util
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -29,3 +30,37 @@ def pytest_runtest_setup(item):
     mod = str(marker.args[0])
     if importlib.util.find_spec(mod) is None:
         pytest.skip(f"optional dependency missing: {mod}")
+
+
+class _DummyQtType:
+    def __init__(self, *args, **kwargs) -> None:
+        pass
+
+    def __call__(self, *args, **kwargs):
+        return None
+
+
+def _qt_module(name: str) -> types.ModuleType:
+    mod = types.ModuleType(name)
+
+    def __getattr__(attr: str):
+        return _DummyQtType
+
+    mod.__getattr__ = __getattr__  # type: ignore[attr-defined]
+    return mod
+
+
+@pytest.fixture
+def stub_pyside6(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Install lightweight PySide6 stubs for tests that only need imports."""
+
+    pyside6 = types.ModuleType("PySide6")
+    pyside6.__path__ = []
+    monkeypatch.setitem(sys.modules, "PySide6", pyside6)
+    monkeypatch.setitem(sys.modules, "PySide6.QtCore", _qt_module("PySide6.QtCore"))
+    monkeypatch.setitem(sys.modules, "PySide6.QtWidgets", _qt_module("PySide6.QtWidgets"))
+    monkeypatch.setitem(sys.modules, "PySide6.QtGui", _qt_module("PySide6.QtGui"))
+
+    qtuitools = _qt_module("PySide6.QtUiTools")
+    qtuitools.QUiLoader = _DummyQtType
+    monkeypatch.setitem(sys.modules, "PySide6.QtUiTools", qtuitools)

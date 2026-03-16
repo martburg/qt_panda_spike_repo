@@ -115,7 +115,9 @@ def test_supervisor_leased_local_manual_survives_empty_joy_selected_axes() -> No
     st.ensure_axis("Anton")
     st.densi_registry["Anton"] = DensiRuntime(device_id="Anton", last_seen_core_tick=st.tick)
     _seed_axis_gate(st, "Anton", ready=True)
-    apply_intent(st, RequestAxisLease(axis_id="Anton", hip_id="sup_smoke_2pairs", req_id="lease-anton"))
+    apply_intent(
+        st, RequestAxisLease(axis_id="Anton", hip_id="sup_smoke_2pairs", req_id="lease-anton")
+    )
 
     apply_intent(st, LocalAxisManualRequest(axis_ids=("Anton",), enable=True, rate=0.4))
     enforce_core_mode_actions(st)

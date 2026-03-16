@@ -32,7 +32,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--no-legacy",
         action="store_true",
-        help="Skip legacy stacks/profiles sync check.",
+        help="Skip configs/stacks compatibility-mirror check.",
     )
     p.add_argument(
         "--no-ruff",
@@ -59,7 +59,8 @@ def main(argv: list[str] | None = None) -> int:
 
     root = repo_root()
 
-    # 1) keep legacy configs/stacks in sync with configs/profiles
+    # 1) keep the legacy configs/stacks compatibility mirror in sync with
+    #    configs/profiles, which remain the source of truth
     if not args.no_legacy:
         rc = run([sys.executable, str(root / "tools" / "check_legacy_stacks.py")], cwd=root)
         if rc != 0:

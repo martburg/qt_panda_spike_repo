@@ -35,7 +35,9 @@ def main() -> int:
         if stale.name not in profile_names:
             stale.unlink()
 
-    print(f"[legacy-stacks] synced {len(profiles)} profile(s) -> configs/stacks")
+    print(
+        f"[legacy-stacks] synced {len(profiles)} authoritative profile(s) -> configs/stacks compatibility mirror"
+    )
     return 0
 
 

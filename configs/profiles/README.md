@@ -1,6 +1,6 @@
 ## Stack profiles
 
-Canonical stack profile location: `configs/profiles/*.toml`.
+Canonical profile location: `configs/profiles/*.toml`.
 
 These TOML files are consumed by:
 
@@ -10,5 +10,8 @@ python -m steuerung3d profiles
 ```
 
 Notes:
-- `configs/stacks/` remains supported for backward compatibility, but new profiles
-  should be added here.
+- `configs/profiles/*.toml` is the source of truth for named profiles.
+- `configs/stacks/*.toml` remains only as a strict compatibility mirror for older docs/scripts.
+- Do not edit `configs/stacks/*.toml` directly.
+- `python tools/check.py` enforces mirror correctness through `tools/check_legacy_stacks.py`.
+- After changing a profile here, refresh the mirror with `python tools/sync_legacy_stacks.py`.

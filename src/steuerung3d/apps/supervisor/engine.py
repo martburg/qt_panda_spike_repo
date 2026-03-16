@@ -1,33 +1,20 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
-
-from steuerung3d.apps.yellow.engines.hip.presentation_extract import (
-    parse_estop_word_from_snapshot,
-)
-from steuerung3d.core.intents import (
-    EchoLifeTick,
-    JoyStateUpdate,
-    LocalAxisManualRequest,
-    ReleaseAxisLease,
-    RequestAxisLease,
-    RequestEstopReset,
-    RequestResync,
-)
+from steuerung3d.core.intents import Intent
 from steuerung3d.core.telemetry import JoyState, TelemetrySnapshot
-from steuerung3d.core.telemetry_axis_view import axis_scoped_snapshot
-from steuerung3d.protocol.banner_estate import BANNER_DYNAMIC_EXCLUDE
-from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS, decode_estop_word
 
-from .models import (
-    AxisConfig,
-    AxisPhase,
-    AxisRow,
-    DensiRemoteAction,
-    OutboundBatch,
-    SupervisorProfile,
-    SupervisorSnapshot,
+from .models import AxisConfig, AxisRow, OutboundBatch, SupervisorProfile, SupervisorSnapshot
+from .outbound import (
+    append_joy_update_if_changed,
+    append_lifetick_echoes,
+    append_reset_and_resync_intents,
+    build_densi_actions,
+    build_joy_update,
+    sync_leases,
+    sync_manual_motion,
 )
+from .rows import build_axis_row
+from .status import build_status_text
 
 
 class SupervisorEngine:
@@ -139,250 +126,87 @@ class SupervisorEngine:
                 key=lambda r: r.unit_id,
             )
         )
-        joy = (
-            getattr(self._last_snapshot, "joy", JoyState())
-            if self._last_snapshot is not None
-            else JoyState()
-        )
+        joy = self._current_joy()
         return SupervisorSnapshot(
             title=self.profile.title,
-            status_text=self._build_status_text(rows=rows, joy=joy),
+            status_text=build_status_text(rows=rows, joy=joy, hip_open_total=self.hip_open_total),
             rows=rows,
             joy=joy,
             hip_open_total=self.hip_open_total,
         )
 
     def consume_outbound(self) -> OutboundBatch:
-        intents = []
-        densi_actions: dict[str, list[DensiRemoteAction]] = {}
-
+        intents: list[Intent] = []
         locked = self._lock_active()
         selected_axes = self._selected_axes()
         selected_axis_ids = tuple(axis.axis_id for axis in selected_axes)
-        desired_leased_axis_ids = set() if locked else set(selected_axis_ids)
 
-        released_axis_ids = sorted(self._leased_axis_ids - desired_leased_axis_ids)
-        for axis_id in released_axis_ids:
-            intents.append(
-                ReleaseAxisLease(axis_id=axis_id, hip_id=str(self.profile.supervisor_id))
-            )
-        requested_axis_ids = sorted(desired_leased_axis_ids - self._leased_axis_ids)
-        for axis_id in requested_axis_ids:
-            intents.append(
-                RequestAxisLease(axis_id=axis_id, hip_id=str(self.profile.supervisor_id))
-            )
-        self._leased_axis_ids = set(desired_leased_axis_ids)
-
-        if not locked and self._pending_reset_estop:
-            for axis in selected_axes:
-                intents.append(
-                    RequestEstopReset(
-                        axis_id=axis.axis_id,
-                        hip_id=str(self.profile.supervisor_id),
-                        actor_kind="supervisor",
-                    )
-                )
+        self._leased_axis_ids = sync_leases(
+            intents=intents,
+            supervisor_id=str(self.profile.supervisor_id),
+            locked=locked,
+            selected_axes=selected_axes,
+            leased_axis_ids=self._leased_axis_ids,
+        )
+        append_reset_and_resync_intents(
+            intents=intents,
+            supervisor_id=str(self.profile.supervisor_id),
+            locked=locked,
+            selected_axes=selected_axes,
+            pending_reset_estop=self._pending_reset_estop,
+            pending_resync=self._pending_resync,
+        )
         self._pending_reset_estop = False
-
-        if not locked and self._pending_resync:
-            for axis in selected_axes:
-                intents.append(
-                    RequestResync(
-                        axis_id=axis.axis_id,
-                        hip_id=str(self.profile.supervisor_id),
-                        actor_kind="supervisor",
-                    )
-                )
         self._pending_resync = False
 
-        if not locked and self._pending_estart:
-            for axis in selected_axes:
-                if axis.densi_action_out:
-                    densi_actions.setdefault(axis.unit_id, []).append(DensiRemoteAction("estart"))
+        densi_actions = build_densi_actions(
+            locked=locked,
+            selected_axes=selected_axes,
+            pending_estart=self._pending_estart,
+            chk_requested=self._chk_requested,
+        )
         self._pending_estart = False
 
-        if not locked:
-            for axis in selected_axes:
-                if axis.densi_action_out:
-                    densi_actions.setdefault(axis.unit_id, []).append(
-                        DensiRemoteAction("chk_es_taster", value=bool(self._chk_requested))
-                    )
-
-        joy = (
-            getattr(self._last_snapshot, "joy", JoyState())
-            if self._last_snapshot is not None
-            else JoyState()
+        joy = self._current_joy()
+        self._manual_active_axis_ids = sync_manual_motion(
+            intents=intents,
+            locked=locked,
+            joy=joy,
+            selected_axis_ids=selected_axis_ids,
+            manual_active_axis_ids=self._manual_active_axis_ids,
+        )
+        append_lifetick_echoes(
+            intents=intents,
+            profile_axes=self.profile.axes,
+            rows_by_unit=self._rows,
+            hip_open_counts=self._hip_open_counts,
+            supervisor_id=str(self.profile.supervisor_id),
         )
 
-        desired_manual_axis_ids = set() if locked else set(selected_axis_ids)
-        if (not bool(joy.deadman)) or locked:
-            disable_axis_ids = sorted(self._manual_active_axis_ids)
-            if disable_axis_ids:
-                intents.append(
-                    LocalAxisManualRequest(axis_ids=tuple(disable_axis_ids), enable=False, rate=0.0)
-                )
-            self._manual_active_axis_ids = set()
-        else:
-            disable_axis_ids = sorted(self._manual_active_axis_ids - desired_manual_axis_ids)
-            if disable_axis_ids:
-                intents.append(
-                    LocalAxisManualRequest(axis_ids=tuple(disable_axis_ids), enable=False, rate=0.0)
-                )
-            if desired_manual_axis_ids:
-                intents.append(
-                    LocalAxisManualRequest(
-                        axis_ids=tuple(sorted(desired_manual_axis_ids)),
-                        enable=True,
-                        rate=float(joy.soll_speed),
-                    )
-                )
-            self._manual_active_axis_ids = set(desired_manual_axis_ids)
-
-        for axis in self.profile.axes:
-            row = self._rows.get(axis.unit_id)
-            if row is None:
-                continue
-            if int(self._hip_open_counts.get(axis.unit_id, 0)) > 0:
-                continue
-            intents.append(
-                EchoLifeTick(
-                    axis_id=axis.axis_id,
-                    value=int(getattr(row, "livetick", 0)) & 0xFFFF,
-                    hip_id=str(self.profile.supervisor_id),
-                )
-            )
-        motion_blocked = locked
-        joy_update = JoyState(
-            deadman=(False if motion_blocked else bool(joy.deadman)),
-            soll_speed=(0.0 if motion_blocked else float(joy.soll_speed)),
-            selected_axes=(() if motion_blocked else selected_axis_ids),
+        joy_update = build_joy_update(joy=joy, locked=locked, selected_axis_ids=selected_axis_ids)
+        changed = append_joy_update_if_changed(
+            intents=intents,
+            joy_update=joy_update,
+            last_joy_sent=self._joy_sent,
         )
-        changed = self._joy_sent != joy_update
         if changed:
-            intents.append(
-                JoyStateUpdate(
-                    deadman=joy_update.deadman,
-                    soll_speed=joy_update.soll_speed,
-                    selected_axes=joy_update.selected_axes,
-                )
-            )
             self._joy_sent = joy_update
         return OutboundBatch(
             intents=tuple(intents),
-            densi_actions={k: tuple(v) for k, v in densi_actions.items()},
+            densi_actions=densi_actions,
             joy_update_changed=changed,
         )
 
     def _build_row(self, axis: AxisConfig, snap: TelemetrySnapshot) -> AxisRow | None:
-        ax = snap.axes.get(axis.axis_id)
-        densi = snap.densis.get(axis.densi_id)
-        if ax is None and densi is None:
-            return None
-        attached = bool(densi.online) if densi is not None else ax is not None
-        if not attached:
-            return None
-        scoped = axis_scoped_snapshot(snap, axis.axis_id)
-        estop_word = int(parse_estop_word_from_snapshot(scoped))
-        estate = self._estate_from_word(estop_word)
-        stale = self._is_stale(snap=snap, axis_id=axis.axis_id, densi=densi)
-        phase = self._phase_from(
-            estate=estate,
-            stale=stale,
-            live_motion=self._is_live(ax=ax, joy=getattr(snap, "joy", JoyState())),
-        )
-        return AxisRow(
-            unit_id=axis.unit_id,
-            axis_id=axis.axis_id,
-            densi_id=axis.densi_id,
-            hip_id=axis.hip_id,
+        return build_axis_row(
+            axis=axis,
+            snap=snap,
             selected=bool(self._selected.get(axis.unit_id, True)),
-            phase=phase,
-            estop=(phase == AxisPhase.ESTOP),
-            livetick=int(getattr(ax, "device_tick", 0) or 0),
-            livetick_diff=int(getattr(ax, "lifetick_age", 0) or 0),
-            pos=float(getattr(ax, "pos", 0.0) or 0.0),
-            vel=float(getattr(ax, "vel", 0.0) or 0.0),
-            stale=stale,
+            stale_after_ms=int(self.profile.stale_after_ms),
             hip_open_count=int(self._hip_open_counts.get(axis.unit_id, 0)),
         )
 
-    def _is_stale(self, *, snap: TelemetrySnapshot, axis_id: str, densi) -> bool:
-        if densi is not None and bool(getattr(densi, "last_seen_age_ticks", 0) or 0):
-            return int(getattr(densi, "last_seen_age_ticks", 0) or 0) * 50 >= int(
-                self.profile.stale_after_ms
-            )
-        ax = snap.axes.get(axis_id)
-        if ax is None:
-            return True
-        age = int(getattr(ax, "lifetick_age", 0) or 0)
-        return age >= int(self.profile.stale_after_ms)
-
-    @staticmethod
-    def _estate_from_word(word: int) -> str:
-        w = int(word) & 0xFFFFFFFF
-        if w == 0:
-            return "ESTOP"
-        bits = decode_estop_word(w)
-        trip_cause = any(bool(bits.get(k, False)) for k in ESTOP_CAUSE_KEYS)
-        ok_keys = [
-            k
-            for k in ESTOP_OK_KEYS
-            if (k not in BANNER_DYNAMIC_EXCLUDE) and (k not in ("brk1_ok", "brk2_ok"))
-        ]
-        ok_chain_fault = any(not bool(bits.get(k, True)) for k in ok_keys)
-        taster = bool(bits.get("taster", False))
-        schuetz = bool(bits.get("schuetz", False))
-        brk_ok = bool(bits.get("brk1_ok", True)) and bool(bits.get("brk2_ok", True))
-        if trip_cause or ok_chain_fault or not schuetz:
-            return "ESTOP"
-        if not taster:
-            return "IDLE"
-        return "READY" if brk_ok else "ARMED"
-
-    @staticmethod
-    def _phase_from(*, estate: str, stale: bool, live_motion: bool) -> AxisPhase:
-        if stale:
-            return AxisPhase.STALE
-        if live_motion:
-            return AxisPhase.LIVE
-        estate_s = str(estate or "").upper()
-        if estate_s == "READY":
-            return AxisPhase.READY
-        if estate_s == "ARMED":
-            return AxisPhase.ARMED
-        if estate_s == "IDLE":
-            return AxisPhase.IDLE
-        return AxisPhase.ESTOP
-
-    @staticmethod
-    def _is_live(*, ax, joy: JoyState) -> bool:
-        if ax is None:
-            return False
-        if not bool(joy.deadman):
-            return False
-        return (
-            abs(float(getattr(ax, "vel", 0.0) or 0.0)) > 1e-6 or abs(float(joy.soll_speed)) > 1e-6
-        )
-
-    def _build_status_text(self, *, rows: Iterable[AxisRow], joy: JoyState) -> str:
-        rows_t = tuple(rows)
-        phases = {row.phase for row in rows_t}
-        if not rows_t:
-            state = "NO AXES"
-        elif AxisPhase.ESTOP in phases:
-            state = "ESTOP"
-        elif AxisPhase.STALE in phases:
-            state = "DEGRADED"
-        elif AxisPhase.LIVE in phases:
-            state = "LIVE"
-        elif rows_t and all(row.phase == AxisPhase.READY for row in rows_t):
-            state = "READY"
-        elif AxisPhase.ARMED in phases:
-            state = "ARMING"
-        else:
-            state = "IDLE"
-        joy_state = "active" if bool(joy.deadman) and self.hip_open_total <= 0 else "online"
-        status = f"System: {state} | axes: {len(rows_t)} | joystick: {joy_state}"
-        if self.hip_open_total > 0:
-            status += f" | hip: {self.hip_open_total} open | supervisor: locked"
-        return status
+    def _current_joy(self) -> JoyState:
+        if self._last_snapshot is None:
+            return JoyState()
+        return getattr(self._last_snapshot, "joy", JoyState())

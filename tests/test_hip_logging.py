@@ -1,49 +1,31 @@
 from __future__ import annotations
 
+import importlib
 import logging
-import sys
-import types
 from types import SimpleNamespace
 
 import pytest
 
 
-class _DummyQtType:
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def __call__(self, *args, **kwargs):
-        return None
-
-
-def _qt_module(name: str) -> types.ModuleType:
-    mod = types.ModuleType(name)
-
-    def __getattr__(attr: str):
-        return _DummyQtType
-
-    mod.__getattr__ = __getattr__  # type: ignore[attr-defined]
-    return mod
-
-
-@pytest.fixture
-def stub_pyside6(monkeypatch: pytest.MonkeyPatch) -> None:
-    pyside6 = types.ModuleType("PySide6")
-    pyside6.__path__ = []
-    monkeypatch.setitem(sys.modules, "PySide6", pyside6)
-    monkeypatch.setitem(sys.modules, "PySide6.QtCore", _qt_module("PySide6.QtCore"))
-    monkeypatch.setitem(sys.modules, "PySide6.QtWidgets", _qt_module("PySide6.QtWidgets"))
-    monkeypatch.setitem(sys.modules, "PySide6.QtGui", _qt_module("PySide6.QtGui"))
-
-    qtuitools = _qt_module("PySide6.QtUiTools")
-    qtuitools.QUiLoader = _DummyQtType
-    monkeypatch.setitem(sys.modules, "PySide6.QtUiTools", qtuitools)
-
-
-from steuerung3d.apps.yellow.binders import hip_qt_binder_apply_impl as apply_impl
-from steuerung3d.apps.yellow.controllers.hip_controller import HiPController
-from steuerung3d.apps.yellow.engines.hip.types import HipUiInputs
-from steuerung3d.apps.yellow.runtimes.hip_runtime_impl import HipRuntimeResult
+def _runtime_result():
+    hip_runtime_impl = importlib.import_module("steuerung3d.apps.yellow.runtimes.hip_runtime_impl")
+    vm = SimpleNamespace(
+        attach_state=SimpleNamespace(attached=True, tabs_enabled=True),
+        lifetick_age=60,
+        drive_status=SimpleNamespace(main_text="NoPwr NotReady FAULT -Geber"),
+        readouts=SimpleNamespace(pos_text="0.00 m", vel_text="0.00 m/s"),
+    )
+    return hip_runtime_impl.HipRuntimeResult(
+        snap=None,
+        engine_result=None,
+        view_model=vm,
+        intents=[object()],
+        txn_events=[],
+        resync_ignored=False,
+        resync_block_reason="",
+        apply_startup_state=False,
+        rx_count=1,
+    )
 
 
 class _DummyReadoutsBindings:
@@ -57,36 +39,21 @@ class _DummyBinder:
         self._readouts_bindings = _DummyReadoutsBindings()
 
 
-def _runtime_result() -> HipRuntimeResult:
-    vm = SimpleNamespace(
-        attach_state=SimpleNamespace(attached=True, tabs_enabled=True),
-        lifetick_age=60,
-        drive_status=SimpleNamespace(main_text="NoPwr NotReady FAULT -Geber"),
-        readouts=SimpleNamespace(pos_text="0.00 m", vel_text="0.00 m/s"),
-    )
-    return HipRuntimeResult(
-        snap=None,
-        engine_result=None,
-        view_model=vm,
-        intents=[object()],
-        txn_events=[],
-        resync_ignored=False,
-        resync_block_reason="",
-        apply_startup_state=False,
-        rx_count=1,
-    )
-
-
 def test_hip_ui_info_log_is_throttled_for_unchanged_state(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, stub_pyside6: None
 ) -> None:
-    controller = HiPController.__new__(HiPController)
+    hip_controller_mod = importlib.import_module(
+        "steuerung3d.apps.yellow.controllers.hip_controller"
+    )
+    hip_types = importlib.import_module("steuerung3d.apps.yellow.engines.hip.types")
+
+    controller = hip_controller_mod.HiPController.__new__(hip_controller_mod.HiPController)
     controller._dbg_next_s = 10_000.0
     controller._dbg_vm_keys_once = True
     controller._ui_log_next_s = 0.0
     controller._last_ui_log_key = None
 
-    ui_inputs = HipUiInputs(
+    ui_inputs = hip_types.HipUiInputs(
         axis_selected="Anton",
         axis_selection_changed=False,
         estop_reset_clicked=False,
@@ -113,6 +80,8 @@ def test_hip_apply_readouts_debug_log_not_emitted_at_info(
     monkeypatch: pytest.MonkeyPatch,
     stub_pyside6: None,
 ) -> None:
+    apply_impl = importlib.import_module("steuerung3d.apps.yellow.binders.hip_qt_binder_apply_impl")
+
     logger = logging.getLogger("hi_p.test.apply_readouts")
     binder = _DummyBinder(logger)
     vm = SimpleNamespace(readouts=SimpleNamespace())
@@ -136,6 +105,8 @@ def test_hip_apply_readouts_debug_log_emitted_at_debug(
     monkeypatch: pytest.MonkeyPatch,
     stub_pyside6: None,
 ) -> None:
+    apply_impl = importlib.import_module("steuerung3d.apps.yellow.binders.hip_qt_binder_apply_impl")
+
     logger = logging.getLogger("hi_p.test.apply_readouts")
     binder = _DummyBinder(logger)
     vm = SimpleNamespace(readouts=SimpleNamespace())

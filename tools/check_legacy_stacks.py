@@ -50,9 +50,15 @@ def main() -> int:
 
     if errors:
         print("[legacy-stacks] FAIL")
+        print(
+            "[legacy-stacks] configs/profiles/*.toml is authoritative; configs/stacks/*.toml is a strict compatibility mirror."
+        )
+        print(
+            "[legacy-stacks] Do not edit configs/stacks directly. Edit configs/profiles and then refresh the mirror."
+        )
         for e in errors:
             print(" -", e)
-        print("\nRefresh mirror with: python tools/sync_legacy_stacks.py")
+        print("\n[legacy-stacks] Refresh mirror with: python tools/sync_legacy_stacks.py")
         return 1
 
     print(f"[legacy-stacks] OK ({len(profiles)} mirrored profiles)")
