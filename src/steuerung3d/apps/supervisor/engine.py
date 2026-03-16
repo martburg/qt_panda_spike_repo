@@ -157,15 +157,15 @@ class SupervisorEngine:
             if axis.unit_id in self._rows and self._selected.get(axis.unit_id, True)
         )
         for axis in self.profile.axes:
-            if axis.unit_id not in self._rows:
+            row = self._rows.get(axis.unit_id)
+            if row is None:
                 continue
             if int(self._hip_open_counts.get(axis.unit_id, 0)) > 0:
                 continue
-            self._echo_tick = (int(self._echo_tick) + 1) & 0xFFFF
             intents.append(
                 EchoLifeTick(
                     axis_id=axis.axis_id,
-                    value=int(self._echo_tick),
+                    value=int(getattr(row, "livetick", 0)) & 0xFFFF,
                     hip_id=str(self.profile.supervisor_id),
                 )
             )

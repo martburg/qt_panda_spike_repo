@@ -153,7 +153,7 @@ def test_supervisor_row_uses_lifetick_diff_not_raw_tick() -> None:
     assert row.livetick_diff == 7
 
 
-def test_supervisor_emits_echo_for_attached_axis_and_suppresses_when_hip_open() -> None:
+def test_supervisor_emits_echo_using_current_axis_lifetick_and_suppresses_when_hip_open() -> None:
     eng = SupervisorEngine(_profile())
     eng.ingest(_snap(estop_word=(1 << 11)))
     batch = eng.consume_outbound()
@@ -162,9 +162,16 @@ def test_supervisor_emits_echo_for_attached_axis_and_suppresses_when_hip_open() 
     assert len(echoes) == 1
     assert echoes[0].axis_id == "Anton"
     assert echoes[0].hip_id == "sup"
+    assert echoes[0].value == 12
     assert len(joys) == 1
 
     eng.set_hip_open_count("anton", 1)
     batch = eng.consume_outbound()
     echoes = [i for i in batch.intents if isinstance(i, EchoLifeTick)]
     assert echoes == []
+
+    eng.set_hip_open_count("anton", 0)
+    batch = eng.consume_outbound()
+    echoes = [i for i in batch.intents if isinstance(i, EchoLifeTick)]
+    assert len(echoes) == 1
+    assert echoes[0].value == 12
