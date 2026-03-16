@@ -31,7 +31,7 @@ from ..ports import CommandIn, TelemetryOut
 from ..qtutil.bindings import YellowBindings
 from ..qtutil.perf_watchdog import PerfWatchdog
 from ..runtimes.densi_runtime import DensiRuntime
-from .controller_utils import init_observability, start_poll_timer
+from .controller_utils import bump_soft_error, init_observability, start_poll_timer
 
 log = logging.getLogger("den_si")
 
@@ -83,16 +83,12 @@ class DenSiController:
             if seed:
                 self.state.params.update(dict(seed))
         except Exception:
-            self._soft_errors["binder.seed_params_from_ui"] = (
-                int(self._soft_errors.get("binder.seed_params_from_ui", 0)) + 1
-            )
+            bump_soft_error(self._soft_errors, "binder.seed_params_from_ui")
 
         try:
             self._binder.init_estop_checkboxes(estop_word=int(self.engine.inj_estop_word))
         except Exception:
-            self._soft_errors["binder.init_estop_checkboxes"] = (
-                int(self._soft_errors.get("binder.init_estop_checkboxes", 0)) + 1
-            )
+            bump_soft_error(self._soft_errors, "binder.init_estop_checkboxes")
 
     # ------------------------------------------------------------------
     # Initialization helpers
@@ -146,17 +142,13 @@ class DenSiController:
                 merged_ui = self._merge_ui_inputs(inputs.ui, ui_inputs.ui)
                 inputs = replace(inputs, ui=merged_ui)
             except Exception:
-                self._soft_errors["binder.read_inputs"] = (
-                    int(self._soft_errors.get("binder.read_inputs", 0)) + 1
-                )
+                bump_soft_error(self._soft_errors, "binder.read_inputs")
             runtime_res = self._runtime.tick(inputs=inputs)
 
             try:
                 self._binder.apply(runtime_res.view_model)
             except Exception:
-                self._soft_errors["binder.apply"] = (
-                    int(self._soft_errors.get("binder.apply", 0)) + 1
-                )
+                bump_soft_error(self._soft_errors, "binder.apply")
 
             self._emit_birdseye(runtime_res)
 

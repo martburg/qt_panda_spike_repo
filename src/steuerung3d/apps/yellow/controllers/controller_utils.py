@@ -58,3 +58,7 @@ def run_guarded(func: Callable[[], None], *, on_error: Callable[[], None] | None
         func()
     except Exception:
         on_error()
+
+
+def bump_soft_error(counters: dict[str, int], key: str) -> None:
+    counters[str(key)] = int(counters.get(str(key), 0)) + 1

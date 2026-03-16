@@ -207,27 +207,36 @@ class HipRuntime:
             return self._handle_no_snapshots(now_ns=now_ns)
 
         snap = snaps[-1]
-        if not self._seen_first_telem:
-            self._log.info(
-                "rx first telemetry: tick=%s core_mode=%s estop=%s fault=%s",
-                getattr(snap, "tick", None),
-                getattr(snap, "core_mode", None),
-                getattr(snap, "estop", None),
-                getattr(snap, "fault", None),
-            )
-            self._seen_first_telem = True
+        self._maybe_log_first_telemetry(snap=snap)
 
         engine_result = self._run_engine_step(snap=snap, now_ns=now_ns, ui=inputs.ui)
-        vm = self._assemble_view_model(engine_result.presentation)
-        legacy_vm = self._assemble_legacy_view_model(engine_result.presentation)
+        vm, legacy_vm = self._assemble_view_models(engine_result.presentation)
         self._update_runtime_state_from_snap(snap=snap, vm=vm)
-
-        if self._shadow_mode == "shadow":
-            self._diff_shadow(engine_vm=vm, legacy_vm=legacy_vm)
+        self._maybe_diff_shadow(engine_vm=vm, legacy_vm=legacy_vm)
 
         self._emit_motion_debug(snap=snap)
         self._emit_status(now_ns)
         return self._build_tick_result(snap=snap, engine_result=engine_result, vm=vm, snaps=snaps)
+
+    def _maybe_log_first_telemetry(self, *, snap: TelemetrySnapshot) -> None:
+        if self._seen_first_telem:
+            return
+        self._log.info(
+            "rx first telemetry: tick=%s core_mode=%s estop=%s fault=%s",
+            getattr(snap, "tick", None),
+            getattr(snap, "core_mode", None),
+            getattr(snap, "estop", None),
+            getattr(snap, "fault", None),
+        )
+        self._seen_first_telem = True
+
+    def _assemble_view_models(self, pres: HipPresentationData) -> tuple[HipViewModel, HipViewModel]:
+        return self._assemble_view_model(pres), self._assemble_legacy_view_model(pres)
+
+    def _maybe_diff_shadow(self, *, engine_vm: HipViewModel, legacy_vm: HipViewModel) -> None:
+        if self._shadow_mode != "shadow":
+            return
+        self._diff_shadow(engine_vm=engine_vm, legacy_vm=legacy_vm)
 
     def _shadow_log(self, key: str, msg: str) -> None:
         if str(self._shadow_mode) != "shadow":

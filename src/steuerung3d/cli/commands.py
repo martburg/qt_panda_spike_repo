@@ -101,6 +101,39 @@ def _kill_pid_hard(pid: int) -> bool:
         return False
 
 
+def _terminate_live_children(meta: object) -> int:
+    terminated = 0
+    children = getattr(meta, "children", {})
+    for c in children.values():
+        pid = int(getattr(c, "pid", 0) or 0)
+        if pid <= 0 or not pid_alive(pid):
+            continue
+        try:
+            os.kill(pid, signal.SIGTERM)
+            terminated += 1
+        except Exception:
+            pass
+    return terminated
+
+
+def _wait_for_children_exit(meta: object, *, deadline: float) -> None:
+    children = getattr(meta, "children", {})
+    for c in children.values():
+        pid = int(getattr(c, "pid", 0) or 0)
+        while pid > 0 and pid_alive(pid) and time.time() < deadline:
+            time.sleep(0.05)
+
+
+def _kill_remaining_children(meta: object) -> int:
+    killed = 0
+    children = getattr(meta, "children", {})
+    for c in children.values():
+        pid = int(getattr(c, "pid", 0) or 0)
+        if pid > 0 and pid_alive(pid) and _kill_pid_hard(pid):
+            killed += 1
+    return killed
+
+
 def cmd_profiles(args: argparse.Namespace) -> int:
     stacks_dir = Path(args.dir) if getattr(args, "dir", None) else None
     print_profiles(stacks_dir=stacks_dir, as_paths=bool(args.paths))
@@ -160,26 +193,10 @@ def cmd_down(args: argparse.Namespace) -> int:
     plan = expand_processes(spec, session_dir=base / "sessions" / "PLAN")
     bind_ports = extract_bind_ports(plan)
 
-    terminated = 0
-    for c in meta.children.values():
-        if c.pid and pid_alive(c.pid):
-            try:
-                os.kill(c.pid, signal.SIGTERM)
-                terminated += 1
-            except Exception:
-                pass
-
+    terminated = _terminate_live_children(meta)
     deadline = time.time() + 1.5
-    for c in meta.children.values():
-        pid = int(c.pid or 0)
-        while pid > 0 and pid_alive(pid) and time.time() < deadline:
-            time.sleep(0.05)
-
-    killed = 0
-    for c in meta.children.values():
-        pid = int(c.pid or 0)
-        if pid > 0 and pid_alive(pid) and _kill_pid_hard(pid):
-            killed += 1
+    _wait_for_children_exit(meta, deadline=deadline)
+    killed = _kill_remaining_children(meta)
 
     cleaned_ports = cleanup_residual_bind_ports(bind_ports)
     print(

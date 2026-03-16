@@ -17,10 +17,85 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from steuerung3d.adapters.links.udp_link import UdpLink
 from steuerung3d.protocol.parse_primitives import parse_bool, parse_float
+
+_PARAM_GROUP_DEFAULTS: Dict[str, List[str]] = {
+    "pos": ["HardMax", "UserMax", "UserMin", "HardMin", "PosWin"],
+    "vel": ["VelMax", "VelWin", "AccMax", "AccMove", "DccMax", "MaxAmp", "VelMaxMot"],
+    "filter": ["P", "I", "D", "IL", "RampForm"],
+    "guider": ["PosMax", "PosMin", "Pitch"],
+}
+
+
+def _axis_id_or_default(axis_id: Optional[str], default: str = "X") -> str:
+    value = str(axis_id or default).strip()
+    return value or default
+
+
+def _frame_axis_id(frame: Any, default: str = "X") -> str:
+    try:
+        axes = getattr(frame, "axes", {}) or {}
+    except Exception:
+        return default
+    if isinstance(axes, Mapping) and axes:
+        try:
+            return _axis_id_or_default(str(next(iter(axes.keys()))), default)
+        except Exception:
+            return default
+    return default
+
+
+def _frame_lifetick_ui_rx(frame: Any, axis_id: str) -> int:
+    try:
+        echo = getattr(frame, "lifetick_echo", {}) or {}
+    except Exception:
+        return 0
+    if isinstance(echo, Mapping) and axis_id in echo:
+        try:
+            return int(echo[axis_id])
+        except Exception:
+            return 0
+    return 0
+
+
+def _extract_param_write_values(
+    fields: Mapping[str, object],
+    *,
+    group_defaults: Mapping[str, List[str]],
+    param_keymap: Mapping[str, str],
+) -> List[tuple[str, Dict[str, float]]]:
+    out: List[tuple[str, Dict[str, float]]] = []
+    for grp, keys in group_defaults.items():
+        values: Dict[str, float] = {}
+        for key in keys:
+            plc_key = param_keymap.get(key)
+            if not plc_key or plc_key not in fields:
+                continue
+            values[str(key)] = _to_float(fields.get(plc_key, "0"), 0.0)
+        if values:
+            out.append((str(grp), values))
+    return out
+
+
+def _frame_param_map(frame: Any) -> Dict[str, float]:
+    params: Dict[str, float] = {}
+    try:
+        from steuerung3d.core.command_frame import ParamWriteOp, coerce_param_ops
+
+        for op in coerce_param_ops(getattr(frame, "param_ops", []) or []):
+            if not isinstance(op, ParamWriteOp):
+                continue
+            for key, value in dict(op.values or {}).items():
+                try:
+                    params[str(key)] = float(value)
+                except Exception:
+                    continue
+    except Exception:
+        return {}
+    return params
 
 
 def _to_bytes(line: str) -> bytes:
@@ -194,58 +269,46 @@ class UdpPlcCommandIn:
         except Exception:
             return out
 
-        axis_id = (self.axis_id or "X").strip() or "X"
-
-        # Default groups for parameter writes on the PLC wire.
-        group_defaults: Dict[str, List[str]] = {
-            "pos": ["HardMax", "UserMax", "UserMin", "HardMin", "PosWin"],
-            "vel": ["VelMax", "VelWin", "AccMax", "AccMove", "DccMax", "MaxAmp", "VelMaxMot"],
-            "filter": ["P", "I", "D", "IL", "RampForm"],
-            "guider": ["PosMax", "PosMin", "Pitch"],
-        }
+        axis_id = _axis_id_or_default(self.axis_id)
 
         for raw in self.link.poll(limit=limit):
             try:
                 dec = decode_downlink(raw)
                 if dec is None:
                     continue
-                f = dec.fields or {}
-                if not isinstance(f, dict):
+                fields = dec.fields or {}
+                if not isinstance(fields, dict):
                     continue
 
-                tick_ui_rx = _to_int(f.get("LifetickUIrx", "0"), 0)
-                vel = _to_float(f.get("SpeedSollIN", "0"), 0.0)
+                tick_ui_rx = _to_int(fields.get("LifetickUIrx", "0"), 0)
+                vel = _to_float(fields.get("SpeedSollIN", "0"), 0.0)
 
-                enable = _to_bool_token(f.get("ControlIN", "False"), False)
-                intent = _to_bool_token(f.get("Intent", "True"), True)
-                resync = _to_bool_token(f.get("ReSync", "False"), False)
-                gui_not_halt = _to_bool_token(f.get("GUINotHaltIN", "False"), False)
+                enable = _to_bool_token(fields.get("ControlIN", "False"), False)
+                intent = _to_bool_token(fields.get("Intent", "True"), True)
+                resync = _to_bool_token(fields.get("ReSync", "False"), False)
+                gui_not_halt = _to_bool_token(fields.get("GUINotHaltIN", "False"), False)
 
                 param_ops: List[Any] = []
-                modus = str(f.get("Modus", "") or "").strip().lower()
+                modus = str(fields.get("Modus", "") or "").strip().lower()
                 if modus == "w":
-                    for grp, keys in group_defaults.items():
-                        values: Dict[str, float] = {}
-                        for k in keys:
-                            plc_k = _PARAM_KEYMAP.get(k)
-                            if not plc_k:
-                                continue
-                            if plc_k in f:
-                                values[str(k)] = _to_float(f.get(plc_k, "0"), 0.0)
-                        if values:
-                            param_ops.append(ParamWriteOp(group=str(grp), values=values))
+                    for group, values in _extract_param_write_values(
+                        fields,
+                        group_defaults=_PARAM_GROUP_DEFAULTS,
+                        param_keymap=_PARAM_KEYMAP,
+                    ):
+                        param_ops.append(ParamWriteOp(group=group, values=values))
 
                 cmd = CommandFrame(
                     tick=tick_ui_rx,
                     t_s=0.0,
                     estop=False,
                     fault=False,
-                    core_mode=str(f.get("CoreMode", "")) or "",
+                    core_mode=str(fields.get("CoreMode", "")) or "",
                     axes={axis_id: AxisSetpoint(enable=enable, vel=vel)},
                     intent=bool(intent),
                     resync=bool(resync),
                     gui_not_halt=bool(gui_not_halt),
-                    estop_reset=_to_bool_token(f.get("EStopReset", "False"), False),
+                    estop_reset=_to_bool_token(fields.get("EStopReset", "False"), False),
                     lifetick_echo={axis_id: tick_ui_rx},
                     resync_by_axis={axis_id: bool(resync)} if bool(resync) else {},
                     param_ops=param_ops,
@@ -282,37 +345,9 @@ class UdpPlcCommandOut:
             self.publish_line(str(frame))
             return
 
-        # Determine axis_id from the frame (router passes per-axis frames with a single key).
-        axis_id = "X"
-        try:
-            axes = getattr(frame, "axes", {}) or {}
-            if isinstance(axes, dict) and axes:
-                axis_id = str(next(iter(axes.keys())))
-        except Exception:
-            pass
-
-        lifetick_ui_rx = 0
-        try:
-            echo = getattr(frame, "lifetick_echo", {}) or {}
-            if isinstance(echo, dict) and axis_id in echo:
-                lifetick_ui_rx = int(echo[axis_id])
-        except Exception:
-            pass
-
-        # Param writes: CommandFrame.param_ops are canonical ParamOp objects.
-        params: Dict[str, float] = {}
-        try:
-            from steuerung3d.core.command_frame import ParamWriteOp, coerce_param_ops
-
-            for op in coerce_param_ops(getattr(frame, "param_ops", []) or []):
-                if isinstance(op, ParamWriteOp):
-                    for k, v in dict(op.values or {}).items():
-                        try:
-                            params[str(k)] = float(v)
-                        except Exception:
-                            continue
-        except Exception:
-            pass
+        axis_id = _frame_axis_id(frame)
+        lifetick_ui_rx = _frame_lifetick_ui_rx(frame, axis_id)
+        params = _frame_param_map(frame)
 
         try:
             payload = encode_downlink(

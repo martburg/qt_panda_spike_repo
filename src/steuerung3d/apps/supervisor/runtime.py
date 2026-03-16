@@ -27,29 +27,13 @@ class SupervisorRuntime(QObject):
         super().__init__()
         self.profile = profile
         self.engine = SupervisorEngine(profile)
-        self.telemetry_in = UdpTelemetryIn.bind(parse_hostport(profile.telem_in))
-        self.intent_out = UdpIntentOut.connect(parse_hostport(profile.intent_out))
-        self.action_outs = {
-            axis.unit_id: UdpDensiActionOut.connect(parse_hostport(axis.densi_action_out))
-            for axis in profile.axes
-            if axis.densi_action_out
-        }
-        self.window = SupervisorWindow()
-        self._merged_snapshot = None
-
-        self.window.reset_estop_clicked.connect(self.engine.queue_reset_estop)
-        self.window.estart_clicked.connect(self.engine.queue_estart)
-        self.window.resync_clicked.connect(self.engine.queue_resync)
-        self.window.recover_clicked.connect(self._on_recover_clicked)
-        self.window.chk_es_taster_changed.connect(self.engine.set_chk_requested)
-        self.window.pair_selected_changed.connect(self.engine.set_selected)
-        self.window.open_hip_clicked.connect(self.open_hip_for_axis)
-
-        self._timer = QTimer(self)
-        self._timer.timeout.connect(self.tick)
-
         self._children: list[subprocess.Popen[str]] = []
         self._hip_children: dict[str, list[subprocess.Popen[str]]] = {}
+        self._merged_snapshot = None
+
+        self._init_transports()
+        self._init_window_and_signals()
+        self._init_timer()
 
     def start(self) -> int:
         self._launch_children()
@@ -60,30 +44,9 @@ class SupervisorRuntime(QObject):
 
     def tick(self) -> None:
         self._refresh_hip_processes()
-        snaps = self.telemetry_in.drain_telemetry(limit=50)
-        if snaps:
-            self._merged_snapshot = merge_snapshots(self._merged_snapshot, snaps)
-            self.engine.ingest(self._merged_snapshot)
-
-        snapshot = self.engine.snapshot()
-        self.window.apply_snapshot(snapshot)
-
-        outbound = self.engine.consume_outbound()
-        for intent in outbound.intents:
-            try:
-                self.intent_out.publish_intent(intent)
-            except Exception:
-                log.exception("failed to publish intent %r", intent)
-
-        for pair_id, actions in outbound.densi_actions.items():
-            tx = self.action_outs.get(pair_id)
-            if tx is None:
-                continue
-            for action in actions:
-                try:
-                    tx.publish_action(action)
-                except Exception:
-                    log.exception("failed to publish densi action %s -> %s", pair_id, action)
+        self._ingest_telemetry()
+        self._apply_window_snapshot()
+        self._publish_outbound()
 
     def open_hip_for_axis(self, unit_id: str) -> None:
         axis = next((axis for axis in self.profile.axes if axis.unit_id == str(unit_id)), None)
@@ -123,12 +86,70 @@ class SupervisorRuntime(QObject):
                     self._release_hip_authority(axis.axis_id, axis.hip_id)
 
     def shutdown(self) -> None:
+        self._terminate_children()
+        self._terminate_hip_children()
+        self._close_transports()
+
+    def _init_transports(self) -> None:
+        self.telemetry_in = UdpTelemetryIn.bind(parse_hostport(self.profile.telem_in))
+        self.intent_out = UdpIntentOut.connect(parse_hostport(self.profile.intent_out))
+        self.action_outs = {
+            axis.unit_id: UdpDensiActionOut.connect(parse_hostport(axis.densi_action_out))
+            for axis in self.profile.axes
+            if axis.densi_action_out
+        }
+
+    def _init_window_and_signals(self) -> None:
+        self.window = SupervisorWindow()
+        self.window.reset_estop_clicked.connect(self.engine.queue_reset_estop)
+        self.window.estart_clicked.connect(self.engine.queue_estart)
+        self.window.resync_clicked.connect(self.engine.queue_resync)
+        self.window.recover_clicked.connect(self._on_recover_clicked)
+        self.window.chk_es_taster_changed.connect(self.engine.set_chk_requested)
+        self.window.pair_selected_changed.connect(self.engine.set_selected)
+        self.window.open_hip_clicked.connect(self.open_hip_for_axis)
+
+    def _init_timer(self) -> None:
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self.tick)
+
+    def _ingest_telemetry(self) -> None:
+        snaps = self.telemetry_in.drain_telemetry(limit=50)
+        if not snaps:
+            return
+        self._merged_snapshot = merge_snapshots(self._merged_snapshot, snaps)
+        self.engine.ingest(self._merged_snapshot)
+
+    def _apply_window_snapshot(self) -> None:
+        snapshot = self.engine.snapshot()
+        self.window.apply_snapshot(snapshot)
+
+    def _publish_outbound(self) -> None:
+        outbound = self.engine.consume_outbound()
+        for intent in outbound.intents:
+            try:
+                self.intent_out.publish_intent(intent)
+            except Exception:
+                log.exception("failed to publish intent %r", intent)
+
+        for pair_id, actions in outbound.densi_actions.items():
+            tx = self.action_outs.get(pair_id)
+            if tx is None:
+                continue
+            for action in actions:
+                try:
+                    tx.publish_action(action)
+                except Exception:
+                    log.exception("failed to publish densi action %s -> %s", pair_id, action)
+
+    def _terminate_children(self) -> None:
         for child in self._children:
             try:
                 child.terminate()
             except Exception:
                 pass
 
+    def _terminate_hip_children(self) -> None:
         for children in self._hip_children.values():
             for child in children:
                 try:
@@ -136,6 +157,7 @@ class SupervisorRuntime(QObject):
                 except Exception:
                     pass
 
+    def _close_transports(self) -> None:
         try:
             self.telemetry_in.rx.link.close()
         except Exception:

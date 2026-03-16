@@ -46,11 +46,11 @@ def _as_str_list(value: object) -> list[str]:
 
 def compute_age_facts(*, last_seen: LastSeenLike) -> BirdsEyeAgeFacts:
     now = time.monotonic()
-    age_int_ts = _as_optional_float(last_seen.get('intent_ts'))
-    age_dev_ts = _as_optional_float(last_seen.get('dev_telem_ts'))
-    age_cmd_ts = _as_optional_float(last_seen.get('cmd_ts'))
-    age_ui_ts = _as_optional_float(last_seen.get('ui_telem_ts'))
-    age_c2_ts = _as_optional_float(last_seen.get('c2_telem_ts'))
+    age_int_ts = _as_optional_float(last_seen.get("intent_ts"))
+    age_dev_ts = _as_optional_float(last_seen.get("dev_telem_ts"))
+    age_cmd_ts = _as_optional_float(last_seen.get("cmd_ts"))
+    age_ui_ts = _as_optional_float(last_seen.get("ui_telem_ts"))
+    age_c2_ts = _as_optional_float(last_seen.get("c2_telem_ts"))
 
     age_int = None if age_int_ts is None else (now - age_int_ts)
     age_dev = None if age_dev_ts is None else (now - age_dev_ts)
@@ -68,11 +68,13 @@ def compute_age_facts(*, last_seen: LastSeenLike) -> BirdsEyeAgeFacts:
     )
 
 
-def compute_level(*, snap: BirdsEyeSnapLike, age_facts: BirdsEyeAgeFacts) -> tuple[str, bool, bool, str]:
+def compute_level(
+    *, snap: BirdsEyeSnapLike, age_facts: BirdsEyeAgeFacts
+) -> tuple[str, bool, bool, str]:
     estop_v = bool(snap.estop)
     fault_v = bool(snap.fault)
     mode_v = core_mode_value(snap.core_mode) or str(snap.core_mode)
-    level = 'ERR' if (estop_v or fault_v) else ('WARN' if age_facts.stale else 'OK')
+    level = "ERR" if (estop_v or fault_v) else ("WARN" if age_facts.stale else "OK")
     return level, estop_v, fault_v, mode_v
 
 
@@ -94,8 +96,8 @@ def build_motion_facts(
     axis_ids: Sequence[str],
     last_intents_meta: LastIntentsMetaLike,
 ) -> BirdsEyeMotionFacts:
-    intents_types = last_intents_meta.get('types', []) or []
-    intents_types_str = ','.join(str(t) for t in intents_types)
+    intents_types = last_intents_meta.get("types", []) or []
+    intents_types_str = ",".join(str(t) for t in intents_types)
     reset_denied_by_axis, reset_denied_total = compute_reset_denied(state=state)
 
     try:
@@ -119,7 +121,7 @@ def build_motion_facts(
     selected_lanes = _as_str_list(joy.selected_axes) if joy is not None else []
 
     attached_lanes = sorted(
-        f'{axis_id}:{owner}' for axis_id, owner in state.axis_claims.items() if str(owner).strip()
+        f"{axis_id}:{owner}" for axis_id, owner in state.axis_claims.items() if str(owner).strip()
     )
 
     resolved_moving_targets: list[str] = []

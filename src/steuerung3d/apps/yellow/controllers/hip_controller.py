@@ -33,7 +33,13 @@ from ..ports import IntentOut, TelemetryIn
 from ..qtutil.bindings import YellowBindings
 from ..qtutil.perf_watchdog import PerfWatchdog
 from ..runtimes.hip_runtime import HipRuntime, HipRuntimeResult
-from .controller_utils import StatusEmitterLike, init_observability, run_guarded, start_poll_timer
+from .controller_utils import (
+    StatusEmitterLike,
+    bump_soft_error,
+    init_observability,
+    run_guarded,
+    start_poll_timer,
+)
 
 _StatusEmitterCls: type[object] | None
 
@@ -128,9 +134,7 @@ class HiPController:
         try:
             self._binder.apply_startup_state()
         except Exception:
-            self._soft_errors["binder.apply_startup_state"] = (
-                int(self._soft_errors.get("binder.apply_startup_state", 0)) + 1
-            )
+            bump_soft_error(self._soft_errors, "binder.apply_startup_state")
 
     # -------------------------------------------------------------------------
     # Initialization helpers
@@ -201,9 +205,7 @@ class HiPController:
         try:
             ui_inputs = self._binder.read_inputs()
         except Exception:
-            self._soft_errors["binder.read_inputs"] = (
-                int(self._soft_errors.get("binder.read_inputs", 0)) + 1
-            )
+            bump_soft_error(self._soft_errors, "binder.read_inputs")
         return ui_inputs
 
     def _log_runtime_result(self, *, ui_inputs: HipUiInputs, rt_result: HipRuntimeResult) -> None:
@@ -266,7 +268,7 @@ class HiPController:
         try:
             self._binder.apply(rt_result.view_model)
         except Exception:
-            self._soft_errors["binder.apply"] = int(self._soft_errors.get("binder.apply", 0)) + 1
+            bump_soft_error(self._soft_errors, "binder.apply")
             now_s = time.time()
             last = self._binder_apply_err_last_s
             if now_s - last > 1.0:
