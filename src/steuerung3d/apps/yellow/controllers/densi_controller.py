@@ -26,6 +26,7 @@ except ImportError:  # pragma: no cover
 from ..binders.densi_qt_binder import DenSiQtBinder
 from ..domain import estop_facts
 from ..engines.densi.engine import DenSiEngine
+from ..engines.densi.inputs import DensiUiInputs
 from ..ports import CommandIn, TelemetryOut
 from ..qtutil.bindings import YellowBindings
 from ..qtutil.perf_watchdog import PerfWatchdog
@@ -142,7 +143,8 @@ class DenSiController:
             inputs = self._runtime.collect_inputs(now_ns=now_ns)
             try:
                 ui_inputs = self._binder.read_inputs()
-                inputs = replace(inputs, ui=ui_inputs.ui)
+                merged_ui = self._merge_ui_inputs(inputs.ui, ui_inputs.ui)
+                inputs = replace(inputs, ui=merged_ui)
             except Exception:
                 self._soft_errors["binder.read_inputs"] = (
                     int(self._soft_errors.get("binder.read_inputs", 0)) + 1
@@ -191,6 +193,26 @@ class DenSiController:
             status.emit_every(level=level, summary=summary, fields=fields)
         except Exception:
             return
+
+    @staticmethod
+    def _merge_ui_inputs(
+        remote_ui: DensiUiInputs | None, local_ui: DensiUiInputs | None
+    ) -> DensiUiInputs:
+        remote = remote_ui or DensiUiInputs()
+        local = local_ui or DensiUiInputs()
+        return DensiUiInputs(
+            es_start_clicked=bool(remote.es_start_clicked or local.es_start_clicked),
+            estop_reset_clicked=bool(remote.estop_reset_clicked or local.estop_reset_clicked),
+            estop_all_set_clicked=bool(remote.estop_all_set_clicked or local.estop_all_set_clicked),
+            estop_all_clear_clicked=bool(
+                remote.estop_all_clear_clicked or local.estop_all_clear_clicked
+            ),
+            diag_resync_clicked=bool(remote.diag_resync_clicked or local.diag_resync_clicked),
+            estop_bit_toggles=[
+                *list(remote.estop_bit_toggles or []),
+                *list(local.estop_bit_toggles or []),
+            ],
+        )
 
     # ------------------------------------------------------------------
     # Static helpers (tests depend on these)

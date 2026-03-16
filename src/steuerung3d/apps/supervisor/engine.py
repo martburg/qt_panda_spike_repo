@@ -35,6 +35,7 @@ class SupervisorEngine:
         self._pending_resync = False
         self._pending_recover = False
         self._chk_requested = False
+        self._chk_dirty = False
         self._joy_sent: JoyState | None = None
         self._hip_open_counts: dict[str, int] = {}
         self._echo_tick: int = 0
@@ -64,7 +65,10 @@ class SupervisorEngine:
         self._pending_recover = True
 
     def set_chk_requested(self, checked: bool) -> None:
-        self._chk_requested = bool(checked)
+        checked = bool(checked)
+        if checked != self._chk_requested:
+            self._chk_requested = checked
+            self._chk_dirty = True
 
     def set_hip_open_count(self, unit_id: str, count: int) -> None:
         was_locked = self._lock_active()
@@ -76,6 +80,7 @@ class SupervisorEngine:
         now_locked = self._lock_active()
         if now_locked and not was_locked:
             self._chk_requested = False
+            self._chk_dirty = False
             self._pending_reset_estop = False
             self._pending_estart = False
             self._pending_resync = False
@@ -177,12 +182,13 @@ class SupervisorEngine:
                     densi_actions.setdefault(axis.unit_id, []).append(DensiRemoteAction("estart"))
         self._pending_estart = False
 
-        if not locked:
+        if not locked and self._chk_dirty:
             for axis in selected_axes:
                 if axis.densi_action_out:
                     densi_actions.setdefault(axis.unit_id, []).append(
                         DensiRemoteAction("chk_es_taster", value=bool(self._chk_requested))
                     )
+        self._chk_dirty = False
 
         joy = (
             getattr(self._last_snapshot, "joy", JoyState())
