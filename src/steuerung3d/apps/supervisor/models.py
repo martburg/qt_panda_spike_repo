@@ -62,7 +62,6 @@ class AxisConfig:
 
     @property
     def pair_id(self) -> str:
-        """Backward-compatible alias for older pair-centric callers."""
         return self.unit_id
 
 
@@ -108,7 +107,6 @@ class SupervisorProfile:
 
     @property
     def pairs(self) -> tuple[AxisConfig, ...]:
-        """Backward-compatible alias for older pair-centric callers."""
         return self.axes
 
 
@@ -162,7 +160,6 @@ class AxisRow:
 
     @property
     def pair_id(self) -> str:
-        """Backward-compatible alias for older pair-centric callers."""
         return self.unit_id
 
 

@@ -30,7 +30,7 @@ T = TypeVar("T")
 
 
 @dataclass
-class _UdpJsonRx(Generic[T]):
+class UdpJsonIn(Generic[T]):
     link: UdpLink
     decode: Callable[[dict], T]
 
@@ -56,7 +56,7 @@ class _UdpJsonRx(Generic[T]):
 
 
 @dataclass
-class _UdpJsonTx(Generic[T]):
+class UdpJsonOut(Generic[T]):
     link: UdpLink
     encode: Callable[[T], dict]
 
@@ -66,15 +66,31 @@ class _UdpJsonTx(Generic[T]):
         self.link.send(raw)
 
 
+# Backward-compatible private aliases for existing imports/tests.
+_UdpJsonRx = UdpJsonIn
+_UdpJsonTx = UdpJsonOut
+
+
+def close_udp_json_endpoint(endpoint: object) -> None:
+    """Close a shared UDP JSON endpoint if it exposes a link-backed rx/tx."""
+    try:
+        channel = getattr(endpoint, "rx", None) or getattr(endpoint, "tx", None)
+        link = getattr(channel, "link", None)
+        if link is not None:
+            link.close()
+    except Exception:
+        pass
+
+
 # ---------- Human input seam ----------
 @dataclass
 class UdpRawControlsIn:
-    rx: _UdpJsonRx[RawControls]
+    rx: UdpJsonIn[RawControls]
 
     @staticmethod
     def bind(addr: Tuple[str, int]) -> "UdpRawControlsIn":
         link = UdpLink(bind=addr, target=addr)
-        return UdpRawControlsIn(rx=_UdpJsonRx(link=link, decode=decode_raw_controls))
+        return UdpRawControlsIn(rx=UdpJsonIn(link=link, decode=decode_raw_controls))
 
     def drain_raw_controls(self, limit: int = 1000) -> List[RawControls]:
         return self.rx.drain(limit=limit)
@@ -82,14 +98,14 @@ class UdpRawControlsIn:
 
 @dataclass
 class UdpRawControlsOut:
-    tx: _UdpJsonTx[RawControls]
+    tx: UdpJsonOut[RawControls]
 
     @staticmethod
     def connect(
         target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpRawControlsOut":
         link = UdpLink(bind=bind, target=target)
-        return UdpRawControlsOut(tx=_UdpJsonTx(link=link, encode=encode_raw_controls))
+        return UdpRawControlsOut(tx=UdpJsonOut(link=link, encode=encode_raw_controls))
 
     def publish_raw_controls(self, rc: RawControls) -> None:
         self.tx.send(rc)
@@ -98,12 +114,12 @@ class UdpRawControlsOut:
 # ---------- Operator seam ----------
 @dataclass
 class UdpIntentIn:
-    rx: _UdpJsonRx[Intent]
+    rx: UdpJsonIn[Intent]
 
     @staticmethod
     def bind(addr: Tuple[str, int]) -> "UdpIntentIn":
         link = UdpLink(bind=addr, target=addr)  # target unused for rx
-        return UdpIntentIn(rx=_UdpJsonRx(link=link, decode=decode_intent))
+        return UdpIntentIn(rx=UdpJsonIn(link=link, decode=decode_intent))
 
     def drain_intents(self, limit: int = 1000) -> List[Intent]:
         return self.rx.drain(limit=limit)
@@ -111,14 +127,14 @@ class UdpIntentIn:
 
 @dataclass
 class UdpIntentOut:
-    tx: _UdpJsonTx[Intent]
+    tx: UdpJsonOut[Intent]
 
     @staticmethod
     def connect(
         target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpIntentOut":
         link = UdpLink(bind=bind, target=target)
-        return UdpIntentOut(tx=_UdpJsonTx(link=link, encode=encode_intent))
+        return UdpIntentOut(tx=UdpJsonOut(link=link, encode=encode_intent))
 
     def publish_intent(self, intent: Intent) -> None:
         self.tx.send(intent)
@@ -126,12 +142,12 @@ class UdpIntentOut:
 
 @dataclass
 class UdpControlContextIn:
-    rx: _UdpJsonRx[ControlContext]
+    rx: UdpJsonIn[ControlContext]
 
     @staticmethod
     def bind(addr: Tuple[str, int]) -> "UdpControlContextIn":
         link = UdpLink(bind=addr, target=addr)
-        return UdpControlContextIn(rx=_UdpJsonRx(link=link, decode=decode_control_context))
+        return UdpControlContextIn(rx=UdpJsonIn(link=link, decode=decode_control_context))
 
     def drain_contexts(self, limit: int = 1000) -> List[ControlContext]:
         return self.rx.drain(limit=limit)
@@ -139,14 +155,14 @@ class UdpControlContextIn:
 
 @dataclass
 class UdpControlContextOut:
-    tx: _UdpJsonTx[ControlContext]
+    tx: UdpJsonOut[ControlContext]
 
     @staticmethod
     def connect(
         target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpControlContextOut":
         link = UdpLink(bind=bind, target=target)
-        return UdpControlContextOut(tx=_UdpJsonTx(link=link, encode=encode_control_context))
+        return UdpControlContextOut(tx=UdpJsonOut(link=link, encode=encode_control_context))
 
     def publish_control_context(self, ctx: ControlContext) -> None:
         self.tx.send(ctx)
@@ -154,12 +170,12 @@ class UdpControlContextOut:
 
 @dataclass
 class UdpTelemetryIn:
-    rx: _UdpJsonRx[TelemetrySnapshot]
+    rx: UdpJsonIn[TelemetrySnapshot]
 
     @staticmethod
     def bind(addr: Tuple[str, int]) -> "UdpTelemetryIn":
         link = UdpLink(bind=addr, target=addr)
-        return UdpTelemetryIn(rx=_UdpJsonRx(link=link, decode=decode_telemetry))
+        return UdpTelemetryIn(rx=UdpJsonIn(link=link, decode=decode_telemetry))
 
     def drain_telemetry(self, limit: int = 1000) -> List[TelemetrySnapshot]:
         return self.rx.drain(limit=limit)
@@ -167,14 +183,14 @@ class UdpTelemetryIn:
 
 @dataclass
 class UdpTelemetryOut:
-    tx: _UdpJsonTx[TelemetrySnapshot]
+    tx: UdpJsonOut[TelemetrySnapshot]
 
     @staticmethod
     def connect(
         target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpTelemetryOut":
         link = UdpLink(bind=bind, target=target)
-        return UdpTelemetryOut(tx=_UdpJsonTx(link=link, encode=encode_telemetry))
+        return UdpTelemetryOut(tx=UdpJsonOut(link=link, encode=encode_telemetry))
 
     def publish_telemetry(self, snap: TelemetrySnapshot) -> None:
         self.tx.send(snap)
@@ -199,12 +215,12 @@ class UdpTelemetryFanout:
 # ---------- Device seam ----------
 @dataclass
 class UdpCommandIn:
-    rx: _UdpJsonRx[CommandFrame]
+    rx: UdpJsonIn[CommandFrame]
 
     @staticmethod
     def bind(addr: Tuple[str, int]) -> "UdpCommandIn":
         link = UdpLink(bind=addr, target=addr)
-        return UdpCommandIn(rx=_UdpJsonRx(link=link, decode=decode_command_frame))
+        return UdpCommandIn(rx=UdpJsonIn(link=link, decode=decode_command_frame))
 
     def drain_command_frames(self, limit: int = 1000) -> List[CommandFrame]:
         return self.rx.drain(limit=limit)
@@ -212,14 +228,14 @@ class UdpCommandIn:
 
 @dataclass
 class UdpCommandOut:
-    tx: _UdpJsonTx[CommandFrame]
+    tx: UdpJsonOut[CommandFrame]
 
     @staticmethod
     def connect(
         target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpCommandOut":
         link = UdpLink(bind=bind, target=target)
-        return UdpCommandOut(tx=_UdpJsonTx(link=link, encode=encode_command_frame))
+        return UdpCommandOut(tx=UdpJsonOut(link=link, encode=encode_command_frame))
 
     def publish_command_frame(self, frame: CommandFrame) -> None:
         self.tx.send(frame)

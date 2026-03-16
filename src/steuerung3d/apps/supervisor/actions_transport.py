@@ -1,55 +1,21 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from typing import Callable, Generic, TypeVar
 
 from steuerung3d.adapters.links.udp_link import UdpLink
+from steuerung3d.protocol.udp_channels import UdpJsonIn, UdpJsonOut
 
 from .models import DensiRemoteAction
-
-T = TypeVar("T")
-
-
-@dataclass
-class _UdpJsonRx(Generic[T]):
-    link: UdpLink
-    decode: Callable[[dict], T]
-
-    def drain(self, limit: int = 1000) -> list[T]:
-        out: list[T] = []
-        for raw in self.link.poll(limit=limit):
-            try:
-                payload = json.loads(raw.decode("utf-8"))
-            except Exception:
-                continue
-            if isinstance(payload, dict):
-                try:
-                    out.append(self.decode(payload))
-                except Exception:
-                    continue
-        return out
-
-
-@dataclass
-class _UdpJsonTx(Generic[T]):
-    link: UdpLink
-    encode: Callable[[T], dict]
-
-    def send(self, obj: T) -> None:
-        payload = self.encode(obj)
-        raw = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-        self.link.send(raw)
 
 
 @dataclass(frozen=True)
 class UdpDensiActionIn:
-    rx: _UdpJsonRx[DensiRemoteAction]
+    rx: UdpJsonIn[DensiRemoteAction]
 
     @staticmethod
     def bind(addr: tuple[str, int]) -> "UdpDensiActionIn":
         link = UdpLink(bind=addr, target=addr)
-        return UdpDensiActionIn(rx=_UdpJsonRx(link=link, decode=_decode_action))
+        return UdpDensiActionIn(rx=UdpJsonIn(link=link, decode=_decode_action))
 
     def drain_actions(self, limit: int = 1000) -> list[DensiRemoteAction]:
         return self.rx.drain(limit=limit)
@@ -57,14 +23,14 @@ class UdpDensiActionIn:
 
 @dataclass(frozen=True)
 class UdpDensiActionOut:
-    tx: _UdpJsonTx[DensiRemoteAction]
+    tx: UdpJsonOut[DensiRemoteAction]
 
     @staticmethod
     def connect(
         target: tuple[str, int], *, bind: tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpDensiActionOut":
         link = UdpLink(bind=bind, target=target)
-        return UdpDensiActionOut(tx=_UdpJsonTx(link=link, encode=_encode_action))
+        return UdpDensiActionOut(tx=UdpJsonOut(link=link, encode=_encode_action))
 
     def publish_action(self, action: DensiRemoteAction) -> None:
         self.tx.send(action)

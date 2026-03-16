@@ -45,8 +45,8 @@ class SupervisorEngine:
                 rows[axis.unit_id] = row
         self._rows = rows
 
-    def set_selected(self, unit_id: str, selected: bool) -> None:
-        self._selected[str(unit_id)] = bool(selected)
+    def set_selected(self, pair_id: str, selected: bool) -> None:
+        self._selected[str(pair_id)] = bool(selected)
 
     def queue_reset_estop(self) -> None:
         self._pending_reset_estop = True

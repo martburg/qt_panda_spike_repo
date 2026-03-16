@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Protocol
 
 from steuerung3d.core.control_context import ControlContext
 from steuerung3d.core.state import MachineState
@@ -14,6 +14,18 @@ from steuerung3d.protocol.udp_plc_channels import UdpPlcTelemetryIn
 from steuerung3d.util.heartbeat import ChangeTracker
 
 from .reporter import emit_birds_eye_status, log_periodic_heartbeat
+
+
+class _SnapshotFanoutLike(Protocol):
+    def publish_telemetry(self, snap: TelemetrySnapshot) -> None: ...
+
+
+class _ControlContextOutLike(Protocol):
+    def publish_control_context(self, ctx: ControlContext) -> None: ...
+
+
+class _StatusLike(Protocol):
+    def emit_every(self, *, level: str, summary: str, fields: dict[str, object]) -> None: ...
 
 
 def build_intent_drain(
@@ -123,12 +135,12 @@ class SnapshotHandler:
     router: AxisRouter
     axis_ids: list[str]
     args: Any
-    c2_fanout: Any
-    c2_telem_outs: list[Any]
-    control_context_out: Any
+    c2_fanout: _SnapshotFanoutLike | None
+    c2_telem_outs: list[object]
+    control_context_out: _ControlContextOutLike
     stats: Dict[str, int]
     last_seen: Dict[str, Any]
-    status: Any
+    status: _StatusLike | None
     state: MachineState
     last_intents_meta: Dict[str, Any]
     log: logging.Logger

@@ -29,10 +29,14 @@ class _RouterLike(Protocol):
 def _coerce_registry(value: object) -> dict[str, object]:
     if not isinstance(value, Mapping):
         return {}
-    out: dict[str, object] = {}
-    for key, item in value.items():
-        out[str(key)] = item
-    return out
+    return {str(key): item for key, item in value.items()}
+
+
+def _safe_axis_owner(*, state: _AggregateStateLike, axis_id: str) -> str:
+    try:
+        return str(state.axis_owner(axis_id) or "")
+    except Exception:
+        return ""
 
 
 def _entry_age_ms(*, entry: object, now_tick: int, dt: float) -> int | None:
@@ -84,10 +88,7 @@ def build_aggregate_inputs(
                 bits = None
                 axis_taster = None
 
-        try:
-            owner = str(state.axis_owner(axis_id) or "")
-        except Exception:
-            owner = ""
+        owner = _safe_axis_owner(state=state, axis_id=axis_id)
 
         age_ms = _entry_age_ms(entry=reg.get(axis_id), now_tick=int(state.tick), dt=dt)
 
