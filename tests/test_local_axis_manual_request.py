@@ -101,3 +101,27 @@ def test_local_axis_manual_request_birds_eye_selected_axis_reports_local_manual_
     assert status.payload["fields"]["local_manual_allowed"] is True
     assert status.payload["fields"]["local_manual_axes"] == ["Anton"]
     assert "local_manual=[Anton]" in status.payload["summary"]
+
+
+def test_supervisor_leased_local_manual_survives_empty_joy_selected_axes() -> None:
+    from steuerung3d.core.executor import build_command_frame
+    from steuerung3d.core.intents import RequestAxisLease
+
+    st = MachineState()
+    st.core_mode = CoreMode.IDLE
+    st.estop = False
+    st.fault = False
+    apply_intent(st, JoyStateUpdate(deadman=True, selected_axes=()))
+    st.ensure_axis("Anton")
+    st.densi_registry["Anton"] = DensiRuntime(device_id="Anton", last_seen_core_tick=st.tick)
+    _seed_axis_gate(st, "Anton", ready=True)
+    apply_intent(st, RequestAxisLease(axis_id="Anton", hip_id="sup_smoke_2pairs", req_id="lease-anton"))
+
+    apply_intent(st, LocalAxisManualRequest(axis_ids=("Anton",), enable=True, rate=0.4))
+    enforce_core_mode_actions(st)
+
+    assert st.axis_cmd["Anton"].enable is True
+    assert st.axis_cmd["Anton"].vel == 0.4
+    cmd = build_command_frame(st)
+    assert cmd.axes["Anton"].enable is True
+    assert cmd.axes["Anton"].vel == 0.4

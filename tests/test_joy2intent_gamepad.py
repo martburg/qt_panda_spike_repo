@@ -251,7 +251,8 @@ def test_contextual_independent_axes_can_publish_only_joy_state_without_local_ma
     )
 
     joy = next(i for i in intents if isinstance(i, JoyStateUpdate))
-    assert set(joy.selected_axes) == {"Anton", "Cecil"}
+    assert joy.selected_axes == ()
+    assert joy.select_hip is False
     assert joy.deadman is True
     assert not any(isinstance(i, LocalAxisManualRequest) for i in intents)
     assert not any(isinstance(i, EnableAxis) for i in intents)

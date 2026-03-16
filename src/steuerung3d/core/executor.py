@@ -43,6 +43,23 @@ def _get_lifetick_logger() -> Optional[logging.Logger]:
     if _lifetick_logger is not None:
         return _lifetick_logger
 
+
+def _supervisor_manual_active_axes(state: MachineState, *, joy_deadman: bool) -> set[str]:
+    if not bool(joy_deadman):
+        return set()
+    active: set[str] = set()
+    for axis_id, cmd in state.axis_cmd.items():
+        if not bool(getattr(cmd, "enable", False)):
+            continue
+        owner = str(state.axis_owner(axis_id) or "")
+        if not owner:
+            continue
+        if str(state.claim_owner(axis_id) or ""):
+            continue
+        if axis_local_motion_allowed(state, axis_id):
+            active.add(axis_id)
+    return active
+
     cfg = _get_lifetick_cfg()
     if not cfg.enable:
         return None
@@ -70,6 +87,23 @@ def _get_lifetick_logger() -> Optional[logging.Logger]:
 
     _lifetick_logger = logger
     return _lifetick_logger
+
+
+def _supervisor_manual_active_axes(state: MachineState, *, joy_deadman: bool) -> set[str]:
+    if not bool(joy_deadman):
+        return set()
+    active: set[str] = set()
+    for axis_id, cmd in state.axis_cmd.items():
+        if not bool(getattr(cmd, "enable", False)):
+            continue
+        owner = str(state.axis_owner(axis_id) or "")
+        if not owner:
+            continue
+        if str(state.claim_owner(axis_id) or ""):
+            continue
+        if axis_local_motion_allowed(state, axis_id):
+            active.add(axis_id)
+    return active
 
 
 def _compute_resync_any(state: MachineState) -> bool:
@@ -197,6 +231,8 @@ def build_command_frame(state: MachineState) -> CommandFrame:
             }
     else:
         active_axes = set()
+
+    active_axes |= _supervisor_manual_active_axes(state, joy_deadman=joy_deadman)
 
     for axis_id, sp in axes.items():
         if (axis_id not in active_axes) and abs(float(sp.vel)) > 1e-6:

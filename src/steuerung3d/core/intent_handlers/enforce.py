@@ -6,6 +6,20 @@ from steuerung3d.core.motion_gate import axis_local_motion_allowed
 from steuerung3d.core.state import MachineState
 
 
+def _keep_supervisor_local_manual(state: MachineState, axis_id: str, *, joy_deadman: bool) -> bool:
+    if not bool(joy_deadman):
+        return False
+    cmd = state.axis_cmd.get(axis_id)
+    if cmd is None or not bool(cmd.enable):
+        return False
+    owner = str(state.axis_owner(axis_id) or "")
+    if not owner:
+        return False
+    if str(state.claim_owner(axis_id) or ""):
+        return False
+    return axis_local_motion_allowed(state, axis_id)
+
+
 def enforce_core_mode_actions(state: MachineState) -> None:
     """Apply mode-derived safety clamps to the current command state."""
     core_mode = core_mode_value(getattr(state, "core_mode", "")).upper()
@@ -32,7 +46,7 @@ def enforce_core_mode_actions(state: MachineState) -> None:
                 bool(joy_deadman)
                 and (axis_id in selected_axes)
                 and axis_local_motion_allowed(state, axis_id)
-            )
+            ) or _keep_supervisor_local_manual(state, axis_id, joy_deadman=joy_deadman)
             if not keep_local:
                 cmd.enable = False
                 cmd.vel = 0.0

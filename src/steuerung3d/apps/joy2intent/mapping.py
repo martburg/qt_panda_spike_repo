@@ -105,7 +105,8 @@ def synthesize_intents(
     rig_ids = rig.ordered_winch_ids()
     facts = collect_input_facts(rc=rc, bind=bind, rig_ids=rig_ids, control_context=control_context)
 
-    intents.append(build_joy_state_update(facts))
+    publish_selected_axes = not (facts.use_contextual_local_manual and not publish_local_manual)
+    intents.append(build_joy_state_update(facts, publish_selected_axes=publish_selected_axes))
 
     if not facts.deadman:
         prev = previous_activity(st=st, rig_ids=rig_ids)

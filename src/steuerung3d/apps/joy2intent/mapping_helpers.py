@@ -229,12 +229,15 @@ def collect_input_facts(
     )
 
 
-def build_joy_state_update(facts: JoyInputFacts) -> JoyStateUpdate:
+def build_joy_state_update(
+    facts: JoyInputFacts, *, publish_selected_axes: bool = True
+) -> JoyStateUpdate:
+    selected_axes = tuple(sorted(facts.selected_set)) if publish_selected_axes else ()
     return JoyStateUpdate(
         deadman=bool(facts.deadman),
-        select_hip=bool(facts.selected_set),
+        select_hip=bool(selected_axes),
         soll_speed=float(facts.soll_speed),
-        selected_axes=tuple(sorted(facts.selected_set)),
+        selected_axes=selected_axes,
     )
 
 
