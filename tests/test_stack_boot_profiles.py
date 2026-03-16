@@ -112,3 +112,21 @@ def test_two_dev_two_hip_attach_profile_loads_and_expands(tmp_path: Path):
 
     core = next(p for p in procs if p.name == "core")
     assert core.argv[core.argv.index("--ui-telem-mode") + 1] == "fanout"
+
+
+def test_supervisor_stack_standard_profile_keeps_densi_headless(tmp_path: Path):
+    profile = Path("configs/stacks/supervisor_2axes_core_fanout.toml")
+    spec = load_stack_profile(profile)
+    procs = expand_processes(spec, session_dir=tmp_path)
+
+    densi_anton = next(p for p in procs if p.name == "densi-Anton")
+    assert "--headless" in densi_anton.argv
+
+
+def test_supervisor_stack_debug_profile_opens_visible_densi(tmp_path: Path):
+    profile = Path("configs/stacks/supervisor_2axes_core_fanout_debug.toml")
+    spec = load_stack_profile(profile)
+    procs = expand_processes(spec, session_dir=tmp_path)
+
+    densi_anton = next(p for p in procs if p.name == "densi-Anton")
+    assert "--headless" not in densi_anton.argv

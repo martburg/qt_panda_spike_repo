@@ -12,6 +12,7 @@ from steuerung3d.ui.birdseye_format import (
     tail_lines,
 )
 
+from .stack_preflight import cleanup_residual_bind_ports, extract_bind_ports
 from .stack_runtime_meta import write_runtime_meta
 from .status import env_for_process
 
@@ -136,6 +137,8 @@ def run_forever(rt: "StackRuntime") -> int:
 
 
 def stop_runtime(rt: "StackRuntime") -> None:
+    bind_ports = extract_bind_ports([rp.spec for rp in rt.processes])
+
     for rp in rt.processes:
         try:
             if rp.popen.poll() is None:
@@ -150,6 +153,29 @@ def stop_runtime(rt: "StackRuntime") -> None:
             rp.popen.wait(timeout=timeout)
         except Exception:
             pass
+
+    for rp in rt.processes:
+        try:
+            if rp.popen.poll() is None:
+                rp.popen.kill()
+        except Exception:
+            pass
+
+    deadline = time.time() + 1.0
+    for rp in rt.processes:
+        try:
+            timeout = max(0.0, deadline - time.time())
+            rp.popen.wait(timeout=timeout)
+        except Exception:
+            pass
+
+    try:
+        if rt.status is not None:
+            rt.status.sock.close()
+    except Exception:
+        pass
+
+    cleanup_residual_bind_ports(bind_ports)
 
     for rp in rt.processes:
         fh = getattr(rp.popen, "_stack_log_fh", None)

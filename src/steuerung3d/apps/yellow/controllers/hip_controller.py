@@ -63,6 +63,8 @@ class HiPController:
 
     _dbg_next_s: float = 0.0
     _dbg_vm_keys_once: bool = False
+    _ui_log_next_s: float = 0.0
+    _last_ui_log_key: tuple[object, ...] | None = None
 
     # Binder apply throttling (avoid log spam on repeated UI update errors)
     _binder_apply_err_last_s: float = 0.0
@@ -205,22 +207,32 @@ class HiPController:
         return ui_inputs
 
     def _log_runtime_result(self, *, ui_inputs: HipUiInputs, rt_result: HipRuntimeResult) -> None:
-        log.info(
-            "hi_p: ui axis=%r changed=%s attached=%s intents=%d",
-            ui_inputs.axis_selected,
-            ui_inputs.axis_selection_changed,
-            rt_result.view_model.attach_state.attached
-            if (rt_result.view_model is not None and rt_result.view_model.attach_state is not None)
-            else None,
-            len(rt_result.intents),
-        )
-
         vm: HipViewModel | None = rt_result.view_model
+        attached = (
+            vm.attach_state.attached if (vm is not None and vm.attach_state is not None) else None
+        )
+        intents_count = len(rt_result.intents)
+        now_s = time.time()
+        ui_log_key = (ui_inputs.axis_selected, attached, intents_count)
+        if (
+            ui_inputs.axis_selection_changed
+            or ui_log_key != self._last_ui_log_key
+            or now_s >= self._ui_log_next_s
+        ):
+            log.info(
+                "hi_p: ui axis=%r changed=%s attached=%s intents=%d",
+                ui_inputs.axis_selected,
+                ui_inputs.axis_selection_changed,
+                attached,
+                intents_count,
+            )
+            self._last_ui_log_key = ui_log_key
+            self._ui_log_next_s = now_s + 1.0
+
         if vm is not None and not self._dbg_vm_keys_once:
             self._dbg_vm_keys_once = True
             log.info("hi_p: dbg vm_type=%s keys=%s", type(vm).__name__, sorted(vars(vm).keys()))
 
-        now_s = time.time()
         if now_s >= self._dbg_next_s:
             self._dbg_next_s = now_s + 1.0
             ast = vm.attach_state if vm is not None else None

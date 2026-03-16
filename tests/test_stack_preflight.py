@@ -57,3 +57,14 @@ def test_extract_bind_ports_ignores_out_targets() -> None:
         )
     ]
     assert extract_bind_ports(procs) == [51003]
+
+
+def test_extract_bind_ports_reads_generic_in_suffix_flags() -> None:
+    procs = [
+        ProcessSpec(
+            name="custom",
+            argv=["python", "-m", "svc", "--status-in", "127.0.0.1:55001"],
+            log_path=Path("custom.log"),
+        )
+    ]
+    assert extract_bind_ports(procs) == [55001]

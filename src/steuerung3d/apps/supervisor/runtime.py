@@ -35,6 +35,7 @@ class SupervisorRuntime(QObject):
         }
         self.window = SupervisorWindow()
         self._merged_snapshot = None
+
         self.window.reset_estop_clicked.connect(self.engine.queue_reset_estop)
         self.window.estart_clicked.connect(self.engine.queue_estart)
         self.window.resync_clicked.connect(self.engine.queue_resync)
@@ -42,8 +43,10 @@ class SupervisorRuntime(QObject):
         self.window.chk_es_taster_changed.connect(self.engine.set_chk_requested)
         self.window.pair_selected_changed.connect(self.engine.set_selected)
         self.window.open_hip_clicked.connect(self.open_hip_for_axis)
+
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.tick)
+
         self._children: list[subprocess.Popen[str]] = []
         self._hip_children: dict[str, list[subprocess.Popen[str]]] = {}
 
@@ -60,14 +63,17 @@ class SupervisorRuntime(QObject):
         if snaps:
             self._merged_snapshot = merge_snapshots(self._merged_snapshot, snaps)
             self.engine.ingest(self._merged_snapshot)
+
         snapshot = self.engine.snapshot()
         self.window.apply_snapshot(snapshot)
+
         outbound = self.engine.consume_outbound()
         for intent in outbound.intents:
             try:
                 self.intent_out.publish_intent(intent)
             except Exception:
                 log.exception("failed to publish intent %r", intent)
+
         for pair_id, actions in outbound.densi_actions.items():
             tx = self.action_outs.get(pair_id)
             if tx is None:
@@ -82,6 +88,7 @@ class SupervisorRuntime(QObject):
         axis = next((axis for axis in self.profile.axes if axis.unit_id == str(unit_id)), None)
         if axis is None:
             return
+
         cmd_text = str(axis.hip_launch).strip()
         if not cmd_text:
             try:
@@ -91,6 +98,7 @@ class SupervisorRuntime(QObject):
             except Exception:
                 pass
             return
+
         env = dict(os.environ)
         argv = shlex.split(cmd_text)
         child = subprocess.Popen(argv, cwd=os.getcwd(), env=env, text=True)
@@ -112,12 +120,29 @@ class SupervisorRuntime(QObject):
                 child.terminate()
             except Exception:
                 pass
+
         for children in self._hip_children.values():
             for child in children:
                 try:
                     child.terminate()
                 except Exception:
                     pass
+
+        try:
+            self.telemetry_in.rx.link.close()
+        except Exception:
+            pass
+
+        try:
+            self.intent_out.tx.link.close()
+        except Exception:
+            pass
+
+        for tx in self.action_outs.values():
+            try:
+                tx.tx.link.close()
+            except Exception:
+                pass
 
     def _launch_children(self) -> None:
         if self.profile.launch_stack:
@@ -131,8 +156,8 @@ class SupervisorRuntime(QObject):
             ]
             self._children.append(subprocess.Popen(cmd, cwd=os.getcwd(), text=True))
             return
+
         env = dict(os.environ)
-        env.setdefault("QT_QPA_PLATFORM", "offscreen")
         for axis in self.profile.axes:
             for cmd_text in (axis.hip_launch, axis.densi_launch):
                 if not cmd_text:

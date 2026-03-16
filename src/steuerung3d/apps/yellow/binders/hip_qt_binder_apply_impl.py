@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from ..engines.hip.attach_state import NOT_ATTACHED
@@ -238,8 +239,8 @@ def _apply_readouts(b, vm: HipViewModel) -> None:
         return
     ro = getattr(vm, "readouts", None)
     log = getattr(b, "log", None) or getattr(b, "_log", None)
-    if log:
-        log.info(
+    if log and log.isEnabledFor(logging.DEBUG):
+        log.debug(
             "hi_p: dbg apply_readouts ro=%s bind=%s txtPos=%s",
             type(ro).__name__ if ro is not None else None,
             type(getattr(b, "_readouts_bindings", None)).__name__

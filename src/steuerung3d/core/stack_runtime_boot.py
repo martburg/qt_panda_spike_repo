@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, List
 from steuerung3d.ui.birdseye_format import LogTailer
 
 from .run_dirs import make_session_dir
+from .stack_preflight import cleanup_residual_bind_ports, extract_bind_ports
 from .stack_render import make_context, render_argv
 from .stack_runtime_meta import write_runtime_meta
 from .stack_runtime_processes import (
@@ -104,6 +105,9 @@ def start_runtime(rt: "StackRuntime") -> Path:
             spec_for_phase1 = replace(rt.spec, services=services)
 
     plan = rt.__class__.expand_processes_static(spec_for_phase1, session_dir=rt.session_dir)
+
+    bind_ports = extract_bind_ports(plan)
+    cleanup_residual_bind_ports(bind_ports)
 
     for p in plan:
         rt._spawn(p)

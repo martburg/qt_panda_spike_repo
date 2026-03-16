@@ -14,6 +14,7 @@ from pathlib import Path
 
 from steuerung3d.core.stack_loader import load_stack_profile
 from steuerung3d.core.stack_meta import find_latest_session_dir, load_meta
+from steuerung3d.core.stack_preflight import cleanup_residual_bind_ports, extract_bind_ports
 from steuerung3d.core.stack_runtime import StackRuntime, expand_processes
 
 
@@ -77,6 +78,29 @@ def pid_alive(pid: int) -> bool:
     return True
 
 
+def _kill_pid_hard(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        try:
+            import subprocess
+
+            cp = subprocess.run(
+                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            return cp.returncode == 0
+        except Exception:
+            return False
+    try:
+        os.kill(pid, signal.SIGKILL)
+        return True
+    except Exception:
+        return False
+
+
 def cmd_profiles(args: argparse.Namespace) -> int:
     stacks_dir = Path(args.dir) if getattr(args, "dir", None) else None
     print_profiles(stacks_dir=stacks_dir, as_paths=bool(args.paths))
@@ -133,15 +157,35 @@ def cmd_down(args: argparse.Namespace) -> int:
         print(f"[down] no sessions found in {base}")
         return 1
     meta = load_meta(session)
-    n = 0
+    plan = expand_processes(spec, session_dir=base / "sessions" / "PLAN")
+    bind_ports = extract_bind_ports(plan)
+
+    terminated = 0
     for c in meta.children.values():
         if c.pid and pid_alive(c.pid):
             try:
                 os.kill(c.pid, signal.SIGTERM)
-                n += 1
+                terminated += 1
             except Exception:
                 pass
-    print(f"[down] sent terminate to {n} processes (session {session})")
+
+    deadline = time.time() + 1.5
+    for c in meta.children.values():
+        pid = int(c.pid or 0)
+        while pid > 0 and pid_alive(pid) and time.time() < deadline:
+            time.sleep(0.05)
+
+    killed = 0
+    for c in meta.children.values():
+        pid = int(c.pid or 0)
+        if pid > 0 and pid_alive(pid) and _kill_pid_hard(pid):
+            killed += 1
+
+    cleaned_ports = cleanup_residual_bind_ports(bind_ports)
+    print(
+        f"[down] terminated={terminated} force_killed={killed} cleaned_ports={len(cleaned_ports)} "
+        f"(session {session})"
+    )
     return 0
 
 
