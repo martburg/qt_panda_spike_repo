@@ -5,12 +5,15 @@ from steuerung3d.core.state import MachineState
 
 
 def axis_reset_allowed(
-    state: MachineState, axis_id: str, hip_id: str, actor_kind: str = "hip"
+    state: MachineState,
+    axis_id: str,
+    hip_id: str,
+    actor_kind: str = "hip",
 ) -> tuple[bool, str]:
     """Policy: who is allowed to request an ESTOP reset pulse for an axis.
 
-    Structural extraction: behavior stays identical to the previous inline
-    helper in intent_handler.py.
+    HiP requests preserve the existing owner/lease policy. Supervisor requests
+    are allowed only when the axis has no active HiP claim or lease holder.
     """
 
     axis_id = str(axis_id or "")
@@ -25,9 +28,14 @@ def axis_reset_allowed(
     holders = axis_lease_holders(state, axis_id)
 
     if actor_kind == "supervisor":
-        if claim_owner or holders:
-            return False, "owned_by_hip"
-        return True, "supervisor_unowned"
+        if claim_owner:
+            return False, "detail_mode_active"
+        unique_holders = {str(h) for h in holders if str(h)}
+        if unique_holders and unique_holders != {hip_id}:
+            return False, "detail_mode_active"
+        if unique_holders == {hip_id}:
+            return True, "supervisor_self_leased"
+        return True, "supervisor_unclaimed"
 
     if claim_owner and hip_id == claim_owner:
         return True, "claim_owner"

@@ -98,6 +98,7 @@ def synthesize_intents(
     lim: JoyLimits,
     hip_id: str = "hip",
     control_context: ControlContext | None = None,
+    publish_local_manual: bool = True,
 ) -> list[object]:
     """Convert a joystick report into a list of core intents."""
     intents: list[object] = []
@@ -113,10 +114,21 @@ def synthesize_intents(
                 build_release_intents(
                     active_ids=prev.active_ids,
                     hip_id=hip_id,
-                    use_contextual_local_manual=facts.use_contextual_local_manual,
+                    use_contextual_local_manual=(
+                        facts.use_contextual_local_manual and publish_local_manual
+                    ),
                 )
             )
         clear_active_selection_state(st)
+        return intents
+
+    if facts.use_contextual_local_manual and not publish_local_manual:
+        update_state_active_selection(
+            st=st,
+            selected_set=facts.selected_set,
+            rig_ids=rig_ids,
+            deadman=True,
+        )
         return intents
 
     if facts.use_contextual_local_manual and not facts.motion_enabled:
@@ -144,7 +156,9 @@ def synthesize_intents(
         build_motion_intents(
             selected_set=facts.selected_set,
             hip_id=hip_id,
-            use_contextual_local_manual=facts.use_contextual_local_manual,
+            use_contextual_local_manual=(
+                facts.use_contextual_local_manual and publish_local_manual
+            ),
             deadman=facts.deadman,
             rate=rate,
         )

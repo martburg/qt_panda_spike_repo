@@ -1,0 +1,59 @@
+# Canonical joy2intent service configuration
+# Used by profiles and distributed deployments.
+#
+# Policy: this file is intentionally explicit. Avoid silent code defaults.
+# Semantic lane mapping lives here; profiles may override IO endpoints but not winch lists.
+# If you add new operational knobs, prefer adding them here and making the loader require them.
+
+[io]
+# Where raw joystick/controller samples arrive (UdpRawControlsIn bind address).
+raw_in = "127.0.0.1:50100"
+# Where intents are sent (UdpIntentOut target address).
+intent_out = "127.0.0.1:51001"
+# Where core publishes control context for colocated joy2intent.
+context_in = "127.0.0.1:51010"
+tick_hz = 50
+stale_after_ms = 200
+
+[identity]
+# Fallback identity for legacy owner-bound motion intents.
+# Independent-axis local manual requests no longer stamp hip_id.
+hip_id = "hip"
+
+[rig]
+# Ordered axis ids (pos 0..N-1). Selection buttons address by position.
+winches = ["Anton", "Debby"]
+# Physical button indices used to select winches by position (0..N-1).
+# Example: [0,1,2,3] means button0 selects winch[0], button1 selects winch[1], ...
+select_buttons = [0, 1]
+
+[mode]
+# Joystick control sub-mode (not the core safety Mode)
+default = "setup_manual"
+
+[limits.manual]
+# Max jog speed for a single winch (m/s or your chosen axis units)
+max_winch_mps = 6
+# Fine mode multiplier (when fine button held)
+fine_scale = 0.20
+
+[limits.sync]
+# Max cartesian jog speeds (placeholder until kinematics layer exists)
+max_v = { x = 0.60, y = 0.60, z = 0.40 }
+
+[bindings.axes]
+# Axis indices as reported by your joystick.
+manual_jog = 1
+soll_speed = 1
+x = 0
+y = 1
+z = 2
+
+[bindings.buttons]
+deadman = 5
+fine = 7
+
+[filters]
+deadzone = 0.08
+expo = 0.25
+invert = { manual_jog = true, y = true }

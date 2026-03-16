@@ -49,15 +49,30 @@ def test_estop_reset_denied_without_owner() -> None:
     assert st.estop_reset_denied_count_by_axis.get("X") == 1
 
 
-def test_estop_reset_allowed_for_supervisor_when_axis_unowned() -> None:
+def test_estop_reset_allowed_for_supervisor_without_open_hip() -> None:
     st = MachineState()
     apply_intent(st, RequestEstopReset(axis_id="X", hip_id="sup", actor_kind="supervisor"))
     assert st.estop_reset_req_by_axis.get("X") is True
 
 
-def test_estop_reset_denied_for_supervisor_when_axis_owned() -> None:
+def test_estop_reset_denied_for_supervisor_when_hip_claims_axis() -> None:
     st = MachineState()
     st.set_axis_claim("X", "hipA")
+    apply_intent(st, RequestEstopReset(axis_id="X", hip_id="sup", actor_kind="supervisor"))
+    assert not st.estop_reset_req_by_axis
+    assert st.estop_reset_denied_count_by_axis.get("X") == 1
+
+
+def test_estop_reset_allowed_for_supervisor_when_supervisor_holds_lease() -> None:
+    st = MachineState()
+    st.lease_axis_holders["X"] = ["sup"]
+    apply_intent(st, RequestEstopReset(axis_id="X", hip_id="sup", actor_kind="supervisor"))
+    assert st.estop_reset_req_by_axis.get("X") is True
+
+
+def test_estop_reset_denied_for_supervisor_when_other_holder_exists() -> None:
+    st = MachineState()
+    st.lease_axis_holders["X"] = ["sup", "hipA"]
     apply_intent(st, RequestEstopReset(axis_id="X", hip_id="sup", actor_kind="supervisor"))
     assert not st.estop_reset_req_by_axis
     assert st.estop_reset_denied_count_by_axis.get("X") == 1

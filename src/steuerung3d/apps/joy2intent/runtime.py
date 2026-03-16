@@ -152,6 +152,7 @@ def _handle_raw_sample(
         rt.limits,
         hip_id=rt.cfg.hip_id,
         control_context=state.latest_ctx,
+        publish_local_manual=rt.cfg.publish_local_manual,
     )
     _log_deadman_and_selection(rt=rt, state=state, pressed=pressed)
     _publish_intents(rt=rt, intents=intents)
@@ -159,7 +160,8 @@ def _handle_raw_sample(
 
 def _emit_stale_stop(*, rt: Joy2IntentRuntime, state: RuntimeState) -> None:
     if (
-        state.latest_ctx is not None
+        rt.cfg.publish_local_manual
+        and state.latest_ctx is not None
         and str(getattr(state.latest_ctx, "mode", "")) == "independent_axes"
         and str(getattr(state.latest_ctx, "input_mapping", "")) == "axis_rate"
     ):

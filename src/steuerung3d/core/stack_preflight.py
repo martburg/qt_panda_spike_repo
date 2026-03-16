@@ -4,7 +4,13 @@ import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 from typing import Iterable
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover
+    import tomli as tomllib
 
 from .stack_spec import ProcessSpec
 
@@ -22,17 +28,22 @@ _BIND_FLAGS_EXACT = {
 def extract_bind_ports(processes: Iterable[ProcessSpec]) -> list[int]:
     ports: list[int] = []
     seen: set[int] = set()
+
+    def add_port(port: int | None) -> None:
+        if port is None or port in seen:
+            return
+        seen.add(port)
+        ports.append(port)
+
     for proc in processes:
         argv = list(proc.argv)
         for i, token in enumerate(argv[:-1]):
             if not _is_bind_flag(str(token)):
                 continue
-            port = _parse_port(argv[i + 1])
-            if port is None:
-                continue
-            if port not in seen:
-                seen.add(port)
-                ports.append(port)
+            add_port(_parse_port(argv[i + 1]))
+        for cfg_path in _config_paths_from_argv(argv):
+            for port in _extract_bind_ports_from_config(cfg_path):
+                add_port(port)
     return ports
 
 
@@ -162,3 +173,46 @@ def _kill_pid(pid: int) -> bool:
         return True
     except Exception:
         return False
+
+
+def _config_paths_from_argv(argv: list[object]) -> list[Path]:
+    out: list[Path] = []
+    for i, token in enumerate(argv[:-1]):
+        if str(token).strip() != "--config":
+            continue
+        cfg = Path(str(argv[i + 1]).strip())
+        if cfg not in out:
+            out.append(cfg)
+    return out
+
+
+def _extract_bind_ports_from_config(path: Path) -> list[int]:
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    ports: list[int] = []
+    seen: set[int] = set()
+
+    def add(value: object) -> None:
+        port = _parse_port(value)
+        if port is None or port in seen:
+            return
+        seen.add(port)
+        ports.append(port)
+
+    io_cfg = data.get("io")
+    if isinstance(io_cfg, dict):
+        for key, value in io_cfg.items():
+            key_s = str(key).strip().lower()
+            if key_s.endswith("_in"):
+                add(value)
+
+    net_cfg = data.get("net")
+    if isinstance(net_cfg, dict):
+        for key, value in net_cfg.items():
+            key_s = str(key).strip().lower()
+            if key_s.endswith("_in"):
+                add(value)
+
+    return ports

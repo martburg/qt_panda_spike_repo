@@ -68,3 +68,19 @@ def test_extract_bind_ports_reads_generic_in_suffix_flags() -> None:
         )
     ]
     assert extract_bind_ports(procs) == [55001]
+
+
+def test_extract_bind_ports_reads_bind_ports_from_config_io_in_keys(tmp_path: Path) -> None:
+    cfg = tmp_path / "joy2intent.toml"
+    cfg.write_text(
+        '[io]\nraw_in = "127.0.0.1:50100"\nintent_out = "127.0.0.1:51001"\ncontext_in = "127.0.0.1:51010"\n',
+        encoding="utf-8",
+    )
+    procs = [
+        ProcessSpec(
+            name="joy2intent",
+            argv=["python", "-m", "joy", "--config", str(cfg)],
+            log_path=Path("joy.log"),
+        )
+    ]
+    assert extract_bind_ports(procs) == [50100, 51010]

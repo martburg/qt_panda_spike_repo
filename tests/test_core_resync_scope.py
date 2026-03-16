@@ -49,15 +49,31 @@ def test_request_resync_denied_for_wrong_or_missing_owner() -> None:
     assert st.resync_req_by_axis == {}
 
 
-def test_request_resync_allowed_for_supervisor_when_axis_unowned() -> None:
+def test_request_resync_allowed_for_supervisor_without_open_hip() -> None:
     st = MachineState()
     st.ensure_axis("Anton")
     apply_intent(st, RequestResync(axis_id="Anton", hip_id="sup", actor_kind="supervisor"))
     assert st.resync_req_by_axis == {"Anton": True}
 
 
-def test_request_resync_denied_for_supervisor_when_axis_owned() -> None:
+def test_request_resync_denied_for_supervisor_when_hip_claims_axis() -> None:
     st = MachineState()
     st.set_axis_claim("Anton", "hipA")
+    apply_intent(st, RequestResync(axis_id="Anton", hip_id="sup", actor_kind="supervisor"))
+    assert st.resync_req_by_axis == {}
+
+
+def test_request_resync_allowed_for_supervisor_when_supervisor_holds_lease() -> None:
+    st = MachineState()
+    st.ensure_axis("Anton")
+    st.lease_axis_holders["Anton"] = ["sup"]
+    apply_intent(st, RequestResync(axis_id="Anton", hip_id="sup", actor_kind="supervisor"))
+    assert st.resync_req_by_axis == {"Anton": True}
+
+
+def test_request_resync_denied_for_supervisor_when_other_holder_exists() -> None:
+    st = MachineState()
+    st.ensure_axis("Anton")
+    st.lease_axis_holders["Anton"] = ["sup", "hipA"]
     apply_intent(st, RequestResync(axis_id="Anton", hip_id="sup", actor_kind="supervisor"))
     assert st.resync_req_by_axis == {}

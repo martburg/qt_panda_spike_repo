@@ -48,16 +48,16 @@ count = 0
 config = "configs/services/hip.toml"
 
 [services.inputd]
-enabled = false
+enabled = true
 module = "steuerung3d.apps.inputd"
 mode = "single"
 config = "configs/inputd_gamepad.toml"
 
 [services.joy2intent]
-enabled = false
+enabled = true
 module = "steuerung3d.apps.joy2intent"
 mode = "single"
-config = "configs/services/joy2intent.toml"
+config = "configs/services/joy2intent_supervisor_2axes.toml"
 args = [
   "--intent-out", "{net.intent}",
 ]

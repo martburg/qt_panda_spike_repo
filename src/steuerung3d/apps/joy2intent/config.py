@@ -125,6 +125,15 @@ def _require_dict_str_int(mapping: Mapping[str, object], key: str, *, ctx: str) 
     return result
 
 
+def _optional_bool(mapping: Mapping[str, object], key: str, default: bool) -> bool:
+    raw_value = mapping.get(key)
+    if raw_value is None:
+        return default
+    if not isinstance(raw_value, bool):
+        raise ValueError(f"Config key '{key}' must be a boolean in joy2intent config")
+    return raw_value
+
+
 def _require_dict_str_bool(mapping: Mapping[str, object], key: str, *, ctx: str) -> dict[str, bool]:
     value = _require_value(mapping, key, ctx=ctx)
     if not isinstance(value, Mapping):
@@ -175,6 +184,7 @@ class Joy2IntentConfig:
     expo: float
     invert: dict[str, bool]
     hip_id: str
+    publish_local_manual: bool = True
     sync_max_v: dict[str, float] = field(default_factory=dict)
 
 
@@ -216,6 +226,7 @@ def load_joy2intent_config(path: Path) -> Joy2IntentConfig:
         select_buttons=select_buttons,
         max_winch_mps=_require_float(lim_m, "max_winch_mps", ctx="limits.manual"),
         fine_scale=_require_float(lim_m, "fine_scale", ctx="limits.manual"),
+        publish_local_manual=_optional_bool(mode, "publish_local_manual", True),
         sync_max_v=sync_max_v,
         axes=_require_dict_str_int(bindings, "axes", ctx="bindings"),
         buttons=_require_dict_str_int_or_int_list(bindings, "buttons", ctx="bindings"),

@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from steuerung3d.apps.supervisor.engine import SupervisorEngine
 from steuerung3d.apps.supervisor.models import PairConfig, PairPhase, SupervisorProfile
-from steuerung3d.core.intents import EchoLifeTick, JoyStateUpdate, RequestEstopReset, RequestResync
+from steuerung3d.core.intents import (
+    EchoLifeTick,
+    JoyStateUpdate,
+    LocalAxisManualRequest,
+    ReleaseAxisLease,
+    RequestAxisLease,
+    RequestEstopReset,
+    RequestResync,
+)
 from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, JoyState, TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import (
     ESTOP_CAUSE_KEYS,
@@ -110,18 +118,15 @@ def test_selection_changes_joy_update_selected_axes() -> None:
     assert batch.intents[-1].selected_axes == ()
 
 
-def test_estart_and_chk_request_emit_independent_remote_densi_actions() -> None:
+def test_estart_and_chk_request_emit_remote_densi_actions() -> None:
     eng = SupervisorEngine(_profile())
     eng.ingest(_snap(estop_word=(1 << 11)))
-
     eng.queue_estart()
-    batch = eng.consume_outbound()
-    assert [a.action for a in batch.densi_actions["anton"]] == ["estart"]
-
     eng.set_chk_requested(True)
     batch = eng.consume_outbound()
-    assert [a.action for a in batch.densi_actions["anton"]] == ["chk_es_taster"]
-    assert batch.densi_actions["anton"][0].value is True
+    assert batch.densi_actions["anton"][0].action == "estart"
+    assert batch.densi_actions["anton"][1].action == "chk_es_taster"
+    assert batch.densi_actions["anton"][1].value is True
 
 
 def test_status_line_uses_arming_when_pair_is_armed() -> None:
@@ -210,7 +215,8 @@ def test_chk_es_taster_is_forced_clear_when_first_hip_opens_and_stays_clear_afte
 
     eng.set_hip_open_count("anton", 0)
     batch = eng.consume_outbound()
-    assert batch.densi_actions == {}
+    assert batch.densi_actions["anton"][0].action == "chk_es_taster"
+    assert batch.densi_actions["anton"][0].value is False
 
 
 def test_supervisor_reset_and_resync_use_supervisor_actor_and_selected_rows() -> None:
@@ -236,12 +242,57 @@ def test_supervisor_reset_and_resync_use_supervisor_actor_and_selected_rows() ->
     assert [i for i in batch.intents if isinstance(i, RequestResync)] == []
 
 
-def test_chk_es_taster_is_edge_triggered_not_level_repeated() -> None:
+def test_supervisor_requests_leases_and_drives_selected_axes_with_simple_1to1_kinematic() -> None:
     eng = SupervisorEngine(_profile())
-    eng.ingest(_snap(estop_word=(1 << 11)))
-    eng.set_chk_requested(True)
+    eng.ingest(_snap(estop_word=(1 << 11), joy_deadman=True, soll_speed=0.5))
     batch = eng.consume_outbound()
-    assert [a.action for a in batch.densi_actions["anton"]] == ["chk_es_taster"]
 
+    leases = [i for i in batch.intents if isinstance(i, RequestAxisLease)]
+    manuals = [i for i in batch.intents if isinstance(i, LocalAxisManualRequest)]
+
+    assert len(leases) == 1
+    assert leases[0].axis_id == "Anton"
+    assert leases[0].hip_id == "sup"
+    assert len(manuals) == 1
+    assert manuals[0].axis_ids == ("Anton",)
+    assert manuals[0].enable is True
+    assert manuals[0].rate == 0.5
+
+
+def test_supervisor_releases_leases_and_stops_manual_motion_when_hip_opens() -> None:
+    eng = SupervisorEngine(_profile())
+    eng.ingest(_snap(estop_word=(1 << 11), joy_deadman=True, soll_speed=0.5))
+    eng.consume_outbound()
+
+    eng.set_hip_open_count("anton", 1)
     batch = eng.consume_outbound()
-    assert batch.densi_actions == {}
+
+    releases = [i for i in batch.intents if isinstance(i, ReleaseAxisLease)]
+    manuals = [i for i in batch.intents if isinstance(i, LocalAxisManualRequest)]
+
+    assert len(releases) == 1
+    assert releases[0].axis_id == "Anton"
+    assert releases[0].hip_id == "sup"
+    assert len(manuals) == 1
+    assert manuals[0].axis_ids == ("Anton",)
+    assert manuals[0].enable is False
+    assert manuals[0].rate == 0.0
+
+
+def test_supervisor_releases_deselected_axis_and_disables_manual_motion_for_it() -> None:
+    eng = SupervisorEngine(_profile())
+    eng.ingest(_snap(estop_word=(1 << 11), joy_deadman=True, soll_speed=0.5))
+    eng.consume_outbound()
+
+    eng.set_selected("anton", False)
+    batch = eng.consume_outbound()
+
+    releases = [i for i in batch.intents if isinstance(i, ReleaseAxisLease)]
+    manuals = [i for i in batch.intents if isinstance(i, LocalAxisManualRequest)]
+
+    assert len(releases) == 1
+    assert releases[0].axis_id == "Anton"
+    assert len(manuals) == 1
+    assert manuals[0].axis_ids == ("Anton",)
+    assert manuals[0].enable is False
+    assert manuals[0].rate == 0.0

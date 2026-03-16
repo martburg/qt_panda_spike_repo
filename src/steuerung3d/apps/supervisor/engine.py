@@ -5,7 +5,15 @@ from collections.abc import Iterable
 from steuerung3d.apps.yellow.engines.hip.presentation_extract import (
     parse_estop_word_from_snapshot,
 )
-from steuerung3d.core.intents import EchoLifeTick, JoyStateUpdate, RequestEstopReset, RequestResync
+from steuerung3d.core.intents import (
+    EchoLifeTick,
+    JoyStateUpdate,
+    LocalAxisManualRequest,
+    ReleaseAxisLease,
+    RequestAxisLease,
+    RequestEstopReset,
+    RequestResync,
+)
 from steuerung3d.core.telemetry import JoyState, TelemetrySnapshot
 from steuerung3d.core.telemetry_axis_view import axis_scoped_snapshot
 from steuerung3d.protocol.banner_estate import BANNER_DYNAMIC_EXCLUDE
@@ -35,9 +43,10 @@ class SupervisorEngine:
         self._pending_resync = False
         self._pending_recover = False
         self._chk_requested = False
-        self._chk_dirty = False
         self._joy_sent: JoyState | None = None
         self._hip_open_counts: dict[str, int] = {}
+        self._leased_axis_ids: set[str] = set()
+        self._manual_active_axis_ids: set[str] = set()
         self._echo_tick: int = 0
 
     def ingest(self, snap: TelemetrySnapshot) -> None:
@@ -65,10 +74,7 @@ class SupervisorEngine:
         self._pending_recover = True
 
     def set_chk_requested(self, checked: bool) -> None:
-        checked = bool(checked)
-        if checked != self._chk_requested:
-            self._chk_requested = checked
-            self._chk_dirty = True
+        self._chk_requested = bool(checked)
 
     def set_hip_open_count(self, unit_id: str, count: int) -> None:
         was_locked = self._lock_active()
@@ -80,7 +86,6 @@ class SupervisorEngine:
         now_locked = self._lock_active()
         if now_locked and not was_locked:
             self._chk_requested = False
-            self._chk_dirty = False
             self._pending_reset_estop = False
             self._pending_estart = False
             self._pending_resync = False
@@ -153,6 +158,20 @@ class SupervisorEngine:
 
         locked = self._lock_active()
         selected_axes = self._selected_axes()
+        selected_axis_ids = tuple(axis.axis_id for axis in selected_axes)
+        desired_leased_axis_ids = set() if locked else set(selected_axis_ids)
+
+        released_axis_ids = sorted(self._leased_axis_ids - desired_leased_axis_ids)
+        for axis_id in released_axis_ids:
+            intents.append(
+                ReleaseAxisLease(axis_id=axis_id, hip_id=str(self.profile.supervisor_id))
+            )
+        requested_axis_ids = sorted(desired_leased_axis_ids - self._leased_axis_ids)
+        for axis_id in requested_axis_ids:
+            intents.append(
+                RequestAxisLease(axis_id=axis_id, hip_id=str(self.profile.supervisor_id))
+            )
+        self._leased_axis_ids = set(desired_leased_axis_ids)
 
         if not locked and self._pending_reset_estop:
             for axis in selected_axes:
@@ -182,20 +201,43 @@ class SupervisorEngine:
                     densi_actions.setdefault(axis.unit_id, []).append(DensiRemoteAction("estart"))
         self._pending_estart = False
 
-        if not locked and self._chk_dirty:
+        if not locked:
             for axis in selected_axes:
                 if axis.densi_action_out:
                     densi_actions.setdefault(axis.unit_id, []).append(
                         DensiRemoteAction("chk_es_taster", value=bool(self._chk_requested))
                     )
-        self._chk_dirty = False
 
         joy = (
             getattr(self._last_snapshot, "joy", JoyState())
             if self._last_snapshot is not None
             else JoyState()
         )
-        selected_axis_ids = tuple(axis.axis_id for axis in selected_axes)
+
+        desired_manual_axis_ids = set() if locked else set(selected_axis_ids)
+        if (not bool(joy.deadman)) or locked:
+            disable_axis_ids = sorted(self._manual_active_axis_ids)
+            if disable_axis_ids:
+                intents.append(
+                    LocalAxisManualRequest(axis_ids=tuple(disable_axis_ids), enable=False, rate=0.0)
+                )
+            self._manual_active_axis_ids = set()
+        else:
+            disable_axis_ids = sorted(self._manual_active_axis_ids - desired_manual_axis_ids)
+            if disable_axis_ids:
+                intents.append(
+                    LocalAxisManualRequest(axis_ids=tuple(disable_axis_ids), enable=False, rate=0.0)
+                )
+            if desired_manual_axis_ids:
+                intents.append(
+                    LocalAxisManualRequest(
+                        axis_ids=tuple(sorted(desired_manual_axis_ids)),
+                        enable=True,
+                        rate=float(joy.soll_speed),
+                    )
+                )
+            self._manual_active_axis_ids = set(desired_manual_axis_ids)
+
         for axis in self.profile.axes:
             row = self._rows.get(axis.unit_id)
             if row is None:

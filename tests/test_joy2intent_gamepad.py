@@ -228,3 +228,31 @@ def test_contextual_independent_axes_deadman_release_emits_only_local_stop(tmp_p
     assert req.axis_ids == ("Anton",)
     assert not any(isinstance(i, EnableAxis) for i in intents2)
     assert not any(isinstance(i, JogWinch) for i in intents2)
+
+
+def test_contextual_independent_axes_can_publish_only_joy_state_without_local_manual(
+    tmp_path: Path,
+) -> None:
+    st = _TestJoyState()
+    bind = _bind()
+    rig = _rig()
+    lim = _lim_from_config(tmp_path)
+    rc = _rc(axes=[0.0, 0.6], pressed=(5, 0, 2))
+    ctx = ControlContext(mode="independent_axes", input_mapping="axis_rate", motion_enabled=True)
+
+    intents = synthesize_intents(
+        st,
+        rc,
+        bind,
+        rig,
+        lim,
+        control_context=ctx,
+        publish_local_manual=False,
+    )
+
+    joy = next(i for i in intents if isinstance(i, JoyStateUpdate))
+    assert set(joy.selected_axes) == {"Anton", "Cecil"}
+    assert joy.deadman is True
+    assert not any(isinstance(i, LocalAxisManualRequest) for i in intents)
+    assert not any(isinstance(i, EnableAxis) for i in intents)
+    assert not any(isinstance(i, JogWinch) for i in intents)

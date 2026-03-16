@@ -25,6 +25,7 @@ select_buttons = [0, 1]
 
 [mode]
 default = "manual"
+publish_local_manual = false
 
 [limits.manual]
 max_winch_mps = 1.25
@@ -61,6 +62,7 @@ def test_load_joy2intent_config_keeps_expected_types(tmp_path: Path) -> None:
     assert cfg.stale_after_ms == 200
     assert cfg.winches == ["Anton", "Debby"]
     assert cfg.select_buttons == [0, 1]
+    assert cfg.publish_local_manual is False
     assert cfg.axes == {"manual_jog": 1}
     assert cfg.buttons == {"deadman": 5, "select": [0, 1]}
     assert cfg.invert == {"manual_jog": False}
