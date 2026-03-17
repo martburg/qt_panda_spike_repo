@@ -10,6 +10,7 @@ from .outbound import (
     append_reset_and_resync_intents,
     build_densi_actions,
     build_joy_update,
+    build_outbound_context,
     sync_leases,
     sync_manual_motion,
 )
@@ -137,22 +138,23 @@ class SupervisorEngine:
 
     def consume_outbound(self) -> OutboundBatch:
         intents: list[Intent] = []
-        locked = self._lock_active()
-        selected_axes = self._selected_axes()
-        selected_axis_ids = tuple(axis.axis_id for axis in selected_axes)
+        context = build_outbound_context(
+            locked=self._lock_active(),
+            selected_axes=self._selected_axes(),
+        )
 
         self._leased_axis_ids = sync_leases(
             intents=intents,
             supervisor_id=str(self.profile.supervisor_id),
-            locked=locked,
-            selected_axes=selected_axes,
+            locked=context.locked,
+            selected_axes=context.selected_axes,
             leased_axis_ids=self._leased_axis_ids,
         )
         append_reset_and_resync_intents(
             intents=intents,
             supervisor_id=str(self.profile.supervisor_id),
-            locked=locked,
-            selected_axes=selected_axes,
+            locked=context.locked,
+            selected_axes=context.selected_axes,
             pending_reset_estop=self._pending_reset_estop,
             pending_resync=self._pending_resync,
         )
@@ -160,8 +162,8 @@ class SupervisorEngine:
         self._pending_resync = False
 
         densi_actions = build_densi_actions(
-            locked=locked,
-            selected_axes=selected_axes,
+            locked=context.locked,
+            selected_axes=context.selected_axes,
             pending_estart=self._pending_estart,
             chk_requested=self._chk_requested,
         )
@@ -170,9 +172,9 @@ class SupervisorEngine:
         joy = self._current_joy()
         self._manual_active_axis_ids = sync_manual_motion(
             intents=intents,
-            locked=locked,
+            locked=context.locked,
             joy=joy,
-            selected_axis_ids=selected_axis_ids,
+            selected_axis_ids=context.selected_axis_ids,
             manual_active_axis_ids=self._manual_active_axis_ids,
         )
         append_lifetick_echoes(
@@ -183,7 +185,11 @@ class SupervisorEngine:
             supervisor_id=str(self.profile.supervisor_id),
         )
 
-        joy_update = build_joy_update(joy=joy, locked=locked, selected_axis_ids=selected_axis_ids)
+        joy_update = build_joy_update(
+            joy=joy,
+            locked=context.locked,
+            selected_axis_ids=context.selected_axis_ids,
+        )
         changed = append_joy_update_if_changed(
             intents=intents,
             joy_update=joy_update,

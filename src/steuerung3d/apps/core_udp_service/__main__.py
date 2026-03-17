@@ -11,8 +11,7 @@ from .runtime_loop import run_core_udp_service
 log = logging.getLogger("core_udp_service")
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
+def _add_core_args(ap: argparse.ArgumentParser) -> None:
     ap.add_argument("--log-level", default="info", choices=("debug", "info", "warning", "error"))
     ap.add_argument("--dt", type=float, default=0.02, help="Core tick (s)")
     ap.add_argument(
@@ -34,6 +33,9 @@ def main() -> int:
         default=[],
         help="Axis ids to initialize in core state (repeatable). Example: --axis Anton --axis Debby",
     )
+
+
+def _add_dev_cmd_args(ap: argparse.ArgumentParser) -> None:
     ap.add_argument(
         "--dev-cmd-target",
         action="append",
@@ -67,6 +69,8 @@ def main() -> int:
         ),
     )
 
+
+def _add_dev_telem_args(ap: argparse.ArgumentParser) -> None:
     ap.add_argument(
         "--dev-telem-in",
         default="127.0.0.1:52002",
@@ -76,6 +80,8 @@ def main() -> int:
         ),
     )
 
+
+def _add_ui_telem_args(ap: argparse.ArgumentParser) -> None:
     # UI telemetry targets
     ap.add_argument(
         "--ui-telem-target",
@@ -114,6 +120,9 @@ def main() -> int:
         choices=("per_axis", "fanout"),
         help="UI telemetry routing mode: per_axis (legacy) or fanout (full snapshots to every HiP).",
     )
+
+
+def _add_c2_telem_args(ap: argparse.ArgumentParser) -> None:
     ap.add_argument(
         "--c2-telem-target",
         action="append",
@@ -139,6 +148,20 @@ def main() -> int:
         default=0,
         help="Convenience: number of C2 telemetry targets to generate from base port.",
     )
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    ap = argparse.ArgumentParser()
+    _add_core_args(ap)
+    _add_dev_cmd_args(ap)
+    _add_dev_telem_args(ap)
+    _add_ui_telem_args(ap)
+    _add_c2_telem_args(ap)
+    return ap
+
+
+def main() -> int:
+    ap = build_arg_parser()
     args = ap.parse_args()
 
     bootstrap_logging(role="core", log_level=args.log_level)

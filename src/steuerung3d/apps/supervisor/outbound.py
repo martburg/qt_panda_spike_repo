@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 
 from steuerung3d.core.intents import (
     EchoLifeTick,
@@ -15,6 +16,22 @@ from steuerung3d.core.intents import (
 from steuerung3d.core.telemetry import JoyState
 
 from .models import AxisConfig, AxisRow, DensiRemoteAction
+
+
+@dataclass(frozen=True)
+class OutboundContext:
+    locked: bool
+    selected_axes: tuple[AxisConfig, ...]
+    selected_axis_ids: tuple[str, ...]
+
+
+def build_outbound_context(*, locked: bool, selected_axes: Sequence[AxisConfig]) -> OutboundContext:
+    axis_tuple = tuple(selected_axes)
+    return OutboundContext(
+        locked=locked,
+        selected_axes=axis_tuple,
+        selected_axis_ids=tuple(axis.axis_id for axis in axis_tuple),
+    )
 
 
 def sync_leases(

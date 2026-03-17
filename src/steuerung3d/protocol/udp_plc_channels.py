@@ -15,23 +15,20 @@ we prefer “don’t crash” over “strict schema enforcement”.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from steuerung3d.adapters.links.udp_link import UdpLink
-from steuerung3d.protocol.udp_plc_coerce import to_bool_token, to_float, to_int
-from steuerung3d.protocol.udp_plc_frame_support import (
-    PARAM_GROUP_DEFAULTS,
-    axis_id_or_default,
-    extract_param_write_values,
-    frame_axis_id,
-    frame_lifetick_ui_rx,
-    frame_param_map,
+from steuerung3d.protocol.udp_plc_channel_support import (
+    decode_command_fields,
+    encode_command_payload,
+    extract_param_ops,
+    iter_decoded_snapshots,
+    load_downlink_decoder,
+    load_downlink_encoder,
+    load_uplink_decoder,
 )
-
-BytesDecoder = Callable[[bytes], Any]
-FrameEncoder = Callable[..., bytes]
+from steuerung3d.protocol.udp_plc_frame_support import axis_id_or_default
 
 
 def _to_bytes(line: str) -> bytes:
@@ -49,91 +46,6 @@ def _stringify_payload(payload: Any) -> str:
     return str(payload)
 
 
-def _load_uplink_decoder() -> BytesDecoder | None:
-    try:
-        from steuerung3d.protocol.plc_codec import decode_uplink_to_snapshot
-    except Exception:
-        return None
-    return decode_uplink_to_snapshot
-
-
-def _load_downlink_decoder() -> tuple[Any, Any, Any, Any, Any] | None:
-    try:
-        from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamWriteOp
-        from steuerung3d.protocol.plc_codec import _PARAM_KEYMAP, decode_downlink
-    except Exception:
-        return None
-    return AxisSetpoint, CommandFrame, ParamWriteOp, _PARAM_KEYMAP, decode_downlink
-
-
-def _load_downlink_encoder() -> FrameEncoder | None:
-    try:
-        from steuerung3d.protocol.plc_codec import encode_downlink
-    except Exception:
-        return None
-    return encode_downlink
-
-
-def _iter_decoded_snapshots(raw_items: list[bytes], decoder: BytesDecoder | None) -> list[Any]:
-    out: list[Any] = []
-    if decoder is None:
-        return out
-    for raw in raw_items:
-        try:
-            snap = decoder(raw)
-        except Exception:
-            continue
-        if snap is not None:
-            out.append(snap)
-    return out
-
-
-def _decode_command_fields(fields: dict[str, Any], *, axis_id: str) -> dict[str, Any]:
-    tick_ui_rx = to_int(fields.get("LifetickUIrx", "0"), 0)
-    resync = bool(to_bool_token(fields.get("ReSync", "False"), False))
-    return {
-        "tick_ui_rx": tick_ui_rx,
-        "vel": to_float(fields.get("SpeedSollIN", "0"), 0.0),
-        "enable": to_bool_token(fields.get("ControlIN", "False"), False),
-        "intent": bool(to_bool_token(fields.get("Intent", "True"), True)),
-        "resync": resync,
-        "gui_not_halt": bool(to_bool_token(fields.get("GUINotHaltIN", "False"), False)),
-        "estop_reset": to_bool_token(fields.get("EStopReset", "False"), False),
-        "core_mode": str(fields.get("CoreMode", "") or ""),
-        "lifetick_echo": {axis_id: tick_ui_rx},
-        "resync_by_axis": {axis_id: True} if resync else {},
-    }
-
-
-def _extract_param_ops(
-    fields: dict[str, Any], *, param_keymap: Any, param_write_op_type: Any
-) -> list[Any]:
-    param_ops: list[Any] = []
-    modus = str(fields.get("Modus", "") or "").strip().lower()
-    if modus != "w":
-        return param_ops
-    for group, values in extract_param_write_values(
-        fields,
-        group_defaults=PARAM_GROUP_DEFAULTS,
-        param_keymap=param_keymap,
-    ):
-        param_ops.append(param_write_op_type(group=group, values=values))
-    return param_ops
-
-
-def _encode_command_payload(frame: Any, *, encode_downlink: FrameEncoder) -> bytes:
-    axis_id = frame_axis_id(frame)
-    lifetick_ui_rx = frame_lifetick_ui_rx(frame, axis_id)
-    params = frame_param_map(frame)
-    return encode_downlink(
-        axis_id=axis_id,
-        frame=frame,
-        pid=str(os.getpid()),
-        lifetick_ui_rx=int(lifetick_ui_rx),
-        params=params or None,
-    )
-
-
 @dataclass
 class UdpPlcTelemetryIn:
     link: UdpLink
@@ -149,7 +61,7 @@ class UdpPlcTelemetryIn:
     def drain_telemetry(self, limit: int = 100) -> List[Any]:
         """Drain and decode PLC uplink telegrams into TelemetrySnapshot objects."""
         raw_items = list(self.link.poll(limit=limit))
-        return _iter_decoded_snapshots(raw_items, _load_uplink_decoder())
+        return iter_decoded_snapshots(raw_items, load_uplink_decoder())
 
 
 @dataclass
@@ -225,7 +137,7 @@ class UdpPlcCommandIn:
         - ControlIN is effectively a numeric enable/bitfield; we accept tolerant boolean parsing.
         """
         out: List[Any] = []
-        loaded = _load_downlink_decoder()
+        loaded = load_downlink_decoder()
         if loaded is None:
             return out
 
@@ -247,8 +159,8 @@ class UdpPlcCommandIn:
                 if not isinstance(fields, dict):
                     continue
 
-                decoded = _decode_command_fields(fields, axis_id=axis_id)
-                param_ops = _extract_param_ops(
+                decoded = decode_command_fields(fields, axis_id=axis_id)
+                param_ops = extract_param_ops(
                     fields,
                     param_keymap=param_keymap,
                     param_write_op_type=param_write_op_type,
@@ -295,13 +207,13 @@ class UdpPlcCommandOut:
 
     def publish_command_frame(self, frame: Any) -> None:
         """Encode a CommandFrame and send it as a PLC downlink telegram."""
-        encode_downlink = _load_downlink_encoder()
+        encode_downlink = load_downlink_encoder()
         if encode_downlink is None:
             self.publish_line(_stringify_payload(frame))
             return
 
         try:
-            payload = _encode_command_payload(frame, encode_downlink=encode_downlink)
+            payload = encode_command_payload(frame, encode_downlink=encode_downlink)
             self.link.send(payload)
         except Exception:
             self.publish_line(_stringify_payload(frame))
