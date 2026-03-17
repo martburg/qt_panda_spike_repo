@@ -8,6 +8,7 @@ from PySide6.QtCore import QObject, QTimer
 from PySide6.QtWidgets import QApplication
 
 from steuerung3d.core.intents import ReleaseAxis, ReleaseAxisLease
+from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.udp_channels import (
     UdpIntentOut as UdpIntentOut,
     UdpTelemetryIn as UdpTelemetryIn,
@@ -41,7 +42,7 @@ class SupervisorRuntime(QObject):
         self.engine = SupervisorEngine(profile)
         self._children: list[subprocess.Popen[str]] = []
         self._hip_children: dict[str, list[subprocess.Popen[str]]] = {}
-        self._merged_snapshot = None
+        self._merged_snapshot: TelemetrySnapshot | None = None
         self._axes_by_unit_id = {axis.unit_id: axis for axis in profile.axes}
 
         self._init_transports()
@@ -123,7 +124,9 @@ class SupervisorRuntime(QObject):
         if merged is self._merged_snapshot:
             return
         self._merged_snapshot = merged
-        self.engine.ingest(self._merged_snapshot)
+        if merged is None:
+            return
+        self.engine.ingest(merged)
 
     def _apply_window_snapshot(self) -> None:
         snapshot = self.engine.snapshot()

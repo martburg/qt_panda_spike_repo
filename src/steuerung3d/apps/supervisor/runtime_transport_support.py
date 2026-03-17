@@ -11,7 +11,7 @@ from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn, clos
 
 from .actions_transport import UdpDensiActionOut
 from .merge import merge_snapshots
-from .models import DensiRemoteAction, OutboundBatch, SupervisorProfile, SupervisorSnapshot
+from .models import DensiRemoteAction, OutboundBatch, SupervisorProfile
 
 log = logging.getLogger("supervisor")
 
@@ -45,8 +45,8 @@ def init_transports(
 
 
 def ingest_telemetry(
-    *, telemetry_in: _TelemetryInLike, merged_snapshot: SupervisorSnapshot
-) -> SupervisorSnapshot:
+    *, telemetry_in: _TelemetryInLike, merged_snapshot: TelemetrySnapshot | None
+) -> TelemetrySnapshot | None:
     snaps = telemetry_in.drain_telemetry(limit=50)
     if not snaps:
         return merged_snapshot
