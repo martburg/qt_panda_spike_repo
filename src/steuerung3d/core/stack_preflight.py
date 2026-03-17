@@ -5,7 +5,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Sequence
 
 try:
     import tomllib
@@ -185,7 +185,7 @@ def _kill_pid(pid: int) -> bool:
         return False
 
 
-def _config_paths_from_argv(argv: list[object]) -> list[Path]:
+def _config_paths_from_argv(argv: Sequence[object]) -> list[Path]:
     out: list[Path] = []
     for i, token in enumerate(argv[:-1]):
         if str(token).strip() != "--config":

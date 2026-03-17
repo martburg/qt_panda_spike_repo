@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import cast
 
 from steuerung3d.apps.yellow.runtimes.densi_runtime_status import build_densi_status_payload
+from steuerung3d.apps.yellow.runtimes.densi_runtime_types import DensiRuntimeStatusPayloadLike
 
 
 class _Axis:
@@ -37,7 +39,9 @@ def test_densi_birdseye_includes_debug_payload() -> None:
         ),
     )
 
-    payload = build_densi_status_payload(runtime=runtime, now_ns=2_000_000)
+    payload = build_densi_status_payload(
+        runtime=cast(DensiRuntimeStatusPayloadLike, runtime), now_ns=2_000_000
+    )
 
     assert payload.fields["axis"] == "Anton"
     assert payload.fields["cmd_enable"] is True

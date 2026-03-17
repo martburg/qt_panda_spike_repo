@@ -254,7 +254,7 @@ class HipQtBinder:
     # ------------------------------------------------------------------
 
     def _init_param_inputs(self) -> None:
-        _init_impl.init_param_inputs(self)
+        self._param_binder.init_param_inputs()
 
     def _find_button(self, object_name: str) -> QPushButton | None:
         return _init_impl.find_button(self, object_name)
@@ -263,7 +263,7 @@ class HipQtBinder:
         return _init_impl.find_line_edit(self, object_name)
 
     def _build_bindings(self) -> None:
-        _init_impl.build_bindings(self)
+        _init_impl._build_bindings(self)
 
     @staticmethod
     def _require_widget(widget: QWidget | None, object_name: str) -> QWidget:

@@ -268,9 +268,10 @@ class HiPController:
 
         if rt_result.view_model is None:
             return False
+        vm = rt_result.view_model
 
         def _apply_vm() -> None:
-            self._binder.apply(rt_result.view_model)
+            self._binder.apply(vm)
 
         def _on_apply_error() -> None:
             self._bump_soft_error("binder.apply")

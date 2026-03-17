@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping, Sequence
+from typing import Mapping, Sequence, cast
 
 from steuerung3d.core.intents import Intent
+from steuerung3d.core.joy_state import JoyState
 
 from .joy_projection import project_joy
 from .step_phase_motion_context import (
@@ -40,7 +41,7 @@ class HipMotionPhaseResult:
 
 
 def project_local_joy(*, joy: object, display_axis_id: str) -> HipJoyProjectionState:
-    joyp = project_joy(joy=joy, display_axis_id=str(display_axis_id or ""))
+    joyp = project_joy(joy=cast(JoyState | None, joy), display_axis_id=str(display_axis_id or ""))
     return HipJoyProjectionState(
         joy_deadman=bool(joyp.deadman),
         joy_select_hip=bool(joyp.select_hip),

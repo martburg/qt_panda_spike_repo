@@ -139,6 +139,7 @@ class MachineState:
 
     # --- joystick state (UI telemetry only; used in Stage 2) ---
     joy: JoyState = field(default_factory=JoyState)
+    control_mode: str = ""
 
     # --- core mode aggregation (Stage 2) ---
     core_mode: CoreMode = CoreMode.ESTOP

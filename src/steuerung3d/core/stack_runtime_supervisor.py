@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 import subprocess
 import time
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, cast
 
 from steuerung3d.ui.birdseye_format import (
+    BirdsEyeFields,
     birdseye_multiline_default,
     build_frederik_panel_lines,
     format_birds_eye,
@@ -76,14 +77,15 @@ def birds_eye_line(rt: "StackRuntime") -> str:
                 if isinstance(sm, dict):
                     level = str(sm.get("level", ""))
                     summary = str(sm.get("summary", ""))
-                    fields = sm.get("fields", {}) if isinstance(sm.get("fields", {}), dict) else {}
+                    raw_fields = sm.get("fields", {})
+                    fields = raw_fields if isinstance(raw_fields, dict) else {}
                 else:
                     level = str(getattr(sm, "level", ""))
                     summary = str(getattr(sm, "summary", ""))
                     fields = {}
                 parts.append(f"{rp.spec.name}: {level} {summary} ({age_ms}ms)")
                 if isinstance(fields, dict) and str(fields.get("component", "")) == "core":
-                    parts.extend(build_frederik_panel_lines(fields))
+                    parts.extend(build_frederik_panel_lines(cast(BirdsEyeFields, fields)))
             else:
                 t = rt.tailers.get(rp.spec.name)
                 if t:

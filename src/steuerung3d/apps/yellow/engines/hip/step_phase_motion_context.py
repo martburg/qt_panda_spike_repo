@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from steuerung3d.core.axis_selection import resolve_motion_axis_id
+from steuerung3d.core.telemetry import TelemetrySnapshot
 
 from .intent_policy import get_claim_owner
 
@@ -47,7 +48,7 @@ def resolve_axis_context(
     axis_in_scope = bool(motion_axis_id and motion_axis_id in axes)
     axis = axes.get(motion_axis_id) if axis_in_scope else None
     axis_fault = bool(getattr(axis, "fault", False)) if axis is not None else False
-    owner = get_claim_owner(snap, motion_axis_id) if motion_axis_id else ""
+    owner = get_claim_owner(cast(TelemetrySnapshot, snap), motion_axis_id) if motion_axis_id else ""
     owner_ok = owner == str(hip_id or "")
     return AxisContext(
         motion_axis_id=str(motion_axis_id or ""),

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import Path
 
-from .stack_spec import ServiceSpec, StackSpec
+from .stack_spec import FanoutMode, ServiceSpec, StackSpec
 
 
 def _as_dict(value: object) -> dict[str, object]:
@@ -23,6 +24,18 @@ def _as_env_dict(value: object) -> dict[str, str]:
     if not isinstance(value, Mapping):
         return {}
     return {str(k): str(v) for k, v in value.items()}
+
+
+def _as_fanout_mode(value: object) -> FanoutMode:
+    mode = str(value or "single").strip().lower()
+    return "per_axis" if mode == "per_axis" else "single"
+
+
+def _as_optional_str(value: object) -> str | None:
+    if value is None:
+        return None
+    s = str(value).strip()
+    return s or None
 
 
 def _normalize_den_si_args(
@@ -65,17 +78,19 @@ def services_from_table(services_tbl: Mapping[str, object]) -> dict[str, Service
         spec = ServiceSpec(
             enabled=bool(tbl.get("enabled", True)),
             module=module_s,
-            mode=str(tbl.get("mode", "single")),
+            mode=_as_fanout_mode(tbl.get("mode", "single")),
             count=tbl.get("count", None),
             args=raw_args,
-            config=tbl.get("config"),
+            config=_as_optional_str(tbl.get("config")),
             env=_as_env_dict(tbl.get("env")),
         )
         services[str(key)] = spec
     return services
 
 
-def stack_spec_from_data(*, data: dict[str, object], profile_path, base_dir) -> StackSpec:
+def stack_spec_from_data(
+    *, data: dict[str, object], profile_path: Path, base_dir: Path
+) -> StackSpec:
     stack_tbl = _as_dict(data.get("stack"))
     name = str(stack_tbl.get("name") or profile_path.stem)
 
@@ -102,6 +117,7 @@ def stack_spec_from_data(*, data: dict[str, object], profile_path, base_dir) -> 
     return StackSpec(
         name=name,
         base_dir=base_dir,
+        profile_path=profile_path,
         axes=[str(a) for a in axes],
         rig=rig_tbl,
         net=net_tbl,

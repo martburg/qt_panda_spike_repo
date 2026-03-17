@@ -19,7 +19,7 @@ def compute_hip_estop_vm(
     profile: object,
     prev_profile: str,
 ) -> HipEstopState:
-    active_keys = active_estop_keys_for_profile(profile, ESTOP_SPECS.keys())
+    active_keys = active_estop_keys_for_profile(str(profile), ESTOP_SPECS.keys())
     profile_changed = str(profile) != str(prev_profile or "")
 
     estop_dots = compute_estop_dot_states(

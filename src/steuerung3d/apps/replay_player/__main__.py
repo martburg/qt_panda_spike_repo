@@ -93,7 +93,7 @@ def _plant_integrate_x(state: MachineState, dt: float) -> None:
 
 
 def _telemetry_close(a: TelemetrySnapshot, b: TelemetrySnapshot, eps: float = 1e-9) -> bool:
-    if a.tick != b.tick or a.mode != b.mode or a.estop != b.estop or a.fault != b.fault:
+    if a.tick != b.tick or a.core_mode != b.core_mode or a.estop != b.estop or a.fault != b.fault:
         return False
     if set(a.axes.keys()) != set(b.axes.keys()):
         return False

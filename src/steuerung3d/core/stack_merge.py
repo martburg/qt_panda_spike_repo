@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 
 def deep_merge(base: dict, override: dict) -> dict:
@@ -33,7 +33,7 @@ def set_by_path(root: dict, dotted: str, value: Any) -> None:
     cur[parts[-1]] = value
 
 
-def apply_sets(data: dict, sets: Iterable[str], *, parse_value: callable) -> dict:
+def apply_sets(data: dict, sets: Iterable[str], *, parse_value: Callable[[str], Any]) -> dict:
     out = dict(data)
     for item in sets or []:
         if "=" not in item:

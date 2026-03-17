@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import argparse
 import logging
+from typing import cast
 
 from steuerung3d.core.status import StatusEmitter
 from steuerung3d.util.app_bootstrap import bootstrap_logging
 
 from .runtime_loop import run_core_udp_service
+from .runtime_loop_types import CoreUdpServiceArgs
 
 log = logging.getLogger("core_udp_service")
 
@@ -171,7 +173,7 @@ def main() -> int:
     #   ST3D_STATUS_OUT, ST3D_STACK_NAME, ST3D_SERVICE_NAME, ST3D_INSTANCE
     status = StatusEmitter.from_env(default_service="core")
 
-    return run_core_udp_service(args=args, status=status)
+    return run_core_udp_service(args=cast(CoreUdpServiceArgs, args), status=status)
 
 
 if __name__ == "__main__":

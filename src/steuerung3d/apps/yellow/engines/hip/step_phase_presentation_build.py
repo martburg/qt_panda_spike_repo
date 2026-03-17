@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from .step_phase_presentation_facts import DriveAndReadoutFacts, EstopFacts, TransportFacts
-from .types import HipPresentationData
+from .types import HipAttachCombo, HipPresentationData
 
 
 def build_presentation(
@@ -44,7 +44,7 @@ def build_presentation(
         readouts=drive_facts.readouts,
         cut_markers=drive_facts.cut_markers,
         attach_state=attach_state,
-        attach_combo=attach_combo,
+        attach_combo=cast(HipAttachCombo | None, attach_combo),
         param_ui=param_ui,
         param_values=dict(params or {}),
         param_freeze_group=str(getattr(param_result, "param_freeze_group", "") or ""),

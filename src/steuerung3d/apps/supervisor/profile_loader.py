@@ -14,10 +14,18 @@ def _as_bool(value: object, default: bool = False) -> bool:
 
 
 def _as_int(value: object, default: int) -> int:
-    try:
+    if isinstance(value, bool):
         return int(value)
-    except Exception:
-        return int(default)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except Exception:
+            return int(default)
+    return int(default)
 
 
 def _as_str(value: object, default: str = "") -> str:

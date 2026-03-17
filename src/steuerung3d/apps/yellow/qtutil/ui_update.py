@@ -63,8 +63,10 @@ class _SliderLike(Protocol):
     def blockSignals(self, block: bool) -> bool: ...
 
 
-def _repolish(widget: "QWidget" | _WidgetLike) -> None:
+def _repolish(widget: object) -> None:
     """Force QSS to re-evaluate dynamic properties on a widget."""
+    if not isinstance(widget, _WidgetLike):
+        return
     style = widget.style()
     style.unpolish(widget)
     style.polish(widget)
@@ -98,8 +100,10 @@ def blocked_signals(widget: object, *, enabled: bool = True) -> Iterator[None]:
                 pass
 
 
-def set_state_property(widget: "QWidget" | _WidgetLike, state: Any, prop: str = "state") -> None:
+def set_state_property(widget: object, state: Any, prop: str = "state") -> None:
     """Set a QSS-driving dynamic property and repolish (only if it changed)."""
+    if not isinstance(widget, _WidgetLike):
+        return
     try:
         if widget.property(prop) == state:
             return

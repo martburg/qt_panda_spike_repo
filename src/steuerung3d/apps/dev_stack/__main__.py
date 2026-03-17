@@ -105,10 +105,6 @@ def main() -> int:
     for aid in axis_ids:
         st.ensure_axis(aid)
 
-    def on_step(state: MachineState, dt: float) -> None:
-        # SIM plant stepping only truly matters for SimDevice; harmless otherwise
-        plant.step(state, dt)
-
     def on_snapshot(snap) -> None:
         transport.publish_telemetry(snap)
 

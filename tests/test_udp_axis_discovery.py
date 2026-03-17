@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, cast
+
 from steuerung3d.adapters.plc.udp_device import UdpPlcDevice
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
 from steuerung3d.core.state import MachineState
+
+if TYPE_CHECKING:
+    from steuerung3d.adapters.plc.udp_device import UdpPlcDevice as _UdpPlcDeviceType
 
 
 class FakeSock:
@@ -10,16 +15,17 @@ class FakeSock:
         self._rx = rx_bytes
         self.sent = []
 
-    def settimeout(self, _t: float) -> None:
+    def settimeout(self, value: float | None, /) -> None:
         return
 
-    def sendto(self, payload: bytes, remote):
-        self.sent.append((payload, remote))
+    def sendto(self, data: bytes, addr: tuple[str, int], /) -> int | None:
+        self.sent.append((data, addr))
+        return len(data)
 
-    def recvfrom(self, _n: int):
+    def recvfrom(self, bufsize: int, /) -> tuple[bytes, tuple[str, int]]:
         return self._rx, ("127.0.0.1", 55001)
 
-    def close(self):
+    def close(self) -> None:
         return
 
 
@@ -27,7 +33,7 @@ def test_udp_device_discovers_unknown_axis_from_telemetry():
     # Telemetry includes an axis not present in the outgoing CommandFrame ("Anton")
     telemetry = b"1;Anton;1;0.0;12.34;0;\n"
     dev = UdpPlcDevice(remote=("127.0.0.1", 55001))
-    dev._sock = FakeSock(telemetry)
+    dev._sock = cast("_UdpPlcDeviceType._SockLike", FakeSock(telemetry))
 
     st = MachineState()
     st.tick = 1

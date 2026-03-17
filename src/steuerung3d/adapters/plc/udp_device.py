@@ -28,22 +28,27 @@ class UdpPlcDevice:
     codec: PlcLineCodec = field(default_factory=lambda: PlcLineCodec())
 
     class _SockLike(Protocol):
-        def settimeout(self, value: float) -> None: ...  # pragma: no cover
+        def settimeout(self, value: float | None, /) -> None: ...  # pragma: no cover
 
-        def sendto(self, data: bytes, addr: Tuple[str, int]) -> int: ...  # pragma: no cover
+        def sendto(
+            self, data: bytes, addr: Tuple[str, int], /
+        ) -> int | None: ...  # pragma: no cover
 
-        def recvfrom(self, bufsize: int) -> tuple[bytes, tuple[str, int]]: ...  # pragma: no cover
+        def recvfrom(
+            self, bufsize: int, /
+        ) -> tuple[bytes, tuple[str, int]]: ...  # pragma: no cover
 
         def close(self) -> None: ...  # pragma: no cover
 
     _sock: Optional[_SockLike] = None
 
     def _ensure_sock(self) -> _SockLike:
-        if self._sock is None:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.settimeout(self.timeout_s)
-            self._sock = s
-        return self._sock
+        sock = self._sock
+        if sock is None:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.settimeout(self.timeout_s)
+            self._sock = sock
+        return sock
 
     def close(self) -> None:
         if self._sock is not None:

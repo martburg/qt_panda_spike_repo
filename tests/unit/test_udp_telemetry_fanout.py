@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import socket
 import time
+from typing import cast
 
 from steuerung3d.core.telemetry import TelemetrySnapshot
-from steuerung3d.protocol.udp_channels import UdpTelemetryFanout, UdpTelemetryIn, UdpTelemetryOut
+from steuerung3d.protocol.udp_channels import (
+    TelemetryOut,
+    UdpTelemetryFanout,
+    UdpTelemetryIn,
+    UdpTelemetryOut,
+)
 
 
 def _free_port() -> int:
@@ -58,8 +64,8 @@ def test_udp_telemetry_fanout_continues_on_failure() -> None:
     p1 = _free_port()
     rx1 = UdpTelemetryIn.bind(("127.0.0.1", p1))
 
-    outs = [UdpTelemetryOut.connect(("127.0.0.1", p1))]
-    outs.extend(_FailingOut() for _ in range(7))
+    outs: list[TelemetryOut] = [UdpTelemetryOut.connect(("127.0.0.1", p1))]
+    outs.extend(cast(TelemetryOut, _FailingOut()) for _ in range(7))
 
     fanout = UdpTelemetryFanout(outs=outs)
     snap = TelemetrySnapshot(tick=1, t_s=0.0, core_mode="IDLE", estop=False, fault=False, axes={})

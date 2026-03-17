@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Optional
 
 from steuerung3d.core.command_frame import CommandFrame
@@ -30,10 +30,10 @@ class MultiPlcDevice:
     endpoints: list[PlcEndpoint]
 
     # diagnostics
-    last_rx_tick_by_endpoint: Dict[str, Optional[int]] = None
+    last_rx_tick_by_endpoint: Dict[str, Optional[int]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if self.last_rx_tick_by_endpoint is None:
+        if not self.last_rx_tick_by_endpoint:
             self.last_rx_tick_by_endpoint = {e.name: None for e in self.endpoints}
 
     def step(self, state: MachineState, cmd: CommandFrame, dt: float) -> None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Sequence, cast
 
 from steuerung3d.core.net import parse_hostport
 from steuerung3d.core.status import StatusEmitter
@@ -47,7 +48,7 @@ def load_runtime(
         rig=JoyRig(winches=cfg.winches),
         bindings=JoyBindings(
             axes=cfg.axes,
-            buttons=cfg.buttons,
+            buttons=cast(dict[str, int | Sequence[int]], cfg.buttons),
             select_buttons=list(cfg.select_buttons or []),
             invert=cfg.invert,
             deadzone=cfg.deadzone,

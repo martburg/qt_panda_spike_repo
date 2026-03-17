@@ -259,7 +259,7 @@ def test_core_densi_param_write_roundtrip_plc():
         )
 
         # Wait for UI telemetry to reflect the written filter P under internal key 'P'.
-        got_p = {"v": None}
+        got_p: dict[str, float | None] = {"v": None}
 
         def _p_reflected():
             snaps = telem_in.drain_telemetry(limit=50)

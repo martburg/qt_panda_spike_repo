@@ -51,7 +51,7 @@ def _decode_action(payload: dict) -> DensiRemoteAction:
 
 
 def _encode_action(action: DensiRemoteAction) -> dict:
-    payload = {"type": "densi_remote_action", "action": str(action.action)}
+    payload: dict[str, object] = {"type": "densi_remote_action", "action": str(action.action)}
     if action.value is not None:
         payload["value"] = bool(action.value)
     return payload

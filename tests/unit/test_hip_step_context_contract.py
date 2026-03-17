@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import cast
 
 from steuerung3d.apps.yellow.engines.hip.step_context import build_step_context
-from steuerung3d.apps.yellow.engines.hip.types import HipStepInputs, HipUiInputs
+from steuerung3d.apps.yellow.engines.hip.types import (
+    HipStepContextEngineLike,
+    HipStepInputs,
+    HipUiInputs,
+)
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
 
@@ -64,7 +69,7 @@ def _inputs() -> HipStepInputs:
 def test_build_step_context_accepts_narrow_runtime_contract() -> None:
     runtime = _StubRuntime()
 
-    ctx = build_step_context(runtime=runtime, inputs=_inputs())
+    ctx = build_step_context(runtime=cast(HipStepContextEngineLike, runtime), inputs=_inputs())
 
     assert ctx.hip_id == "hip_anton"
     assert ctx.selected_axis == "Anton"

@@ -125,7 +125,7 @@ def test_core_hip_livetick_echo_roundtrip_plc():
         upl_bytes = upl.encode("utf-8", errors="replace")
 
         # Robust against core startup races: keep injecting uplink while waiting.
-        observed = {
+        observed: dict[str, int | str | float | None] = {
             "snap_tick": None,
             "axis_tick": None,
             "axis_key": None,

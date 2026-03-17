@@ -14,16 +14,15 @@ from .densi.types import EStopState, L0Sub, L0Top
 if TYPE_CHECKING:
     from .densi.engine import DenSiEngine
     from .densi.engine_types import DenSiTickResult
-    from .hip.engine import (
+    from .hip.engine import HipEngine, HipViewModel
+    from .hip.types import (
         HipAttachInputs,
         HipAttachState,
         HipBannerInputs,
-        HipEngine,
         HipParamCommitDialog,
         HipState,
         HipStepInputs,
         HipStepResult,
-        HipViewModel,
     )
 
 __all__ = [

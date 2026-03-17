@@ -24,6 +24,7 @@ from . import densi_qt_binder_support as _support
 if TYPE_CHECKING:
     from ..panels.densi.densi_banner_render import DenSiBannerBindings
     from ..panels.densi.densi_cut_markers_render import DenSiCutMarkersBindings
+    from ..panels.densi.densi_estop_checkboxes_render import DenSiEstopCheckboxBindings
     from ..panels.densi.densi_readouts_render import DenSiReadoutsBindings
     from ..qtutil.param_widget_binder import ParamWidgetBinder
     from ..qtutil.widget_cache import WidgetCache
@@ -36,7 +37,7 @@ class DenSiQtBinder:
     axis_ids: list[str]
 
     _ui_actions: DensiUiInputs = field(default_factory=DensiUiInputs)
-    _estop_cb_bindings: object | None = None
+    _estop_cb_bindings: DenSiEstopCheckboxBindings | None = None
     _wcache: WidgetCache = field(init=False)
     _param_binder: ParamWidgetBinder = field(init=False)
     _b_readouts: DenSiReadoutsBindings = field(init=False)

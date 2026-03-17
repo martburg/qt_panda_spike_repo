@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from steuerung3d.apps.yellow.engines.hip.engine import HipEngine, HipStepInputs, HipUiInputs
 from steuerung3d.core.intents import ClaimAxis, EnableAxis, JogAxis, JogWinch
 from steuerung3d.core.joy_state import JoyState
@@ -226,19 +228,15 @@ def test_soll_speed_repeat_is_throttled() -> None:
 
 
 def test_single_actionable_axis_fallback_selects_in_scope_axis() -> None:
-    class _AxisWithScope:
-        def __init__(self, *, in_scope: bool, fault: bool = False) -> None:
-            self.pos = 0.0
-            self.vel = 0.0
-            self.enabled = True
-            self.fault = fault
-            self.in_scope = in_scope
+    @dataclass(frozen=True)
+    class _AxisWithScope(AxisTelemetry):
+        in_scope: bool = False
 
     eng = HipEngine(hip_id="hip-test")
     joy = JoyState(deadman=True, select_hip=True, soll_speed=0.5, selected_axes=("Anton",))
     axes = {
-        "Anton": _AxisWithScope(in_scope=True, fault=False),
-        "Debby": _AxisWithScope(in_scope=False, fault=False),
+        "Anton": _AxisWithScope(pos=0.0, vel=0.0, enabled=True, fault=False, in_scope=True),
+        "Debby": _AxisWithScope(pos=0.0, vel=0.0, enabled=True, fault=False, in_scope=False),
     }
     densis = {
         "Anton": DensiTelemetry(

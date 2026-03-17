@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from steuerung3d.core.axis_selection import (
     joy_selected_for_axis,
@@ -10,6 +10,7 @@ from steuerung3d.core.axis_selection import (
 )
 from steuerung3d.core.joy_facts import extract_joy_facts
 from steuerung3d.core.joy_state import JoyState
+from steuerung3d.core.telemetry import TelemetrySnapshot
 
 from ..engines.hip.intent_policy import get_claim_owner
 from .runtime_kernel import compute_health, with_health_fields
@@ -97,7 +98,9 @@ def build_runtime_status_facts(
     joy_select_hip = joy_selected_for_axis(joy=joy, axis_id=axis)
     joy_soll_speed = joy_speed_for_axis(joy=joy, axis_id=axis)
 
-    owner = get_claim_owner(snap, axis) if (snap is not None and axis) else ""
+    owner = (
+        get_claim_owner(cast(TelemetrySnapshot, snap), axis) if (snap is not None and axis) else ""
+    )
     return HipRuntimeStatusFacts(
         axis=str(axis or ""),
         attached=bool(axis_sel.attached),

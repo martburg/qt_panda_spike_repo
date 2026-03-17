@@ -110,5 +110,11 @@ def merge_overrides(base: StackSpec, override: StackSpec) -> StackSpec:
     rig = dict(getattr(base, "rig", {}) or {})
     rig.update(getattr(override, "rig", {}) or {})
     return StackSpec(
-        name=name, base_dir=base.base_dir, axes=axes, rig=rig, net=net, services=services
+        name=name,
+        base_dir=base.base_dir,
+        profile_path=override.profile_path or base.profile_path,
+        axes=axes,
+        rig=rig,
+        net=net,
+        services=services,
     )

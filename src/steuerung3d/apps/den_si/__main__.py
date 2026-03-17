@@ -3,11 +3,13 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from typing import cast
 
 from PySide6.QtWidgets import QApplication
 
 from steuerung3d.apps.supervisor.actions_transport import UdpDensiActionIn
 from steuerung3d.apps.yellow.controllers.densi_controller import DenSiController
+from steuerung3d.apps.yellow.ports import TelemetryOut as YellowTelemetryOut
 from steuerung3d.apps.yellow.ui_shell import build_yellow_window
 from steuerung3d.core.net import parse_hostport
 
@@ -100,18 +102,21 @@ def main() -> int:
     ctl = DenSiController(
         win=win,
         command_in=command_in,
-        telemetry_out=telemetry_out,
+        telemetry_out=cast(YellowTelemetryOut, telemetry_out),
         axis_ids=axis_ids,
         dt_s=args.dt,
         action_in=action_in,
     )
     # Start controller (timer + IO loop)
-    if hasattr(ctl, "start"):
-        ctl.start()
-    elif hasattr(ctl, "run"):
-        ctl.run()
+    start = getattr(ctl, "start", None)
+    if callable(start):
+        start()
     else:
-        raise AttributeError(f"DenSiController has no start/run method: {type(ctl).__name__}")
+        run = getattr(ctl, "run", None)
+        if callable(run):
+            run()
+        else:
+            raise AttributeError(f"DenSiController has no start/run method: {type(ctl).__name__}")
 
     if not args.headless:
         win.show()

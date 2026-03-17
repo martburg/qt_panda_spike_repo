@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import cast
 
 from PySide6.QtCore import QFile, QTimer
 from PySide6.QtUiTools import QUiLoader
@@ -51,20 +52,25 @@ def parse_role(argv: list[str]) -> str:
 
 
 def _refit_window_height_only(win: QWidget) -> None:
-    w = win.window() or win
+    w_obj = win.window()
+    w = w_obj if isinstance(w_obj, QWidget) else win
     cw = getattr(w, "centralWidget", None)
     central = cw() if callable(cw) else None
     if isinstance(central, QWidget):
-        layout = central.layout()
-        if layout is not None:
-            layout.activate()
-        central.adjustSize()
+        layout_fn = getattr(central, "layout", None)
+        layout = layout_fn() if callable(layout_fn) else None
+        activate = getattr(layout, "activate", None)
+        if callable(activate):
+            activate()
+        adjust_size = getattr(central, "adjustSize", None)
+        if callable(adjust_size):
+            adjust_size()
 
     w.adjustSize()
     w.resize(w.width(), max(w.minimumSizeHint().height(), w.sizeHint().height()))
 
 
-def load_ui(path: Path):
+def load_ui(path: Path) -> QWidget:
     loader = QUiLoader()
     f = QFile(str(path))
     if not f.open(QFile.ReadOnly):
@@ -73,9 +79,9 @@ def load_ui(path: Path):
         w = loader.load(f, None)
     finally:
         f.close()
-    if w is None:
+    if not isinstance(w, QWidget):
         raise RuntimeError(f"QUiLoader failed to load: {path}")
-    return w
+    return cast(QWidget, w)
 
 
 def _pretty_name(obj_name: str) -> str:

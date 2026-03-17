@@ -50,6 +50,7 @@ class StackSpec:
 
     # Services by key (core, hip, densi, inputd, joy2intent, ...)
     services: Dict[str, ServiceSpec]
+    profile_path: Path | None = None
 
 
 @dataclass(frozen=True)

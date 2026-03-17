@@ -6,7 +6,7 @@ No semantic changes intended; this is a mechanical extraction from `engine.py`.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Mapping, Sequence
+from typing import TYPE_CHECKING, Mapping, Sequence, cast
 
 if TYPE_CHECKING:
     # Only needed for type checking; avoids runtime import cycles.
@@ -27,7 +27,14 @@ from .param_ui import ParamTxnResult, run_param_txn
 from .step_context import build_step_context
 from .step_phase_motion import HipJoyProjectionState, compute_motion_phase, project_local_joy
 from .step_phase_presentation import HipPresentationPhase, compute_presentation_phase
-from .types import HipAttachCombo, HipPresentationData, HipStepInputs, HipStepResult, HipUiInputs
+from .types import (
+    HipAttachCombo,
+    HipPresentationData,
+    HipStepContextEngineLike,
+    HipStepInputs,
+    HipStepResult,
+    HipUiInputs,
+)
 
 
 @dataclass(frozen=True)
@@ -64,7 +71,7 @@ class _CommandPhaseResult:
 
 
 def _build_step_state(*, engine: "HipEngine", inputs: HipStepInputs) -> _StepState:
-    ctx = build_step_context(runtime=engine, inputs=inputs)
+    ctx = build_step_context(runtime=cast(HipStepContextEngineLike, engine), inputs=inputs)
     snap = ctx.snap
     ui = ctx.ui
     axis_ids = ctx.axis_ids

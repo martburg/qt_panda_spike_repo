@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Callable, cast
 
 from steuerung3d.core.state import MachineState
 
@@ -56,7 +56,7 @@ def maybe_latch_cut_markers(
             systemtime_tok = now_token()
 
             try:
-                state.params["SystemTime"] = systemtime_tok
+                cast(dict[str, object], state.params)["SystemTime"] = systemtime_tok
             except Exception:
                 pass
 

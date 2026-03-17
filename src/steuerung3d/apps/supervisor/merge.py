@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
 
@@ -68,6 +69,6 @@ def merge_snapshots(
             param_commit_status=str(_latest_scalar(snap, latest, "param_commit_status", "idle")),
             param_commit_age_ticks=int(_latest_scalar(snap, latest, "param_commit_age_ticks", 0)),
             param_commit_unmatched=_latest_list(snap, latest, "param_commit_unmatched"),
-            joy=getattr(snap, "joy", getattr(latest, "joy", None)),
+            joy=getattr(snap, "joy", getattr(latest, "joy", None)) or JoyState(),
         )
     return latest

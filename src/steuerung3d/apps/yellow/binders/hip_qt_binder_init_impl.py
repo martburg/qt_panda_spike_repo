@@ -65,10 +65,16 @@ def wire_signals(self: "HipQtBinder") -> None:
         self._btn_estop_reset.clicked.connect(self._on_estop_reset_clicked)
     if self._btn_diag_resync is not None:
         self._btn_diag_resync.clicked.connect(self._on_resync_clicked)
-    if getattr(self, "_btn_main_reset", None) is not None:
-        self._btn_main_reset.clicked.connect(self._on_main_reset_clicked)
-    if getattr(self, "_btn_guider_reset", None) is not None:
-        self._btn_guider_reset.clicked.connect(self._on_guider_reset_clicked)
+    btn_main_reset = getattr(self, "_btn_main_reset", None)
+    if isinstance(btn_main_reset, QPushButton):
+        sig = getattr(btn_main_reset, "clicked", None)
+        if sig is not None:
+            sig.connect(self._on_main_reset_clicked)
+    btn_guider_reset = getattr(self, "_btn_guider_reset", None)
+    if isinstance(btn_guider_reset, QPushButton):
+        sig = getattr(btn_guider_reset, "clicked", None)
+        if sig is not None:
+            sig.connect(self._on_guider_reset_clicked)
     for grp, (b_edit, b_write, b_cancel) in {
         "pos": ("btnPosEdit", "btnPosWrite", "btnPosCancel"),
         "vel": ("btnVelEdit", "btnVelWrite", "btnVelCancel"),

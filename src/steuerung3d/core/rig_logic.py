@@ -70,7 +70,8 @@ def freeze_config(state: MachineState) -> None:
     for dev in participating:
         d = reg[dev]
         if d.anchor_xyz is not None:
-            anchors[dev] = tuple(float(x) for x in d.anchor_xyz)
+            x, y, z = d.anchor_xyz
+            anchors[dev] = (float(x), float(y), float(z))
     state.rig_sync_config = RigSyncConfig(
         participating=tuple(sorted(participating)), anchors=anchors
     )

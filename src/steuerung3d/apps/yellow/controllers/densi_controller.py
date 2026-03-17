@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtWidgets import QWidget
 
@@ -33,6 +34,9 @@ from ..qtutil.perf_watchdog import PerfWatchdog
 from ..runtimes.densi_runtime import DensiRuntime
 from .controller_utils import GuardedControllerOps, init_observability, start_poll_timer
 
+if TYPE_CHECKING:
+    from ..runtimes.densi_runtime_types import DensiActionInLike
+
 log = logging.getLogger("den_si")
 
 
@@ -46,7 +50,7 @@ class DenSiController:
     wire_proto: str = "json"  # json|plc
     dt_s: float = 0.01
     stale_after_ms: int = 500
-    action_in: object | None = None
+    action_in: "DensiActionInLike | None" = None
 
     def __post_init__(self) -> None:
         # Soft-error counters for swallowed exceptions (binder/UI)
@@ -68,7 +72,7 @@ class DenSiController:
             axis_ids=list(self.axis_ids),
             stale_after_ms=int(self.stale_after_ms),
             log=log,
-            action_in=self.action_in,
+            action_in=cast("DensiActionInLike | None", self.action_in),
         )
         self._wd = PerfWatchdog(log, name="den_si")
 

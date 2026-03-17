@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Iterable
+from typing import Iterable, cast
 
 from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.mode_aggregate_support import decision_from_eligible_axes, scan_axes
@@ -81,17 +81,18 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
         stale_after_ms=int(inputs.stale_after_ms),
         make_blocked_reason=BlockedReason,
     )
+    axis_blocked = cast(list[BlockedReason], list(axis_scan.blocked_by))
     if axis_scan.has_missing_or_stale and axis_scan.eligible_axes:
         return _finish_result(
             core_mode=CoreMode.FAULT,
-            blocked_by=list(axis_scan.blocked_by),
+            blocked_by=axis_blocked,
             axis_gate=axis_scan.axis_gate,
         )
 
     decision = decision_from_eligible_axes(
         eligible_axes=axis_scan.eligible_axes,
         axis_gate=axis_scan.axis_gate,
-        blocked_by=list(axis_scan.blocked_by),
+        blocked_by=cast(list[object], axis_blocked),
         joy_deadman=bool(inputs.joy_deadman),
         joy_select_hip=bool(inputs.joy_select_hip),
         joy_soll_speed=float(inputs.joy_soll_speed),
@@ -99,7 +100,7 @@ def aggregate_core_mode(inputs: AggregateInputs) -> AggregateResult:
     )
     return _finish_result(
         core_mode=decision.core_mode,
-        blocked_by=list(decision.blocked_by),
+        blocked_by=cast(list[BlockedReason], list(decision.blocked_by)),
         axis_gate=axis_scan.axis_gate,
         motion_allowed=decision.motion_allowed,
     )

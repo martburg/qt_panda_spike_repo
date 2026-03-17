@@ -6,7 +6,7 @@ from steuerung3d.apps.yellow.engines.hip.engine import HipEngine, HipStepInputs,
 from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.executor import build_command_frame
 from steuerung3d.core.intent_handler import apply_intent
-from steuerung3d.core.intents import EnableAxis, JogWinch, JoyStateUpdate, RequestAxisLease
+from steuerung3d.core.intents import EnableAxis, Intent, JogWinch, JoyStateUpdate, RequestAxisLease
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
@@ -68,7 +68,7 @@ def _step_engine(
     claimed_by: str,
     hip_id: str,
     vel_max: float = 1.0,
-) -> list[object]:
+) -> list[Intent]:
     eng = HipEngine(hip_id=hip_id)
     snap = _snap(axis_id, joy=joy, claimed_by=claimed_by, vel_max=vel_max)
     inputs = HipStepInputs(
@@ -89,7 +89,7 @@ def _step_engine(
     return list(result.intents or [])
 
 
-def _apply_intents(state: MachineState, intents: Iterable[object]) -> None:
+def _apply_intents(state: MachineState, intents: Iterable[Intent]) -> None:
     for intent in intents:
         apply_intent(state, intent)
 
