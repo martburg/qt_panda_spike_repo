@@ -45,7 +45,6 @@ def test_request_resync_denied_for_wrong_or_missing_owner() -> None:
     assert st.resync_req_by_axis == {}
 
     apply_intent(st, RequestResync(axis_id="", hip_id="hipA"))
-    assert st.resync_req is False
     assert st.resync_req_by_axis == {}
 
 

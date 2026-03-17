@@ -39,8 +39,6 @@ def publish_command_frames(
 
         resync_map = getattr(cmd_frame, "resync_by_axis", {}) or {}
         resync_axis = bool(resync_map.get(axis_id, False))
-        if not resync_axis and len(getattr(cmd_frame, "axes", {}) or {}) == 1:
-            resync_axis = bool(getattr(cmd_frame, "resync", False))
 
         frame_axis = CommandFrame(
             tick=cmd_frame.tick,

@@ -84,14 +84,12 @@ class MachineState:
     # high-level health/safety flags (v0.1)
     estop: bool = False
     fault: bool = False
-    estop_reset_req: bool = False  # legacy/global (single-axis)
-    # NEW: per-axis one-shot request (preferred for multi-axis)
+    # Per-axis one-shot request (canonical)
     estop_reset_req_by_axis: Dict[str, bool] = field(default_factory=dict)
     # Policy diagnostics: denied reset requests per axis
     estop_reset_denied_count_by_axis: Dict[str, int] = field(default_factory=dict)
 
-    # Legacy ReSync pulse (clears cut marker latches / recover flow)
-    resync_req: bool = False  # legacy/global (single-axis)
+    # ReSync pulse (clears cut marker latches / recover flow), per axis.
     resync_req_by_axis: Dict[str, bool] = field(default_factory=dict)
 
     # Main/guider amplifier reset pulses (one-shot), emitted via ControlIN/GuideControlUI bitfields
@@ -151,18 +149,14 @@ class MachineState:
     def clear_one_shots(self) -> None:
         """Clear one-shot request fields after they have been emitted once.
 
-        Semantic policy (2026-02-28):
-        - The per-axis maps (``*_by_axis``) are the canonical source of truth.
-        - The legacy global fields (``estop_reset_req``, ``resync_req``)
-          are maintained only for backward compatibility and are cleared here as well.
+        Semantic policy (2026-03-17):
+        - Reset/resync one-shots are per-axis only via ``*_by_axis`` maps.
         - Parameter ops are per-axis only; axis-less param intents are rejected at the boundary.
         """
 
         # Reset / resync pulses (one-shot)
-        self.estop_reset_req = False
         self.estop_reset_req_by_axis.clear()
 
-        self.resync_req = False
         self.resync_req_by_axis.clear()
 
         self.main_reset_req_by_axis.clear()

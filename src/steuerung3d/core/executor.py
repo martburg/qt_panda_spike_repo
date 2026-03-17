@@ -107,12 +107,13 @@ def _supervisor_manual_active_axes(state: MachineState, *, joy_deadman: bool) ->
 
 
 def _compute_resync_any(state: MachineState) -> bool:
-    """Return legacy/global resync pulse state.
+    """Return the legacy/global resync pulse.
 
-    Multi-axis code should prefer ``_compute_resync_by_axis``. The legacy
-    global field is kept for single-axis compatibility only.
+    Global resync has been removed from the supported state model. The field is
+    kept on ``CommandFrame`` only for backward wire compatibility and stays
+    false; axis-targeted resync is carried exclusively via ``resync_by_axis``.
     """
-    return bool(getattr(state, "resync_req", False))
+    return False
 
 
 def _compute_resync_by_axis(state: MachineState) -> dict[str, bool]:
@@ -121,19 +122,13 @@ def _compute_resync_by_axis(state: MachineState) -> dict[str, bool]:
 
 
 def _compute_estop_reset_any(state: MachineState) -> bool:
-    """Return whether any estop-reset pulse should be emitted this tick.
-
-    Canonical source is ``state.estop_reset_req_by_axis`` (per-axis, one-shot).
-    ``state.estop_reset_req`` is legacy/global and only kept for compatibility.
-    """
-    if bool(getattr(state, "estop_reset_req", False)):
-        return True
+    """Return whether any estop-reset pulse should be emitted this tick."""
     m = getattr(state, "estop_reset_req_by_axis", {})
     if isinstance(m, dict):
         try:
             return any(bool(v) for v in m.values())
         except Exception:
-            return bool(getattr(state, "estop_reset_req", False))
+            return False
     return False
 
 
@@ -243,7 +238,7 @@ def build_command_frame(state: MachineState) -> CommandFrame:
         core_mode=core_mode,
         axes=axes,
         estop_reset=_compute_estop_reset_any(state),  # pulse from HI-P intent (derived)
-        resync=resync_any,  # legacy ReSync pulse
+        resync=resync_any,  # legacy field kept false; use resync_by_axis
         param_ops=coerce_param_ops(_compute_param_ops_any(state)),
         lifetick_echo=lifetick_echo,
         resync_by_axis=_compute_resync_by_axis(state),

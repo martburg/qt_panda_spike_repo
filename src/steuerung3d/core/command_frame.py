@@ -107,9 +107,8 @@ class CommandFrame:
     # Keep defaults so existing callers/tests remain stable.
     # intent: controller "claim" bit (PLC expects "True"/"False" string)
     intent: bool = True
-    # resync: legacy ReSync signal (clears cut markers / recover flow)
-    # Keep for single-axis compatibility; multi-axis code should prefer
-    # resync_by_axis so the pulse stays target-scoped through routing.
+    # resync: legacy wire-compat field (kept false by current core logic).
+    # Axis-targeted resync pulses are carried via ``resync_by_axis``.
     resync: bool = False
     # gui_not_halt: legacy GUI Not-Halt input (placeholder until verified)
     gui_not_halt: bool = False

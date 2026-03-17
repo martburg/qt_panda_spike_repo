@@ -17,9 +17,7 @@ def compute_one_shots_by_axis(
         (estop_reset_by_axis, param_ops_by_axis)
 
     Notes:
-    - Multi-axis: use per-axis maps directly.
-    - Single-axis: still allows legacy estop-reset fallback, but parameter ops
-      are per-axis only.
+    - Reset and parameter one-shots are per-axis only.
     """
     multi_axis = len(axis_ids) > 1
     if multi_axis:
@@ -30,10 +28,7 @@ def compute_one_shots_by_axis(
 
     axis0 = axis_ids[0]
     estop_reset_by_axis = {
-        axis0: bool(
-            dict(getattr(state, "estop_reset_req_by_axis", {}) or {}).get(axis0, False)
-            or getattr(state, "estop_reset_req", False)
-        )
+        axis0: bool(dict(getattr(state, "estop_reset_req_by_axis", {}) or {}).get(axis0, False))
     }
     per_axis_ops = coerce_param_ops(
         dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).get(axis0, [])
