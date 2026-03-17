@@ -4,9 +4,12 @@ from steuerung3d.core.intents import JoyStateUpdate
 
 
 class _Rc:
-    def __init__(self, axes, pressed):
+    def __init__(self, axes: list[float], pressed: list[int]) -> None:
         self.axes = list(axes)
-        self.pressed = set(pressed)
+        self.buttons = [0] * 16
+        for idx in pressed:
+            if 0 <= idx < len(self.buttons):
+                self.buttons[idx] = 1
 
 
 def test_multi_select_publishes_selected_axes() -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 
 from steuerung3d.apps.core_udp_service.reporter import emit_birds_eye_status, log_periodic_heartbeat
 
@@ -20,7 +21,7 @@ class _Snap:
     fault: bool = False
     core_mode: str = ""
     estop_status_word: int = 0
-    densis: dict[str, object] | None = None
+    densis: Mapping[str, object] = field(default_factory=dict)
 
 
 class _State:
@@ -82,8 +83,7 @@ def test_log_periodic_heartbeat_smoke() -> None:
         def __init__(self) -> None:
             self.msgs: list[str] = []
 
-        def info(self, msg: str, *args) -> None:
-            # very small smoke check: formatting call works
+        def info(self, msg: str, *args: object) -> None:
             self.msgs.append(msg % args)
 
     log = _Log()

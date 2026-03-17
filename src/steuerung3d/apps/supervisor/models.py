@@ -159,7 +159,9 @@ class AxisRow:
         object.__setattr__(self, "phase", phase)
         object.__setattr__(self, "estop", bool(estop))
         object.__setattr__(self, "estop_word", int(estop_word))
-        object.__setattr__(self, "estop_dots", tuple((None if v is None else bool(v)) for v in estop_dots))
+        object.__setattr__(
+            self, "estop_dots", tuple((None if v is None else bool(v)) for v in estop_dots)
+        )
         object.__setattr__(self, "livetick", int(livetick))
         object.__setattr__(self, "livetick_diff", int(livetick_diff))
         object.__setattr__(self, "pos", float(pos))

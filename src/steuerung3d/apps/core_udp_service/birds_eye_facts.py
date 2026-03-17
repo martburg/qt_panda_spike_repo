@@ -2,18 +2,16 @@ from __future__ import annotations
 
 import time
 from collections.abc import Sequence
-from typing import cast
 
 from steuerung3d.core.core_mode import core_mode_value
 from steuerung3d.core.joy_facts import extract_joy_facts
-from steuerung3d.core.motion_gate import axis_local_motion_allowed
 
 from .birds_eye_types import (
     BirdsEyeAgeFacts,
+    BirdsEyeAxisDetailStateLike,
     BirdsEyeMotionFacts,
+    BirdsEyeRouterLike,
     BirdsEyeSnapLike,
-    BirdsEyeStateLike,
-    CommandFrameLike,
     LastIntentsMetaLike,
     LastSeenLike,
 )
@@ -41,7 +39,12 @@ def _as_str_list(value: object) -> list[str]:
         return []
     if not isinstance(value, Sequence):
         return []
-    return sorted([str(item) for item in value if str(item).strip()])
+    out: list[str] = []
+    for item in value:
+        text = str(item).strip()
+        if text:
+            out.append(text)
+    return sorted(out)
 
 
 def compute_age_facts(*, last_seen: LastSeenLike) -> BirdsEyeAgeFacts:
@@ -78,7 +81,7 @@ def compute_level(
     return level, estop_v, fault_v, mode_v
 
 
-def compute_reset_denied(*, state: BirdsEyeStateLike) -> tuple[dict[str, int], int]:
+def compute_reset_denied(*, state: BirdsEyeAxisDetailStateLike) -> tuple[dict[str, int], int]:
     reset_denied_by_axis = {
         str(axis_id): int(count)
         for axis_id, count in state.estop_reset_denied_count_by_axis.items()
@@ -88,11 +91,30 @@ def compute_reset_denied(*, state: BirdsEyeStateLike) -> tuple[dict[str, int], i
     return reset_denied_by_axis, reset_denied_total
 
 
+def _axis_local_motion_allowed(state: BirdsEyeAxisDetailStateLike, axis_id: str) -> bool:
+    gate = state.core_axis_gate.get(axis_id)
+    if gate is None:
+        return False
+
+    key_mode = str(gate.get("key_mode") or "").upper()
+    if key_mode not in ("", "KEY0"):
+        return False
+
+    return (
+        bool(gate.get("in_scope", False))
+        and not bool(gate.get("missing", False))
+        and not bool(gate.get("stale", False))
+        and not bool(gate.get("hard_estop_active", False))
+        and not bool(gate.get("fault_estop_active", False))
+        and bool(gate.get("ready", False))
+    )
+
+
 def build_motion_facts(
     *,
     snap: BirdsEyeSnapLike,
-    state: BirdsEyeStateLike,
-    router: object,
+    state: BirdsEyeAxisDetailStateLike,
+    router: BirdsEyeRouterLike | None,
     axis_ids: Sequence[str],
     last_intents_meta: LastIntentsMetaLike,
 ) -> BirdsEyeMotionFacts:
@@ -101,13 +123,12 @@ def build_motion_facts(
     reset_denied_by_axis, reset_denied_total = compute_reset_denied(state=state)
 
     try:
-        axes_snapshot, blocked_by, blocked_payload, cmd_frame_raw = build_blocked_and_axes_snapshot(
+        axes_snapshot, blocked_by, blocked_payload, cmd_frame = build_blocked_and_axes_snapshot(
             snap=snap,
             state=state,
             router=router,
             axis_ids=list(axis_ids),
         )
-        cmd_frame = cast(CommandFrameLike | None, cmd_frame_raw)
     except Exception:
         axes_snapshot = []
         blocked_by = []
@@ -133,7 +154,7 @@ def build_motion_facts(
     local_manual_axes = [
         axis_id
         for axis_id in selected_lanes
-        if axis_id in axis_ids and axis_local_motion_allowed(state, axis_id)
+        if axis_id in axis_ids and _axis_local_motion_allowed(state, axis_id)
     ]
 
     devices = sorted(str(k) for k in snap.densis.keys())

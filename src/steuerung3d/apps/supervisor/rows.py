@@ -10,8 +10,8 @@ from steuerung3d.core.telemetry_axis_view import axis_scoped_snapshot
 from steuerung3d.protocol.estop_bits import decode_estop_word
 
 from .models import AxisConfig, AxisRow
-from .row_estop_dots import SUPERVISOR_ESTOP_COLUMNS
 from .row_estate import estate_from_word
+from .row_estop_dots import SUPERVISOR_ESTOP_COLUMNS
 from .row_phase import is_live_motion, phase_from_facts
 from .row_staleness import axis_is_stale
 
@@ -103,7 +103,9 @@ def _build_axis_row_facts(
         estate=estate_from_word(estop_word),
         estop_word=estop_word,
         estop_dots=tuple(
-            None if (not has_estop_info or not column.key) else column.present(bool(bits.get(column.key, False)))
+            None
+            if (not has_estop_info or not column.key)
+            else column.present(bool(bits.get(column.key, False)))
             for column in SUPERVISOR_ESTOP_COLUMNS
         ),
         stale=axis_is_stale(

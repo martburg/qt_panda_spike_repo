@@ -9,16 +9,17 @@ def test_status_emitter_emit_every_accepts_empty_fields() -> None:
 
 
 from steuerung3d.apps.core_udp_service.reporter_birdseye import emit_birds_eye_status
+from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.state import MachineState
-from steuerung3d.core.telemetry import TelemetrySnapshot
+from steuerung3d.core.telemetry import DensiTelemetry, TelemetrySnapshot
 
 
 class _FakeStatus:
     def __init__(self) -> None:
-        self.calls = []
+        self.calls: list[dict[str, object]] = []
 
-    def emit_every(self, *, level="OK", summary="", fields=None) -> None:
+    def emit_every(self, *, level: str = "OK", summary: str = "", fields: dict[str, object] | None = None) -> None:
         self.calls.append({"level": level, "summary": summary, "fields": dict(fields or {})})
 
 
@@ -29,7 +30,7 @@ class _FakeRouter:
 def test_birds_eye_exposes_lane_selection_and_resolved_targets() -> None:
     status = _FakeStatus()
     state = MachineState()
-    state.core_mode = "LIVE"
+    state.core_mode = CoreMode.LIVE
     state.joy = JoyState(deadman=True, soll_speed=0.5, selected_axes=("Anton", "Debby"))
     state.axis_claims = {"Anton": "hip-1", "Debby": "hip-2"}
     state.ensure_axis("Anton")
@@ -46,7 +47,10 @@ def test_birds_eye_exposes_lane_selection_and_resolved_targets() -> None:
         estop=False,
         fault=False,
         axes={},
-        densis={"Anton": object(), "Debby": object()},
+        densis={
+            "Anton": DensiTelemetry(device_id="Anton", online=True),
+            "Debby": DensiTelemetry(device_id="Debby", online=True),
+        },
     )
 
     emit_birds_eye_status(
@@ -67,6 +71,7 @@ def test_birds_eye_exposes_lane_selection_and_resolved_targets() -> None:
 
     assert status.calls, "expected birds-eye emission"
     fields = status.calls[-1]["fields"]
+    assert isinstance(fields, dict)
     assert fields["deadman"] is True
     assert fields["selected_lanes"] == ["Anton", "Debby"]
     assert fields["attached_lanes"] == ["Anton:hip-1", "Debby:hip-2"]

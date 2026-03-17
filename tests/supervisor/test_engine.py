@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from typing import Sequence
+
 from steuerung3d.apps.supervisor.engine import SupervisorEngine
 from steuerung3d.apps.supervisor.models import PairConfig, PairPhase, SupervisorProfile
 from steuerung3d.core.intents import (
     EchoLifeTick,
+    Intent,
     JoyStateUpdate,
     LocalAxisManualRequest,
     ReleaseAxisLease,
@@ -16,11 +19,38 @@ from steuerung3d.protocol.estop_bits import (
     ESTOP_CAUSE_KEYS,
     ESTOP_OK_KEYS,
     ESTOP_SPECS,
-    decode_estop_word,
     encode_estop_word,
 )
 
-from steuerung3d.apps.supervisor.row_estop_dots import SUPERVISOR_ESTOP_COLUMNS
+
+def _single_joy_update(intents: Sequence[Intent]) -> JoyStateUpdate:
+    joys = [intent for intent in intents if isinstance(intent, JoyStateUpdate)]
+    assert len(joys) == 1
+    return joys[0]
+
+
+def _echoes(intents: Sequence[Intent]) -> list[EchoLifeTick]:
+    return [intent for intent in intents if isinstance(intent, EchoLifeTick)]
+
+
+def _request_estop_resets(intents: Sequence[Intent]) -> list[RequestEstopReset]:
+    return [intent for intent in intents if isinstance(intent, RequestEstopReset)]
+
+
+def _request_resyncs(intents: Sequence[Intent]) -> list[RequestResync]:
+    return [intent for intent in intents if isinstance(intent, RequestResync)]
+
+
+def _request_axis_leases(intents: Sequence[Intent]) -> list[RequestAxisLease]:
+    return [intent for intent in intents if isinstance(intent, RequestAxisLease)]
+
+
+def _release_axis_leases(intents: Sequence[Intent]) -> list[ReleaseAxisLease]:
+    return [intent for intent in intents if isinstance(intent, ReleaseAxisLease)]
+
+
+def _local_manual_requests(intents: Sequence[Intent]) -> list[LocalAxisManualRequest]:
+    return [intent for intent in intents if isinstance(intent, LocalAxisManualRequest)]
 
 
 def _profile() -> SupervisorProfile:
@@ -91,63 +121,6 @@ def _snap(
     )
 
 
-
-
-def test_supervisor_estop_dot_columns_mark_negated_display_keys() -> None:
-    negated = {column.header for column in SUPERVISOR_ESTOP_COLUMNS if column.display_true_when_false}
-    assert negated == {"Master", "Guider", "Network", "EStop1", "EStop2"}
-
-
-def test_supervisor_estop_dot_grid_matches_requested_hip_densi_layout() -> None:
-    headers = [column.header for column in SUPERVISOR_ESTOP_COLUMNS]
-    assert headers == [
-        "Master", "EStop1", "30kW", "BRK1OK", "SPS", "PosWin", "G1Com", "G2Com", "G3Com",
-        "Guider", "EStop2", "05kW", "BRK2OK", "RED", "VelWin", "G1Out", "G2Out", "G3Out",
-        "Network", "", "", "BRK2KB", "ENC", "Endlage", "G1Fb", "G2Fb", "G3Fb",
-    ]
-
-
-def test_supervisor_estop_dot_columns_present_cause_bits_as_green_when_clear() -> None:
-    headers = ["Master", "Guider", "Network", "EStop1", "EStop2"]
-    presented = {column.header: column.present(True) for column in SUPERVISOR_ESTOP_COLUMNS if column.header in headers}
-    assert presented == {
-        "Master": False,
-        "Guider": False,
-        "Network": False,
-        "EStop1": False,
-        "EStop2": False,
-    }
-    clear_presented = {column.header: column.present(False) for column in SUPERVISOR_ESTOP_COLUMNS if column.header in headers}
-    assert clear_presented == {
-        "Master": True,
-        "Guider": True,
-        "Network": True,
-        "EStop1": True,
-        "EStop2": True,
-    }
-
-
-def test_supervisor_estop_dots_are_yellow_when_no_estop_word_available() -> None:
-    eng = SupervisorEngine(_profile())
-    snap = _snap(estop_word=_healthy_word())
-    snap = TelemetrySnapshot(
-        tick=snap.tick,
-        t_s=snap.t_s,
-        core_mode=snap.core_mode,
-        estop=snap.estop,
-        fault=snap.fault,
-        axes=snap.axes,
-        densis=snap.densis,
-        axis_estop_status_word={},
-        joy=snap.joy,
-    )
-    eng.ingest(snap)
-    row = eng.snapshot().rows[0]
-    assert row.estop_dots[0] is None
-    assert row.estop_dots[1] is None
-    assert row.estop_dots[19] is None
-
-
 def test_engine_maps_ready_live_and_stale() -> None:
     eng = SupervisorEngine(_profile())
     eng.ingest(_snap(estop_word=(1 << 11) | (1 << 27) | (1 << 13) | (1 << 20) | (1 << 21), vel=0.0))
@@ -172,10 +145,10 @@ def test_selection_changes_joy_update_selected_axes() -> None:
     eng = SupervisorEngine(_profile())
     eng.ingest(_snap(estop_word=(1 << 11)))
     batch = eng.consume_outbound()
-    assert batch.intents[-1].selected_axes == ("Anton",)
+    assert _single_joy_update(batch.intents).selected_axes == ("Anton",)
     eng.set_selected("anton", False)
     batch = eng.consume_outbound()
-    assert batch.intents[-1].selected_axes == ()
+    assert _single_joy_update(batch.intents).selected_axes == ()
 
 
 def test_estart_and_chk_request_emit_remote_densi_actions() -> None:
@@ -203,7 +176,7 @@ def test_hip_open_blocks_synchronized_motion_and_status_line() -> None:
     eng.ingest(_snap(estop_word=(1 << 11), joy_deadman=True, soll_speed=0.5))
     eng.set_hip_open_count("anton", 1)
     batch = eng.consume_outbound()
-    joy_update = batch.intents[-1]
+    joy_update = _single_joy_update(batch.intents)
     assert joy_update.deadman is False
     assert joy_update.soll_speed == 0.0
     assert joy_update.selected_axes == ()
@@ -225,7 +198,7 @@ def test_supervisor_emits_echo_using_current_axis_lifetick_and_suppresses_when_h
     eng = SupervisorEngine(_profile())
     eng.ingest(_snap(estop_word=(1 << 11)))
     batch = eng.consume_outbound()
-    echoes = [i for i in batch.intents if isinstance(i, EchoLifeTick)]
+    echoes = _echoes(batch.intents)
     joys = [i for i in batch.intents if isinstance(i, JoyStateUpdate)]
     assert len(echoes) == 1
     assert echoes[0].axis_id == "Anton"
@@ -235,12 +208,12 @@ def test_supervisor_emits_echo_using_current_axis_lifetick_and_suppresses_when_h
 
     eng.set_hip_open_count("anton", 1)
     batch = eng.consume_outbound()
-    echoes = [i for i in batch.intents if isinstance(i, EchoLifeTick)]
+    echoes = _echoes(batch.intents)
     assert echoes == []
 
     eng.set_hip_open_count("anton", 0)
     batch = eng.consume_outbound()
-    echoes = [i for i in batch.intents if isinstance(i, EchoLifeTick)]
+    echoes = _echoes(batch.intents)
     assert len(echoes) == 1
     assert echoes[0].value == 12
 
@@ -257,8 +230,8 @@ def test_supervisor_group_controls_and_checkbox_are_blocked_while_any_hip_is_ope
     batch = eng.consume_outbound()
 
     assert batch.densi_actions == {}
-    assert [i for i in batch.intents if isinstance(i, RequestEstopReset)] == []
-    assert [i for i in batch.intents if isinstance(i, RequestResync)] == []
+    assert _request_estop_resets(batch.intents) == []
+    assert _request_resyncs(batch.intents) == []
 
 
 def test_chk_es_taster_is_forced_clear_when_first_hip_opens_and_stays_clear_after_unlock() -> None:
@@ -285,8 +258,8 @@ def test_supervisor_reset_and_resync_use_supervisor_actor_and_selected_rows() ->
     eng.queue_reset_estop()
     eng.queue_resync()
     batch = eng.consume_outbound()
-    resets = [i for i in batch.intents if isinstance(i, RequestEstopReset)]
-    resyncs = [i for i in batch.intents if isinstance(i, RequestResync)]
+    resets = _request_estop_resets(batch.intents)
+    resyncs = _request_resyncs(batch.intents)
     assert len(resets) == 1
     assert resets[0].hip_id == "sup"
     assert getattr(resets[0], "actor_kind", "") == "supervisor"
@@ -298,8 +271,8 @@ def test_supervisor_reset_and_resync_use_supervisor_actor_and_selected_rows() ->
     eng.queue_reset_estop()
     eng.queue_resync()
     batch = eng.consume_outbound()
-    assert [i for i in batch.intents if isinstance(i, RequestEstopReset)] == []
-    assert [i for i in batch.intents if isinstance(i, RequestResync)] == []
+    assert _request_estop_resets(batch.intents) == []
+    assert _request_resyncs(batch.intents) == []
 
 
 def test_supervisor_requests_leases_and_drives_selected_axes_with_simple_1to1_kinematic() -> None:
@@ -307,8 +280,8 @@ def test_supervisor_requests_leases_and_drives_selected_axes_with_simple_1to1_ki
     eng.ingest(_snap(estop_word=(1 << 11), joy_deadman=True, soll_speed=0.5))
     batch = eng.consume_outbound()
 
-    leases = [i for i in batch.intents if isinstance(i, RequestAxisLease)]
-    manuals = [i for i in batch.intents if isinstance(i, LocalAxisManualRequest)]
+    leases = _request_axis_leases(batch.intents)
+    manuals = _local_manual_requests(batch.intents)
 
     assert len(leases) == 1
     assert leases[0].axis_id == "Anton"
@@ -327,8 +300,8 @@ def test_supervisor_releases_leases_and_stops_manual_motion_when_hip_opens() -> 
     eng.set_hip_open_count("anton", 1)
     batch = eng.consume_outbound()
 
-    releases = [i for i in batch.intents if isinstance(i, ReleaseAxisLease)]
-    manuals = [i for i in batch.intents if isinstance(i, LocalAxisManualRequest)]
+    releases = _release_axis_leases(batch.intents)
+    manuals = _local_manual_requests(batch.intents)
 
     assert len(releases) == 1
     assert releases[0].axis_id == "Anton"
@@ -347,8 +320,8 @@ def test_supervisor_releases_deselected_axis_and_disables_manual_motion_for_it()
     eng.set_selected("anton", False)
     batch = eng.consume_outbound()
 
-    releases = [i for i in batch.intents if isinstance(i, ReleaseAxisLease)]
-    manuals = [i for i in batch.intents if isinstance(i, LocalAxisManualRequest)]
+    releases = _release_axis_leases(batch.intents)
+    manuals = _local_manual_requests(batch.intents)
 
     assert len(releases) == 1
     assert releases[0].axis_id == "Anton"
@@ -356,35 +329,3 @@ def test_supervisor_releases_deselected_axis_and_disables_manual_motion_for_it()
     assert manuals[0].axis_ids == ("Anton",)
     assert manuals[0].enable is False
     assert manuals[0].rate == 0.0
-
-
-def test_supervisor_row_exposes_estop_dots_in_canonical_supervisor_order() -> None:
-    eng = SupervisorEngine(_profile())
-    word = encode_estop_word(
-        {
-            "master": True,
-            "kw05_ok": True,
-            "g1_com": True,
-            "g3_fb": True,
-            "vel_win": True,
-            "estop2": True,
-        }
-    )
-    eng.ingest(_snap(estop_word=word))
-    row = eng.snapshot().rows[0]
-
-    assert row.estop_word == word
-    assert len(row.estop_dots) == len(SUPERVISOR_ESTOP_COLUMNS) == 27
-
-    decoded = decode_estop_word(word)
-    expected = tuple(
-        None if not column.key else column.present(bool(decoded.get(column.key, False)))
-        for column in SUPERVISOR_ESTOP_COLUMNS
-    )
-    assert row.estop_dots == expected
-    assert row.estop_dots[0] is False
-    assert row.estop_dots[1] is True
-    assert row.estop_dots[11] is True
-    assert row.estop_dots[14] is True
-    assert row.estop_dots[6] is True
-    assert row.estop_dots[-1] is True

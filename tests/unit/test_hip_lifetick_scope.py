@@ -1,7 +1,16 @@
 from __future__ import annotations
 
+from typing import Sequence
+
 from steuerung3d.apps.yellow.engines.hip.engine import HipEngine
+from steuerung3d.core.intents import EchoLifeTick, Intent
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
+
+
+def _single_echo(intents: Sequence[Intent]) -> EchoLifeTick:
+    echoes = [intent for intent in intents if isinstance(intent, EchoLifeTick)]
+    assert len(echoes) == 1
+    return echoes[0]
 
 
 def _snap() -> TelemetrySnapshot:
@@ -25,9 +34,9 @@ def test_hip_echoes_only_selected_axis() -> None:
         selected_axis="Anton",
         last_lifetick_echo_sent={},
     )
-    assert len(intents) == 1
-    assert intents[0].axis_id == "Anton"
-    assert intents[0].value == 101
+    echo = _single_echo(intents)
+    assert echo.axis_id == "Anton"
+    assert echo.value == 101
     assert echo_map == {"Anton": 101}
 
 

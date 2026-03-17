@@ -6,13 +6,22 @@ from typing import Protocol, TypedDict
 
 
 class CommandAxisLike(Protocol):
-    vel: float
+    @property
+    def vel(self) -> float: ...
+
+    @property
+    def enable(self) -> bool: ...
 
 
 class CommandFrameLike(Protocol):
-    axes: Mapping[str, CommandAxisLike]
-    estop_reset: bool
-    resync: bool
+    @property
+    def axes(self) -> Mapping[str, CommandAxisLike]: ...
+
+    @property
+    def estop_reset(self) -> bool: ...
+
+    @property
+    def resync(self) -> bool: ...
 
 
 class BirdsEyeStatusLike(Protocol):
@@ -20,36 +29,79 @@ class BirdsEyeStatusLike(Protocol):
 
 
 class BirdsEyeJoyLike(Protocol):
-    selected_axes: Sequence[str]
+    @property
+    def selected_axes(self) -> Sequence[str]: ...
 
 
 class BirdsEyeStateLike(Protocol):
-    joy: BirdsEyeJoyLike | None
-    axis_claims: Mapping[str, str]
-    estop_reset_denied_count_by_axis: Mapping[str, int]
-    core_motion_allowed: bool
-    core_axis_gate: Mapping[str, Mapping[str, object]]
+    @property
+    def joy(self) -> BirdsEyeJoyLike | None: ...
+
+    @property
+    def axis_claims(self) -> Mapping[str, str]: ...
+
+    @property
+    def estop_reset_denied_count_by_axis(self) -> Mapping[str, int]: ...
+
+    @property
+    def core_motion_allowed(self) -> bool: ...
+
+    @property
+    def core_axis_gate(self) -> Mapping[str, Mapping[str, object]]: ...
+
+
+class BirdsEyeAxisDetailStateLike(BirdsEyeStateLike, Protocol):
+    @property
+    def core_blocked_by(self) -> Sequence[object]: ...
+
+    @property
+    def axis_cmd(self) -> Mapping[str, object]: ...
+
+    @property
+    def lease_axis_holders(self) -> Mapping[str, Sequence[str]]: ...
+
+    @property
+    def fault(self) -> bool: ...
+
+    def claim_owner(self, axis_id: str) -> str | None: ...
 
 
 class BirdsEyeSnapLike(Protocol):
-    estop: bool
-    fault: bool
-    core_mode: str
-    tick: int
-    densis: Mapping[str, object]
+    @property
+    def estop(self) -> bool: ...
+
+    @property
+    def fault(self) -> bool: ...
+
+    @property
+    def core_mode(self) -> str: ...
+
+    @property
+    def tick(self) -> int: ...
+
+    @property
+    def densis(self) -> Mapping[str, object]: ...
+
+    @property
+    def estop_status_word(self) -> int: ...
+
+
+class BirdsEyeRouterLike(Protocol):
+    @property
+    def last_dev_estop_word_by_axis(self) -> Mapping[str, int]: ...
 
 
 class LastSeenLike(TypedDict, total=False):
-    intent_ts: float
-    dev_telem_ts: float
-    cmd_ts: float
-    ui_telem_ts: float
-    c2_telem_ts: float
+    intent_ts: float | None
+    dev_telem_ts: float | None
+    cmd_ts: float | None
+    ui_telem_ts: float | None
+    c2_telem_ts: float | None
 
 
 class LastIntentsMetaLike(TypedDict, total=False):
     count: int
-    types: list[str]
+    types: Sequence[str]
 
 
 @dataclass(frozen=True)

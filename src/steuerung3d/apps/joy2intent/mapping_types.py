@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
 class _JoyBindingsLike(Protocol):
@@ -32,18 +32,34 @@ class _JoyLimitsLike(Protocol):
     def max_speed(self) -> float: ...
 
 
+@runtime_checkable
 class _IndexedJoyStateLike(Protocol):
-    prev_deadman: bool
-    deadman_prev: bool
-    prev_active_winch_idxs: set[int]
-    enabled_winch_ids: set[str]
+    @property
+    def prev_deadman(self) -> bool: ...
+
+    @prev_deadman.setter
+    def prev_deadman(self, value: bool) -> None: ...
+
+    @property
+    def prev_active_winch_idxs(self) -> set[int]: ...
+
+    @prev_active_winch_idxs.setter
+    def prev_active_winch_idxs(self, value: set[int]) -> None: ...
 
 
+@runtime_checkable
 class _NamedJoyStateLike(Protocol):
-    prev_deadman: bool
-    deadman_prev: bool
-    prev_active_winch_idxs: set[int]
-    enabled_winch_ids: set[str]
+    @property
+    def deadman_prev(self) -> bool: ...
+
+    @deadman_prev.setter
+    def deadman_prev(self, value: bool) -> None: ...
+
+    @property
+    def enabled_winch_ids(self) -> set[str]: ...
+
+    @enabled_winch_ids.setter
+    def enabled_winch_ids(self, value: set[str]) -> None: ...
 
 
 _JoyStateLike = _IndexedJoyStateLike | _NamedJoyStateLike

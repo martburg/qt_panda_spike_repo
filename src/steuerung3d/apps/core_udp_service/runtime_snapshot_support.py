@@ -4,13 +4,56 @@ import logging
 import time
 from typing import Any
 
-from steuerung3d.core.control_context import ControlContext
+from steuerung3d.core.control_context import (
+    ControlContext,
+    ControlContextInputMapping,
+    ControlContextMode,
+)
 from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.axis_router import AxisRouter
 from steuerung3d.util.heartbeat import ChangeTracker
 
+from .birds_eye_types import LastIntentsMetaLike, LastSeenLike
 from .reporter import emit_birds_eye_status
+
+
+def _coerce_control_mode(raw: object) -> ControlContextMode:
+    mode = str(raw or "")
+    if mode == "sync_kinematic_jog":
+        return "sync_kinematic_jog"
+    if mode == "goto_pose":
+        return "goto_pose"
+    if mode == "follow_path":
+        return "follow_path"
+    return "independent_axes"
+
+
+def _input_mapping_for_mode(mode: ControlContextMode) -> ControlContextInputMapping:
+    if mode == "sync_kinematic_jog":
+        return "cartesian_xyz"
+    if mode == "goto_pose":
+        return "pose_speed"
+    if mode == "follow_path":
+        return "path_speed_trim"
+    return "axis_rate"
+
+
+def _coerce_last_intents_meta(raw: dict[str, Any]) -> LastIntentsMetaLike:
+    raw_types = raw.get("types", [])
+    types = [str(item) for item in raw_types] if isinstance(raw_types, (list, tuple)) else []
+    return {
+        "count": int(raw.get("count", 0) or 0),
+        "types": types,
+    }
+
+
+def _coerce_last_seen(raw: dict[str, Any]) -> LastSeenLike:
+    out: LastSeenLike = {}
+    for key in ("intent_ts", "dev_telem_ts", "cmd_ts", "ui_telem_ts", "c2_telem_ts"):
+        value = raw.get(key)
+        out[key] = None if value is None else float(value)
+    return out
 
 
 def log_state_changes(
@@ -117,19 +160,12 @@ def publish_control_context(
     context_seq: int,
 ) -> int:
     next_seq = context_seq + 1
-    mode = str(getattr(state, "control_mode", "") or "independent_axes")
-    input_mapping = {
-        "independent_axes": "axis_rate",
-        "sync_kinematic_jog": "cartesian_xyz",
-        "goto_pose": "pose_speed",
-        "follow_path": "path_speed_trim",
-    }.get(mode, "axis_rate")
+    mode = _coerce_control_mode(getattr(state, "control_mode", ""))
+    input_mapping = _input_mapping_for_mode(mode)
     control_context_out.publish_control_context(
         ControlContext(
             seq=int(next_seq),
-            mode=mode
-            if mode in {"independent_axes", "sync_kinematic_jog", "goto_pose", "follow_path"}
-            else "independent_axes",
+            mode=mode,
             selected_target_kind="axis",
             input_mapping=input_mapping,
             motion_enabled=True,
@@ -154,6 +190,6 @@ def emit_birds_eye(
         state=state,
         router=router,
         axis_ids=axis_ids,
-        last_intents_meta=last_intents_meta,
-        last_seen=last_seen,
+        last_intents_meta=_coerce_last_intents_meta(last_intents_meta),
+        last_seen=_coerce_last_seen(last_seen),
     )

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from .birds_eye_types import (
     BirdsEyeAgeFacts,
+    BirdsEyeAxisDetailStateLike,
     BirdsEyeMotionFacts,
     BirdsEyeSnapLike,
-    BirdsEyeStateLike,
     LastIntentsMetaLike,
 )
 
@@ -12,7 +12,7 @@ from .birds_eye_types import (
 def build_summary(
     *,
     mode_v: str,
-    state: BirdsEyeStateLike,
+    state: BirdsEyeAxisDetailStateLike,
     motion_facts: BirdsEyeMotionFacts,
     last_intents_meta: LastIntentsMetaLike,
 ) -> str:
@@ -37,7 +37,7 @@ def _age_ms(age: float | None) -> float | None:
 def build_fields(
     *,
     snap: BirdsEyeSnapLike,
-    state: BirdsEyeStateLike,
+    state: BirdsEyeAxisDetailStateLike,
     mode_v: str,
     estop_v: bool,
     fault_v: bool,

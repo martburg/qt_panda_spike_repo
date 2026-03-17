@@ -20,7 +20,6 @@ from PySide6.QtWidgets import (
 from ..models import AxisRow, SupervisorSnapshot
 from ..row_estop_dots import ESTOP_GRID_COLUMNS, ESTOP_GRID_ROWS, SUPERVISOR_ESTOP_COLUMNS
 
-
 DISPLAY_SLIDER_MAX = 1000
 DISPLAY_SLIDER_CENTER = DISPLAY_SLIDER_MAX // 2
 DOT_SIZE_PX = 8
@@ -65,6 +64,7 @@ class _TooltipDot(QFrame):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
 
 class SupervisorWindow(QMainWindow):
     reset_estop_clicked = Signal()
@@ -272,7 +272,7 @@ class SupervisorWindow(QMainWindow):
                 cell_layout.addWidget(dot_wrap)
                 grid.addWidget(cell, row, col)
                 cells.append(dot)
-        setattr(container, "_cells", cells)
+        container._cells = cells
         return container
 
     @staticmethod
@@ -314,8 +314,8 @@ class SupervisorWindow(QMainWindow):
         slider.setEnabled(False)
         layout.addWidget(label)
         layout.addWidget(slider)
-        setattr(container, "_value_label", label)
-        setattr(container, "_value_slider", slider)
+        container._value_label = label
+        container._value_slider = slider
         return container
 
     @staticmethod

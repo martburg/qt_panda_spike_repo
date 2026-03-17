@@ -5,8 +5,9 @@ from collections.abc import Sequence
 from .birds_eye_facts import build_motion_facts, compute_age_facts, compute_level
 from .birds_eye_fields import build_fields, build_summary
 from .birds_eye_types import (
+    BirdsEyeAxisDetailStateLike,
+    BirdsEyeRouterLike,
     BirdsEyeSnapLike,
-    BirdsEyeStateLike,
     BirdsEyeStatusLike,
     LastIntentsMetaLike,
     LastSeenLike,
@@ -17,8 +18,8 @@ def emit_birds_eye_status(
     *,
     status: BirdsEyeStatusLike | None,
     snap: BirdsEyeSnapLike,
-    state: BirdsEyeStateLike,
-    router: object,
+    state: BirdsEyeAxisDetailStateLike,
+    router: BirdsEyeRouterLike | None,
     axis_ids: Sequence[str],
     last_intents_meta: LastIntentsMetaLike,
     last_seen: LastSeenLike,

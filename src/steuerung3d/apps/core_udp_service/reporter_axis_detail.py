@@ -1,53 +1,46 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Protocol
+from dataclasses import dataclass
 
 from steuerung3d.apps.yellow.domain.banner_facts import derive_banner_estate_from_word
 from steuerung3d.core.executor import build_command_frame
+from steuerung3d.core.state import MachineState
 from steuerung3d.protocol.estop_bits import decode_estop_word
 
-
-class _BlockedItemLike(Protocol):
-    code: object
-    axis_id: object
-    detail: object
-
-
-class _StateLike(Protocol):
-    core_blocked_by: Sequence[object]
-    axis_cmd: Mapping[str, object]
-    core_axis_gate: Mapping[str, Mapping[str, object]]
-    lease_axis_holders: Mapping[str, Sequence[str]]
-    fault: bool
-
-    def claim_owner(self, axis_id: str) -> str | None: ...
+from .birds_eye_types import (
+    BirdsEyeAxisDetailStateLike,
+    BirdsEyeRouterLike,
+    BirdsEyeSnapLike,
+    CommandFrameLike,
+)
 
 
-class _RouterLike(Protocol):
-    last_dev_estop_word_by_axis: Mapping[str, int]
+@dataclass(frozen=True)
+class _StaticAxisCommandOut:
+    enable: bool = False
+    vel: float = 0.0
 
 
-class _AxisCommandOutLike(Protocol):
-    enable: bool
-    vel: float
-
-
-class _CommandFrameLike(Protocol):
-    axes: Mapping[str, _AxisCommandOutLike]
-
-
-class _SnapLike(Protocol):
-    estop_status_word: int
+@dataclass(frozen=True)
+class _StaticCommandFrame:
+    axes: Mapping[str, _StaticAxisCommandOut]
+    estop_reset: bool = False
+    resync: bool = False
 
 
 def _as_mapping(value: object) -> dict[str, object]:
     if not isinstance(value, Mapping):
         return {}
-    return {str(key): item for key, item in value.items()}
+    result: dict[str, object] = {}
+    for key, item in value.items():
+        result[str(key)] = item
+    return result
 
 
-def _build_blocked_payload(state: _StateLike) -> tuple[list[str], list[dict[str, object]]]:
+def _build_blocked_payload(
+    state: BirdsEyeAxisDetailStateLike,
+) -> tuple[list[str], list[dict[str, object]]]:
     blocked_by: list[str] = []
     blocked_payload: list[dict[str, object]] = []
     core_blocked = list(state.core_blocked_by or [])
@@ -61,22 +54,22 @@ def _build_blocked_payload(state: _StateLike) -> tuple[list[str], list[dict[str,
 
 
 def _decode_estop_state(
-    *, router: _RouterLike, snap: _SnapLike, axis_id: str
+    *, router: BirdsEyeRouterLike | None, snap: BirdsEyeSnapLike, axis_id: str
 ) -> tuple[dict[str, object], str]:
-    estop_word = int(
-        router.last_dev_estop_word_by_axis.get(
-            axis_id, int(getattr(snap, "estop_status_word", 0)) or 0
-        )
+    last_dev_estop_word_by_axis = (
+        router.last_dev_estop_word_by_axis if router is not None else {}
     )
+    estop_word = int(last_dev_estop_word_by_axis.get(axis_id, int(snap.estop_status_word)) or 0)
     try:
         bits = decode_estop_word(estop_word)
         estate = derive_banner_estate_from_word(estop_word, within_brake_grace=lambda: False)
-        return bits, estate
+        typed_bits: dict[str, object] = {str(key): value for key, value in bits.items()}
+        return typed_bits, estate
     except Exception:
         return {}, ""
 
 
-def _resolve_axis_owner(*, state: _StateLike, axis_id: str) -> str:
+def _resolve_axis_owner(*, state: BirdsEyeAxisDetailStateLike, axis_id: str) -> str:
     owner = str(state.claim_owner(axis_id) or "")
     if owner:
         return owner
@@ -84,12 +77,32 @@ def _resolve_axis_owner(*, state: _StateLike, axis_id: str) -> str:
     return str(holders[0]) if holders else ""
 
 
+def _build_command_frame_for_birdseye(state: BirdsEyeAxisDetailStateLike) -> CommandFrameLike:
+    if isinstance(state, MachineState):
+        return build_command_frame(state)
+
+    axes: dict[str, _StaticAxisCommandOut] = {}
+    for axis_id, cmd in state.axis_cmd.items():
+        axis_name = str(axis_id).strip()
+        if not axis_name:
+            continue
+        try:
+            vel = float(getattr(cmd, "vel", 0.0) or 0.0)
+        except Exception:
+            vel = 0.0
+        axes[axis_name] = _StaticAxisCommandOut(
+            enable=bool(getattr(cmd, "enable", False)),
+            vel=vel,
+        )
+    return _StaticCommandFrame(axes=axes)
+
+
 def _build_axis_snapshot_entry(
     *,
     axis_id: str,
-    snap: _SnapLike,
-    state: _StateLike,
-    router: _RouterLike,
+    snap: BirdsEyeSnapLike,
+    state: BirdsEyeAxisDetailStateLike,
+    router: BirdsEyeRouterLike | None,
     cmd_axes: Mapping[str, object],
     axis_cmd: Mapping[str, object],
     axis_gate: Mapping[str, object],
@@ -120,7 +133,7 @@ def _build_axis_snapshot_entry(
     owner = _resolve_axis_owner(state=state, axis_id=axis_id)
     reset_allowed = bool(owner) and bool(bits.get("reset_able", False))
     estop_axis = estate_upper == "ESTOP"
-    fault_axis = bool(getattr(state, "fault", False))
+    fault_axis = bool(state.fault)
 
     gate = dict(_as_mapping(axis_gate.get(axis_id, {})))
     gate_estop = gate.get("hard_estop_active")
@@ -159,14 +172,14 @@ def _build_axis_snapshot_entry(
 
 def build_blocked_and_axes_snapshot(
     *,
-    snap: _SnapLike,
-    state: _StateLike,
-    router: _RouterLike,
+    snap: BirdsEyeSnapLike,
+    state: BirdsEyeAxisDetailStateLike,
+    router: BirdsEyeRouterLike | None,
     axis_ids: list[str],
-) -> tuple[list[dict[str, object]], list[str], list[dict[str, object]], _CommandFrameLike]:
+) -> tuple[list[dict[str, object]], list[str], list[dict[str, object]], CommandFrameLike]:
     """Build per-axis status + blocked-by summary for birds-eye reporting."""
-    cmd_frame = build_command_frame(state)
-    cmd_axes = _as_mapping(getattr(cmd_frame, "axes", {}))
+    cmd_frame = _build_command_frame_for_birdseye(state)
+    cmd_axes = _as_mapping(cmd_frame.axes)
     blocked_by, blocked_payload = _build_blocked_payload(state)
     axis_cmd = _as_mapping(state.axis_cmd)
     axis_gate = _as_mapping(state.core_axis_gate)

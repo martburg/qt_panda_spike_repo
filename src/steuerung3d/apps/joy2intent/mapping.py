@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Protocol
 
 from steuerung3d.core.control_context import ControlContext
 
@@ -34,6 +33,7 @@ from .mapping_helpers import (
     previous_activity,
     update_state_active_selection,
 )
+from .mapping_types import _JoyReportLike as JoyReportLike, _JoyStateLike as JoyStateLike
 
 
 @dataclass(frozen=True)
@@ -75,19 +75,6 @@ class JoyRig:
 
     def ordered_winch_ids(self) -> list[str]:
         return self.winches if self.winches else self.winch_ids
-
-
-class JoyStateLike(Protocol):
-    prev_deadman: bool
-    prev_active_winch_idxs: set[int]
-
-
-class JoyReportLike(Protocol):
-    @property
-    def axes(self) -> Sequence[float]: ...
-
-    @property
-    def buttons(self) -> Sequence[int]: ...
 
 
 def synthesize_intents(
