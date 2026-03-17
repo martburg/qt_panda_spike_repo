@@ -16,8 +16,11 @@ from steuerung3d.protocol.estop_bits import (
     ESTOP_CAUSE_KEYS,
     ESTOP_OK_KEYS,
     ESTOP_SPECS,
+    decode_estop_word,
     encode_estop_word,
 )
+
+from steuerung3d.apps.supervisor.row_estop_dots import SUPERVISOR_ESTOP_COLUMNS
 
 
 def _profile() -> SupervisorProfile:
@@ -86,6 +89,63 @@ def _snap(
         axis_estop_status_word={"Anton": estop_word},
         joy=JoyState(deadman=joy_deadman, soll_speed=soll_speed),
     )
+
+
+
+
+def test_supervisor_estop_dot_columns_mark_negated_display_keys() -> None:
+    negated = {column.header for column in SUPERVISOR_ESTOP_COLUMNS if column.display_true_when_false}
+    assert negated == {"Master", "Guider", "Network", "EStop1", "EStop2"}
+
+
+def test_supervisor_estop_dot_grid_matches_requested_hip_densi_layout() -> None:
+    headers = [column.header for column in SUPERVISOR_ESTOP_COLUMNS]
+    assert headers == [
+        "Master", "EStop1", "30kW", "BRK1OK", "SPS", "PosWin", "G1Com", "G2Com", "G3Com",
+        "Guider", "EStop2", "05kW", "BRK2OK", "RED", "VelWin", "G1Out", "G2Out", "G3Out",
+        "Network", "", "", "BRK2KB", "ENC", "Endlage", "G1Fb", "G2Fb", "G3Fb",
+    ]
+
+
+def test_supervisor_estop_dot_columns_present_cause_bits_as_green_when_clear() -> None:
+    headers = ["Master", "Guider", "Network", "EStop1", "EStop2"]
+    presented = {column.header: column.present(True) for column in SUPERVISOR_ESTOP_COLUMNS if column.header in headers}
+    assert presented == {
+        "Master": False,
+        "Guider": False,
+        "Network": False,
+        "EStop1": False,
+        "EStop2": False,
+    }
+    clear_presented = {column.header: column.present(False) for column in SUPERVISOR_ESTOP_COLUMNS if column.header in headers}
+    assert clear_presented == {
+        "Master": True,
+        "Guider": True,
+        "Network": True,
+        "EStop1": True,
+        "EStop2": True,
+    }
+
+
+def test_supervisor_estop_dots_are_yellow_when_no_estop_word_available() -> None:
+    eng = SupervisorEngine(_profile())
+    snap = _snap(estop_word=_healthy_word())
+    snap = TelemetrySnapshot(
+        tick=snap.tick,
+        t_s=snap.t_s,
+        core_mode=snap.core_mode,
+        estop=snap.estop,
+        fault=snap.fault,
+        axes=snap.axes,
+        densis=snap.densis,
+        axis_estop_status_word={},
+        joy=snap.joy,
+    )
+    eng.ingest(snap)
+    row = eng.snapshot().rows[0]
+    assert row.estop_dots[0] is None
+    assert row.estop_dots[1] is None
+    assert row.estop_dots[19] is None
 
 
 def test_engine_maps_ready_live_and_stale() -> None:
@@ -296,3 +356,35 @@ def test_supervisor_releases_deselected_axis_and_disables_manual_motion_for_it()
     assert manuals[0].axis_ids == ("Anton",)
     assert manuals[0].enable is False
     assert manuals[0].rate == 0.0
+
+
+def test_supervisor_row_exposes_estop_dots_in_canonical_supervisor_order() -> None:
+    eng = SupervisorEngine(_profile())
+    word = encode_estop_word(
+        {
+            "master": True,
+            "kw05_ok": True,
+            "g1_com": True,
+            "g3_fb": True,
+            "vel_win": True,
+            "estop2": True,
+        }
+    )
+    eng.ingest(_snap(estop_word=word))
+    row = eng.snapshot().rows[0]
+
+    assert row.estop_word == word
+    assert len(row.estop_dots) == len(SUPERVISOR_ESTOP_COLUMNS) == 27
+
+    decoded = decode_estop_word(word)
+    expected = tuple(
+        None if not column.key else column.present(bool(decoded.get(column.key, False)))
+        for column in SUPERVISOR_ESTOP_COLUMNS
+    )
+    assert row.estop_dots == expected
+    assert row.estop_dots[0] is False
+    assert row.estop_dots[1] is True
+    assert row.estop_dots[11] is True
+    assert row.estop_dots[14] is True
+    assert row.estop_dots[6] is True
+    assert row.estop_dots[-1] is True

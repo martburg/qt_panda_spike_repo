@@ -115,6 +115,8 @@ class SupervisorEngine:
                         selected=row.selected,
                         phase=row.phase,
                         estop=row.estop,
+                        estop_word=row.estop_word,
+                        estop_dots=row.estop_dots,
                         livetick=row.livetick,
                         livetick_diff=row.livetick_diff,
                         pos=row.pos,

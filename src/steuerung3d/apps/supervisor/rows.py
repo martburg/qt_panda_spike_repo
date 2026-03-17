@@ -7,8 +7,10 @@ from steuerung3d.apps.yellow.engines.hip.presentation_extract import (
 )
 from steuerung3d.core.telemetry import JoyState, TelemetrySnapshot
 from steuerung3d.core.telemetry_axis_view import axis_scoped_snapshot
+from steuerung3d.protocol.estop_bits import decode_estop_word
 
 from .models import AxisConfig, AxisRow
+from .row_estop_dots import SUPERVISOR_ESTOP_COLUMNS
 from .row_estate import estate_from_word
 from .row_phase import is_live_motion, phase_from_facts
 from .row_staleness import axis_is_stale
@@ -17,6 +19,8 @@ from .row_staleness import axis_is_stale
 @dataclass(frozen=True)
 class _AxisRowFacts:
     estate: str
+    estop_word: int
+    estop_dots: tuple[bool | None, ...]
     stale: bool
     live_motion: bool
 
@@ -66,6 +70,8 @@ def build_axis_row(
         selected=bool(selected),
         phase=phase,
         estop=(phase == phase.ESTOP),
+        estop_word=facts.estop_word,
+        estop_dots=facts.estop_dots,
         livetick=metrics.livetick,
         livetick_diff=metrics.livetick_diff,
         pos=metrics.pos,
@@ -84,10 +90,22 @@ def _build_axis_row_facts(
     stale_after_ms: int,
 ) -> _AxisRowFacts:
     scoped = axis_scoped_snapshot(snap, axis_id)
+    axis_word_map = getattr(snap, "axis_estop_status_word", {}) or {}
+    raw_word = axis_word_map.get(axis_id)
+    fields = getattr(scoped, "plc_uplink_fields", None)
+    if isinstance(fields, dict) and fields.get("EStopStatus") is not None:
+        raw_word = fields.get("EStopStatus")
+    has_estop_info = raw_word is not None
     estop_word = int(parse_estop_word_from_snapshot(scoped))
+    bits = decode_estop_word(estop_word)
     joy = getattr(snap, "joy", JoyState())
     return _AxisRowFacts(
         estate=estate_from_word(estop_word),
+        estop_word=estop_word,
+        estop_dots=tuple(
+            None if (not has_estop_info or not column.key) else column.present(bool(bits.get(column.key, False)))
+            for column in SUPERVISOR_ESTOP_COLUMNS
+        ),
         stale=axis_is_stale(
             snap=snap,
             axis_id=axis_id,

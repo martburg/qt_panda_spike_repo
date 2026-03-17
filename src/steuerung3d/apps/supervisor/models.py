@@ -123,9 +123,11 @@ class AxisRow:
     phase: AxisPhase
     estop: bool
     livetick: int
-    livetick_diff: int = 0
     pos: float
     vel: float
+    estop_word: int = 0
+    estop_dots: tuple[bool | None, ...] = ()
+    livetick_diff: int = 0
     stale: bool = False
     hip_open_count: int = 0
 
@@ -133,17 +135,19 @@ class AxisRow:
         self,
         *,
         axis_id: str,
-        unit_id: str = "",
-        pair_id: str = "",
         densi_id: str,
         hip_id: str,
         selected: bool,
         phase: AxisPhase,
         estop: bool,
         livetick: int,
-        livetick_diff: int = 0,
         pos: float,
         vel: float,
+        unit_id: str = "",
+        pair_id: str = "",
+        estop_word: int = 0,
+        estop_dots: tuple[bool | None, ...] = (),
+        livetick_diff: int = 0,
         stale: bool = False,
         hip_open_count: int = 0,
     ) -> None:
@@ -154,6 +158,8 @@ class AxisRow:
         object.__setattr__(self, "selected", bool(selected))
         object.__setattr__(self, "phase", phase)
         object.__setattr__(self, "estop", bool(estop))
+        object.__setattr__(self, "estop_word", int(estop_word))
+        object.__setattr__(self, "estop_dots", tuple((None if v is None else bool(v)) for v in estop_dots))
         object.__setattr__(self, "livetick", int(livetick))
         object.__setattr__(self, "livetick_diff", int(livetick_diff))
         object.__setattr__(self, "pos", float(pos))
