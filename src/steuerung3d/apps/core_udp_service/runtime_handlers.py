@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Protocol
 
@@ -37,7 +38,7 @@ class _ControlContextOutLike(Protocol):
     def publish_control_context(self, ctx: ControlContext) -> None: ...
 
 
-class _StatusLike(Protocol):
+class StatusLike(Protocol):
     def emit_every(self, *, level: str, summary: str, fields: dict[str, object]) -> None: ...
 
 
@@ -142,11 +143,11 @@ class SnapshotHandler:
     axis_ids: list[str]
     args: Any
     c2_fanout: _SnapshotFanoutLike | None
-    c2_telem_outs: list[object]
+    c2_telem_outs: Sequence[object]
     control_context_out: _ControlContextOutLike
     stats: Dict[str, int]
     last_seen: Dict[str, Any]
-    status: _StatusLike | None
+    status: StatusLike | None
     state: MachineState
     last_intents_meta: Dict[str, Any]
     log: logging.Logger

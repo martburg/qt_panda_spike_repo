@@ -11,7 +11,7 @@ from steuerung3d.protocol.core_runner import CoreRunner
 
 from .cli_validation import uniq_axes_or_error, validate_dev_cmd_targets, validate_ui_telem_targets
 from .fatal_ui import fatal as _fatal
-from .runtime_handlers import DeviceStepper, SnapshotHandler, build_intent_drain
+from .runtime_handlers import DeviceStepper, SnapshotHandler, StatusLike, build_intent_drain
 from .runtime_helpers import (
     apply_mode_aggregation as _apply_mode_aggregation,
     compute_one_shots_by_axis as _compute_one_shots_by_axis,
@@ -65,7 +65,7 @@ def _build_router(
 def build_runtime_components(
     *,
     args: CoreUdpServiceArgs,
-    status: object,
+    status: StatusLike | None,
     endpoints: UdpEndpoints,
     runtime_stats: RuntimeStats,
 ) -> CoreRuntimeSetup | int:

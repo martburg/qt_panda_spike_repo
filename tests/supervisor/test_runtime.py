@@ -4,10 +4,11 @@ import importlib
 import sys
 import types
 from types import SimpleNamespace
+from typing import Any, cast
 
 
 def _qtcore_module() -> types.ModuleType:
-    m = types.ModuleType("PySide6.QtCore")
+    m = cast(Any, types.ModuleType("PySide6.QtCore"))
 
     class QObject:
         def __init__(self, *args, **kwargs) -> None:
@@ -26,11 +27,11 @@ def _qtcore_module() -> types.ModuleType:
 
     m.QObject = QObject
     m.QTimer = QTimer
-    return m
+    return cast(types.ModuleType, m)
 
 
 def _qtwidgets_module() -> types.ModuleType:
-    m = types.ModuleType("PySide6.QtWidgets")
+    m = cast(Any, types.ModuleType("PySide6.QtWidgets"))
 
     class QApplication:
         @staticmethod
@@ -44,7 +45,7 @@ def _qtwidgets_module() -> types.ModuleType:
             return 0
 
     m.QApplication = QApplication
-    return m
+    return cast(types.ModuleType, m)
 
 
 def test_refresh_hip_processes_releases_claim_and_lease_when_last_child_exits(monkeypatch) -> None:
@@ -54,7 +55,7 @@ def test_refresh_hip_processes_releases_claim_and_lease_when_last_child_exits(mo
     monkeypatch.setitem(sys.modules, "PySide6.QtCore", _qtcore_module())
     monkeypatch.setitem(sys.modules, "PySide6.QtWidgets", _qtwidgets_module())
 
-    dummy_window_mod = types.ModuleType("steuerung3d.apps.supervisor.gui.window")
+    dummy_window_mod = cast(Any, types.ModuleType("steuerung3d.apps.supervisor.gui.window"))
     dummy_window_mod.SupervisorWindow = lambda: SimpleNamespace(
         reset_estop_clicked=SimpleNamespace(connect=lambda *_: None),
         estart_clicked=SimpleNamespace(connect=lambda *_: None),
@@ -68,7 +69,11 @@ def test_refresh_hip_processes_releases_claim_and_lease_when_last_child_exits(mo
         show=lambda: None,
         show_recover_placeholder=lambda: None,
     )
-    monkeypatch.setitem(sys.modules, "steuerung3d.apps.supervisor.gui.window", dummy_window_mod)
+    monkeypatch.setitem(
+        sys.modules,
+        "steuerung3d.apps.supervisor.gui.window",
+        cast(types.ModuleType, dummy_window_mod),
+    )
 
     runtime_mod = importlib.import_module("steuerung3d.apps.supervisor.runtime")
 

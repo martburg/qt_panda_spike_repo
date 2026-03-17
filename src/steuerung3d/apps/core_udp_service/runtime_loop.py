@@ -11,6 +11,7 @@ this slice's owning modules:
 
 from __future__ import annotations
 
+from .runtime_handlers import StatusLike
 from .runtime_loop_build import build_runtime_components
 from .runtime_loop_endpoints import build_udp_endpoints
 from .runtime_loop_logging import build_runtime_stats, log_startup_summary, run_service_loop
@@ -27,7 +28,7 @@ __all__ = [
 ]
 
 
-def run_core_udp_service(*, args: CoreUdpServiceArgs, status: object) -> int:
+def run_core_udp_service(*, args: CoreUdpServiceArgs, status: StatusLike | None) -> int:
     """Build endpoints and runtime components, then run the core service loop."""
     endpoints = build_udp_endpoints(args=args)
     if isinstance(endpoints, int):

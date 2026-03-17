@@ -10,20 +10,29 @@ from steuerung3d.protocol.estop_bits import decode_estop_word
 
 
 class _RegistryEntryLike(Protocol):
-    last_seen_core_tick: int
+    @property
+    def last_seen_core_tick(self) -> int: ...
 
 
 class _AggregateStateLike(Protocol):
-    tick: int
-    joy: object | None
-    densi_registry: Mapping[str, _RegistryEntryLike]
-    densi_offline_after_ticks: int
+    @property
+    def tick(self) -> int: ...
+
+    @property
+    def joy(self) -> object | None: ...
+
+    @property
+    def densi_registry(self) -> Mapping[str, _RegistryEntryLike]: ...
+
+    @property
+    def densi_offline_after_ticks(self) -> int: ...
 
     def axis_owner(self, axis_id: str) -> str | None: ...
 
 
 class _RouterLike(Protocol):
-    last_dev_estop_word_by_axis: Mapping[str, int]
+    @property
+    def last_dev_estop_word_by_axis(self) -> Mapping[str, int]: ...
 
 
 def _coerce_registry(value: object) -> dict[str, object]:

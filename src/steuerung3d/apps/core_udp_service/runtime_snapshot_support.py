@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Sequence
 from typing import Any
 
 from steuerung3d.core.control_context import (
@@ -98,7 +99,7 @@ def publish_ui_and_c2(
     args: Any,
     router: AxisRouter,
     c2_fanout: Any,
-    c2_telem_outs: list[object],
+    c2_telem_outs: Sequence[object],
     stats: dict[str, int],
     last_seen: dict[str, Any],
 ) -> None:

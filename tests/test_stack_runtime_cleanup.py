@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, cast
 
 from steuerung3d.core.stack_runtime_boot import start_runtime
 from steuerung3d.core.stack_runtime_supervisor import stop_runtime
@@ -59,7 +60,7 @@ class _FakeRT:
         self.session_dir = None
         self.processes = []
         self.tailers = {}
-        self.status = None
+        self.status: _FakeStatus | None = None
 
     @staticmethod
     def expand_processes_static(spec: StackSpec, *, session_dir: Path) -> list[ProcessSpec]:
@@ -98,7 +99,7 @@ def test_start_runtime_cleans_residual_bind_ports(monkeypatch, tmp_path: Path) -
         lambda ports: cleaned.append(list(ports)) or [],
     )
 
-    start_runtime(rt)
+    start_runtime(cast(Any, rt))
 
     assert cleaned == [[51001]]
 
@@ -124,9 +125,10 @@ def test_stop_runtime_force_kills_and_closes_status(monkeypatch) -> None:
         lambda rt, stopped_at_s=None: None,
     )
 
-    stop_runtime(rt)
+    stop_runtime(cast(Any, rt))
 
     assert fake_proc.terminated == 1
     assert fake_proc.killed == 1
+    assert rt.status is not None
     assert rt.status.sock.closed is True
     assert cleaned == [[51001]]

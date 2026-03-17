@@ -4,9 +4,18 @@ import os
 import shlex
 import subprocess
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from typing import Protocol
 
 from .models import SupervisorProfile
+
+
+class _AxisUnitLike(Protocol):
+    @property
+    def axis_id(self) -> str: ...
+
+    @property
+    def hip_id(self) -> str: ...
 
 
 def launch_children(*, profile: SupervisorProfile) -> list[subprocess.Popen[str]]:
@@ -45,9 +54,9 @@ def refresh_hip_processes(
     hip_children: dict[str, list[subprocess.Popen[str]]],
     set_hip_open_count: Callable[[str, int], None],
     release_hip_authority: Callable[[str, str], None],
-    axes_by_unit_id: dict[str, object] | None = None,
+    axes_by_unit_id: Mapping[str, _AxisUnitLike] | None = None,
 ) -> None:
-    axes_by_unit_id = axes_by_unit_id or {axis.unit_id: axis for axis in profile.axes}
+    resolved_axes_by_unit_id = axes_by_unit_id or {axis.unit_id: axis for axis in profile.axes}
     for unit_id, children in list(hip_children.items()):
         alive = [child for child in children if child.poll() is None]
         exited = len(children) - len(alive)
@@ -57,7 +66,7 @@ def refresh_hip_processes(
             hip_children.pop(unit_id, None)
         set_hip_open_count(unit_id, len(alive))
         if exited > 0 and len(alive) == 0:
-            axis = axes_by_unit_id.get(str(unit_id))
+            axis = resolved_axes_by_unit_id.get(str(unit_id))
             if axis is not None and axis.hip_id:
                 release_hip_authority(axis.axis_id, axis.hip_id)
 
