@@ -18,8 +18,8 @@ def compute_one_shots_by_axis(
 
     Notes:
     - Multi-axis: use per-axis maps directly.
-    - Single-axis: preserve backward compatibility by allowing the legacy global
-      fields to apply to the single configured axis.
+    - Single-axis: still allows legacy estop-reset fallback, but parameter ops
+      are per-axis only.
     """
     multi_axis = len(axis_ids) > 1
     if multi_axis:
@@ -38,8 +38,7 @@ def compute_one_shots_by_axis(
     per_axis_ops = coerce_param_ops(
         dict(getattr(state, "pending_param_ops_by_axis", {}) or {}).get(axis0, [])
     )
-    global_ops = coerce_param_ops(getattr(state, "pending_param_ops", []) or [])
-    param_ops_by_axis = {axis0: (per_axis_ops + global_ops)}
+    param_ops_by_axis = {axis0: per_axis_ops}
     return estop_reset_by_axis, param_ops_by_axis
 
 

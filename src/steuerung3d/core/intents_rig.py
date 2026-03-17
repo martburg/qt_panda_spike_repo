@@ -12,6 +12,13 @@ from typing import Dict, Literal
 ParamGroup = Literal["pos", "vel", "filter", "guider"]
 
 
+def _require_param_axis_id(axis_id: str, *, intent_type: str) -> str:
+    axis = str(axis_id or "").strip()
+    if not axis:
+        raise ValueError(f"{intent_type} requires non-empty axis_id")
+    return axis
+
+
 @dataclass(frozen=True)
 class ParamEditBegin:
     """Prime the device to accept parameter writes for a parameter group."""
@@ -22,6 +29,13 @@ class ParamEditBegin:
     group: ParamGroup = "pos"
     req_id: str = ""
     session_id: str = ""
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "axis_id",
+            _require_param_axis_id(self.axis_id, intent_type=self.type),
+        )
 
 
 @dataclass(frozen=True)
@@ -36,6 +50,13 @@ class ParamWrite:
     req_id: str = ""
     session_id: str = ""
 
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "axis_id",
+            _require_param_axis_id(self.axis_id, intent_type=self.type),
+        )
+
 
 @dataclass(frozen=True)
 class ParamCancel:
@@ -47,3 +68,10 @@ class ParamCancel:
     group: ParamGroup = "pos"
     req_id: str = ""
     session_id: str = ""
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "axis_id",
+            _require_param_axis_id(self.axis_id, intent_type=self.type),
+        )

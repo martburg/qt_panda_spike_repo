@@ -106,9 +106,8 @@ class MachineState:
     param_edit_group: str = ""
     params: Dict[str, float] = field(default_factory=dict)
 
-    # Pending ops to be sent on the next command frame (core-side only):
-    pending_param_ops: list[ParamOp] = field(default_factory=list)  # legacy/global
-    # NEW: per-axis pending ops (preferred for multi-axis)
+    # Pending ops to be sent on the next command frame (core-side only).
+    # Per-axis storage is canonical; param intents without axis_id are rejected.
     pending_param_ops_by_axis: Dict[str, list[ParamOp]] = field(default_factory=dict)
 
     # --- HIP<->Core transactional acks (axis-agnostic parameter ops) ---
@@ -154,8 +153,9 @@ class MachineState:
 
         Semantic policy (2026-02-28):
         - The per-axis maps (``*_by_axis``) are the canonical source of truth.
-        - The legacy global fields (``estop_reset_req``, ``resync_req``, ``pending_param_ops``)
+        - The legacy global fields (``estop_reset_req``, ``resync_req``)
           are maintained only for backward compatibility and are cleared here as well.
+        - Parameter ops are per-axis only; axis-less param intents are rejected at the boundary.
         """
 
         # Reset / resync pulses (one-shot)
@@ -169,7 +169,6 @@ class MachineState:
         self.guider_reset_req_by_axis.clear()
 
         # Parameter ops are one-shot as well (UI can re-issue if needed)
-        self.pending_param_ops.clear()
         self.pending_param_ops_by_axis.clear()
 
     def clear_transients(self) -> None:

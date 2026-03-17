@@ -148,12 +148,12 @@ def _compute_guider_reset_by_axis(state: MachineState) -> dict[str, bool]:
 
 
 def _compute_param_ops_any(state: MachineState) -> list[ParamOp]:
-    """Flatten any pending ParamOps into a single list for CommandFrame.
+    """Flatten pending per-axis ParamOps into a single list for CommandFrame.
 
     Notes:
     - In multi-axis mode, core_udp_service routes param ops per-axis separately.
-      This aggregate is mainly for single-axis adapters and backward compatibility.
-    - We keep legacy ``pending_param_ops`` as well, but prefer per-axis storage.
+    - Axis-less param intents are rejected at the boundary, so there is no
+      legacy/global param-op fallback anymore.
     """
     ops: list[ParamOp] = []
     per_axis = getattr(state, "pending_param_ops_by_axis", {})
@@ -162,9 +162,6 @@ def _compute_param_ops_any(state: MachineState) -> list[ParamOp]:
             v = per_axis.get(axis_id) or []
             if isinstance(v, list):
                 ops.extend(v)
-    legacy = getattr(state, "pending_param_ops", []) or []
-    if isinstance(legacy, list):
-        ops.extend(legacy)
     return ops
 
 

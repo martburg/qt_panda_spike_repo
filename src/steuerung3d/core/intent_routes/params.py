@@ -23,13 +23,10 @@ def handle_param_edit_begin(state: MachineState, intent: ParamEditBegin) -> None
     grp = getattr(intent, "group", "")
     op = ParamEditBeginOp(group=grp)
 
-    if axis_id:
-        owner = state.claim_owner(axis_id)
-        if owner and hip_id and owner != hip_id:
-            return
-        state.pending_param_ops_by_axis.setdefault(axis_id, []).append(op)
-    else:
-        state.pending_param_ops.append(op)
+    owner = state.claim_owner(axis_id)
+    if owner and hip_id and owner != hip_id:
+        return
+    state.pending_param_ops_by_axis.setdefault(axis_id, []).append(op)
 
 
 def handle_param_write(state: MachineState, intent: ParamWrite) -> None:
@@ -60,13 +57,10 @@ def handle_param_write(state: MachineState, intent: ParamWrite) -> None:
     wire_vals.update({k: float(v) for k, v in cleaned.items()})
     op = ParamWriteOp(group=grp, values=wire_vals)
 
-    if axis_id:
-        owner = state.claim_owner(axis_id)
-        if owner and hip_id and owner != hip_id:
-            return
-        state.pending_param_ops_by_axis.setdefault(axis_id, []).append(op)
-    else:
-        state.pending_param_ops.append(op)
+    owner = state.claim_owner(axis_id)
+    if owner and hip_id and owner != hip_id:
+        return
+    state.pending_param_ops_by_axis.setdefault(axis_id, []).append(op)
 
 
 def handle_param_cancel(state: MachineState, intent: ParamCancel) -> None:
@@ -87,10 +81,7 @@ def handle_param_cancel(state: MachineState, intent: ParamCancel) -> None:
 
     op = ParamCancelOp(group=grp)
 
-    if axis_id:
-        owner = state.claim_owner(axis_id)
-        if owner and hip_id and owner != hip_id:
-            return
-        state.pending_param_ops_by_axis.setdefault(axis_id, []).append(op)
-    else:
-        state.pending_param_ops.append(op)
+    owner = state.claim_owner(axis_id)
+    if owner and hip_id and owner != hip_id:
+        return
+    state.pending_param_ops_by_axis.setdefault(axis_id, []).append(op)
