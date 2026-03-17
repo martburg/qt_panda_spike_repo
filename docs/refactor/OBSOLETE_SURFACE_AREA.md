@@ -35,20 +35,20 @@ compatibility.
 
 - `steuerung3d.adapters.plc_twincat_legacy` (legacy TwinCAT semicolon protocol)
 
-## Obsolete state surfaces (ready-to-delete candidates)
+## Obsolete state surfaces (status)
 
-These are legacy/global fields that should become **read-only derived views**
-and then be deleted once no supported code reads them.
+The previously tracked legacy/global one-shot fields have now been removed from
+active code:
 
-- `MachineState.estop_reset_req` (use `estop_reset_req_by_axis`)
-- `MachineState.resync_req` (use `resync_req_by_axis`)
-- `MachineState.pending_param_ops` (use `pending_param_ops_by_axis`)
+- `MachineState.estop_reset_req` → removed; use `estop_reset_req_by_axis`
+- `MachineState.resync_req` → removed; use `resync_req_by_axis`
+- `MachineState.pending_param_ops` → removed; use `pending_param_ops_by_axis`
 
-Deletion readiness:
+Current repo truth:
 
-1) `grep -RIn "\\bestop_reset_req\\b" src/steuerung3d` shows no reads (or only in `legacy/`).
-2) Same for `resync_req` and `pending_param_ops`.
-3) Multi-axis smoke (two densis) demonstrates one-shot isolation per axis.
+1) Reset / resync / param one-shots are axis-scoped only.
+2) Supported runtime code should not reference the removed global fields.
+3) Multi-axis smoke demonstrates one-shot isolation per axis.
 
 ## “Ready to delete” checklist
 
@@ -57,7 +57,7 @@ Before deleting a module tree, ensure all of the following are true:
 1. **No supported app imports it**
    - `core_udp_service`, `hi_p`, `den_si`, `joy2intent` must not import it.
 2. **No supported profile depends on it**
-   - `configs/stacks/*.toml` are legacy mirrors; CI / daily work should use `configs/profiles/*.toml`.
+   - supported profiles live under `configs/profiles/*.toml`; `configs/stacks/*.toml` has been removed.
 3. **Tests cover the supported alternative**
    - any behavior the obsolete module provided has a test for the replacement.
 4. **Docs updated**

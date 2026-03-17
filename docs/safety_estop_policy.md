@@ -19,7 +19,7 @@ Command frames are for **commands**, not truth.
 
 Semantic note (2026-02-28):
 - Core stores reset requests canonically as **per-axis one-shots** (`estop_reset_req_by_axis`)
-- `CommandFrame.estop_reset` is derived as `any(estop_reset_req_by_axis.values())` (plus legacy fallback)
+- `CommandFrame.estop_reset` is derived as `any(estop_reset_req_by_axis.values())`
 
 ### Intents
 - HI-P emits **RequestEstopReset** when the operator clicks `btnEStopReset`.

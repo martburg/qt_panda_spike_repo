@@ -19,9 +19,8 @@ Run these from the repo root after installing editable (`pip install -e .`) or b
 - `python -m steuerung3d.apps.hi_p`
 - `python -m steuerung3d.apps.den_si`
 
-Also present:
-- `python -m steuerung3d.tools.run_stack_2win`
-- `python -m steuerung3d.run_stack_2win`
+Developer utility scripts live under `tools/` (for example `tools/run_stack_2win.py`).
+
 
 ## Package-level dependencies
 
@@ -761,7 +760,7 @@ device_step(state, cmd_frame, dt)
 
 Clear one-shot requests
 
-state.estop_reset_req = False
+state.clear_one_shots()  # clears per-axis reset/resync/param requests
 
 Emit telemetry snapshot
 
@@ -782,7 +781,7 @@ flowchart TD
   D["advance tick + t_s"]
   F["build_command_frame(state)"]
   G["device_step(state,cmd_frame,dt)"]
-  H["clear estop_reset_req"]
+  H["clear one-shots via state.clear_one_shots()"]
   I["TelemetrySnapshot.from_state(state)"]
   J["on_snapshot(snap)  (UdpTelemetryOut.publish_telemetry)"]
 
