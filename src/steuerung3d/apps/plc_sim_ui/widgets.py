@@ -25,7 +25,7 @@ class LedIndicator(QWidget):
         self._colors = colors
         self._checked = checked
         self.setMinimumHeight(18)
-        self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
     def sizeHint(self) -> QSize:  # pragma: no cover (Qt)
         return QSize(90, 18)
@@ -40,7 +40,7 @@ class LedIndicator(QWidget):
 
     def paintEvent(self, _evt) -> None:  # pragma: no cover (Qt)
         p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing, True)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
 
         h = self.height()
         r = min(12, h - 4)
@@ -56,13 +56,20 @@ class LedIndicator(QWidget):
         font = p.font()
         font.setPointSize(9)
         p.setFont(font)
-        p.drawText(22, 0, self.width() - 22, h, Qt.AlignVCenter | Qt.AlignLeft, self._text)
+        p.drawText(
+            22,
+            0,
+            self.width() - 22,
+            h,
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+            self._text,
+        )
 
 
 def make_readout(width: int = 90, bold: bool = True) -> QLineEdit:
     e = QLineEdit("99.99")
     e.setReadOnly(True)
-    e.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    e.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
     f = e.font()
     f.setPointSize(11)
     f.setBold(bold)
@@ -74,20 +81,20 @@ def make_readout(width: int = 90, bold: bool = True) -> QLineEdit:
 def make_small_readonly(width: int = 80) -> QLineEdit:
     e = QLineEdit("0")
     e.setReadOnly(True)
-    e.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    e.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
     e.setFixedWidth(width)
     return e
 
 
 def make_edit(width: int = 80, text: str = "0") -> QLineEdit:
     e = QLineEdit(text)
-    e.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    e.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
     e.setFixedWidth(width)
     return e
 
 
 def hline() -> QFrame:
     ln = QFrame()
-    ln.setFrameShape(QFrame.HLine)
-    ln.setFrameShadow(QFrame.Sunken)
+    ln.setFrameShape(QFrame.Shape.HLine)
+    ln.setFrameShadow(QFrame.Shadow.Sunken)
     return ln

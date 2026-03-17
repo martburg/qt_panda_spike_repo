@@ -16,6 +16,7 @@
     "**/__pycache__/**",
     "archive/**",
     "legacy/attic_src/**",
+    "legacy/legacy_program/**",
     "tools/**"
   ]
 }

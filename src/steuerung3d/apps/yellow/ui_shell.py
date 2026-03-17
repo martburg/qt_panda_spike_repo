@@ -73,7 +73,7 @@ def _refit_window_height_only(win: QWidget) -> None:
 def load_ui(path: Path) -> QWidget:
     loader = QUiLoader()
     f = QFile(str(path))
-    if not f.open(QFile.ReadOnly):
+    if not f.open(QFile.OpenModeFlag.ReadOnly):
         raise RuntimeError(f"Could not open UI file: {path}")
     try:
         w = loader.load(f, None)

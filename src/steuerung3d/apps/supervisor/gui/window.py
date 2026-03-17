@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import cast
-
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -66,6 +64,19 @@ class _TooltipDot(QFrame):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
+
+class _EstopBlockWidget(QWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._cells: list[_TooltipDot] = []
+
+
+class _ValueSliderWidget(QWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._value_label: QLabel | None = None
+        self._value_slider: QSlider | None = None
 
 
 class SupervisorWindow(QMainWindow):
@@ -199,7 +210,7 @@ class SupervisorWindow(QMainWindow):
         if item is None:
             item = QTableWidgetItem()
             if col != COL_AXIS:
-                item.setTextAlignment(int(Qt.AlignCenter))
+                item.setTextAlignment(int(Qt.AlignmentFlag.AlignCenter))
             self.table.setItem(row, col, item)
         item.setText(text)
 
@@ -219,8 +230,8 @@ class SupervisorWindow(QMainWindow):
         if not isinstance(container, QWidget):
             container = self._make_estop_block_widget()
             self.table.setCellWidget(row_idx, COL_ESTOP, container)
-        cells = getattr(container, "_cells", None)
-        if not isinstance(cells, list):
+        cells = container._cells if isinstance(container, _EstopBlockWidget) else None
+        if cells is None:
             return
         states = tuple(row.estop_dots)
         for idx, column in enumerate(SUPERVISOR_ESTOP_COLUMNS):
@@ -241,13 +252,13 @@ class SupervisorWindow(QMainWindow):
                 grandparent.setToolTip(tooltip)
 
     @staticmethod
-    def _make_estop_block_widget() -> QWidget:
-        container = QWidget()
+    def _make_estop_block_widget() -> _EstopBlockWidget:
+        container = _EstopBlockWidget()
         grid = QGridLayout(container)
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setHorizontalSpacing(1)
         grid.setVerticalSpacing(1)
-        cells: list[QFrame] = []
+        cells: list[_TooltipDot] = []
         for row in range(ESTOP_GRID_ROWS):
             for col in range(ESTOP_GRID_COLUMNS):
                 idx = row * ESTOP_GRID_COLUMNS + col
@@ -261,7 +272,7 @@ class SupervisorWindow(QMainWindow):
                 dot_wrap_layout = QHBoxLayout(dot_wrap)
                 dot_wrap_layout.setContentsMargins(0, 0, 0, 0)
                 dot_wrap_layout.setSpacing(0)
-                dot_wrap_layout.setAlignment(Qt.AlignCenter)
+                dot_wrap_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 dot = _TooltipDot(dot_wrap)
                 dot.setStyleSheet(DOT_YELLOW_STYLE)
                 dot_wrap.setToolTip(column.header)
@@ -291,8 +302,8 @@ class SupervisorWindow(QMainWindow):
         if not isinstance(container, QWidget):
             container = self._make_value_slider_widget()
             self.table.setCellWidget(row, col, container)
-        label = cast(QLabel | None, getattr(container, "_value_label", None))
-        slider = cast(QSlider | None, getattr(container, "_value_slider", None))
+        label = container._value_label if isinstance(container, _ValueSliderWidget) else None
+        slider = container._value_slider if isinstance(container, _ValueSliderWidget) else None
         if label is not None:
             label.setText(f"{float(value):.3f}")
         if slider is not None:
@@ -300,17 +311,17 @@ class SupervisorWindow(QMainWindow):
             slider.setToolTip(f"{float(value):.3f}")
 
     @staticmethod
-    def _make_value_slider_widget() -> QWidget:
-        container = QWidget()
+    def _make_value_slider_widget() -> _ValueSliderWidget:
+        container = _ValueSliderWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(1, 0, 1, 0)
         layout.setSpacing(0)
         label = QLabel("0.000")
-        label.setAlignment(Qt.AlignCenter)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         label_font = label.font()
         label_font.setPointSize(max(7, label_font.pointSize() - 2))
         label.setFont(label_font)
-        slider = QSlider(Qt.Horizontal)
+        slider = QSlider(Qt.Orientation.Horizontal)
         slider.setRange(0, DISPLAY_SLIDER_MAX)
         slider.setValue(DISPLAY_SLIDER_CENTER)
         slider.setEnabled(False)

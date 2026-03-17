@@ -2,6 +2,7 @@ import importlib.util
 import sys
 import types
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -62,5 +63,5 @@ def stub_pyside6(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(sys.modules, "PySide6.QtGui", _qt_module("PySide6.QtGui"))
 
     qtuitools = _qt_module("PySide6.QtUiTools")
-    qtuitools.QUiLoader = _DummyQtType
+    cast(Any, qtuitools).QUiLoader = _DummyQtType
     monkeypatch.setitem(sys.modules, "PySide6.QtUiTools", qtuitools)

@@ -89,11 +89,11 @@ class YellowAxisWindow(QMainWindow):
         self.cmb_axis.setFixedWidth(130)
         lay.addWidget(self.cmb_axis)
 
-        lay.addItem(QSpacerItem(20, 10, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        lay.addItem(QSpacerItem(20, 10, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
 
         self.txt_time = QLineEdit("00:00:00")
         self.txt_time.setReadOnly(True)
-        self.txt_time.setAlignment(Qt.AlignCenter)
+        self.txt_time.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.txt_time.setFixedWidth(90)
         lay.addWidget(self.txt_time)
 
@@ -120,7 +120,7 @@ class YellowAxisWindow(QMainWindow):
         lay.addWidget(self.led_fault)
         lay.addWidget(self.led_online)
 
-        lay.addItem(QSpacerItem(10, 10, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        lay.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         return box
 
     def _build_main_panels(self) -> QWidget:
@@ -209,7 +209,7 @@ class YellowAxisWindow(QMainWindow):
         sp = QGroupBox("Soll Speed")
         spl = QHBoxLayout(sp)
         spl.setContentsMargins(8, 8, 8, 8)
-        self.sld_speed = QSlider(Qt.Vertical)
+        self.sld_speed = QSlider(Qt.Orientation.Vertical)
         self.sld_speed.setRange(-100, 100)
         self.sld_speed.setValue(0)
         self.txt_speed_cmd = make_small_readonly(width=90)

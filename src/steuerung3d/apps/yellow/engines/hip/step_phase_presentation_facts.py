@@ -23,8 +23,7 @@ from .viewmodel import HipDriveStatusState
 
 
 class _HipPresentationState(Protocol):
-    @property
-    def prev_device_tick(self) -> int | None: ...
+    prev_device_tick: int | None
 
 
 class _HipPresentationEngine(Protocol):

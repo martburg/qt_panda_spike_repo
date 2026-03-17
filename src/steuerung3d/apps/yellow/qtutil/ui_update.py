@@ -9,7 +9,7 @@ Goals:
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Iterator, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Iterator, Protocol, runtime_checkable
 
 if TYPE_CHECKING:  # pragma: no cover
     from PySide6.QtWidgets import QWidget
@@ -129,9 +129,9 @@ def set_state_by_object_name(
         return
 
 
-def set_text(widget: Optional[_HasText], text: str) -> None:
+def set_text(widget: object | None, text: str) -> None:
     """Set QLabel/QLineEdit text only if it differs."""
-    if widget is None:
+    if widget is None or not isinstance(widget, _HasText):
         return
     try:
         if widget.text() == text:
@@ -141,9 +141,9 @@ def set_text(widget: Optional[_HasText], text: str) -> None:
         return
 
 
-def set_enabled(widget: Optional[_HasEnabled], enabled: bool) -> None:
+def set_enabled(widget: object | None, enabled: bool) -> None:
     """Set QWidget enabled state only if it differs."""
-    if widget is None:
+    if widget is None or not isinstance(widget, _HasEnabled):
         return
     try:
         en = bool(enabled)
@@ -154,14 +154,14 @@ def set_enabled(widget: Optional[_HasEnabled], enabled: bool) -> None:
         return
 
 
-def set_enabled_repolish(widget: Optional[_HasEnabled], enabled: bool) -> None:
+def set_enabled_repolish(widget: object | None, enabled: bool) -> None:
     """Set enabled state and repolish the widget, but only on change.
 
     Some Yellow UI variants rely on QSS rules that combine dynamic properties
     (e.g. paramField) with enabled/disabled state. Qt will usually restyle
     correctly on enable changes, but repolishing here is a cheap, safe guard.
     """
-    if widget is None:
+    if widget is None or not isinstance(widget, _HasEnabled):
         return
     try:
         en = bool(enabled)
@@ -177,14 +177,12 @@ def set_enabled_repolish(widget: Optional[_HasEnabled], enabled: bool) -> None:
         return
 
 
-def set_checked(
-    widget: Optional[_HasChecked], checked: bool, *, block_signals: bool = False
-) -> None:
+def set_checked(widget: object | None, checked: bool, *, block_signals: bool = False) -> None:
     """Set QAbstractButton/QCheckBox checked state only if it differs.
 
     If block_signals=True, the widget's signals are temporarily blocked.
     """
-    if widget is None:
+    if widget is None or not isinstance(widget, _HasChecked):
         return
     try:
         v = bool(checked)
@@ -197,7 +195,7 @@ def set_checked(
 
 
 def update_slider(
-    slider: Optional[_SliderLike],
+    slider: object | None,
     *,
     minimum: int | None = None,
     maximum: int | None = None,
@@ -210,7 +208,7 @@ def update_slider(
     written if it differs. If block_signals=True, the slider's signals are
     blocked while applying updates.
     """
-    if slider is None:
+    if slider is None or not isinstance(slider, _SliderLike):
         return
     try:
         need_min = minimum is not None and int(slider.minimum()) != int(minimum)

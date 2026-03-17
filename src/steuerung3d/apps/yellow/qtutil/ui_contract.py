@@ -11,11 +11,21 @@ These helpers are intentionally *non-fatal*: they only log at DEBUG level.
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, Protocol, cast
 
 from PySide6.QtWidgets import QWidget
 
 from .widget_cache import WidgetCache
+
+
+class _LoggerLike(Protocol):
+    def debug(self, msg: str, *args: object) -> object: ...
+    def warning(self, msg: str, *args: object) -> object: ...
+
+
+def _widget_cls(cls: type[object]) -> type[QWidget]:
+    return QWidget if cls is object else cast(type[QWidget], cls)
+
 
 _LOGGED_CONTEXTS: set[str] = set()
 
@@ -23,16 +33,16 @@ _LOGGED_CONTEXTS: set[str] = set()
 _LOGGED_REQUIRED_CONTEXTS: set[str] = set()
 
 
-def missing_required(cache: WidgetCache, specs: Iterable[tuple[type[QWidget], str]]) -> list[str]:
+def missing_required(cache: WidgetCache, specs: Iterable[tuple[type[object], str]]) -> list[str]:
     """Return a list of missing *required* objectNames for the given specs."""
     # Implementation is the same as missing_optional; intent differs.
     return missing_optional(cache, specs)
 
 
 def log_missing_required_once(
-    logger,
+    logger: _LoggerLike,
     cache: WidgetCache,
-    specs: Iterable[tuple[type[QWidget], str]],
+    specs: Iterable[tuple[type[object], str]],
     *,
     context: str,
 ) -> None:
@@ -48,9 +58,9 @@ def log_missing_required_once(
 
 
 def log_missing_required(
-    logger,
+    logger: _LoggerLike,
     cache: WidgetCache,
-    specs: Iterable[tuple[type[QWidget], str]],
+    specs: Iterable[tuple[type[object], str]],
     *,
     context: str,
 ) -> None:
@@ -69,21 +79,21 @@ def log_missing_required(
         return
 
 
-def missing_optional(cache: WidgetCache, specs: Iterable[tuple[type[QWidget], str]]) -> list[str]:
+def missing_optional(cache: WidgetCache, specs: Iterable[tuple[type[object], str]]) -> list[str]:
     """Return a list of missing objectNames for the given specs."""
     out: list[str] = []
     for cls, name in specs:
         if not name:
             continue
-        if cache.get(cls, name) is None:
+        if cache.get(_widget_cls(cls), name) is None:
             out.append(str(name))
     return out
 
 
 def log_missing_optional_once(
-    logger,
+    logger: _LoggerLike,
     cache: WidgetCache,
-    specs: Iterable[tuple[type[QWidget], str]],
+    specs: Iterable[tuple[type[object], str]],
     *,
     context: str,
 ) -> None:
@@ -99,9 +109,9 @@ def log_missing_optional_once(
 
 
 def log_missing_optional(
-    logger,
+    logger: _LoggerLike,
     cache: WidgetCache,
-    specs: Iterable[tuple[type[QWidget], str]],
+    specs: Iterable[tuple[type[object], str]],
     *,
     context: str,
 ) -> None:
@@ -114,7 +124,7 @@ def log_missing_optional(
         for cls, name in specs:
             if not name:
                 continue
-            if cache.get(cls, name) is None:
+            if cache.get(_widget_cls(cls), name) is None:
                 missing.append(str(name))
         if missing:
             logger.debug(
