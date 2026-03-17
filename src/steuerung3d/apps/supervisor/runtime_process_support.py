@@ -45,7 +45,9 @@ def refresh_hip_processes(
     hip_children: dict[str, list[subprocess.Popen[str]]],
     set_hip_open_count: Callable[[str, int], None],
     release_hip_authority: Callable[[str, str], None],
+    axes_by_unit_id: dict[str, object] | None = None,
 ) -> None:
+    axes_by_unit_id = axes_by_unit_id or {axis.unit_id: axis for axis in profile.axes}
     for unit_id, children in list(hip_children.items()):
         alive = [child for child in children if child.poll() is None]
         exited = len(children) - len(alive)
@@ -55,7 +57,7 @@ def refresh_hip_processes(
             hip_children.pop(unit_id, None)
         set_hip_open_count(unit_id, len(alive))
         if exited > 0 and len(alive) == 0:
-            axis = next((axis for axis in profile.axes if axis.unit_id == str(unit_id)), None)
+            axis = axes_by_unit_id.get(str(unit_id))
             if axis is not None and axis.hip_id:
                 release_hip_authority(axis.axis_id, axis.hip_id)
 

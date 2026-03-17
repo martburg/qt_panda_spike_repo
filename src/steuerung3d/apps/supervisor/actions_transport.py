@@ -23,6 +23,12 @@ class UdpDensiActionIn:
 
 @dataclass(frozen=True)
 class UdpDensiActionOut:
+    """UDP transport for remote densi actions.
+
+    The public publish surface intentionally accepts a single action object to
+    avoid call-site drift between split-argument and object-based forms.
+    """
+
     tx: UdpJsonOut[DensiRemoteAction]
 
     @staticmethod
@@ -33,6 +39,8 @@ class UdpDensiActionOut:
         return UdpDensiActionOut(tx=UdpJsonOut(link=link, encode=_encode_action))
 
     def publish_action(self, action: DensiRemoteAction) -> None:
+        """Publish one remote densi action."""
+
         self.tx.send(action)
 
 

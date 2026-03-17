@@ -25,7 +25,8 @@ PairPhase = AxisPhase
 class AxisConfig:
     """Configuration for one supervised axis/unit.
 
-    Backward compatible with the older pair-centric constructor shape.
+    Axis/unit naming is canonical inside the supervisor. The older pair-centric
+    constructor shape remains supported as a compatibility boundary.
     """
 
     axis_id: str
@@ -62,6 +63,8 @@ class AxisConfig:
 
     @property
     def pair_id(self) -> str:
+        """Backward-compatible alias for older pair-centric call sites."""
+
         return self.unit_id
 
 
@@ -160,6 +163,8 @@ class AxisRow:
 
     @property
     def pair_id(self) -> str:
+        """Backward-compatible alias for older pair-centric row consumers."""
+
         return self.unit_id
 
 

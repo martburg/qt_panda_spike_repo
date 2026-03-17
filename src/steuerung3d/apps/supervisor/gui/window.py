@@ -24,6 +24,7 @@ class SupervisorWindow(QMainWindow):
     recover_clicked = Signal()
     chk_es_taster_changed = Signal(bool)
     pair_selected_changed = Signal(str, bool)
+    unit_selected_changed = Signal(str, bool)
     open_hip_clicked = Signal(str)
 
     def __init__(self) -> None:
@@ -81,7 +82,7 @@ class SupervisorWindow(QMainWindow):
                 if not isinstance(chk, QCheckBox):
                     chk = QCheckBox()
                     chk.toggled.connect(
-                        lambda checked, unit_id=row.unit_id: self._emit_pair_selected(
+                        lambda checked, unit_id=row.unit_id: self._emit_unit_selected(
                             unit_id, checked
                         )
                     )
@@ -113,10 +114,16 @@ class SupervisorWindow(QMainWindow):
     def show_recover_placeholder(self) -> None:
         QMessageBox.information(self, "Recover", "Recover not implemented yet.")
 
-    def _emit_pair_selected(self, pair_id: str, checked: bool) -> None:
+    def _emit_unit_selected(self, unit_id: str, checked: bool) -> None:
         if self._updating:
             return
-        self.pair_selected_changed.emit(str(pair_id), bool(checked))
+        normalized_unit_id = str(unit_id)
+        normalized_checked = bool(checked)
+        self.unit_selected_changed.emit(normalized_unit_id, normalized_checked)
+        self.pair_selected_changed.emit(normalized_unit_id, normalized_checked)
+
+    def _emit_pair_selected(self, pair_id: str, checked: bool) -> None:
+        self._emit_unit_selected(pair_id, checked)
 
     @staticmethod
     def _hip_button_text(open_count: int) -> str:

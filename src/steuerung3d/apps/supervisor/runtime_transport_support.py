@@ -36,12 +36,12 @@ def init_transports(
 ) -> tuple[UdpTelemetryIn, UdpIntentOut, dict[str, UdpDensiActionOut]]:
     telemetry_in = UdpTelemetryIn.bind(parse_hostport(profile.telem_in))
     intent_out = UdpIntentOut.connect(parse_hostport(profile.intent_out))
-    action_outs = {
+    action_outs_by_unit_id = {
         axis.unit_id: UdpDensiActionOut.connect(parse_hostport(axis.densi_action_out))
         for axis in profile.axes
         if axis.densi_action_out
     }
-    return telemetry_in, intent_out, action_outs
+    return telemetry_in, intent_out, action_outs_by_unit_id
 
 
 def ingest_telemetry(
@@ -57,7 +57,7 @@ def publish_outbound(
     *,
     outbound: OutboundBatch,
     intent_out: _IntentOutLike,
-    action_outs: Mapping[str, _ActionOutLike],
+    action_outs_by_unit_id: Mapping[str, _ActionOutLike],
 ) -> None:
     for intent in outbound.intents:
         try:
@@ -65,24 +65,24 @@ def publish_outbound(
         except Exception:
             log.exception("failed to publish intent %r", intent)
 
-    for pair_id, actions in outbound.densi_actions.items():
-        tx = action_outs.get(pair_id)
+    for unit_id, actions in outbound.densi_actions.items():
+        tx = action_outs_by_unit_id.get(unit_id)
         if tx is None:
             continue
         for action in actions:
             try:
                 tx.publish_action(action)
             except Exception:
-                log.exception("failed to publish densi action %s -> %s", pair_id, action)
+                log.exception("failed to publish densi action %s -> %s", unit_id, action)
 
 
 def close_transports(
     *,
     telemetry_in: _TelemetryInLike,
     intent_out: _IntentOutLike,
-    action_outs: Mapping[str, _ActionOutLike],
+    action_outs_by_unit_id: Mapping[str, _ActionOutLike],
 ) -> None:
     close_udp_json_endpoint(telemetry_in)
     close_udp_json_endpoint(intent_out)
-    for tx in action_outs.values():
+    for tx in action_outs_by_unit_id.values():
         close_udp_json_endpoint(tx)

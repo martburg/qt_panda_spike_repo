@@ -42,6 +42,7 @@ class SupervisorRuntime(QObject):
         self._children: list[subprocess.Popen[str]] = []
         self._hip_children: dict[str, list[subprocess.Popen[str]]] = {}
         self._merged_snapshot = None
+        self._axes_by_unit_id = {axis.unit_id: axis for axis in profile.axes}
 
         self._init_transports()
         self._init_window_and_signals()
@@ -61,7 +62,7 @@ class SupervisorRuntime(QObject):
         self._publish_outbound()
 
     def open_hip_for_axis(self, unit_id: str) -> None:
-        axis = next((axis for axis in self.profile.axes if axis.unit_id == str(unit_id)), None)
+        axis = self._axes_by_unit_id.get(str(unit_id))
         if axis is None:
             return
 
@@ -85,6 +86,7 @@ class SupervisorRuntime(QObject):
             hip_children=self._hip_children,
             set_hip_open_count=self.engine.set_hip_open_count,
             release_hip_authority=self._release_hip_authority,
+            axes_by_unit_id=self._axes_by_unit_id,
         )
 
     def shutdown(self) -> None:
@@ -93,7 +95,9 @@ class SupervisorRuntime(QObject):
         self._close_transports()
 
     def _init_transports(self) -> None:
-        self.telemetry_in, self.intent_out, self.action_outs = init_transports(profile=self.profile)
+        self.telemetry_in, self.intent_out, self.action_outs_by_unit_id = init_transports(
+            profile=self.profile
+        )
 
     def _init_window_and_signals(self) -> None:
         self.window = SupervisorWindow()
@@ -102,7 +106,10 @@ class SupervisorRuntime(QObject):
         self.window.resync_clicked.connect(self.engine.queue_resync)
         self.window.recover_clicked.connect(self._on_recover_clicked)
         self.window.chk_es_taster_changed.connect(self.engine.set_chk_requested)
-        self.window.pair_selected_changed.connect(self.engine.set_selected)
+        selected_signal = getattr(
+            self.window, "unit_selected_changed", self.window.pair_selected_changed
+        )
+        selected_signal.connect(self.engine.set_selected)
         self.window.open_hip_clicked.connect(self.open_hip_for_axis)
 
     def _init_timer(self) -> None:
@@ -126,7 +133,7 @@ class SupervisorRuntime(QObject):
         publish_outbound(
             outbound=self.engine.consume_outbound(),
             intent_out=self.intent_out,
-            action_outs=self.action_outs,
+            action_outs_by_unit_id=self.action_outs_by_unit_id,
         )
 
     def _terminate_children(self) -> None:
@@ -139,7 +146,7 @@ class SupervisorRuntime(QObject):
         close_transports(
             telemetry_in=self.telemetry_in,
             intent_out=self.intent_out,
-            action_outs=self.action_outs,
+            action_outs_by_unit_id=self.action_outs_by_unit_id,
         )
 
     def _launch_children(self) -> None:
