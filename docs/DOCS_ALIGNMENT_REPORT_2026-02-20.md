@@ -8,7 +8,7 @@ This pass focused on **eliminating stale entry points and file references** intr
 
 - Rewritten to match the **actual config files present** under `configs/`.
 - Clarifies the two supported configuration surfaces:
-  - **Profiles** (`configs/profiles/*.toml`, via `python -m steuerung3d up --profile ...`; legacy mirror: `configs/stacks/*.toml`)
+  - **Profiles** (`configs/profiles/*.toml`, via `python -m steuerung3d up --profile ...`)
   - **Single-process runners** (e.g. `apps/dev_stack`, `apps/plc_stack`, `apps/joy2intent`, `apps/inputd`)
 - Removed references to non-existent files:
   - `configs/dev_stack.toml`

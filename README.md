@@ -80,7 +80,7 @@ python -m steuerung3d down   --profile dev_sim
 
 Profiles live in `configs/profiles/*.toml` and own the **rig axes + wiring** (ports, services enabled, per-axis expansion).
 
-Legacy note: `configs/stacks/` remains as a compatibility mirror for older docs/scripts; edit `configs/profiles/` as the source of truth.
+Profiles live under `configs/profiles/`; treat that directory as the single source of truth for named stack profiles.
 
 ### Session logging (per run, per process)
 

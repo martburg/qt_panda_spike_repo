@@ -12,7 +12,7 @@ python -m steuerung3d sup --profile configs/supervisor/smoke_2pairs.toml
 
 The supervisor launches a **core+densi stack** via:
 
-- `configs/stacks/supervisor_2axes_core_fanout.toml`
+- `configs/profiles/supervisor_2axes_core_fanout.toml`
 
 That stack starts:
 

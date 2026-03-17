@@ -19,34 +19,21 @@ from steuerung3d.core.stack_runtime import StackRuntime, expand_processes
 
 
 def discover_stack_profiles(stacks_dir: Path | None = None) -> list[str]:
-    """Return available stack profile *names* (without .toml).
+    """Return available stack profile *names* (without .toml)."""
 
-    Canonical location is ``configs/profiles``.
-    ``configs/stacks`` remains supported for backward compatibility.
-    """
-
-    if stacks_dir is not None:
-        dirs = [stacks_dir]
-    else:
-        dirs = [Path("configs") / "profiles", Path("configs") / "stacks"]
-
-    names: set[str] = set()
-    for d in dirs:
-        if not d.exists() or not d.is_dir():
-            continue
-        for p in sorted(d.glob("*.toml")):
-            if p.is_file():
-                names.add(p.stem)
-    return sorted(names)
+    d = stacks_dir or (Path("configs") / "profiles")
+    if not d.exists() or not d.is_dir():
+        return []
+    return sorted(p.stem for p in d.glob("*.toml") if p.is_file())
 
 
 def print_profiles(stacks_dir: Path | None = None, *, as_paths: bool = False) -> None:
     names = discover_stack_profiles(stacks_dir)
     d = stacks_dir or (Path("configs") / "profiles")
     if not names:
-        print(f"[profiles] none found (looked in {d} and configs/stacks)")
+        print(f"[profiles] none found (looked in {d})")
         return
-    print(f"[profiles] available ({len(names)}) in {d} (and configs/stacks):")
+    print(f"[profiles] available ({len(names)}) in {d}:")
     for n in names:
         if as_paths:
             p = default_profile_path(n) if stacks_dir is None else (d / (n + ".toml"))
@@ -63,11 +50,7 @@ def default_profile_path(name_or_path: str) -> Path:
     p = Path(name_or_path)
     if p.suffix.lower() == ".toml" or p.exists():
         return p
-    # Prefer canonical dir, fall back to legacy.
-    cand = Path("configs") / "profiles" / f"{name_or_path}.toml"
-    if cand.exists():
-        return cand
-    return Path("configs") / "stacks" / f"{name_or_path}.toml"
+    return Path("configs") / "profiles" / f"{name_or_path}.toml"
 
 
 def pid_alive(pid: int) -> bool:

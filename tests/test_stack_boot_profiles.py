@@ -9,7 +9,7 @@ from steuerung3d.core.stack_runtime import expand_processes
 
 
 def test_dev_sim_profile_loads_and_expands(tmp_path: Path):
-    profile = Path("configs/stacks/dev_sim.toml")
+    profile = Path("configs/profiles/dev_sim.toml")
     spec = load_stack_profile(profile)
     assert spec.name == "dev_sim"
     assert spec.axes == ["Anton", "Debby", "Cecil", "Burt"]
@@ -61,7 +61,7 @@ args = []
 
 def test_override_toml_rewrites_ports(tmp_path: Path):
     """Override TOML should take precedence over base for scalar fields."""
-    profile = Path("configs/stacks/dev_sim.toml")
+    profile = Path("configs/profiles/dev_sim.toml")
     ov = tmp_path / "override.toml"
     ov.write_text(
         """
@@ -78,7 +78,7 @@ cmd_base = 53001
 
 
 def test_set_disables_service(tmp_path: Path):
-    profile = Path("configs/stacks/dev_sim.toml")
+    profile = Path("configs/profiles/dev_sim.toml")
     spec = load_stack_profile(profile, sets=["services.hip.enabled=false"])
     procs = expand_processes(spec, session_dir=tmp_path)
     names = [p.name for p in procs]
@@ -86,7 +86,7 @@ def test_set_disables_service(tmp_path: Path):
 
 
 def test_two_dev_two_hip_attach_profile_loads_and_expands(tmp_path: Path):
-    profile = Path("configs/stacks/2dev_2hip_attach_sim.toml")
+    profile = Path("configs/profiles/2dev_2hip_attach_sim.toml")
     spec = load_stack_profile(profile)
     assert spec.name == "2dev_2hip_attach_sim"
     assert spec.axes == ["Anton", "Debby"]
@@ -115,7 +115,7 @@ def test_two_dev_two_hip_attach_profile_loads_and_expands(tmp_path: Path):
 
 
 def test_supervisor_stack_standard_profile_keeps_densi_headless(tmp_path: Path):
-    profile = Path("configs/stacks/supervisor_2axes_core_fanout.toml")
+    profile = Path("configs/profiles/supervisor_2axes_core_fanout.toml")
     spec = load_stack_profile(profile)
     procs = expand_processes(spec, session_dir=tmp_path)
 
@@ -124,7 +124,7 @@ def test_supervisor_stack_standard_profile_keeps_densi_headless(tmp_path: Path):
 
 
 def test_supervisor_stack_debug_profile_opens_visible_densi(tmp_path: Path):
-    profile = Path("configs/stacks/supervisor_2axes_core_fanout_debug.toml")
+    profile = Path("configs/profiles/supervisor_2axes_core_fanout_debug.toml")
     spec = load_stack_profile(profile)
     procs = expand_processes(spec, session_dir=tmp_path)
 

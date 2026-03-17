@@ -9,7 +9,7 @@ def test_1dev_sim_profile_uses_core_udp_service() -> None:
     """Protect the canonical core entrypoint used by the dev_sim profile."""
 
     repo_root = Path(__file__).resolve().parents[1]
-    profile = repo_root / "configs" / "stacks" / "1dev_sim.toml"
+    profile = repo_root / "configs" / "profiles" / "1dev_sim.toml"
     spec = load_stack_profile(profile, base_dir=repo_root)
 
     core = spec.services.get("core")

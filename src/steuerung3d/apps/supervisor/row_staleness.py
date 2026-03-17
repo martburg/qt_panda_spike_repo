@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
-
 DEFAULT_DENSI_AGE_TICK_MS = 50
 
 
-def axis_is_stale(*, snap: TelemetrySnapshot, axis_id: str, densi: object, stale_after_ms: int) -> bool:
+def axis_is_stale(
+    *, snap: TelemetrySnapshot, axis_id: str, densi: object, stale_after_ms: int
+) -> bool:
     """Return whether the axis row should be treated as stale."""
 
     if densi is not None and bool(getattr(densi, "last_seen_age_ticks", 0) or 0):

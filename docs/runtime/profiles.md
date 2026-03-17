@@ -19,4 +19,4 @@ python -m steuerung3d up --profile <name>
 - `joy_local_to_remote_core.toml` — joystick local -> remote core wiring.
 - `only_densi_anton.toml` — DenSi-only for Anton.
 
-Note: legacy stacks are kept in sync under `configs/stacks/*.toml` via `tools/check_legacy_stacks.py`.
+Named stack profiles live under `configs/profiles/*.toml`. Direct `.toml` paths still work when passed explicitly.

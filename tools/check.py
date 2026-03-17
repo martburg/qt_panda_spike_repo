@@ -30,11 +30,6 @@ def _maybe_run_pyright(root: Path) -> int:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Repo health gate (Lane 1 safe)")
     p.add_argument(
-        "--no-legacy",
-        action="store_true",
-        help="Skip configs/stacks compatibility-mirror check.",
-    )
-    p.add_argument(
         "--no-ruff",
         action="store_true",
         help="Skip ruff lint + format checks.",
@@ -59,14 +54,7 @@ def main(argv: list[str] | None = None) -> int:
 
     root = repo_root()
 
-    # 1) keep the legacy configs/stacks compatibility mirror in sync with
-    #    configs/profiles, which remain the source of truth
-    if not args.no_legacy:
-        rc = run([sys.executable, str(root / "tools" / "check_legacy_stacks.py")], cwd=root)
-        if rc != 0:
-            return rc
-
-    # 2) ruff lint + formatting
+    # 1) ruff lint + formatting
     if not args.no_ruff:
         rc = run([sys.executable, "-m", "ruff", "check", str(root)], cwd=root)
         if rc != 0:
@@ -76,13 +64,13 @@ def main(argv: list[str] | None = None) -> int:
         if rc != 0:
             return rc
 
-    # 3) optional type check
+    # 2) optional type check
     if not args.no_pyright and (root / "pyrightconfig.json").exists():
         rc = _maybe_run_pyright(root)
         if rc != 0:
             return rc
 
-    # 4) unit tests
+    # 3) unit tests
     if not args.no_pytest:
         rc = run([sys.executable, "-m", "pytest", "-q"], cwd=root)
         if rc != 0:

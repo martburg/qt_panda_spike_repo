@@ -29,7 +29,6 @@ class _AxisRowMetrics:
     vel: float
 
 
-
 def build_axis_row(
     *,
     axis: AxisConfig,
@@ -76,7 +75,6 @@ def build_axis_row(
     )
 
 
-
 def _build_axis_row_facts(
     *,
     snap: TelemetrySnapshot,
@@ -98,7 +96,6 @@ def _build_axis_row_facts(
         ),
         live_motion=is_live_motion(ax=ax, joy=joy),
     )
-
 
 
 def _build_axis_row_metrics(*, ax: object) -> _AxisRowMetrics:

@@ -19,7 +19,7 @@ The goal is to make local development easy *without* coupling core logic to any 
 Profiles live in:
 
 - `configs/profiles/*.toml` (source of truth)
-- `configs/stacks/*.toml` (legacy compatibility mirror)
+
 
 They describe:
 

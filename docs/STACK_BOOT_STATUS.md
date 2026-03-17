@@ -87,7 +87,7 @@ When status is enabled, the supervisor prints a compact birds-eye view based on 
 
 Profiles live in `configs/profiles/*.toml`.
 
-Legacy note: `configs/stacks/` remains as a compatibility mirror (kept in sync from `configs/profiles/`).
+Profiles are now canonicalized on `configs/profiles/` only.
 
 - Profiles own the **rig axes + wiring**.
 - The `dev_sim` profile includes the status channel:

@@ -8,7 +8,7 @@ stale_after_ms = 800
 gui = true
 
 [launch]
-stack_profile = "configs/stacks/supervisor_2axes_core_fanout_debug.toml"
+stack_profile = "configs/profiles/supervisor_2axes_core_fanout_debug.toml"
 
 [[axes]]
 unit_id = "anton"

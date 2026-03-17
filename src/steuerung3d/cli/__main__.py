@@ -32,7 +32,7 @@ def _profile_arg(value: str) -> str:
     """argparse type for --profile.
 
     Accepts either:
-      - a known profile name (resolved via configs/profiles/<name>.toml; legacy: configs/stacks)
+      - a known profile name (resolved via configs/profiles/<name>.toml)
       - an explicit TOML path
 
     Raises a helpful error listing known profile names.
@@ -55,7 +55,7 @@ def _profile_arg(value: str) -> str:
         )
     raise argparse.ArgumentTypeError(
         f"unknown profile '{v}' and no profiles discovered. "
-        "(Tip: expected configs/profiles/*.toml (or legacy configs/stacks) or a direct .toml path)"
+        "(Tip: expected configs/profiles/*.toml or a direct .toml path)"
     )
 
 
@@ -69,14 +69,14 @@ class St3DArgumentParser(argparse.ArgumentParser):
             if names:
                 extra_lines = [
                     "",
-                    "Available profiles (configs/profiles/*.toml; legacy configs/stacks):",
+                    "Available profiles (configs/profiles/*.toml):",
                 ]
                 extra_lines += [f"  - {n}" for n in names]
                 extra_lines += ["", "Tip: python -m steuerung3d profiles"]
                 extra = "\n".join(extra_lines) + "\n"
             else:
                 extra = (
-                    "\nNo profiles found under configs/profiles/ (or legacy configs/stacks/). "
+                    "\nNo profiles found under configs/profiles/. "
                     "Provide a direct .toml path, or add configs/profiles/<name>.toml.\n"
                 )
 

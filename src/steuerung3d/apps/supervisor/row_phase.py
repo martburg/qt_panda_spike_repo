@@ -13,7 +13,6 @@ def is_live_motion(*, ax: object, joy: JoyState) -> bool:
     return abs(float(getattr(ax, "vel", 0.0) or 0.0)) > 1e-6 or abs(float(joy.soll_speed)) > 1e-6
 
 
-
 def phase_from_facts(*, estate: str, stale: bool, live_motion: bool) -> AxisPhase:
     if stale:
         return AxisPhase.STALE
