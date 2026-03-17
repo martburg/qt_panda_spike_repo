@@ -15,6 +15,18 @@ if TYPE_CHECKING:
 log = logging.getLogger("hi_p")
 
 
+def _coerce_float_param(params: Mapping[str, object], key: str, default: float = 0.0) -> float:
+    value = params.get(key, default)
+    if value is None or value == "":
+        return default
+    if isinstance(value, (int, float, str)):
+        try:
+            return float(value)
+        except Exception:
+            return default
+    return default
+
+
 def apply_axis_change_behavior(
     *,
     intents: list[Intent],
@@ -38,10 +50,7 @@ def build_jog_active_intents(
     speed: float,
     params: Mapping[str, object],
 ) -> float:
-    try:
-        vel_max_mps = float(params.get("VelMax", 0.0) or 0.0)
-    except Exception:
-        vel_max_mps = 0.0
+    vel_max_mps = _coerce_float_param(params, "VelMax", 0.0)
     if vel_max_mps <= 0.0 and abs(float(speed)) > 0.0:
         log.debug("HiP vel_max unavailable for axis %s", motion_axis_id)
 

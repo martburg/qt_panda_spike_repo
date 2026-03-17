@@ -14,10 +14,14 @@ _PI = 3.141592653589793
 
 
 def _float_or_default(value: object, default: float = 0.0) -> float:
-    try:
-        return float(value or default)
-    except Exception:
+    if value is None or value == "":
         return default
+    if isinstance(value, (int, float, str)):
+        try:
+            return float(value)
+        except Exception:
+            return default
+    return default
 
 
 def _param_float(params: Mapping[str, float], key: str, default: float = 0.0) -> float:

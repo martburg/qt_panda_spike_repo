@@ -142,7 +142,7 @@ class HipStepInputs:
     last_estate: str
     ui: HipUiInputs
     core_acks: list[str]
-    joy: JoyState
+    joy: JoyState | None
 
 
 @dataclass(frozen=True)

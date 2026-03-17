@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -289,11 +291,11 @@ class SupervisorWindow(QMainWindow):
         if not isinstance(container, QWidget):
             container = self._make_value_slider_widget()
             self.table.setCellWidget(row, col, container)
-        label = getattr(container, "_value_label", None)
-        slider = getattr(container, "_value_slider", None)
-        if isinstance(label, QLabel):
+        label = cast(QLabel | None, getattr(container, "_value_label", None))
+        slider = cast(QSlider | None, getattr(container, "_value_slider", None))
+        if label is not None:
             label.setText(f"{float(value):.3f}")
-        if isinstance(slider, QSlider):
+        if slider is not None:
             slider.setValue(int(slider_value))
             slider.setToolTip(f"{float(value):.3f}")
 

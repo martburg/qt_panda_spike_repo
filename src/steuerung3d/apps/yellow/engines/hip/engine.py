@@ -8,8 +8,9 @@ comparison before cutover.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import asdict
-from typing import Any, Iterable
+from typing import Any
 
 from steuerung3d.core.intents import EchoLifeTick, Intent
 from steuerung3d.core.telemetry import TelemetrySnapshot
@@ -64,10 +65,10 @@ class HipEngine:
         self.state = HipState()
 
     @staticmethod
-    def _is_motion_intent(intent: object) -> bool:
+    def _is_motion_intent(intent: Intent) -> bool:
         return is_motion_intent(intent)
 
-    def _gate_motion_intents(self, intents: Iterable[object], *, deadman: bool) -> list[object]:
+    def _gate_motion_intents(self, intents: Iterable[Intent], *, deadman: bool) -> list[Intent]:
         return gate_motion_intents(intents, deadman=deadman)
 
     def _update_taster_edge(self, axis_id: str, taster: bool, now_s: float) -> None:

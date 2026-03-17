@@ -53,10 +53,12 @@ def parse_role(argv: list[str]) -> str:
 def _refit_window_height_only(win: QWidget) -> None:
     w = win.window() or win
     cw = getattr(w, "centralWidget", None)
-    if callable(cw) and cw():
-        if cw().layout():
-            cw().layout().activate()
-        cw().adjustSize()
+    central = cw() if callable(cw) else None
+    if isinstance(central, QWidget):
+        layout = central.layout()
+        if layout is not None:
+            layout.activate()
+        central.adjustSize()
 
     w.adjustSize()
     w.resize(w.width(), max(w.minimumSizeHint().height(), w.sizeHint().height()))
