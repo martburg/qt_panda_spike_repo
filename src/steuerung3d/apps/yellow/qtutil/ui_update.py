@@ -8,7 +8,8 @@ Goals:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any, Iterator, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:  # pragma: no cover
     from PySide6.QtWidgets import QWidget
@@ -68,6 +69,33 @@ def _repolish(widget: "QWidget" | _WidgetLike) -> None:
     style.unpolish(widget)
     style.polish(widget)
     widget.update()
+
+
+@contextmanager
+def blocked_signals(widget: object, *, enabled: bool = True) -> Iterator[None]:
+    """Best-effort signal blocker for Qt widgets.
+
+    This intentionally stays tolerant: widgets without blockSignals support, or
+    widgets that raise while blocking/restoring, are treated as no-ops.
+    """
+    if not enabled or widget is None or not isinstance(widget, _HasBlockSignals):
+        yield
+        return
+
+    was: bool | None
+    try:
+        was = widget.blockSignals(True)
+    except Exception:
+        was = None
+
+    try:
+        yield
+    finally:
+        if was is not None:
+            try:
+                widget.blockSignals(was)
+            except Exception:
+                pass
 
 
 def set_state_property(widget: "QWidget" | _WidgetLike, state: Any, prop: str = "state") -> None:
@@ -158,18 +186,7 @@ def set_checked(
         v = bool(checked)
         if bool(widget.isChecked()) == v:
             return
-        if block_signals and isinstance(widget, _HasBlockSignals):
-            try:
-                was = widget.blockSignals(True)
-            except Exception:
-                was = None
-            widget.setChecked(v)
-            if was is not None:
-                try:
-                    widget.blockSignals(was)
-                except Exception:
-                    pass
-        else:
+        with blocked_signals(widget, enabled=block_signals):
             widget.setChecked(v)
     except Exception:
         return
@@ -198,26 +215,13 @@ def update_slider(
         if not (need_min or need_max or need_val):
             return
 
-        if block_signals:
-            try:
-                was = slider.blockSignals(True)
-            except Exception:
-                was = None
-        else:
-            was = None
-
         # Range first, then value.
-        if need_min and minimum is not None:
-            slider.setMinimum(int(minimum))
-        if need_max and maximum is not None:
-            slider.setMaximum(int(maximum))
-        if need_val and value is not None:
-            slider.setValue(int(value))
-
-        if was is not None:
-            try:
-                slider.blockSignals(was)
-            except Exception:
-                pass
+        with blocked_signals(slider, enabled=block_signals):
+            if need_min and minimum is not None:
+                slider.setMinimum(int(minimum))
+            if need_max and maximum is not None:
+                slider.setMaximum(int(maximum))
+            if need_val and value is not None:
+                slider.setValue(int(value))
     except Exception:
         return

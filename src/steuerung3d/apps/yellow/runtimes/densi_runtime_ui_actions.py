@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from ..engines.densi.inputs import DensiInputs
-
-if TYPE_CHECKING:
-    from .densi_runtime_impl import DensiRuntime
+from .densi_runtime_types import DensiRuntimeUiActionsLike
 
 
-def apply_ui_actions(rt: "DensiRuntime", inputs: DensiInputs) -> None:
+def apply_ui_actions(rt: DensiRuntimeUiActionsLike, inputs: DensiInputs) -> None:
     ui = inputs.ui
     if ui is None:
         return

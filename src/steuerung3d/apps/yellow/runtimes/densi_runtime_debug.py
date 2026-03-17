@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
 
 from steuerung3d.core.command_frame import CommandFrame
 
+from .densi_runtime_types import DensiRuntimeDebugLike
 from .runtime_utils import should_interval_log
 
-if TYPE_CHECKING:
-    from .densi_runtime_impl import DensiRuntime
 
-
-def step_lifetick_debug(rt: "DensiRuntime", *, now_ns: int, last_cmd: CommandFrame | None) -> None:
+def step_lifetick_debug(
+    rt: DensiRuntimeDebugLike, *, now_ns: int, last_cmd: CommandFrame | None
+) -> None:
     now_s = time.monotonic()
     echo_map = getattr(last_cmd, "lifetick_echo", {}) if last_cmd is not None else {}
 

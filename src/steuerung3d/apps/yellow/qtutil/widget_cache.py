@@ -41,15 +41,18 @@ class WidgetCache:
     def get(self, cls: type[T], object_name: str) -> Optional[T]:
         """Return a cached child widget by class + objectName."""
         key = (cls, str(object_name))
-        v = self._cache.get(key, _MISSING)
-        if v is _MISSING:
-            try:
-                w = self.root.findChild(cls, str(object_name))
-            except Exception:
-                w = None
-            self._cache[key] = w if (w is not None and isinstance(w, cls)) else None
-            v = self._cache[key]
-        return v if isinstance(v, cls) else None
+        cached = self._cache.get(key, _MISSING)
+        if cached is _MISSING:
+            cached = self._lookup(cls, object_name)
+            self._cache[key] = cached
+        return cached if isinstance(cached, cls) else None
+
+    def _lookup(self, cls: type[T], object_name: str) -> Optional[T]:
+        try:
+            widget = self.root.findChild(cls, str(object_name))
+        except Exception:
+            widget = None
+        return widget if (widget is not None and isinstance(widget, cls)) else None
 
     # Convenience typed accessors -------------------------------------------------
 

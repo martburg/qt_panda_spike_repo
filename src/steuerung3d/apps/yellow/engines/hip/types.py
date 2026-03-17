@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from steuerung3d.core.intents import Intent
 from steuerung3d.core.joy_state import JoyState
@@ -13,6 +13,22 @@ from ...domain.param_txn import RetryEvent
 
 if TYPE_CHECKING:  # pragma: no cover
     from .viewmodel import HipCutMarkersState, HipDriveStatusState, HipReadoutsState, HipViewModel
+
+
+class HipParamTxnStateLike(Protocol):
+    hip_id: str
+
+
+class HipStepStateLike(Protocol):
+    joy: JoyState
+    selected_axis: str
+    fixed_axis_applied: bool
+    last_ui_axis_selected: str
+
+
+class HipStepContextEngineLike(Protocol):
+    state: HipStepStateLike
+    _param_txn: HipParamTxnStateLike
 
 
 @dataclass(frozen=True)

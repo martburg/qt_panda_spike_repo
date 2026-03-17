@@ -64,7 +64,7 @@ class _CommandPhaseResult:
 
 
 def _build_step_state(*, engine: "HipEngine", inputs: HipStepInputs) -> _StepState:
-    ctx = build_step_context(engine=engine, inputs=inputs)
+    ctx = build_step_context(runtime=engine, inputs=inputs)
     snap = ctx.snap
     ui = ctx.ui
     axis_ids = ctx.axis_ids

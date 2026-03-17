@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from steuerung3d.core.command_frame import CommandFrame
 
-if TYPE_CHECKING:
-    from .densi_runtime_impl import DensiRuntime
+from .densi_runtime_types import DensiRuntimeTickLike
 
 
-def edge_log_cmd_changes(rt: "DensiRuntime", cmd: CommandFrame | None) -> None:
+def edge_log_cmd_changes(rt: DensiRuntimeTickLike, cmd: CommandFrame | None) -> None:
     try:
         if rt._ch.changed("cmd_core_mode", str(getattr(cmd, "core_mode", ""))):
             rt._log.info("cmd_core_mode=%s", getattr(cmd, "core_mode", ""))
@@ -18,7 +15,7 @@ def edge_log_cmd_changes(rt: "DensiRuntime", cmd: CommandFrame | None) -> None:
         pass
 
 
-def handle_gui_not_halt_cmd(rt: "DensiRuntime", cmd: CommandFrame | None) -> None:
+def handle_gui_not_halt_cmd(rt: DensiRuntimeTickLike, cmd: CommandFrame | None) -> None:
     try:
         if rt._ch.changed("cmd_gui_not_halt", bool(getattr(cmd, "gui_not_halt", False))):
             rt._log.info("gui_not_halt=%s", bool(getattr(cmd, "gui_not_halt", False)))

@@ -1,10 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .engine import HipEngine
 
 from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.axis_selection import authoritative_selected_axis, visible_axis_ids_for_hip
@@ -13,7 +9,7 @@ from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
 from .attach_state import NOT_ATTACHED, build_attach_combo
-from .types import HipAttachCombo, HipStepInputs, HipUiInputs
+from .types import HipAttachCombo, HipStepContextEngineLike, HipStepInputs, HipUiInputs
 
 
 @dataclass(frozen=True)
@@ -28,15 +24,15 @@ class StepContext:
     intents: list[Intent]
 
 
-def _sync_joy_state(engine: "HipEngine", hip_id: str, joy: JoyState | object) -> None:
+def _sync_joy_state(runtime: HipStepContextEngineLike, hip_id: str, joy: JoyState | object) -> None:
     joy_in = joy if isinstance(joy, JoyState) else JoyState()
-    engine.state.joy = JoyState(
+    runtime.state.joy = JoyState(
         deadman=bool(getattr(joy_in, "deadman", False)),
         select_hip=bool(getattr(joy_in, "select_hip", False)),
         soll_speed=clamp_soll_speed(getattr(joy_in, "soll_speed", 0.0)),
     )
-    if getattr(engine._param_txn, "hip_id", "") != hip_id:
-        engine._param_txn.hip_id = hip_id
+    if getattr(runtime._param_txn, "hip_id", "") != hip_id:
+        runtime._param_txn.hip_id = hip_id
 
 
 def _visible_axis_context(
@@ -64,23 +60,23 @@ def _visible_axis_context(
 
 
 def _resolve_ui_axis(
-    *, engine: "HipEngine", ui: HipUiInputs, axis_norm_to_canon: dict[str, str]
+    *, runtime: HipStepContextEngineLike, ui: HipUiInputs, axis_norm_to_canon: dict[str, str]
 ) -> str:
     ui_axis = str(ui.axis_selected or "").strip()
     ui_axis_norm = normalize_axis_id(ui_axis)
     if ui.axis_selection_changed:
-        engine.state.last_ui_axis_selected = ui_axis
+        runtime.state.last_ui_axis_selected = ui_axis
         return ui_axis
-    if engine.state.last_ui_axis_selected:
-        return str(engine.state.last_ui_axis_selected)
-    if not (engine.state.joy.select_hip and ui_axis_norm and (ui_axis_norm in axis_norm_to_canon)):
+    if runtime.state.last_ui_axis_selected:
+        return str(runtime.state.last_ui_axis_selected)
+    if not (runtime.state.joy.select_hip and ui_axis_norm and (ui_axis_norm in axis_norm_to_canon)):
         return ""
     return ui_axis
 
 
 def _build_attach_context(
     *,
-    engine: "HipEngine",
+    runtime: HipStepContextEngineLike,
     inputs: HipStepInputs,
     axis_ids: list[str],
     ui_axis: str,
@@ -92,7 +88,7 @@ def _build_attach_context(
         ui_axis=str(ui_axis or ""),
         fixed_axis=str(fixed_axis or ""),
         prev_selected=str(prev_selected or ""),
-        fixed_applied=bool(engine.state.fixed_axis_applied),
+        fixed_applied=bool(runtime.state.fixed_axis_applied),
         lock_axis_combo=bool(inputs.lock_axis_combo),
     )
 
@@ -150,23 +146,23 @@ def _build_selection_intents(
     return intents
 
 
-def build_step_context(*, engine: "HipEngine", inputs: HipStepInputs) -> StepContext:
+def build_step_context(*, runtime: HipStepContextEngineLike, inputs: HipStepInputs) -> StepContext:
     """Normalize HiP step inputs into a small, testable context object."""
     snap = inputs.snap
     ui = inputs.ui
     hip_id = str(inputs.hip_id or "")
 
-    _sync_joy_state(engine, hip_id, inputs.joy)
-    prev_selected = str(engine.state.selected_axis or "")
+    _sync_joy_state(runtime, hip_id, inputs.joy)
+    prev_selected = str(runtime.state.selected_axis or "")
     axis_ids, axis_norm_to_canon = _visible_axis_context(
         snap=snap,
         hip_id=hip_id,
         prev_selected=prev_selected,
         fixed_axis=inputs.fixed_axis,
     )
-    ui_axis = _resolve_ui_axis(engine=engine, ui=ui, axis_norm_to_canon=axis_norm_to_canon)
+    ui_axis = _resolve_ui_axis(runtime=runtime, ui=ui, axis_norm_to_canon=axis_norm_to_canon)
     attach_combo, selected_axis, fixed_applied = _build_attach_context(
-        engine=engine,
+        runtime=runtime,
         inputs=inputs,
         axis_ids=axis_ids,
         ui_axis=ui_axis,

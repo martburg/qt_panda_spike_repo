@@ -23,7 +23,13 @@ from ..engines.densi.viewmodel import DensiViewModel
 from .densi_runtime_debug import step_lifetick_debug
 from .densi_runtime_status import emit_status, publish_telemetry_and_heartbeat
 from .densi_runtime_tick import edge_log_cmd_changes, handle_gui_not_halt_cmd
-from .densi_runtime_types import DensiRuntimeResult
+from .densi_runtime_types import (
+    DensiRuntimeDebugLike,
+    DensiRuntimeResult,
+    DensiRuntimeStatusLike,
+    DensiRuntimeTickLike,
+    DensiRuntimeUiActionsLike,
+)
 from .densi_runtime_ui_actions import apply_ui_actions
 from .densi_runtime_viewmodel import compute_densi_view_model
 
@@ -159,22 +165,26 @@ class DensiRuntime:
             "estop_word": int(getattr(snap, "estop_status_word", 0) or 0),
         }
 
-    def _edge_log_cmd_changes(self, cmd: CommandFrame | None) -> None:
+    def _edge_log_cmd_changes(self: DensiRuntimeTickLike, cmd: CommandFrame | None) -> None:
         edge_log_cmd_changes(self, cmd)
 
-    def _handle_gui_not_halt_cmd(self, cmd: CommandFrame | None) -> None:
+    def _handle_gui_not_halt_cmd(self: DensiRuntimeTickLike, cmd: CommandFrame | None) -> None:
         handle_gui_not_halt_cmd(self, cmd)
 
-    def _publish_telemetry_and_heartbeat(self, snap: TelemetrySnapshot, now_ns: int) -> None:
+    def _publish_telemetry_and_heartbeat(
+        self: DensiRuntimeStatusLike, snap: TelemetrySnapshot, now_ns: int
+    ) -> None:
         publish_telemetry_and_heartbeat(self, snap, now_ns)
 
-    def _emit_status(self, now_ns: int) -> None:
+    def _emit_status(self: DensiRuntimeStatusLike, now_ns: int) -> None:
         emit_status(self, now_ns)
 
-    def _step_lifetick_debug(self, *, now_ns: int, last_cmd: CommandFrame | None) -> None:
+    def _step_lifetick_debug(
+        self: DensiRuntimeDebugLike, *, now_ns: int, last_cmd: CommandFrame | None
+    ) -> None:
         step_lifetick_debug(self, now_ns=now_ns, last_cmd=last_cmd)
 
-    def _apply_ui_actions(self, inputs: DensiInputs) -> None:
+    def _apply_ui_actions(self: DensiRuntimeUiActionsLike, inputs: DensiInputs) -> None:
         apply_ui_actions(self, inputs)
 
     def _compute_view_model(

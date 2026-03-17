@@ -106,10 +106,7 @@ class ParamWidgetBinder:
                 txt = ""
             set_text(le, txt)
             if disable:
-                try:
-                    set_enabled(le, False)
-                except Exception:
-                    pass
+                set_enabled(le, False)
 
     def init_param_inputs(self) -> None:
         loc = QLocale.system()

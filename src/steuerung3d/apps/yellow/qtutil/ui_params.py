@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from typing import Any, Callable, Mapping
 
+from .ui_update import blocked_signals, set_text
+
 
 def param_value_to_text(val: Any) -> str:
     """Format a parameter value for a QLineEdit.
@@ -37,6 +39,45 @@ def param_value_to_text(val: Any) -> str:
         return ""
 
 
+def _find_param_line_edit(object_name: str, find_line_edit: Callable[[str], Any]) -> Any:
+    try:
+        return find_line_edit(object_name)
+    except Exception:
+        return None
+
+
+def _write_line_edit_text(
+    line_edit: Any,
+    text: str,
+    *,
+    skip_focused: bool = False,
+    block_signals_enabled: bool = True,
+) -> bool:
+    """Write QLineEdit text using the shared diff-first + signal-blocking policy.
+
+    Returns True when the widget was a viable target, even if no text change was
+    needed. Returns False only when no write should occur at all.
+    """
+    if line_edit is None:
+        return False
+
+    try:
+        if skip_focused and bool(line_edit.hasFocus()):
+            return False
+    except Exception:
+        pass
+
+    try:
+        if str(line_edit.text()) == text:
+            return True
+    except Exception:
+        pass
+
+    with blocked_signals(line_edit, enabled=block_signals_enabled):
+        set_text(line_edit, text)
+    return True
+
+
 def apply_param_values_to_line_edits(
     params: Mapping[str, Any],
     param_widgets: Mapping[str, Mapping[str, str]],
@@ -54,52 +95,21 @@ def apply_param_values_to_line_edits(
     if not params:
         return
 
-    # Late import keeps this helper usable in unit tests without Qt.
-    try:
-        from .ui_update import set_text  # type: ignore
-    except Exception:
-        return
-
     for grp, mapping in param_widgets.items():
         if freeze_group and str(grp) == str(freeze_group):
             continue
         for key, obj_name in mapping.items():
             if key not in params:
                 continue
-            le = None
-            try:
-                le = find_line_edit(obj_name)
-            except Exception:
-                le = None
+            le = _find_param_line_edit(obj_name, find_line_edit)
             if le is None:
                 continue
-
-            try:
-                if skip_focused and bool(le.hasFocus()):
-                    continue
-            except Exception:
-                pass
-
-            txt = param_value_to_text(params.get(key))
-            try:
-                if str(le.text()) == txt:
-                    continue
-            except Exception:
-                pass
-
-            if block_signals:
-                try:
-                    was = le.blockSignals(True)
-                except Exception:
-                    was = None
-                set_text(le, txt)
-                if was is not None:
-                    try:
-                        le.blockSignals(was)
-                    except Exception:
-                        pass
-            else:
-                set_text(le, txt)
+            _write_line_edit_text(
+                le,
+                param_value_to_text(params.get(key)),
+                skip_focused=bool(skip_focused),
+                block_signals_enabled=bool(block_signals),
+            )
 
 
 def set_single_param_in_ui(
@@ -114,46 +124,16 @@ def set_single_param_in_ui(
 
     Returns True if a matching widget was found (even if the text was unchanged).
     """
-    # Late import keeps this helper usable in unit tests without Qt.
-    try:
-        from .ui_update import set_text  # type: ignore
-    except Exception:
-        return False
-
-    obj_name: str | None = None
-    for _grp, mapping in param_widgets.items():
-        if key in mapping:
-            obj_name = str(mapping[key])
-            break
+    obj_name = next(
+        (str(mapping[key]) for mapping in param_widgets.values() if key in mapping),
+        None,
+    )
     if not obj_name:
         return False
 
-    try:
-        le = find_line_edit(obj_name)
-    except Exception:
-        le = None
-    if le is None:
-        return False
-
-    txt = param_value_to_text(value)
-    try:
-        if str(le.text()) == txt:
-            return True
-    except Exception:
-        pass
-
-    if block_signals:
-        try:
-            was = le.blockSignals(True)
-        except Exception:
-            was = None
-        set_text(le, txt)
-        if was is not None:
-            try:
-                le.blockSignals(was)
-            except Exception:
-                pass
-    else:
-        set_text(le, txt)
-
-    return True
+    le = _find_param_line_edit(obj_name, find_line_edit)
+    return _write_line_edit_text(
+        le,
+        param_value_to_text(value),
+        block_signals_enabled=bool(block_signals),
+    )
