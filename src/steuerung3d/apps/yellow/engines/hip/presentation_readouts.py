@@ -8,6 +8,62 @@ from ...domain.ui_format import fmt_f_unit, fmt_i_unit
 from .presentation_extract import raw_uplink_float
 from .viewmodel import HipReadoutsState
 
+_SCALE = 1000.0
+_DRUM_DIAMETER = 0.5
+_PI = 3.141592653589793
+
+
+def _float_or_default(value: object, default: float = 0.0) -> float:
+    try:
+        return float(value or default)
+    except Exception:
+        return default
+
+
+def _param_float(params: Mapping[str, float], key: str, default: float = 0.0) -> float:
+    return _float_or_default(params.get(key, default), default)
+
+
+def _ordered_param_pair(
+    params: Mapping[str, float], min_key: str, max_key: str, default: float = 0.0
+) -> tuple[float, float]:
+    min_value = _param_float(params, min_key, default)
+    max_value = _param_float(params, max_key, default)
+    if max_value < min_value:
+        return max_value, min_value
+    return min_value, max_value
+
+
+def _param_or_uplink(
+    params: Mapping[str, float],
+    key: str,
+    snap: TelemetrySnapshot,
+    uplink_key: str,
+    *,
+    default: float = 0.0,
+) -> float:
+    value = _param_float(params, key, default)
+    if value == 0.0:
+        return raw_uplink_float(snap, uplink_key, value)
+    return value
+
+
+def _clamp(value: float, lower: float, upper: float) -> float:
+    if value > upper:
+        return upper
+    if value < lower:
+        return lower
+    return value
+
+
+def _to_scaled_int(value: float, scale: float = _SCALE) -> int:
+    return int(round(value * scale))
+
+
+def _axis_vel_cmd(ax: AxisTelemetry | None, fallback: float) -> float:
+    source = getattr(ax, "vel_cmd", fallback) if ax is not None else fallback
+    return _float_or_default(source, fallback)
+
 
 def compute_readouts_state(
     *,
@@ -24,84 +80,40 @@ def compute_readouts_state(
     amp_text = fmt_i_unit(int(round(amp)), "A")
     temp_text = f"{int(round(temp))}°"
 
-    try:
-        g_pos_min = float(params.get("PosMin", 0.0) or 0.0)
-    except Exception:
-        g_pos_min = 0.0
-    try:
-        g_pos_max = float(params.get("PosMax", 0.0) or 0.0)
-    except Exception:
-        g_pos_max = 0.0
-    if g_pos_max < g_pos_min:
-        g_pos_min, g_pos_max = g_pos_max, g_pos_min
-
-    try:
-        g_pos = float(params.get("GuidePosIst", 0.0) or 0.0)
-    except Exception:
-        g_pos = 0.0
-    if g_pos == 0.0:
-        g_pos = raw_uplink_float(snap, "GuidePosIstUI", g_pos)
+    g_pos_min, g_pos_max = _ordered_param_pair(params, "PosMin", "PosMax")
+    g_pos = _param_or_uplink(params, "GuidePosIst", snap, "GuidePosIstUI")
 
     guider_min_text = f"{g_pos_min:.3f} m"
     guider_max_text = f"{g_pos_max:.3f} m"
     guider_val_text = f"{g_pos:.3f} m"
 
-    try:
-        vel_max = float(params.get("VelMax", 0.0) or 0.0)
-    except Exception:
-        vel_max = 0.0
+    vel_max = _param_float(params, "VelMax")
     if vel_max <= 0.0:
         vel_max = 1.0
 
-    try:
-        vel_cmd = float(getattr(ax, "vel_cmd", vel) if ax is not None else vel)
-    except Exception:
-        vel_cmd = vel
-    scale = 1000.0
-    vel_cmd_min = int(round(-vel_max * scale))
-    vel_cmd_max = int(round(+vel_max * scale))
-    vel_cmd_val = int(round(vel_cmd * scale))
+    vel_cmd = _axis_vel_cmd(ax, vel)
+    vel_cmd_min = _to_scaled_int(-vel_max)
+    vel_cmd_max = _to_scaled_int(+vel_max)
+    vel_cmd_val = _to_scaled_int(vel_cmd)
 
-    try:
-        user_min = float(params.get("UserMin", 0.0) or 0.0)
-    except Exception:
-        user_min = 0.0
-    try:
-        user_max = float(params.get("UserMax", 0.0) or 0.0)
-    except Exception:
-        user_max = 0.0
-    if user_max < user_min:
-        user_min, user_max = user_max, user_min
-    limit_min = int(round(user_min * scale))
-    limit_max = int(round(user_max * scale))
-    limit_val = int(round(pos * scale))
+    user_min, user_max = _ordered_param_pair(params, "UserMin", "UserMax")
+    limit_min = _to_scaled_int(user_min)
+    limit_max = _to_scaled_int(user_max)
+    limit_val = _to_scaled_int(pos)
 
-    drum_diam = 0.5
-    try:
-        pitch = float(params.get("Pitch", 0.0) or 0.0)
-    except Exception:
-        pitch = 0.0
-    denom = 3.141592653589793 * drum_diam
+    pitch = _param_float(params, "Pitch")
+    denom = _PI * _DRUM_DIAMETER
     ratio = (pitch / denom) if (denom > 0.0 and pitch > 0.0) else 0.0
 
-    try:
-        g_vel_meas = float(params.get("GuideIstSpeed", 0.0) or 0.0)
-    except Exception:
-        g_vel_meas = 0.0
-    if g_vel_meas == 0.0:
-        g_vel_meas = raw_uplink_float(snap, "GuideIstSpeedUI", g_vel_meas)
-
+    g_vel_meas = _param_or_uplink(params, "GuideIstSpeed", snap, "GuideIstSpeedUI")
     g_vel_max = abs(vel_max) * ratio
     if g_vel_max <= 0.0:
         g_vel_max = 1.0
-    if g_vel_meas > g_vel_max:
-        g_vel_meas = g_vel_max
-    elif g_vel_meas < -g_vel_max:
-        g_vel_meas = -g_vel_max
+    g_vel_meas = _clamp(g_vel_meas, -g_vel_max, g_vel_max)
 
-    guider_speed_min = int(round(-g_vel_max * scale))
-    guider_speed_max = int(round(+g_vel_max * scale))
-    guider_speed_val = int(round(g_vel_meas * scale))
+    guider_speed_min = _to_scaled_int(-g_vel_max)
+    guider_speed_max = _to_scaled_int(+g_vel_max)
+    guider_speed_val = _to_scaled_int(g_vel_meas)
     guider_speed_text = f"{g_vel_meas:.3f} m/s"
 
     return HipReadoutsState(
@@ -119,9 +131,9 @@ def compute_readouts_state(
         limit_min=int(limit_min),
         limit_max=int(limit_max),
         limit_val=int(limit_val),
-        guider_range_min=int(round(g_pos_min * scale)),
-        guider_range_max=int(round(g_pos_max * scale)),
-        guider_range_val=int(round(g_pos * scale)),
+        guider_range_min=_to_scaled_int(g_pos_min),
+        guider_range_max=_to_scaled_int(g_pos_max),
+        guider_range_val=_to_scaled_int(g_pos),
         guider_speed_min=int(guider_speed_min),
         guider_speed_max=int(guider_speed_max),
         guider_speed_val=int(guider_speed_val),
