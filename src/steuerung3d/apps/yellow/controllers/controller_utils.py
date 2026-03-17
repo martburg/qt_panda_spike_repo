@@ -8,6 +8,7 @@ reason about observability objects and Qt timer parenting.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Callable, Protocol, TypeVar
 
 from PySide6.QtCore import QObject, QTimer
@@ -22,6 +23,26 @@ class StatusEmitterLike(Protocol):
     def from_env(cls, *, default_service: str) -> "StatusEmitterLike": ...
 
     def emit_every(self, *, level: str, summary: str, fields: dict[str, object]) -> None: ...
+
+
+@dataclass(slots=True)
+class GuardedControllerOps:
+    """Tiny keyed wrappers for swallowed controller-side soft errors.
+
+    This keeps controller orchestration code readable while preserving the
+    existing best-effort semantics used around binder/UI interactions.
+    """
+
+    soft_errors: dict[str, int]
+
+    def bump(self, key: str) -> None:
+        bump_soft_error(self.soft_errors, key)
+
+    def best_effort(self, key: str, func: Callable[[], None]) -> None:
+        best_effort(func, on_error=lambda: self.bump(key))
+
+    def read_or_fallback(self, key: str, func: Callable[[], _T], *, fallback: _T) -> _T:
+        return read_or_fallback(func, fallback=fallback, on_error=lambda: self.bump(key))
 
 
 def init_observability(

@@ -14,7 +14,6 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, replace
-from typing import Callable
 
 from PySide6.QtWidgets import QWidget
 
@@ -32,13 +31,7 @@ from ..ports import CommandIn, TelemetryOut
 from ..qtutil.bindings import YellowBindings
 from ..qtutil.perf_watchdog import PerfWatchdog
 from ..runtimes.densi_runtime import DensiRuntime
-from .controller_utils import (
-    best_effort,
-    bump_soft_error,
-    init_observability,
-    read_or_fallback,
-    start_poll_timer,
-)
+from .controller_utils import GuardedControllerOps, init_observability, start_poll_timer
 
 log = logging.getLogger("den_si")
 
@@ -58,6 +51,7 @@ class DenSiController:
     def __post_init__(self) -> None:
         # Soft-error counters for swallowed exceptions (binder/UI)
         self._soft_errors: dict[str, int] = {}
+        self._guard_ops = GuardedControllerOps(self._soft_errors)
         """Bind widgets and initialize the DenSi device-side simulator."""
         self._init_wire_proto_and_ui()
         self._init_observability()
@@ -103,17 +97,13 @@ class DenSiController:
     # ------------------------------------------------------------------
 
     def _bump_soft_error(self, key: str) -> None:
-        bump_soft_error(self._soft_errors, key)
+        self._guard_ops.bump(key)
 
-    def _best_effort(self, key: str, func: Callable[[], None]) -> None:
-        best_effort(func, on_error=lambda: self._bump_soft_error(key))
+    def _best_effort(self, key: str, func) -> None:
+        self._guard_ops.best_effort(key, func)
 
-    def _read_or_fallback(
-        self, key: str, func: Callable[[], object], *, fallback: object
-    ) -> object:
-        return read_or_fallback(
-            func, fallback=fallback, on_error=lambda: self._bump_soft_error(key)
-        )
+    def _read_or_fallback(self, key: str, func, *, fallback):
+        return self._guard_ops.read_or_fallback(key, func, fallback=fallback)
 
     # ------------------------------------------------------------------
     # Initialization helpers
