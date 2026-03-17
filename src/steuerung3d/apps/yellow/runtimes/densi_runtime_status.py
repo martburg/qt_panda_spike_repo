@@ -8,7 +8,7 @@ from typing import Any
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
-from .densi_runtime_types import DensiRuntimeStatusLike
+from .densi_runtime_types import DensiRuntimeStatusLike, DensiRuntimeStatusPayloadLike
 from .runtime_kernel import compute_health, emit_runtime_status, with_health_fields
 
 
@@ -19,12 +19,12 @@ class DensiStatusPayload:
     fields: dict[str, Any]
 
 
-def _axis_id(runtime: DensiRuntimeStatusLike) -> str:
+def _axis_id(runtime: DensiRuntimeStatusPayloadLike) -> str:
     axis_ids = list(getattr(runtime, "_axis_ids", []) or [])
     return str(axis_ids[0]) if axis_ids else ""
 
 
-def _engine_state(runtime: DensiRuntimeStatusLike) -> object:
+def _engine_state(runtime: DensiRuntimeStatusPayloadLike) -> object:
     return getattr(getattr(runtime, "engine", object()), "state", object())
 
 
@@ -44,7 +44,7 @@ def _command_setpoint(cmd: CommandFrame | None, axis: str) -> tuple[bool, float]
 
 
 def _axis_applied_state(
-    runtime: DensiRuntimeStatusLike, axis: str
+    runtime: DensiRuntimeStatusPayloadLike, axis: str
 ) -> tuple[float, float, int | None]:
     if not axis:
         return 0.0, 0.0, None
@@ -64,7 +64,7 @@ def _axis_applied_state(
 
 
 def build_densi_status_payload(
-    *, runtime: DensiRuntimeStatusLike, now_ns: int
+    *, runtime: DensiRuntimeStatusPayloadLike, now_ns: int
 ) -> DensiStatusPayload:
     h = compute_health(
         now_ns=int(now_ns),

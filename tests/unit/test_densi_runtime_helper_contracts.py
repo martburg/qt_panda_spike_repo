@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from types import SimpleNamespace
+from typing import cast
 
-from steuerung3d.apps.yellow.engines.densi.inputs import DensiInputs, DensiUiInputs
+from steuerung3d.apps.yellow.engines.densi.inputs import (
+    DensiEstopToggle,
+    DensiInputs,
+    DensiUiInputs,
+)
 from steuerung3d.apps.yellow.runtimes.densi_runtime_status import build_densi_status_payload
 from steuerung3d.apps.yellow.runtimes.densi_runtime_tick import edge_log_cmd_changes
 from steuerung3d.apps.yellow.runtimes.densi_runtime_ui_actions import apply_ui_actions
+from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
+from steuerung3d.util.heartbeat import ChangeTracker
 
 
 class _Axis:
@@ -16,9 +24,30 @@ class _Axis:
         self.meta = {"plc_lifetick_age_ticks": 7}
 
 
-class _Tracker:
-    def changed(self, key: str, value: object) -> bool:
-        return True
+@dataclass
+class _PayloadRuntime:
+    _last_cmd_ns: int | None
+    _stale_after_ms: int
+    _seen_first_cmd: bool
+    _last_estop: bool
+    _last_fault: bool
+    _axis_ids: list[str]
+    _last_mode: str
+    _last_cmd: CommandFrame | None
+    engine: object
+
+
+@dataclass
+class _TickRuntime:
+    _ch: ChangeTracker
+    _log: logging.Logger
+
+
+@dataclass
+class _UiRuntime:
+    engine: object
+    _log: logging.Logger
+    _force_refresh_checkboxes: bool
 
 
 class _EngineStub:
@@ -32,7 +61,7 @@ class _EngineStub:
 
 
 def test_densi_status_payload_accepts_narrow_runtime_stub() -> None:
-    runtime = SimpleNamespace(
+    runtime = _PayloadRuntime(
         _last_cmd_ns=1,
         _stale_after_ms=500,
         _seen_first_cmd=True,
@@ -40,10 +69,14 @@ def test_densi_status_payload_accepts_narrow_runtime_stub() -> None:
         _last_fault=False,
         _axis_ids=["Anton"],
         _last_mode="LIVE",
-        _last_cmd=SimpleNamespace(
+        _last_cmd=CommandFrame(
+            tick=0,
+            t_s=0.0,
+            estop=False,
+            fault=False,
             core_mode="LIVE",
             intent=True,
-            axes={"Anton": SimpleNamespace(enable=True, vel=0.5)},
+            axes={"Anton": AxisSetpoint(enable=True, vel=0.5)},
         ),
         engine=SimpleNamespace(
             drive_ready=True,
@@ -62,21 +95,36 @@ def test_densi_status_payload_accepts_narrow_runtime_stub() -> None:
     assert payload.fields["cmd_enable"] is True
     debug = payload.fields.get("debug")
     assert isinstance(debug, dict)
-    assert debug.get("axis_selected") == "Anton"
-    assert debug.get("cmd_vel") == 0.5
-    assert debug.get("vel_applied") == 0.25
-    assert debug.get("lifetick_age_ticks") == 7
+    debug_map = cast(dict[str, object], debug)
+    assert debug_map.get("axis_selected") == "Anton"
+    assert debug_map.get("cmd_vel") == 0.5
+    assert debug_map.get("vel_applied") == 0.25
+    assert debug_map.get("lifetick_age_ticks") == 7
 
 
 def test_densi_tick_helpers_accept_minimal_runtime_stub() -> None:
     records: list[str] = []
 
-    class _Log:
-        def info(self, msg: str, *args: object) -> None:
-            records.append(msg % args if args else msg)
+    class _ListHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            records.append(record.getMessage())
 
-    runtime = SimpleNamespace(_ch=_Tracker(), _log=_Log())
-    cmd = SimpleNamespace(core_mode="LIVE", estop_reset=True)
+    logger = logging.getLogger("test.densi.tick_helpers")
+    logger.handlers = []
+    logger.propagate = False
+    logger.setLevel(logging.INFO)
+    logger.addHandler(_ListHandler())
+
+    runtime = _TickRuntime(_ch=ChangeTracker(), _log=logger)
+    cmd = CommandFrame(
+        tick=0,
+        t_s=0.0,
+        estop=False,
+        fault=False,
+        core_mode="LIVE",
+        estop_reset=True,
+        axes={},
+    )
 
     edge_log_cmd_changes(runtime, cmd)
 
@@ -86,13 +134,13 @@ def test_densi_tick_helpers_accept_minimal_runtime_stub() -> None:
 
 def test_densi_ui_actions_accept_minimal_runtime_stub() -> None:
     engine = _EngineStub()
-    runtime = SimpleNamespace(
+    runtime = _UiRuntime(
         engine=engine,
         _log=logging.getLogger("test.densi.ui_actions"),
         _force_refresh_checkboxes=False,
     )
     ui = DensiUiInputs()
-    ui.estop_bit_toggles.append(SimpleNamespace(key="taster", checked=True))
+    ui.estop_bit_toggles.append(DensiEstopToggle(key="taster", checked=True))
 
     apply_ui_actions(runtime, DensiInputs(frames=[], now_ns=0, ui=ui))
 

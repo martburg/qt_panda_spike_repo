@@ -11,6 +11,7 @@ from typing import cast
 from steuerung3d.core.command_frame import CommandFrame
 
 from .engine_host_protocols import DenSiEngineHost
+from .engine_types import DenSiTickResult
 from .motion_clamp import apply_estop_clamp_to_state, compute_moving_guard
 from .param_ops import apply_densi_param_ops
 from .plc_anton_vel_cmd import step_plc_anton_vel_cmd
@@ -158,5 +159,5 @@ class DenSiPipelineMixin:
         host.state.t_s += float(host.tb.dt_s)
         host.prev_estop_state = bool(host.state.estop)
 
-    def step(self, *, frames: list[CommandFrame], now_ns: int) -> object:
+    def step(self, *, frames: list[CommandFrame], now_ns: int) -> DenSiTickResult:
         return _step(engine=self._host(), frames=frames, now_ns=now_ns)

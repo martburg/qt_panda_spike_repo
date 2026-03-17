@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from logging import Logger
 from typing import Any, List, Protocol, runtime_checkable
 
+from steuerung3d.apps.supervisor.models import DensiRemoteAction
+from steuerung3d.apps.yellow.ports import CommandIn
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
@@ -51,7 +53,7 @@ class DensiRuntimeDebugLike(Protocol):
 
 
 @runtime_checkable
-class DensiRuntimeStatusLike(Protocol):
+class DensiRuntimeStatusPayloadLike(Protocol):
     engine: Any
     _axis_ids: list[str]
     _stale_after_ms: int
@@ -61,11 +63,20 @@ class DensiRuntimeStatusLike(Protocol):
     _last_fault: bool
     _last_mode: str
     _last_cmd: CommandFrame | None
+
+
+@runtime_checkable
+class DensiRuntimeStatusLike(DensiRuntimeStatusPayloadLike, Protocol):
     _status: Any
     _dbg_rl: Any
     _hb: Heartbeat
     _ch: ChangeTracker
     _log: Logger
+
+
+@runtime_checkable
+class DensiActionInLike(Protocol):
+    def drain_actions(self, limit: int = 1000) -> list[DensiRemoteAction]: ...
 
 
 @runtime_checkable
@@ -77,8 +88,8 @@ class DensiRuntimeViewModelLike(Protocol):
 
 @runtime_checkable
 class DensiRuntimeInputLike(Protocol):
-    command_in: Any
-    action_in: Any
+    command_in: CommandIn
+    action_in: DensiActionInLike | None
     _log: Logger
 
     def _apply_ui_actions(self, inputs: DensiInputs) -> None: ...

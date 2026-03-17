@@ -13,17 +13,20 @@ from __future__ import annotations
 
 import logging
 
+from steuerung3d.apps.yellow.ports import CommandIn, TelemetryOut
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 
 from ..engines.densi.engine import DenSiEngine
+from ..engines.densi.engine_types import DenSiTickResult
 from ..engines.densi.inputs import DensiInputs
 from ..engines.densi.viewmodel import DensiViewModel
 from .densi_runtime_debug import step_lifetick_debug
 from .densi_runtime_status import emit_status, publish_telemetry_and_heartbeat
 from .densi_runtime_tick import edge_log_cmd_changes, handle_gui_not_halt_cmd
 from .densi_runtime_types import (
+    DensiActionInLike,
     DensiRuntimeDebugLike,
     DensiRuntimeResult,
     DensiRuntimeStatusLike,
@@ -41,8 +44,8 @@ class DensiRuntime:
         self,
         *,
         engine: DenSiEngine,
-        command_in,
-        telemetry_out,
+        command_in: CommandIn,
+        telemetry_out: TelemetryOut,
         hb: Heartbeat,
         ch: ChangeTracker,
         status=None,
@@ -50,7 +53,7 @@ class DensiRuntime:
         axis_ids: list[str],
         stale_after_ms: int,
         log: logging.Logger,
-        action_in=None,
+        action_in: DensiActionInLike | None = None,
     ) -> None:
         self.engine = engine
         self.command_in = command_in
@@ -191,7 +194,7 @@ class DensiRuntime:
         self,
         *,
         now_ns: int,
-        tick_result,
+        tick_result: DenSiTickResult,
         snap: TelemetrySnapshot,
         last_cmd: CommandFrame | None,
         last_cmd_ns: int | None,

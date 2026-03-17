@@ -7,7 +7,8 @@ from steuerung3d.core.axis_ids import normalize_axis_id
 
 
 class _AxisGateStateLike(Protocol):
-    core_axis_gate: Mapping[str, Mapping[str, object]]
+    @property
+    def core_axis_gate(self) -> Mapping[str, Mapping[str, object]]: ...
 
 
 def axis_local_motion_allowed(state: _AxisGateStateLike, axis_id: str) -> bool:

@@ -19,7 +19,9 @@ class _FakeStatus:
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
 
-    def emit_every(self, *, level: str = "OK", summary: str = "", fields: dict[str, object] | None = None) -> None:
+    def emit_every(
+        self, *, level: str = "OK", summary: str = "", fields: dict[str, object] | None = None
+    ) -> None:
         self.calls.append({"level": level, "summary": summary, "fields": dict(fields or {})})
 
 

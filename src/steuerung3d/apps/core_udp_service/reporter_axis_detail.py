@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from steuerung3d.apps.yellow.domain.banner_facts import derive_banner_estate_from_word
@@ -56,9 +56,7 @@ def _build_blocked_payload(
 def _decode_estop_state(
     *, router: BirdsEyeRouterLike | None, snap: BirdsEyeSnapLike, axis_id: str
 ) -> tuple[dict[str, object], str]:
-    last_dev_estop_word_by_axis = (
-        router.last_dev_estop_word_by_axis if router is not None else {}
-    )
+    last_dev_estop_word_by_axis = router.last_dev_estop_word_by_axis if router is not None else {}
     estop_word = int(last_dev_estop_word_by_axis.get(axis_id, int(snap.estop_status_word)) or 0)
     try:
         bits = decode_estop_word(estop_word)
