@@ -5,6 +5,10 @@ from typing import TYPE_CHECKING
 from steuerung3d.core.axis_id import normalize_axis_id
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.telemetry import TelemetrySnapshot
+from steuerung3d.core.telemetry_projection import (
+    project_device_surface_from_axis,
+    snapshot_with_axis_device_caches,
+)
 
 from .axis_router_types import make_snapshot
 
@@ -24,7 +28,7 @@ def slice_snapshot_for_axis(
     lease_axis = dict(getattr(snap, "lease_axis", {}) or {})
     lease_one = {axis_id: lease_axis[axis_id]} if axis_id in lease_axis else {}
 
-    return make_snapshot(
+    base = make_snapshot(
         tick=int(getattr(snap, "tick", 0)),
         t_s=float(getattr(snap, "t_s", 0.0)),
         core_mode=str(getattr(snap, "core_mode", "")),
@@ -35,61 +39,23 @@ def slice_snapshot_for_axis(
         densis=densis_one,
         lease_rig=str(getattr(snap, "lease_rig", "")),
         lease_axis=lease_one,
-        estop_status_word=int(
-            router.last_dev_estop_word_by_axis.get(
-                axis_id, int(getattr(snap, "estop_status_word", 0))
-            )
-        ),
-        param_edit_active=bool(
-            router.last_dev_param_edit_active_by_axis.get(
-                axis_id, bool(getattr(snap, "param_edit_active", False))
-            )
-        ),
-        param_edit_group=str(
-            router.last_dev_param_edit_group_by_axis.get(
-                axis_id, str(getattr(snap, "param_edit_group", ""))
-            )
-        ),
-        params=dict(
-            router.last_dev_params_by_axis.get(axis_id, dict(getattr(snap, "params", {})) or {})
-        ),
-        plc_uplink_fields=dict(
-            router.last_dev_plc_uplink_fields_by_axis.get(
-                axis_id, dict(getattr(snap, "plc_uplink_fields", {})) or {}
-            )
-        ),
-        plc_uplink_tail=dict(
-            router.last_dev_plc_uplink_tail_by_axis.get(
-                axis_id, dict(getattr(snap, "plc_uplink_tail", {})) or {}
-            )
-        ),
         core_acks=list(getattr(snap, "core_acks", [])),
-        param_commit_req_id=str(
-            router.last_dev_param_commit_req_id_by_axis.get(
-                axis_id, str(getattr(snap, "param_commit_req_id", ""))
-            )
-        ),
-        param_commit_group=str(
-            router.last_dev_param_commit_group_by_axis.get(
-                axis_id, str(getattr(snap, "param_commit_group", ""))
-            )
-        ),
-        param_commit_status=str(
-            router.last_dev_param_commit_status_by_axis.get(
-                axis_id, str(getattr(snap, "param_commit_status", "idle"))
-            )
-        ),
-        param_commit_age_ticks=int(
-            router.last_dev_param_commit_age_ticks_by_axis.get(
-                axis_id, int(getattr(snap, "param_commit_age_ticks", 0))
-            )
-        ),
-        param_commit_unmatched=list(
-            router.last_dev_param_commit_unmatched_by_axis.get(
-                axis_id, list(getattr(snap, "param_commit_unmatched", [])) or []
-            )
-        ),
         joy=getattr(snap, "joy", JoyState()),
+    )
+    return project_device_surface_from_axis(
+        base,
+        axis_id,
+        estop_status_word_by_axis=router.last_dev_estop_word_by_axis,
+        param_edit_active_by_axis=router.last_dev_param_edit_active_by_axis,
+        param_edit_group_by_axis=router.last_dev_param_edit_group_by_axis,
+        params_by_axis=router.last_dev_params_by_axis,
+        plc_uplink_fields_by_axis=router.last_dev_plc_uplink_fields_by_axis,
+        plc_uplink_tail_by_axis=router.last_dev_plc_uplink_tail_by_axis,
+        param_commit_req_id_by_axis=router.last_dev_param_commit_req_id_by_axis,
+        param_commit_group_by_axis=router.last_dev_param_commit_group_by_axis,
+        param_commit_status_by_axis=router.last_dev_param_commit_status_by_axis,
+        param_commit_age_ticks_by_axis=router.last_dev_param_commit_age_ticks_by_axis,
+        param_commit_unmatched_by_axis=router.last_dev_param_commit_unmatched_by_axis,
     )
 
 
@@ -108,7 +74,7 @@ def project_joy_for_axis(snap: TelemetrySnapshot, axis_id: str) -> JoyState:
 def fanout_snapshot_with_axis_caches(
     router: "AxisRouter", snap: TelemetrySnapshot
 ) -> TelemetrySnapshot:
-    return make_snapshot(
+    base = make_snapshot(
         tick=int(getattr(snap, "tick", 0)),
         t_s=float(getattr(snap, "t_s", 0.0)),
         core_mode=str(getattr(snap, "core_mode", "")),
@@ -128,47 +94,6 @@ def fanout_snapshot_with_axis_caches(
         params=dict(getattr(snap, "params", {}) or {}),
         plc_uplink_fields=dict(getattr(snap, "plc_uplink_fields", {}) or {}),
         plc_uplink_tail=dict(getattr(snap, "plc_uplink_tail", {}) or {}),
-        axis_estop_status_word={
-            str(k): int(v) for k, v in dict(router.last_dev_estop_word_by_axis or {}).items()
-        },
-        axis_param_edit_active={
-            str(k): bool(v)
-            for k, v in dict(router.last_dev_param_edit_active_by_axis or {}).items()
-        },
-        axis_param_edit_group={
-            str(k): str(v) for k, v in dict(router.last_dev_param_edit_group_by_axis or {}).items()
-        },
-        axis_params={
-            str(k): dict(v or {}) for k, v in dict(router.last_dev_params_by_axis or {}).items()
-        },
-        axis_plc_uplink_fields={
-            str(k): dict(v or {})
-            for k, v in dict(router.last_dev_plc_uplink_fields_by_axis or {}).items()
-        },
-        axis_plc_uplink_tail={
-            str(k): dict(v or {})
-            for k, v in dict(router.last_dev_plc_uplink_tail_by_axis or {}).items()
-        },
-        axis_param_commit_req_id={
-            str(k): str(v)
-            for k, v in dict(router.last_dev_param_commit_req_id_by_axis or {}).items()
-        },
-        axis_param_commit_group={
-            str(k): str(v)
-            for k, v in dict(router.last_dev_param_commit_group_by_axis or {}).items()
-        },
-        axis_param_commit_status={
-            str(k): str(v)
-            for k, v in dict(router.last_dev_param_commit_status_by_axis or {}).items()
-        },
-        axis_param_commit_age_ticks={
-            str(k): int(v)
-            for k, v in dict(router.last_dev_param_commit_age_ticks_by_axis or {}).items()
-        },
-        axis_param_commit_unmatched={
-            str(k): list(v or [])
-            for k, v in dict(router.last_dev_param_commit_unmatched_by_axis or {}).items()
-        },
         core_acks=list(getattr(snap, "core_acks", [])),
         param_commit_req_id=str(getattr(snap, "param_commit_req_id", "")),
         param_commit_group=str(getattr(snap, "param_commit_group", "")),
@@ -176,4 +101,18 @@ def fanout_snapshot_with_axis_caches(
         param_commit_age_ticks=int(getattr(snap, "param_commit_age_ticks", 0)),
         param_commit_unmatched=list(getattr(snap, "param_commit_unmatched", []) or []),
         joy=getattr(snap, "joy", JoyState()),
+    )
+    return snapshot_with_axis_device_caches(
+        base,
+        estop_status_word_by_axis=router.last_dev_estop_word_by_axis,
+        param_edit_active_by_axis=router.last_dev_param_edit_active_by_axis,
+        param_edit_group_by_axis=router.last_dev_param_edit_group_by_axis,
+        params_by_axis=router.last_dev_params_by_axis,
+        plc_uplink_fields_by_axis=router.last_dev_plc_uplink_fields_by_axis,
+        plc_uplink_tail_by_axis=router.last_dev_plc_uplink_tail_by_axis,
+        param_commit_req_id_by_axis=router.last_dev_param_commit_req_id_by_axis,
+        param_commit_group_by_axis=router.last_dev_param_commit_group_by_axis,
+        param_commit_status_by_axis=router.last_dev_param_commit_status_by_axis,
+        param_commit_age_ticks_by_axis=router.last_dev_param_commit_age_ticks_by_axis,
+        param_commit_unmatched_by_axis=router.last_dev_param_commit_unmatched_by_axis,
     )

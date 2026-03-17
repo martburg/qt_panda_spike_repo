@@ -1,25 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
 from steuerung3d.core.telemetry import TelemetrySnapshot
-
-
-def _blank_device_surface(snap: TelemetrySnapshot) -> TelemetrySnapshot:
-    return replace(
-        snap,
-        estop_status_word=0,
-        param_edit_active=False,
-        param_edit_group="",
-        params={},
-        plc_uplink_fields={},
-        plc_uplink_tail={},
-        param_commit_req_id="",
-        param_commit_group="",
-        param_commit_status="idle",
-        param_commit_age_ticks=0,
-        param_commit_unmatched=[],
-    )
+from steuerung3d.core.telemetry_projection import (
+    axis_cache_maps_from_snapshot,
+    blank_device_surface,
+    has_axis_device_cache,
+    project_device_surface_from_axis,
+)
 
 
 def axis_scoped_snapshot(snap: TelemetrySnapshot, axis_id: str) -> TelemetrySnapshot:
@@ -38,51 +25,25 @@ def axis_scoped_snapshot(snap: TelemetrySnapshot, axis_id: str) -> TelemetrySnap
     """
     axis = str(axis_id or "").strip()
 
-    estop_map = dict(getattr(snap, "axis_estop_status_word", {}) or {})
-    edit_active_map = dict(getattr(snap, "axis_param_edit_active", {}) or {})
-    edit_group_map = dict(getattr(snap, "axis_param_edit_group", {}) or {})
-    params_map = dict(getattr(snap, "axis_params", {}) or {})
-    fields_map = dict(getattr(snap, "axis_plc_uplink_fields", {}) or {})
-    tail_map = dict(getattr(snap, "axis_plc_uplink_tail", {}) or {})
-    commit_req_map = dict(getattr(snap, "axis_param_commit_req_id", {}) or {})
-    commit_group_map = dict(getattr(snap, "axis_param_commit_group", {}) or {})
-    commit_status_map = dict(getattr(snap, "axis_param_commit_status", {}) or {})
-    commit_age_map = dict(getattr(snap, "axis_param_commit_age_ticks", {}) or {})
-    commit_unmatched_map = dict(getattr(snap, "axis_param_commit_unmatched", {}) or {})
-
-    has_axis_cache = any(
-        bool(m)
-        for m in (
-            estop_map,
-            edit_active_map,
-            edit_group_map,
-            params_map,
-            fields_map,
-            tail_map,
-            commit_req_map,
-            commit_group_map,
-            commit_status_map,
-            commit_age_map,
-            commit_unmatched_map,
-        )
-    )
-    if not has_axis_cache:
+    axis_cache_maps = axis_cache_maps_from_snapshot(snap)
+    if not has_axis_device_cache(axis_cache_maps):
         return snap
 
     if not axis:
-        return _blank_device_surface(snap)
+        return blank_device_surface(snap)
 
-    return replace(
+    return project_device_surface_from_axis(
         snap,
-        estop_status_word=int(estop_map.get(axis, 0)),
-        param_edit_active=bool(edit_active_map.get(axis, False)),
-        param_edit_group=str(edit_group_map.get(axis, "")),
-        params=dict(params_map.get(axis, {}) or {}),
-        plc_uplink_fields=dict(fields_map.get(axis, {}) or {}),
-        plc_uplink_tail=dict(tail_map.get(axis, {}) or {}),
-        param_commit_req_id=str(commit_req_map.get(axis, "")),
-        param_commit_group=str(commit_group_map.get(axis, "")),
-        param_commit_status=str(commit_status_map.get(axis, "idle")),
-        param_commit_age_ticks=int(commit_age_map.get(axis, 0)),
-        param_commit_unmatched=list(commit_unmatched_map.get(axis, []) or []),
+        axis,
+        estop_status_word_by_axis=axis_cache_maps["estop_status_word"],
+        param_edit_active_by_axis=axis_cache_maps["param_edit_active"],
+        param_edit_group_by_axis=axis_cache_maps["param_edit_group"],
+        params_by_axis=axis_cache_maps["params"],
+        plc_uplink_fields_by_axis=axis_cache_maps["plc_uplink_fields"],
+        plc_uplink_tail_by_axis=axis_cache_maps["plc_uplink_tail"],
+        param_commit_req_id_by_axis=axis_cache_maps["param_commit_req_id"],
+        param_commit_group_by_axis=axis_cache_maps["param_commit_group"],
+        param_commit_status_by_axis=axis_cache_maps["param_commit_status"],
+        param_commit_age_ticks_by_axis=axis_cache_maps["param_commit_age_ticks"],
+        param_commit_unmatched_by_axis=axis_cache_maps["param_commit_unmatched"],
     )
