@@ -1,4 +1,3 @@
-# src/steuerung3d/apps/yellow/qtutil/ui_update.py
 """Small, pragmatic UI write helpers.
 
 Goals:
@@ -9,13 +8,61 @@ Goals:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:  # pragma: no cover
     from PySide6.QtWidgets import QWidget
 
 
-def _repolish(widget: "QWidget") -> None:
+@runtime_checkable
+class _StyleLike(Protocol):
+    def unpolish(self, widget: object) -> None: ...
+    def polish(self, widget: object) -> None: ...
+
+
+@runtime_checkable
+class _WidgetLike(Protocol):
+    def style(self) -> _StyleLike: ...
+    def update(self) -> None: ...
+    def property(self, name: str) -> object: ...
+    def setProperty(self, name: str, value: object) -> bool: ...
+
+
+@runtime_checkable
+class _HasText(Protocol):
+    def text(self) -> str: ...
+    def setText(self, text: str) -> None: ...
+
+
+@runtime_checkable
+class _HasEnabled(Protocol):
+    def isEnabled(self) -> bool: ...
+    def setEnabled(self, enabled: bool) -> None: ...
+
+
+@runtime_checkable
+class _HasChecked(Protocol):
+    def isChecked(self) -> bool: ...
+    def setChecked(self, checked: bool) -> None: ...
+
+
+@runtime_checkable
+class _HasBlockSignals(Protocol):
+    def blockSignals(self, block: bool) -> bool: ...
+
+
+@runtime_checkable
+class _SliderLike(Protocol):
+    def minimum(self) -> int: ...
+    def maximum(self) -> int: ...
+    def value(self) -> int: ...
+    def setMinimum(self, value: int) -> None: ...
+    def setMaximum(self, value: int) -> None: ...
+    def setValue(self, value: int) -> None: ...
+    def blockSignals(self, block: bool) -> bool: ...
+
+
+def _repolish(widget: "QWidget" | _WidgetLike) -> None:
     """Force QSS to re-evaluate dynamic properties on a widget."""
     style = widget.style()
     style.unpolish(widget)
@@ -23,7 +70,7 @@ def _repolish(widget: "QWidget") -> None:
     widget.update()
 
 
-def set_state_property(widget: "QWidget", state: Any, prop: str = "state") -> None:
+def set_state_property(widget: "QWidget" | _WidgetLike, state: Any, prop: str = "state") -> None:
     """Set a QSS-driving dynamic property and repolish (only if it changed)."""
     try:
         if widget.property(prop) == state:
@@ -40,7 +87,7 @@ def set_state_by_object_name(
     """Find a child widget under `root` by objectName and set its state property."""
     try:
         # Import only for runtime (keeps helper importable in headless/unit test contexts).
-        from PySide6.QtWidgets import QWidget  # type: ignore
+        from PySide6.QtWidgets import QWidget
 
         w = root.findChild(QWidget, object_name)
         if w is None:
@@ -50,34 +97,32 @@ def set_state_by_object_name(
         return
 
 
-def set_text(widget: Optional[Any], text: str) -> None:
+def set_text(widget: Optional[_HasText], text: str) -> None:
     """Set QLabel/QLineEdit text only if it differs."""
     if widget is None:
         return
     try:
-        cur = widget.text()  # type: ignore[attr-defined]
-        if cur == text:
+        if widget.text() == text:
             return
-        widget.setText(text)  # type: ignore[attr-defined]
+        widget.setText(text)
     except Exception:
         return
 
 
-def set_enabled(widget: Optional[Any], enabled: bool) -> None:
+def set_enabled(widget: Optional[_HasEnabled], enabled: bool) -> None:
     """Set QWidget enabled state only if it differs."""
     if widget is None:
         return
     try:
-        cur = bool(widget.isEnabled())  # type: ignore[attr-defined]
         en = bool(enabled)
-        if cur == en:
+        if bool(widget.isEnabled()) == en:
             return
-        widget.setEnabled(en)  # type: ignore[attr-defined]
+        widget.setEnabled(en)
     except Exception:
         return
 
 
-def set_enabled_repolish(widget: Optional[Any], enabled: bool) -> None:
+def set_enabled_repolish(widget: Optional[_HasEnabled], enabled: bool) -> None:
     """Set enabled state and repolish the widget, but only on change.
 
     Some Yellow UI variants rely on QSS rules that combine dynamic properties
@@ -87,21 +132,22 @@ def set_enabled_repolish(widget: Optional[Any], enabled: bool) -> None:
     if widget is None:
         return
     try:
-        cur = bool(widget.isEnabled())  # type: ignore[attr-defined]
         en = bool(enabled)
-        if cur == en:
+        if bool(widget.isEnabled()) == en:
             return
-        widget.setEnabled(en)  # type: ignore[attr-defined]
+        widget.setEnabled(en)
         # Repolish is intentionally only done when enabled state changed.
         try:
-            _repolish(widget)  # type: ignore[arg-type]
+            _repolish(widget)
         except Exception:
             pass
     except Exception:
         return
 
 
-def set_checked(widget: Optional[Any], checked: bool, *, block_signals: bool = False) -> None:
+def set_checked(
+    widget: Optional[_HasChecked], checked: bool, *, block_signals: bool = False
+) -> None:
     """Set QAbstractButton/QCheckBox checked state only if it differs.
 
     If block_signals=True, the widget's signals are temporarily blocked.
@@ -110,27 +156,27 @@ def set_checked(widget: Optional[Any], checked: bool, *, block_signals: bool = F
         return
     try:
         v = bool(checked)
-        if bool(widget.isChecked()) == v:  # type: ignore[attr-defined]
+        if bool(widget.isChecked()) == v:
             return
-        if block_signals:
+        if block_signals and isinstance(widget, _HasBlockSignals):
             try:
-                was = widget.blockSignals(True)  # type: ignore[attr-defined]
+                was = widget.blockSignals(True)
             except Exception:
                 was = None
-            widget.setChecked(v)  # type: ignore[attr-defined]
+            widget.setChecked(v)
             if was is not None:
                 try:
-                    widget.blockSignals(was)  # type: ignore[attr-defined]
+                    widget.blockSignals(was)
                 except Exception:
                     pass
         else:
-            widget.setChecked(v)  # type: ignore[attr-defined]
+            widget.setChecked(v)
     except Exception:
         return
 
 
 def update_slider(
-    slider: Optional[Any],
+    slider: Optional[_SliderLike],
     *,
     minimum: int | None = None,
     maximum: int | None = None,
@@ -146,31 +192,31 @@ def update_slider(
     if slider is None:
         return
     try:
-        need_min = minimum is not None and int(slider.minimum()) != int(minimum)  # type: ignore[attr-defined]
-        need_max = maximum is not None and int(slider.maximum()) != int(maximum)  # type: ignore[attr-defined]
-        need_val = value is not None and int(slider.value()) != int(value)  # type: ignore[attr-defined]
+        need_min = minimum is not None and int(slider.minimum()) != int(minimum)
+        need_max = maximum is not None and int(slider.maximum()) != int(maximum)
+        need_val = value is not None and int(slider.value()) != int(value)
         if not (need_min or need_max or need_val):
             return
 
         if block_signals:
             try:
-                was = slider.blockSignals(True)  # type: ignore[attr-defined]
+                was = slider.blockSignals(True)
             except Exception:
                 was = None
         else:
             was = None
 
         # Range first, then value.
-        if need_min:
-            slider.setMinimum(int(minimum))  # type: ignore[attr-defined]
-        if need_max:
-            slider.setMaximum(int(maximum))  # type: ignore[attr-defined]
-        if need_val:
-            slider.setValue(int(value))  # type: ignore[attr-defined]
+        if need_min and minimum is not None:
+            slider.setMinimum(int(minimum))
+        if need_max and maximum is not None:
+            slider.setMaximum(int(maximum))
+        if need_val and value is not None:
+            slider.setValue(int(value))
 
         if was is not None:
             try:
-                slider.blockSignals(was)  # type: ignore[attr-defined]
+                slider.blockSignals(was)
             except Exception:
                 pass
     except Exception:

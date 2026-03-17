@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ..._lazy_exports import resolve_lazy_export
+
 __all__ = [
     "DenSiEngine",
     "DenSiTickResult",
@@ -15,37 +17,22 @@ __all__ = [
     "normalize_densi_view_model",
 ]
 
+_EXPORTS = {
+    "DenSiEngine": ("steuerung3d.apps.yellow.engines.densi.engine", "DenSiEngine"),
+    "DenSiTickResult": ("steuerung3d.apps.yellow.engines.densi.engine_types", "DenSiTickResult"),
+    "DensiInputs": ("steuerung3d.apps.yellow.engines.densi.inputs", "DensiInputs"),
+    "DensiUiInputs": ("steuerung3d.apps.yellow.engines.densi.inputs", "DensiUiInputs"),
+    "DensiEstopToggle": ("steuerung3d.apps.yellow.engines.densi.inputs", "DensiEstopToggle"),
+    "EStopState": ("steuerung3d.apps.yellow.engines.densi.types", "EStopState"),
+    "L0Top": ("steuerung3d.apps.yellow.engines.densi.types", "L0Top"),
+    "L0Sub": ("steuerung3d.apps.yellow.engines.densi.types", "L0Sub"),
+    "DensiViewModel": ("steuerung3d.apps.yellow.engines.densi.viewmodel", "DensiViewModel"),
+    "normalize_densi_view_model": (
+        "steuerung3d.apps.yellow.engines.densi.viewmodel",
+        "normalize_densi_view_model",
+    ),
+}
+
 
 def __getattr__(name: str):
-    if name not in __all__:
-        raise AttributeError(name)
-
-    from .engine import DenSiEngine  # type: ignore
-    from .engine_types import DenSiTickResult  # type: ignore
-    from .inputs import DensiEstopToggle, DensiInputs, DensiUiInputs  # type: ignore
-    from .types import EStopState, L0Sub, L0Top  # type: ignore
-    from .viewmodel import DensiViewModel, normalize_densi_view_model  # type: ignore
-
-    if name == "DenSiEngine":
-        return DenSiEngine
-    if name == "DenSiTickResult":
-        return DenSiTickResult
-    if name == "DensiInputs":
-        return DensiInputs
-    if name == "DensiUiInputs":
-        return DensiUiInputs
-    if name == "DensiEstopToggle":
-        return DensiEstopToggle
-    if name == "EStopState":
-        return EStopState
-    if name == "L0Top":
-        return L0Top
-    if name == "L0Sub":
-        return L0Sub
-    if name == "DensiViewModel":
-        return DensiViewModel
-    if name == "normalize_densi_view_model":
-        return normalize_densi_view_model
-
-    # Defensive fallback (should not be reachable)
-    raise AttributeError(name)
+    return resolve_lazy_export(name, _EXPORTS)

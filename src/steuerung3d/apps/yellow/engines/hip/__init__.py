@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ..._lazy_exports import resolve_lazy_export
+
 __all__ = [
     "HipEngine",
     "HipAttachInputs",
@@ -16,46 +18,20 @@ __all__ = [
     "HipStepResult",
 ]
 
+_EXPORTS = {
+    "HipEngine": ("steuerung3d.apps.yellow.engines.hip.engine", "HipEngine"),
+    "HipAttachInputs": ("steuerung3d.apps.yellow.engines.hip.engine", "HipAttachInputs"),
+    "HipAttachState": ("steuerung3d.apps.yellow.engines.hip.types", "HipAttachState"),
+    "HipBannerInputs": ("steuerung3d.apps.yellow.engines.hip.engine", "HipBannerInputs"),
+    "HipParamAction": ("steuerung3d.apps.yellow.engines.hip.engine", "HipParamAction"),
+    "HipParamCommitDialog": ("steuerung3d.apps.yellow.engines.hip.types", "HipParamCommitDialog"),
+    "HipState": ("steuerung3d.apps.yellow.engines.hip.engine", "HipState"),
+    "HipUiInputs": ("steuerung3d.apps.yellow.engines.hip.engine", "HipUiInputs"),
+    "HipViewModel": ("steuerung3d.apps.yellow.engines.hip.engine", "HipViewModel"),
+    "HipStepInputs": ("steuerung3d.apps.yellow.engines.hip.engine", "HipStepInputs"),
+    "HipStepResult": ("steuerung3d.apps.yellow.engines.hip.engine", "HipStepResult"),
+}
+
 
 def __getattr__(name: str):
-    if name not in __all__:
-        raise AttributeError(name)
-
-    from .engine import (  # type: ignore
-        HipAttachInputs,
-        HipBannerInputs,
-        HipEngine,
-        HipParamAction,
-        HipState,
-        HipStepInputs,
-        HipStepResult,
-        HipUiInputs,
-        HipViewModel,
-    )
-    from .types import HipAttachState, HipParamCommitDialog  # type: ignore
-
-    if name == "HipEngine":
-        return HipEngine
-    if name == "HipAttachInputs":
-        return HipAttachInputs
-    if name == "HipAttachState":
-        return HipAttachState
-    if name == "HipBannerInputs":
-        return HipBannerInputs
-    if name == "HipParamAction":
-        return HipParamAction
-    if name == "HipParamCommitDialog":
-        return HipParamCommitDialog
-    if name == "HipState":
-        return HipState
-    if name == "HipUiInputs":
-        return HipUiInputs
-    if name == "HipViewModel":
-        return HipViewModel
-    if name == "HipStepInputs":
-        return HipStepInputs
-    if name == "HipStepResult":
-        return HipStepResult
-
-    # Defensive fallback (should not be reachable)
-    raise AttributeError(name)
+    return resolve_lazy_export(name, _EXPORTS)
