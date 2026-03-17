@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Literal
 
-ParamGroup = Literal["pos", "vel", "filter", "guider"]
+from .param_groups import ParamGroup
 
 
 def _require_param_axis_id(axis_id: str, *, intent_type: str) -> str:

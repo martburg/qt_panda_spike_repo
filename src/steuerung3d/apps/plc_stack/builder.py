@@ -18,7 +18,7 @@ from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.state import MachineState
 from steuerung3d.protocol.recording import JsonlRecorder, LoggedTransport
-from steuerung3d.protocol.transport import InMemTransport
+from steuerung3d.protocol.transport import InMemTransport, Transport
 
 # --------------------
 # Types
@@ -48,7 +48,7 @@ class CodecFactory(Protocol):
 @dataclass
 class PlcStackRuntime:
     cfg: PlcStackConfig
-    transport: InMemTransport  # may be wrapped (LoggedTransport)
+    transport: Transport
     timebase: Timebase
     state: MachineState
     engine: CoreEngine
@@ -73,7 +73,7 @@ def collect_axes(cfg: PlcStackConfig) -> list[str]:
     return out
 
 
-def build_transport(cfg: PlcStackConfig) -> tuple[InMemTransport, JsonlRecorder]:
+def build_transport(cfg: PlcStackConfig) -> tuple[Transport, JsonlRecorder]:
     raw = InMemTransport()
     rec = JsonlRecorder(Path(cfg.app.log_path))
     transport = LoggedTransport(raw, rec)  # type: ignore[assignment]
@@ -101,15 +101,21 @@ def build_plc_device(
     Returns:
       (device, endpoints)
     """
-    if link_factory is None:
+    resolved_link_factory = link_factory
+    if resolved_link_factory is None:
 
-        def link_factory(*, bind, target):
+        def _default_link_factory(*, bind: tuple[str, int], target: tuple[str, int]) -> Link:
             return UdpLink(bind=bind, target=target)
 
-    if codec_factory is None:
+        resolved_link_factory = _default_link_factory
 
-        def codec_factory(*, spec):
+    resolved_codec_factory = codec_factory
+    if resolved_codec_factory is None:
+
+        def _default_codec_factory(*, spec: PlcWireSpec) -> PlcCodec:
             return PlcCodec(spec=spec)
+
+        resolved_codec_factory = _default_codec_factory
 
     endpoints: list[PlcEndpoint] = []
     for ep_cfg in cfg.plc_endpoints:
@@ -121,8 +127,8 @@ def build_plc_device(
             true_token=ep_cfg.true_token,
             false_token=ep_cfg.false_token,
         )
-        codec = codec_factory(spec=spec)
-        link = link_factory(
+        codec = resolved_codec_factory(spec=spec)
+        link = resolved_link_factory(
             bind=(ep_cfg.bind_host, ep_cfg.bind_port),
             target=(ep_cfg.target_host, ep_cfg.target_port),
         )
@@ -154,7 +160,7 @@ def build_core(
     - transport is InMemTransport (optionally wrapped with JSONL logging)
     - engine is CoreEngine with apply_intent and provided device_step
     """
-    transport: InMemTransport
+    transport: Transport
     rec: Optional[JsonlRecorder] = None
 
     if enable_logging:

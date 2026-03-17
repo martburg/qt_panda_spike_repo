@@ -8,6 +8,7 @@ from steuerung3d.core.intent_handlers.txn import (
     txn_seen_or_mark as _txn_seen_or_mark,
 )
 from steuerung3d.core.intents import ParamCancel, ParamEditBegin, ParamWrite
+from steuerung3d.core.param_groups import coerce_param_group
 from steuerung3d.core.param_registry import normalize_group_values
 from steuerung3d.core.state import MachineState
 
@@ -20,7 +21,7 @@ def handle_param_edit_begin(state: MachineState, intent: ParamEditBegin) -> None
 
     axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     hip_id = str(getattr(intent, "hip_id", "") or "")
-    grp = getattr(intent, "group", "")
+    grp = coerce_param_group(getattr(intent, "group", ""))
     op = ParamEditBeginOp(group=grp)
 
     owner = state.claim_owner(axis_id)
@@ -37,7 +38,7 @@ def handle_param_write(state: MachineState, intent: ParamWrite) -> None:
 
     axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     hip_id = str(getattr(intent, "hip_id", "") or "")
-    grp = getattr(intent, "group", "")
+    grp = coerce_param_group(getattr(intent, "group", ""))
     vals = getattr(intent, "values", {})
 
     cleaned = {str(k): float(v) for k, v in dict(vals).items()}
@@ -71,7 +72,7 @@ def handle_param_cancel(state: MachineState, intent: ParamCancel) -> None:
 
     axis_id = normalize_axis_id(getattr(intent, "axis_id", ""))
     hip_id = str(getattr(intent, "hip_id", "") or "")
-    grp = getattr(intent, "group", "")
+    grp = coerce_param_group(getattr(intent, "group", ""))
 
     if str(getattr(state, "param_commit_status", "idle")) == "pending" and str(
         getattr(state, "param_commit_group", "")

@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Union
 
+from .param_groups import ParamGroup, coerce_param_group
+
 
 @dataclass(frozen=True)
 class AxisSetpoint:
@@ -11,8 +13,6 @@ class AxisSetpoint:
 
 
 # -------- Parameters (axis-agnostic, v0.1) --------
-
-ParamGroup = Literal["pos", "vel", "filter", "guider"]
 
 
 @dataclass(frozen=True)
@@ -53,16 +53,20 @@ def decode_param_ops(payload: Any) -> List[ParamOp]:
             continue
         t = item.get("type")
         if t == "param_edit_begin":
-            out.append(ParamEditBeginOp(**item))
+            out.append(ParamEditBeginOp(group=coerce_param_group(item.get("group", "pos"))))
         elif t == "param_write":
             # ensure values is a dict[str,float]
             vals = dict(item.get("values", {}))
             cleaned = {str(k): float(v) for k, v in vals.items()}
             out.append(
-                ParamWriteOp(type="param_write", group=item.get("group", "pos"), values=cleaned)
+                ParamWriteOp(
+                    type="param_write",
+                    group=coerce_param_group(item.get("group", "pos")),
+                    values=cleaned,
+                )
             )
         elif t == "param_cancel":
-            out.append(ParamCancelOp(**item))
+            out.append(ParamCancelOp(group=coerce_param_group(item.get("group", "pos"))))
         else:
             continue
     return out

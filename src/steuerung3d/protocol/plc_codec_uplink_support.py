@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict, Mapping, Optional
 
 from steuerung3d.core.axis_id import normalize_axis_id
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
@@ -160,15 +160,21 @@ def _decode_estop_active(estop_status_word: int) -> bool:
         return bool(int(estop_status_word) != 0)
 
 
-def _decode_params(*, fields: dict[str, object], tail: dict[str, object]) -> Dict[str, float]:
+def _decode_params(*, fields: Mapping[str, object], tail: Mapping[str, object]) -> Dict[str, float]:
     params: Dict[str, float] = {}
     for plc_k, internal_k in _PLC_TO_INTERNAL.items():
         if plc_k in fields:
-            params[internal_k] = _to_float(fields.get(plc_k, "0"), 0.0)
+            params[internal_k] = _coerce_float(fields.get(plc_k, "0"), default=0.0)
     for plc_k, internal_k in _TAIL_TO_INTERNAL.items():
         if plc_k in tail:
-            params[internal_k] = _to_float(tail.get(plc_k, "0"), 0.0)
+            params[internal_k] = _coerce_float(tail.get(plc_k, "0"), default=0.0)
     return params
+
+
+def _coerce_float(value: object, *, default: float = 0.0) -> float:
+    if isinstance(value, str):
+        return _to_float(value, default)
+    return _to_float(str(value), default)
 
 
 def encode_snapshot_to_uplink(snap: TelemetrySnapshot, *, axis_name: str) -> bytes:
