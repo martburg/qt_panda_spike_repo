@@ -29,6 +29,7 @@ from .engine_core_pipeline import DenSiPipelineMixin
 from .types import EStopState, L0Sub, L0Top
 
 ParamValue = float | str
+ParamNormalizer = Callable[[dict[str, float]], Mapping[str, float]]
 
 
 def _state_params_store(state: MachineState) -> dict[str, ParamValue]:
@@ -108,10 +109,10 @@ class DenSiEngine(
     posdiff_stop_m: float = 0.0
 
     # param ops hooks (controller supplies: keep semantics)
-    normalize_pos_chain: Callable[[Mapping[str, float]], dict[str, float]] | None = None
-    normalize_guider_range: Callable[[Mapping[str, float]], dict[str, float]] | None = None
-    enforce_pos_chain: Callable[[Mapping[str, float]], dict[str, float]] | None = None
-    enforce_guider_minmax: Callable[[Mapping[str, float]], dict[str, float]] | None = None
+    normalize_pos_chain: Callable[[dict[str, float]], Mapping[str, float]] | None = None
+    normalize_guider_range: Callable[[dict[str, float]], Mapping[str, float]] | None = None
+    enforce_pos_chain: Callable[[dict[str, float]], Mapping[str, float]] | None = None
+    enforce_guider_minmax: Callable[[dict[str, float]], Mapping[str, float]] | None = None
 
     # PLC-faithful vel_cmd behavior tuning
     lifetick_stale_after_ticks_active: int = 50
@@ -123,10 +124,10 @@ class DenSiEngine(
         *,
         axis_ids: list[str],
         dt_s: float,
-        normalize_pos_chain,
-        normalize_guider_range,
-        enforce_pos_chain,
-        enforce_guider_minmax,
+        normalize_pos_chain: ParamNormalizer | None,
+        normalize_guider_range: ParamNormalizer | None,
+        enforce_pos_chain: ParamNormalizer | None,
+        enforce_guider_minmax: ParamNormalizer | None,
         lifetick_stale_after_ticks_active: int | None = None,
         lifetick_stale_after_ticks_idle: int | None = None,
         now_s: Callable[[], float] | None = None,

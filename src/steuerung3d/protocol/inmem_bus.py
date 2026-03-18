@@ -2,16 +2,24 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Deque, List
+from typing import Deque, List, cast
 
 from steuerung3d.core.intents import Intent
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
 
+def _new_intent_queue() -> Deque[Intent]:
+    return cast(Deque[Intent], deque())
+
+
+def _new_telemetry_queue() -> Deque[TelemetrySnapshot]:
+    return cast(Deque[TelemetrySnapshot], deque())
+
+
 @dataclass
 class InMemBus:
-    _intent_q: Deque[Intent] = field(default_factory=deque)
-    _telemetry_q: Deque[TelemetrySnapshot] = field(default_factory=deque)
+    _intent_q: Deque[Intent] = field(default_factory=_new_intent_queue)
+    _telemetry_q: Deque[TelemetrySnapshot] = field(default_factory=_new_telemetry_queue)
 
     # --- intents (client -> core) ---
     def publish_intent(self, intent: Intent) -> None:

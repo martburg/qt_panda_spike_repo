@@ -118,7 +118,7 @@ def _validate(endpoints: List[PlcEndpointConfig]) -> None:
     if len(set(names)) != len(names):
         raise ValueError(f"Duplicate plc_endpoints names: {names}")
 
-    owned = {}
+    owned: dict[str, str] = {}
     for e in endpoints:
         if not e.axis_ids:
             raise ValueError(f"Endpoint '{e.name}' has empty axis_ids")

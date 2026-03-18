@@ -13,9 +13,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 FanoutMode = Literal["single", "per_axis"]
+
+
+def _new_args_list() -> list[Any]:
+    return []
+
+
+def _new_env_dict() -> dict[str, str]:
+    return {}
 
 
 @dataclass(frozen=True)
@@ -30,9 +38,9 @@ class ServiceSpec:
     # If set to the string "auto", StackRuntime may choose a sensible count
     # based on the current inventory (SIM vs REAL).
     count: Any = None
-    args: List[Any] = field(default_factory=list)
-    config: Optional[str] = None  # if set, becomes --config <path>
-    env: Dict[str, str] = field(default_factory=dict)
+    args: list[Any] = field(default_factory=_new_args_list)
+    config: str | None = None  # if set, becomes --config <path>
+    env: dict[str, str] = field(default_factory=_new_env_dict)
 
 
 @dataclass(frozen=True)
@@ -44,12 +52,12 @@ class StackSpec:
 
     # High-level rig: in SIM this is the expected axes list (spawns sims).
     # In REAL this may be empty; the runtime discovers devices from telemetry.
-    axes: List[str]
-    rig: Dict[str, Any]
-    net: Dict[str, Any]
+    axes: list[str]
+    rig: dict[str, Any]
+    net: dict[str, Any]
 
     # Services by key (core, hip, densi, inputd, joy2intent, ...)
-    services: Dict[str, ServiceSpec]
+    services: dict[str, ServiceSpec]
     profile_path: Path | None = None
 
 
@@ -58,7 +66,7 @@ class ProcessSpec:
     """A concrete subprocess to launch."""
 
     name: str
-    argv: List[str]
+    argv: list[str]
     log_path: Path
-    env: Dict[str, str] = field(default_factory=dict)
+    env: dict[str, str] = field(default_factory=_new_env_dict)
     creationflags: int = 0

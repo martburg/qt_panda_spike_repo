@@ -4,25 +4,27 @@ import importlib
 import sys
 import types
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any, Callable, cast
+
+import pytest
 
 
 def _qtcore_module() -> types.ModuleType:
     m = cast(Any, types.ModuleType("PySide6.QtCore"))
 
     class QObject:
-        def __init__(self, *args, **kwargs) -> None:
+        def __init__(self, *args: object, **kwargs: object) -> None:
             pass
 
     class _Signal:
-        def connect(self, *_args, **_kwargs) -> None:
+        def connect(self, *_args: object, **_kwargs: object) -> None:
             pass
 
     class QTimer:
-        def __init__(self, *_args, **_kwargs) -> None:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
             self.timeout = _Signal()
 
-        def start(self, *_args, **_kwargs) -> None:
+        def start(self, *_args: object, **_kwargs: object) -> None:
             pass
 
     m.QObject = QObject
@@ -35,10 +37,10 @@ def _qtwidgets_module() -> types.ModuleType:
 
     class QApplication:
         @staticmethod
-        def instance():
+        def instance() -> None:
             return None
 
-        def __init__(self, *_args, **_kwargs) -> None:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
             self.aboutToQuit = SimpleNamespace(connect=lambda *_: None)
 
         def exec(self) -> int:
@@ -48,13 +50,7 @@ def _qtwidgets_module() -> types.ModuleType:
     return cast(types.ModuleType, m)
 
 
-def test_refresh_hip_processes_releases_claim_and_lease_when_last_child_exits(monkeypatch) -> None:
-    published: list[object] = []
-
-    monkeypatch.setitem(sys.modules, "PySide6", types.ModuleType("PySide6"))
-    monkeypatch.setitem(sys.modules, "PySide6.QtCore", _qtcore_module())
-    monkeypatch.setitem(sys.modules, "PySide6.QtWidgets", _qtwidgets_module())
-
+def _dummy_window_module() -> types.ModuleType:
     dummy_window_mod = cast(Any, types.ModuleType("steuerung3d.apps.supervisor.gui.window"))
     dummy_window_mod.SupervisorWindow = lambda: SimpleNamespace(
         reset_estop_clicked=SimpleNamespace(connect=lambda *_: None),
@@ -69,30 +65,44 @@ def test_refresh_hip_processes_releases_claim_and_lease_when_last_child_exits(mo
         show=lambda: None,
         show_recover_placeholder=lambda: None,
     )
+    return cast(types.ModuleType, dummy_window_mod)
+
+
+def _drain_telemetry_stub(*_args: object, **_kwargs: object) -> object:
+    return SimpleNamespace(
+        drain_telemetry=lambda limit=50: [],
+        rx=SimpleNamespace(link=SimpleNamespace(close=lambda: None)),
+    )
+
+
+def _publish_intent_stub(published: list[object]) -> Callable[..., object]:
+    def _connect(*_args: object, **_kwargs: object) -> object:
+        return SimpleNamespace(
+            publish_intent=published.append,
+            tx=SimpleNamespace(link=SimpleNamespace(close=lambda: None)),
+        )
+
+    return _connect
+
+
+def test_refresh_hip_processes_releases_claim_and_lease_when_last_child_exits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    published: list[object] = []
+
+    monkeypatch.setitem(sys.modules, "PySide6", types.ModuleType("PySide6"))
+    monkeypatch.setitem(sys.modules, "PySide6.QtCore", _qtcore_module())
+    monkeypatch.setitem(sys.modules, "PySide6.QtWidgets", _qtwidgets_module())
     monkeypatch.setitem(
         sys.modules,
         "steuerung3d.apps.supervisor.gui.window",
-        cast(types.ModuleType, dummy_window_mod),
+        _dummy_window_module(),
     )
 
     runtime_mod = importlib.import_module("steuerung3d.apps.supervisor.runtime")
 
-    monkeypatch.setattr(
-        runtime_mod.UdpTelemetryIn,
-        "bind",
-        lambda *_args, **_kwargs: SimpleNamespace(
-            drain_telemetry=lambda limit=50: [],
-            rx=SimpleNamespace(link=SimpleNamespace(close=lambda: None)),
-        ),
-    )
-    monkeypatch.setattr(
-        runtime_mod.UdpIntentOut,
-        "connect",
-        lambda *_args, **_kwargs: SimpleNamespace(
-            publish_intent=published.append,
-            tx=SimpleNamespace(link=SimpleNamespace(close=lambda: None)),
-        ),
-    )
+    monkeypatch.setattr(runtime_mod.UdpTelemetryIn, "bind", _drain_telemetry_stub)
+    monkeypatch.setattr(runtime_mod.UdpIntentOut, "connect", _publish_intent_stub(published))
 
     from steuerung3d.apps.supervisor.models import PairConfig, SupervisorProfile
     from steuerung3d.core.intents import ReleaseAxis, ReleaseAxisLease

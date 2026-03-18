@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, cast
+
+
+def _new_anchor_dict() -> Dict[str, Tuple[float, float, float]]:
+    return cast(Dict[str, Tuple[float, float, float]], {})
+
+
+def _new_target_lengths_dict() -> Dict[str, float]:
+    return cast(Dict[str, float], {})
 
 
 class RigMode(str, Enum):
@@ -47,7 +55,7 @@ class RigSyncConfig:
     """Frozen configuration snapshot created when entering ARMED_SYNC."""
 
     participating: Tuple[str, ...] = ()
-    anchors: Dict[str, Tuple[float, float, float]] = field(default_factory=dict)
+    anchors: Dict[str, Tuple[float, float, float]] = field(default_factory=_new_anchor_dict)
 
 
 @dataclass
@@ -55,7 +63,7 @@ class RecoverPlan:
     """Active recovery plan in SYNC_RECOVER."""
 
     active: bool = False
-    target_lengths: Dict[str, float] = field(default_factory=dict)
+    target_lengths: Dict[str, float] = field(default_factory=_new_target_lengths_dict)
 
     # simple proportional 'go to target length' controller on measured pos
     kp: float = 1.0

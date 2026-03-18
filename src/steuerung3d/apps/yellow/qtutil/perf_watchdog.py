@@ -4,6 +4,11 @@ import logging
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from typing import cast
+
+
+def _new_segment_list() -> list[tuple[str, float]]:
+    return cast(list[tuple[str, float]], [])
 
 
 @dataclass
@@ -30,7 +35,7 @@ class PerfWatchdog:
 
     _t0: float | None = None
     _last: float | None = None
-    _segments: list[tuple[str, float]] = field(default_factory=list)
+    _segments: list[tuple[str, float]] = field(default_factory=_new_segment_list)
     _last_log_t: float = 0.0
 
     @contextmanager

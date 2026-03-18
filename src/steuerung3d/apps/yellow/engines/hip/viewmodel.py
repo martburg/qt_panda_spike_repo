@@ -7,6 +7,10 @@ from dataclasses import dataclass, field
 from .types import HipAttachCombo, HipAttachState, HipParamCommitDialog, HipParamUiState
 
 
+def _new_float_dict() -> dict[str, float]:
+    return {}
+
+
 @dataclass(frozen=True)
 class HipBannerState:
     estate: str
@@ -94,10 +98,10 @@ class HipViewModel:
     attach_state: HipAttachState | None = None
     attach_combo: HipAttachCombo | None = None
     param_ui: HipParamUiState | None = None
-    param_values: dict[str, float] = field(default_factory=dict)
+    param_values: dict[str, float] = field(default_factory=_new_float_dict)
     param_freeze_group: str = ""
-    limit_values: dict[str, float] = field(default_factory=dict)
+    limit_values: dict[str, float] = field(default_factory=_new_float_dict)
     param_writeback_group: str = ""
-    param_writeback_values: dict[str, float] = field(default_factory=dict)
+    param_writeback_values: dict[str, float] = field(default_factory=_new_float_dict)
     param_writeback_message: str = ""
     param_commit_dialog: HipParamCommitDialog | None = None

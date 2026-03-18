@@ -37,7 +37,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
-from typing import List
+from typing import List, cast
 
 from .stack_merge import apply_sets, deep_merge
 from .stack_normalize import stack_spec_from_data
@@ -48,7 +48,8 @@ from .stack_toml import load_toml, parse_toml_value
 def _as_table(value: object) -> dict[str, object]:
     if not isinstance(value, Mapping):
         return {}
-    return {str(k): v for k, v in value.items()}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
 
 
 def load_stack_profile(

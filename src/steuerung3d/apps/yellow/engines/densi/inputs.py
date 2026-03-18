@@ -8,6 +8,10 @@ from typing import List
 from steuerung3d.core.command_frame import CommandFrame
 
 
+def _new_estop_toggle_list() -> list[DensiEstopToggle]:
+    return []
+
+
 @dataclass(frozen=True)
 class DensiEstopToggle:
     key: str
@@ -21,7 +25,7 @@ class DensiUiInputs:
     estop_all_set_clicked: bool = False
     estop_all_clear_clicked: bool = False
     diag_resync_clicked: bool = False
-    estop_bit_toggles: list[DensiEstopToggle] = field(default_factory=list)
+    estop_bit_toggles: list[DensiEstopToggle] = field(default_factory=_new_estop_toggle_list)
 
 
 @dataclass(frozen=True)

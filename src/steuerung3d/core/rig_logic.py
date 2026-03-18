@@ -10,7 +10,7 @@ from steuerung3d.core.rig_types import RecoverPlan, RigMode, RigSyncConfig
 from steuerung3d.core.state import MachineState
 
 
-def _normalize_rig_mode(value) -> RigMode:
+def _normalize_rig_mode(value: object) -> RigMode:
     """Accept RigMode, 'DISCOVERY', or 'RigMode.DISCOVERY' and return RigMode.
 
     This is intentionally tolerant because older code sometimes stringifies enums.
@@ -223,7 +223,7 @@ def enforce_rig_invariants(state: MachineState) -> None:
 
 def rig_debug_dict(state: MachineState) -> dict:
     """Convenience for debugging/telemetry."""
-    out = {
+    out: dict[str, object] = {
         "rig_mode": str(_normalize_rig_mode(getattr(state, "rig_mode", RigMode.DISCOVERY))),
         "frozen": frozen(state),
     }

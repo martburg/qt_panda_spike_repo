@@ -3,11 +3,12 @@ from __future__ import annotations
 import importlib
 import logging
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
 
-def _runtime_result():
+def _runtime_result() -> object:
     hip_runtime_impl = importlib.import_module("steuerung3d.apps.yellow.runtimes.hip_runtime_impl")
     vm = SimpleNamespace(
         attach_state=SimpleNamespace(attached=True, tabs_enabled=True),
@@ -37,6 +38,16 @@ class _DummyBinder:
     def __init__(self, logger: logging.Logger) -> None:
         self.log = logger
         self._readouts_bindings = _DummyReadoutsBindings()
+
+
+def _bump_counter(counter: dict[str, int]) -> CallableApply:
+    def _apply(*_args: object, **_kwargs: object) -> None:
+        counter["n"] = counter["n"] + 1
+
+    return _apply
+
+
+CallableApply = Any
 
 
 def test_hip_ui_info_log_is_throttled_for_unchanged_state(
@@ -87,11 +98,7 @@ def test_hip_apply_readouts_debug_log_not_emitted_at_info(
     vm = SimpleNamespace(readouts=SimpleNamespace())
 
     called = {"n": 0}
-    monkeypatch.setattr(
-        apply_impl,
-        "apply_hip_readouts",
-        lambda *args, **kwargs: called.__setitem__("n", called["n"] + 1),
-    )
+    monkeypatch.setattr(apply_impl, "apply_hip_readouts", _bump_counter(called))
 
     with caplog.at_level(logging.INFO, logger=logger.name):
         apply_impl._apply_readouts(binder, vm)
@@ -112,11 +119,7 @@ def test_hip_apply_readouts_debug_log_emitted_at_debug(
     vm = SimpleNamespace(readouts=SimpleNamespace())
 
     called = {"n": 0}
-    monkeypatch.setattr(
-        apply_impl,
-        "apply_hip_readouts",
-        lambda *args, **kwargs: called.__setitem__("n", called["n"] + 1),
-    )
+    monkeypatch.setattr(apply_impl, "apply_hip_readouts", _bump_counter(called))
 
     with caplog.at_level(logging.DEBUG, logger=logger.name):
         apply_impl._apply_readouts(binder, vm)

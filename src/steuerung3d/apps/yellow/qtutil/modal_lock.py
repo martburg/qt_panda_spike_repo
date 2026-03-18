@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Iterable
+from typing import Callable, Iterable, cast
 
 from PySide6.QtWidgets import QLineEdit, QTabWidget, QWidget
+
+
+def _new_widget_enabled_map() -> dict[QWidget, bool]:
+    return cast(dict[QWidget, bool], {})
 
 
 @dataclass
@@ -16,7 +20,7 @@ class ModalLock:
     enable_line_edit: Callable[[QLineEdit, bool], None]
 
     _locked: bool = False
-    _prev_enabled: dict[QWidget, bool] = field(default_factory=dict)
+    _prev_enabled: dict[QWidget, bool] = field(default_factory=_new_widget_enabled_map)
     _prev_tabbar_enabled: bool | None = None
 
     def lock(self, allow: Iterable[QWidget] | None = None) -> None:

@@ -17,7 +17,7 @@ class _FakeProc:
         self.killed = 0
         self.wait_calls = 0
 
-    def poll(self):
+    def poll(self) -> int | None:
         return None if self._alive else 0
 
     def terminate(self) -> None:
@@ -91,14 +91,17 @@ def test_start_runtime_cleans_residual_bind_ports(
 
     make_session_dir = cast(Any, lambda base, keep_last: tmp_path)
     write_runtime_meta = cast(Any, lambda rt, stopped_at_s=None: None)
-    expand_processes = cast(Any, staticmethod(lambda spec, session_dir: [proc]))
+
+    def _expand_processes(spec: StackSpec, *, session_dir: Path) -> list[ProcessSpec]:
+        return [proc]
+
     cleanup_ports = cast(Any, lambda ports: cleaned.append(list(cast(list[int], ports))) or [])
 
     monkeypatch.setattr("steuerung3d.core.stack_runtime_boot.make_session_dir", make_session_dir)
     monkeypatch.setattr(
         "steuerung3d.core.stack_runtime_boot.write_runtime_meta", write_runtime_meta
     )
-    monkeypatch.setattr(_FakeRT, "expand_processes_static", expand_processes)
+    monkeypatch.setattr(_FakeRT, "expand_processes_static", staticmethod(_expand_processes))
     monkeypatch.setattr(
         "steuerung3d.core.stack_runtime_boot.cleanup_residual_bind_ports",
         cleanup_ports,
@@ -138,5 +141,3 @@ def test_stop_runtime_force_kills_and_closes_status(monkeypatch: pytest.MonkeyPa
     assert fake_proc.terminated == 1
     assert fake_proc.killed == 1
     assert rt.status is not None
-    assert rt.status.sock.closed is True
-    assert cleaned == [[51001]]

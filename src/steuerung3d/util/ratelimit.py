@@ -19,12 +19,16 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict
 
 
+def _new_last_seen() -> Dict[str, float]:
+    return {}
+
+
 @dataclass
 class RateLimiter:
     """Allow an event only once per `min_interval_s` per key."""
 
     min_interval_s: float = 2.0
-    _last_s: Dict[str, float] = field(default_factory=dict)
+    _last_s: Dict[str, float] = field(default_factory=_new_last_seen)
 
     def allow(self, key: str) -> bool:
         now = time.monotonic()

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import List
+from typing import Any
 
 from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
 from steuerung3d.adapters.sim.device import SimDevice
@@ -18,24 +18,25 @@ from steuerung3d.protocol.codec import encode_command_frame
 from steuerung3d.protocol.transport import InMemTransport
 
 
-def _fingerprint(frames: List[CommandFrame]) -> str:
+def _fingerprint(frames: list[CommandFrame]) -> str:
     # Build a stable representation for regression tests.
     # We intentionally ignore t_s to avoid float formatting drift.
-    payloads = []
+    payloads: list[dict[str, Any]] = []
     for cf in frames:
-        d = encode_command_frame(cf)
+        d: dict[str, Any] = dict(encode_command_frame(cf))
         d.pop("t_s", None)
         # Sort axes for stability
-        axes = d.get("axes", {})
-        if isinstance(axes, dict):
-            d["axes"] = {k: axes[k] for k in sorted(axes.keys())}
+        axes_obj = d.get("axes", {})
+        if isinstance(axes_obj, dict):
+            axes = dict(axes_obj)
+            d["axes"] = {k: axes[k] for k in sorted(str(k) for k in axes.keys())}
         payloads.append(d)
 
     blob = json.dumps(payloads, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(blob).hexdigest()
 
 
-def test_command_frame_sequence_regression_hash():
+def test_command_frame_sequence_regression_hash() -> None:
     """Regression guard: command-frame sequence should not change silently.
 
     If this test fails and the change is intentional:
@@ -52,7 +53,7 @@ def test_command_frame_sequence_regression_hash():
     st.core_mode = CoreMode.LIVE
     st.joy = JoyState(deadman=True, selected_axes=("X", "Y"))
 
-    frames: List[CommandFrame] = []
+    frames: list[CommandFrame] = []
 
     sim = SimDevice(plant=SimAxisPlant())
 
@@ -86,10 +87,5 @@ def test_command_frame_sequence_regression_hash():
     assert frames, "expected command frames"
     got = _fingerprint(frames)
 
-    # Baseline generated from current deterministic SIM behavior with explicit
-    # selected_axes + deadman driving motion eligibility.
-    expected = "4075eb972757e7312e6f7d3a0523d750ec3b4d0717c89b3d6f7db05d1684af2f"  # updated: CommandFrame now carries amp reset pulses
-    # updated: CommandFrame now preserves axis-scoped resync
-    # (and retains per-axis reset pulse fields), so the deterministic
-    # encoded command-frame sequence changed intentionally.
+    expected = "4075eb972757e7312e6f7d3a0523d750ec3b4d0717c89b3d6f7db05d1684af2f"
     assert got == expected, f"command-frame regression hash changed: {got} != {expected}"

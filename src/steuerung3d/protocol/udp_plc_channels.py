@@ -17,9 +17,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, List, Optional, Tuple, cast
+from typing import Any, List, Optional, Tuple, TypeAlias, cast
 
 from steuerung3d.adapters.links.udp_link import UdpLink
+from steuerung3d.core.command_frame import CommandFrame
+from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.udp_plc_channel_support import (
     decode_command_fields,
     encode_command_payload,
@@ -54,9 +56,13 @@ def _as_field_map(value: object) -> dict[str, object]:
     return {str(k): v for k, v in mapping.items()}
 
 
+PayloadSequence: TypeAlias = list[object] | tuple[object, ...]
+
+
 def _first_payload_item(payload: object) -> object:
     if isinstance(payload, (list, tuple)) and payload:
-        return cast(list[object] | tuple[object, ...], payload)[0]
+        seq = cast(PayloadSequence, payload)
+        return seq[0]
     return payload
 
 
@@ -72,10 +78,12 @@ class UdpPlcTelemetryIn:
     def drain_lines(self, limit: int = 1000) -> List[str]:
         return [_from_bytes(b) for b in self.link.poll(limit=limit)]
 
-    def drain_telemetry(self, limit: int = 100) -> List[Any]:
+    def drain_telemetry(self, limit: int = 100) -> list[TelemetrySnapshot]:
         """Drain and decode PLC uplink telegrams into TelemetrySnapshot objects."""
         raw_items = list(self.link.poll(limit=limit))
-        return iter_decoded_snapshots(raw_items, load_uplink_decoder())
+        return cast(
+            list[TelemetrySnapshot], iter_decoded_snapshots(raw_items, load_uplink_decoder())
+        )
 
 
 @dataclass
@@ -107,7 +115,7 @@ class UdpPlcTelemetryOut:
             if not payload:
                 return
             if all(isinstance(x, str) for x in payload):
-                for line in cast(list[str], payload):
+                for line in [str(x) for x in payload]:
                     self.publish_line(line)
                 return
             payload = _first_payload_item(payload)
@@ -138,7 +146,7 @@ class UdpPlcCommandIn:
     def drain_lines(self, limit: int = 1000) -> List[str]:
         return [_from_bytes(b) for b in self.link.poll(limit=limit)]
 
-    def drain_command_frames(self, limit: int = 100) -> List[Any]:
+    def drain_command_frames(self, limit: int = 100) -> list[CommandFrame]:
         """Drain and decode PLC downlink telegrams into CommandFrame objects.
 
         The PLC downlink does not contain the axis name; we therefore bind the
@@ -150,7 +158,7 @@ class UdpPlcCommandIn:
           and the ST often compares case-sensitively against 'True'.
         - ControlIN is effectively a numeric enable/bitfield; we accept tolerant boolean parsing.
         """
-        out: List[Any] = []
+        out: list[CommandFrame] = []
         loaded = load_downlink_decoder()
         if loaded is None:
             return out
@@ -179,25 +187,28 @@ class UdpPlcCommandIn:
                     param_keymap=param_keymap,
                     param_write_op_type=param_write_op_type,
                 )
-                cmd = command_frame_type(
-                    tick=decoded["tick_ui_rx"],
-                    t_s=0.0,
-                    estop=False,
-                    fault=False,
-                    core_mode=decoded["core_mode"],
-                    axes={
-                        axis_id: axis_setpoint_type(
-                            enable=decoded["enable"],
-                            vel=decoded["vel"],
-                        )
-                    },
-                    intent=decoded["intent"],
-                    resync=decoded["resync"],
-                    gui_not_halt=decoded["gui_not_halt"],
-                    estop_reset=decoded["estop_reset"],
-                    lifetick_echo=decoded["lifetick_echo"],
-                    resync_by_axis=decoded["resync_by_axis"],
-                    param_ops=param_ops,
+                cmd = cast(
+                    CommandFrame,
+                    command_frame_type(
+                        tick=decoded["tick_ui_rx"],
+                        t_s=0.0,
+                        estop=False,
+                        fault=False,
+                        core_mode=decoded["core_mode"],
+                        axes={
+                            axis_id: axis_setpoint_type(
+                                enable=decoded["enable"],
+                                vel=decoded["vel"],
+                            )
+                        },
+                        intent=decoded["intent"],
+                        resync=decoded["resync"],
+                        gui_not_halt=decoded["gui_not_halt"],
+                        estop_reset=decoded["estop_reset"],
+                        lifetick_echo=decoded["lifetick_echo"],
+                        resync_by_axis=decoded["resync_by_axis"],
+                        param_ops=param_ops,
+                    ),
                 )
                 out.append(cmd)
             except Exception:

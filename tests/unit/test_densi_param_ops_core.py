@@ -4,15 +4,14 @@ from typing import Mapping
 sys.path.insert(0, "src")
 
 from steuerung3d.apps.yellow.engines.densi.param_ops import apply_densi_param_ops
-from steuerung3d.core.command_frame import ParamEditBeginOp, ParamWriteOp
+from steuerung3d.core.command_frame import ParamEditBeginOp, ParamOp, ParamWriteOp
 from steuerung3d.core.state import MachineState
 
 
-def test_param_ops_begin_write_ends_session_and_applies_values():
+def test_param_ops_begin_write_ends_session_and_applies_values() -> None:
     st = MachineState()
 
     def norm_pos(vals: Mapping[str, float]) -> dict[str, float]:
-        # simulate normalization: swap min/max if needed
         v = dict(vals)
         if "HardMin" in v and "HardMax" in v and v["HardMin"] > v["HardMax"]:
             v["HardMin"], v["HardMax"] = v["HardMax"], v["HardMin"]
@@ -22,7 +21,6 @@ def test_param_ops_begin_write_ends_session_and_applies_values():
         return dict(vals)
 
     def enf_pos(vals: Mapping[str, float]) -> dict[str, float]:
-        # simulate enforcement: clamp
         v = dict(vals)
         if "HardMax" in v:
             v["HardMax"] = min(v["HardMax"], 10.0)
@@ -31,7 +29,7 @@ def test_param_ops_begin_write_ends_session_and_applies_values():
     def enf_guider(vals: Mapping[str, float]) -> dict[str, float]:
         return dict(vals)
 
-    ops = [
+    ops: list[ParamOp] = [
         ParamEditBeginOp(group="pos"),
         ParamWriteOp(group="pos", values={"HardMin": 5.0, "HardMax": 12.0}),
     ]
@@ -53,7 +51,7 @@ def test_param_ops_begin_write_ends_session_and_applies_values():
     assert res.applied_values["HardMax"] == 10.0
 
 
-def test_param_ops_rejects_mismatched_group_when_session_active():
+def test_param_ops_rejects_mismatched_group_when_session_active() -> None:
     st = MachineState(param_edit_active=True, param_edit_group="pos")
 
     def ident(vals: Mapping[str, float]) -> dict[str, float]:
@@ -73,7 +71,7 @@ def test_param_ops_rejects_mismatched_group_when_session_active():
     assert res.applied_values == {}
 
 
-def test_param_ops_allow_false_ignores_everything():
+def test_param_ops_allow_false_ignores_everything() -> None:
     st = MachineState()
 
     def boom(vals: Mapping[str, float]) -> dict[str, float]:

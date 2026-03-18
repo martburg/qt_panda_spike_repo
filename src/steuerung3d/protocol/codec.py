@@ -46,7 +46,7 @@ from steuerung3d.protocol.raw_controls import RawControls
 # Intents
 # ---------------------------
 
-_INTENT_TYPE_MAP = {
+_INTENT_TYPE_MAP: dict[str, type[Intent]] = {
     "enable_axis": EnableAxis,
     "jog_axis": JogAxis,
     "jog_winch": JogWinch,
@@ -96,7 +96,7 @@ def decode_intent(payload: Dict[str, Any]) -> Intent:
     t = payload.get("type")
     if not isinstance(t, str):
         raise ValueError("intent payload missing 'type'")
-    cls = _INTENT_TYPE_MAP.get(t)
+    cls: type[Intent] | None = _INTENT_TYPE_MAP.get(t)
     if cls is None:
         raise ValueError(f"unknown intent type: {t}")
     # dataclass ctor matches keys (including 'type')

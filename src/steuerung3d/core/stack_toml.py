@@ -5,9 +5,11 @@ from pathlib import Path
 from typing import Any, TypeAlias, cast
 
 try:
-    import tomllib  # py3.11+
+    import tomllib as _tomllib  # py3.11+
 except Exception:  # pragma: no cover
-    tomllib = None  # type: ignore
+    _tomllib = None
+
+tomllib = cast(Any, _tomllib)
 
 TomlTable: TypeAlias = dict[str, object]
 

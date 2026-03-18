@@ -23,6 +23,14 @@ from steuerung3d.core.intents import Intent, ParamCancel, ParamEditBegin, ParamG
 from steuerung3d.core.param_groups import coerce_param_group
 
 
+def _new_session_map() -> Dict[ParamGroup, str]:
+    return {}
+
+
+def _new_pending_txn_map() -> Dict[str, PendingTxnInfo]:
+    return {}
+
+
 @dataclass(frozen=True)
 class RetryEvent:
     """A resend/giveup decision emitted by :meth:`ParamEditTxnClient.retry_pending`."""
@@ -61,8 +69,8 @@ class ParamEditTxnClient:
 
     # --- transaction bookkeeping ---
     _req_seq: int = 0
-    _session_by_group: Dict[ParamGroup, str] = field(default_factory=dict)
-    _pending_txn: Dict[str, PendingTxnInfo] = field(default_factory=dict)
+    _session_by_group: Dict[ParamGroup, str] = field(default_factory=_new_session_map)
+    _pending_txn: Dict[str, PendingTxnInfo] = field(default_factory=_new_pending_txn_map)
 
     # ------------------------------------------------------------------
     # Local edit state

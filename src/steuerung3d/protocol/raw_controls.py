@@ -4,6 +4,14 @@ from dataclasses import dataclass, field
 from typing import List
 
 
+def _new_axes() -> List[float]:
+    return []
+
+
+def _new_buttons() -> List[int]:
+    return []
+
+
 @dataclass(frozen=True)
 class RawControls:
     """Normalized human input sample.
@@ -22,5 +30,5 @@ class RawControls:
     type: str = "raw_controls"
     t_ns: int = 0
     src: str = ""  # e.g. "gamepad0", "wwconsole", "replay"
-    axes: List[float] = field(default_factory=list)
-    buttons: List[int] = field(default_factory=list)
+    axes: List[float] = field(default_factory=_new_axes)
+    buttons: List[int] = field(default_factory=_new_buttons)
