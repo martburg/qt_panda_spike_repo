@@ -1,9 +1,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Union
+from typing import Any, Dict, List, Literal, Mapping, Union
 
 from .param_groups import ParamGroup, coerce_param_group
+
+
+def _as_object_dict(value: Any) -> dict[object, object]:
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def _new_str_float_dict() -> Dict[str, float]:
+    return {}
+
+
+def _new_param_ops_list() -> List[ParamOp]:
+    return []
+
+
+def _new_str_int_dict() -> Dict[str, int]:
+    return {}
+
+
+def _new_str_bool_dict() -> Dict[str, bool]:
+    return {}
 
 
 @dataclass(frozen=True)
@@ -25,7 +45,7 @@ class ParamEditBeginOp:
 class ParamWriteOp:
     type: Literal["param_write"] = "param_write"
     group: ParamGroup = "pos"
-    values: Dict[str, float] = field(default_factory=dict)
+    values: Dict[str, float] = field(default_factory=_new_str_float_dict)
 
 
 @dataclass(frozen=True)
@@ -51,22 +71,23 @@ def decode_param_ops(payload: Any) -> List[ParamOp]:
     for item in payload:
         if not isinstance(item, dict):
             continue
-        t = item.get("type")
+        item_dict: Mapping[object, object] = item
+        t = item_dict.get("type")
         if t == "param_edit_begin":
-            out.append(ParamEditBeginOp(group=coerce_param_group(item.get("group", "pos"))))
+            out.append(ParamEditBeginOp(group=coerce_param_group(item_dict.get("group", "pos"))))
         elif t == "param_write":
             # ensure values is a dict[str,float]
-            vals = dict(item.get("values", {}))
+            vals = _as_object_dict(item_dict.get("values", {}))
             cleaned = {str(k): float(v) for k, v in vals.items()}
             out.append(
                 ParamWriteOp(
                     type="param_write",
-                    group=coerce_param_group(item.get("group", "pos")),
+                    group=coerce_param_group(item_dict.get("group", "pos")),
                     values=cleaned,
                 )
             )
         elif t == "param_cancel":
-            out.append(ParamCancelOp(group=coerce_param_group(item.get("group", "pos"))))
+            out.append(ParamCancelOp(group=coerce_param_group(item_dict.get("group", "pos"))))
         else:
             continue
     return out
@@ -119,14 +140,14 @@ class CommandFrame:
 
     estop_reset: bool = False  # momentary request to clear device latch
     # NEW: parameter editing/writing operations (axis-agnostic v0.1)
-    param_ops: List[ParamOp] = field(default_factory=list)
+    param_ops: List[ParamOp] = field(default_factory=_new_param_ops_list)
 
     # NEW (optional): UI-originating livetick echo values by axis.
     # Keep empty by default so existing regression fingerprints stay stable.
-    lifetick_echo: Dict[str, int] = field(default_factory=dict)
+    lifetick_echo: Dict[str, int] = field(default_factory=_new_str_int_dict)
     # NEW: per-axis resync pulses. Preferred over the legacy global resync bit
     # in multi-axis / multi-HiP runs.
-    resync_by_axis: Dict[str, bool] = field(default_factory=dict)
+    resync_by_axis: Dict[str, bool] = field(default_factory=_new_str_bool_dict)
     # NEW: per-axis amplifier reset pulses (bit-wrangled into ControlIN / GuideControlUI)
-    main_reset_by_axis: Dict[str, bool] = field(default_factory=dict)
-    guider_reset_by_axis: Dict[str, bool] = field(default_factory=dict)
+    main_reset_by_axis: Dict[str, bool] = field(default_factory=_new_str_bool_dict)
+    guider_reset_by_axis: Dict[str, bool] = field(default_factory=_new_str_bool_dict)

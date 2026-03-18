@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import Any, List
 
 from steuerung3d.config.toml_loader import load_toml
 
@@ -45,6 +45,16 @@ class PlcStackConfig:
 # --------------------
 
 
+def _as_table(value: object) -> dict[str, Any]:
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def _as_table_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [dict(item) for item in value if isinstance(item, dict)]
+
+
 def load_plc_stack_config(path: Path) -> PlcStackConfig:
     """Load PLC stack configuration from TOML.
 
@@ -57,26 +67,24 @@ def load_plc_stack_config(path: Path) -> PlcStackConfig:
 
     raw = load_toml(path)
 
-    app_raw = raw.get("app", {}) or {}
+    app_raw = _as_table(raw.get("app", {}))
     app = AppConfig(
         dt_s=float(app_raw.get("dt_s", 0.01)),
         realtime=bool(app_raw.get("realtime", True)),
         log_path=str(app_raw.get("log_path", "logs/session_plc.jsonl")),
     )
 
-    endpoints_raw = raw.get("plc_endpoints", None)
+    endpoints_obj = raw.get("plc_endpoints", None)
 
-    if endpoints_raw is None:
-        endpoints_raw = []
-
-    if not isinstance(endpoints_raw, list):
+    if endpoints_obj is None:
+        endpoints_raw: list[dict[str, Any]] = []
+    elif not isinstance(endpoints_obj, list):
         raise ValueError("TOML: plc_endpoints must be a list (use [[plc_endpoints]]).")
+    else:
+        endpoints_raw = _as_table_list(endpoints_obj)
 
     endpoints: List[PlcEndpointConfig] = []
     for i, e in enumerate(endpoints_raw):
-        if not isinstance(e, dict):
-            raise ValueError(f"TOML: plc_endpoints[{i}] must be a table")
-
         axis_ids = e.get("axis_ids", None)
         if axis_ids is None:
             raise ValueError(f"TOML: plc_endpoints[{i}].axis_ids is required")

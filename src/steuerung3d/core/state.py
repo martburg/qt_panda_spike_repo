@@ -10,6 +10,62 @@ from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.rig_types import DensiRuntime, RecoverPlan, RigMode, RigSyncConfig
 
 
+def _new_str_any_dict() -> Dict[str, Any]:
+    return {}
+
+
+def _new_str_densi_runtime_dict() -> Dict[str, DensiRuntime]:
+    return {}
+
+
+def _new_str_axis_state_dict() -> Dict[str, "AxisState"]:
+    return {}
+
+
+def _new_str_axis_command_state_dict() -> Dict[str, "AxisCommandState"]:
+    return {}
+
+
+def _new_str_axis_control_dict() -> Dict[str, "AxisControl"]:
+    return {}
+
+
+def _new_str_str_dict() -> Dict[str, str]:
+    return {}
+
+
+def _new_str_list_str_dict() -> Dict[str, list[str]]:
+    return {}
+
+
+def _new_str_bool_dict() -> Dict[str, bool]:
+    return {}
+
+
+def _new_str_int_dict() -> Dict[str, int]:
+    return {}
+
+
+def _new_str_float_dict() -> Dict[str, float]:
+    return {}
+
+
+def _new_str_param_ops_list_dict() -> Dict[str, list[ParamOp]]:
+    return {}
+
+
+def _new_str_object_dict_dict() -> Dict[str, Dict[str, object]]:
+    return {}
+
+
+def _new_object_list() -> list[object]:
+    return []
+
+
+def _new_str_list() -> list[str]:
+    return []
+
+
 @dataclass
 class AxisState:
     # --- measured (what the device reports / sim produces) ---
@@ -17,7 +73,7 @@ class AxisState:
     vel: float = 0.0
     enabled: bool = False
     fault: bool = False
-    meta: Dict[str, Any] = field(default_factory=dict)
+    meta: Dict[str, Any] = field(default_factory=_new_str_any_dict)
 
 
 @dataclass
@@ -56,28 +112,28 @@ class MachineState:
     densi_offline_after_ticks: int = 200
 
     # DenSi runtime registry (core is the authority).
-    densi_registry: Dict[str, DensiRuntime] = field(default_factory=dict)
+    densi_registry: Dict[str, DensiRuntime] = field(default_factory=_new_str_densi_runtime_dict)
 
     # Rig workflow (core-local; published via telemetry for UI/debug)
     rig_mode: RigMode = RigMode.DISCOVERY
     rig_sync_config: RigSyncConfig = field(default_factory=RigSyncConfig)
     rig_recover_plan: RecoverPlan = field(default_factory=RecoverPlan)
-    rig_last_good: Dict[str, Any] = field(default_factory=dict)
+    rig_last_good: Dict[str, Any] = field(default_factory=_new_str_any_dict)
     rig_recover_timeout_ticks: int = 400
 
-    axes: Dict[str, AxisState] = field(default_factory=dict)
-    axis_cmd: Dict[str, AxisCommandState] = field(default_factory=dict)
+    axes: Dict[str, AxisState] = field(default_factory=_new_str_axis_state_dict)
+    axis_cmd: Dict[str, AxisCommandState] = field(default_factory=_new_str_axis_command_state_dict)
 
     # Bundled per-axis view (structural): axis_id -> AxisControl
-    axis_ctl: Dict[str, AxisControl] = field(default_factory=dict)
+    axis_ctl: Dict[str, AxisControl] = field(default_factory=_new_str_axis_control_dict)
 
     # Exclusive control claims: axis_id -> hip_id (set by ClaimAxis/ReleaseAxis)
-    axis_claims: Dict[str, str] = field(default_factory=dict)
+    axis_claims: Dict[str, str] = field(default_factory=_new_str_str_dict)
 
     # Rig-level lease (exclusive). Core owns policy; default empty.
     lease_rig: str = ""
     # Axis leases (set-valued holders per axis)
-    lease_axis_holders: Dict[str, list[str]] = field(default_factory=dict)
+    lease_axis_holders: Dict[str, list[str]] = field(default_factory=_new_str_list_str_dict)
     # Last lease denial reason (for telemetry)
     lease_last_denial_reason: str = ""
 
@@ -85,16 +141,16 @@ class MachineState:
     estop: bool = False
     fault: bool = False
     # Per-axis one-shot request (canonical)
-    estop_reset_req_by_axis: Dict[str, bool] = field(default_factory=dict)
+    estop_reset_req_by_axis: Dict[str, bool] = field(default_factory=_new_str_bool_dict)
     # Policy diagnostics: denied reset requests per axis
-    estop_reset_denied_count_by_axis: Dict[str, int] = field(default_factory=dict)
+    estop_reset_denied_count_by_axis: Dict[str, int] = field(default_factory=_new_str_int_dict)
 
     # ReSync pulse (clears cut marker latches / recover flow), per axis.
-    resync_req_by_axis: Dict[str, bool] = field(default_factory=dict)
+    resync_req_by_axis: Dict[str, bool] = field(default_factory=_new_str_bool_dict)
 
     # Main/guider amplifier reset pulses (one-shot), emitted via ControlIN/GuideControlUI bitfields
-    main_reset_req_by_axis: Dict[str, bool] = field(default_factory=dict)
-    guider_reset_req_by_axis: Dict[str, bool] = field(default_factory=dict)
+    main_reset_req_by_axis: Dict[str, bool] = field(default_factory=_new_str_bool_dict)
+    guider_reset_req_by_axis: Dict[str, bool] = field(default_factory=_new_str_bool_dict)
 
     estop_status_word: int = 0  # NEW: measured bitfield
 
@@ -102,18 +158,20 @@ class MachineState:
     # Measured/confirmed by device (via telemetry):
     param_edit_active: bool = False
     param_edit_group: str = ""
-    params: Dict[str, float] = field(default_factory=dict)
+    params: Dict[str, float] = field(default_factory=_new_str_float_dict)
 
     # Pending ops to be sent on the next command frame (core-side only).
     # Per-axis storage is canonical; param intents without axis_id are rejected.
-    pending_param_ops_by_axis: Dict[str, list[ParamOp]] = field(default_factory=dict)
+    pending_param_ops_by_axis: Dict[str, list[ParamOp]] = field(
+        default_factory=_new_str_param_ops_list_dict
+    )
 
     # --- HIP<->Core transactional acks (axis-agnostic parameter ops) ---
     # One-shot ack list emitted in TelemetrySnapshot, then cleared after publish.
-    core_acks: list[str] = field(default_factory=list)
+    core_acks: list[str] = field(default_factory=_new_str_list)
 
     # Deduplication of transactional intents: req_id -> last_seen_tick
-    seen_req_ids: Dict[str, int] = field(default_factory=dict)
+    seen_req_ids: Dict[str, int] = field(default_factory=_new_str_int_dict)
 
     # --- Observed parameter commit status (Core->DenSi is not transactional) ---
     # DenSi/PLC is considered "semi-frozen": we cannot rely on ACKs.
@@ -123,8 +181,8 @@ class MachineState:
     param_commit_group: str = ""
     param_commit_status: str = "idle"  # idle|pending|applied|timeout|cancelled
     param_commit_start_tick: int = 0
-    param_commit_desired: Dict[str, float] = field(default_factory=dict)
-    param_commit_unmatched: list[str] = field(default_factory=list)
+    param_commit_desired: Dict[str, float] = field(default_factory=_new_str_float_dict)
+    param_commit_unmatched: list[str] = field(default_factory=_new_str_list)
     # Observation bookkeeping (device tick based):
     param_commit_last_device_tick: int = -1
     param_commit_observed_ticks: int = 0
@@ -135,7 +193,7 @@ class MachineState:
     # --- livetick echo (optional) ---
     # HI-P can emit EchoLifeTick(axis_id,value). Core stores the last value per axis
     # and forwards it via CommandFrame.lifetick_echo so DenSi/device can mirror it.
-    lifetick_echo_by_axis: Dict[str, int] = field(default_factory=dict)
+    lifetick_echo_by_axis: Dict[str, int] = field(default_factory=_new_str_int_dict)
 
     # --- joystick state (UI telemetry only; used in Stage 2) ---
     joy: JoyState = field(default_factory=JoyState)
@@ -143,8 +201,8 @@ class MachineState:
 
     # --- core mode aggregation (Stage 2) ---
     core_mode: CoreMode = CoreMode.ESTOP
-    core_blocked_by: list[object] = field(default_factory=list)
-    core_axis_gate: Dict[str, Dict[str, object]] = field(default_factory=dict)
+    core_blocked_by: list[object] = field(default_factory=_new_object_list)
+    core_axis_gate: Dict[str, Dict[str, object]] = field(default_factory=_new_str_object_dict_dict)
     core_motion_allowed: bool = False
 
     def clear_one_shots(self) -> None:

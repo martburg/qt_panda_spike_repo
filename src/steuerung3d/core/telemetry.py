@@ -12,6 +12,42 @@ from steuerung3d.core.rig_logic import note_densi_seen
 from steuerung3d.core.state import AxisState, MachineState
 
 
+def _new_str_densi_dict() -> Dict[str, DensiTelemetry]:
+    return {}
+
+
+def _new_str_list_str_dict() -> Dict[str, list[str]]:
+    return {}
+
+
+def _new_str_float_dict() -> Dict[str, float]:
+    return {}
+
+
+def _new_str_str_dict() -> Dict[str, str]:
+    return {}
+
+
+def _new_str_int_dict() -> Dict[str, int]:
+    return {}
+
+
+def _new_str_bool_dict() -> Dict[str, bool]:
+    return {}
+
+
+def _new_nested_str_float_dict() -> Dict[str, Dict[str, float]]:
+    return {}
+
+
+def _new_nested_str_str_dict() -> Dict[str, Dict[str, str]]:
+    return {}
+
+
+def _new_str_list() -> list[str]:
+    return []
+
+
 @dataclass(frozen=True)
 class AxisTelemetry:
     # measured
@@ -53,13 +89,13 @@ class TelemetrySnapshot:
 
     # Rig workflow
     rig_mode: str = "DISCOVERY"
-    densis: Mapping[str, DensiTelemetry] = field(default_factory=dict)
+    densis: Mapping[str, DensiTelemetry] = field(default_factory=_new_str_densi_dict)
 
     # Leases (Core-owned authority surface)
     lease_rig: str = ""
-    lease_axis: Mapping[str, list[str]] = field(default_factory=dict)
+    lease_axis: Mapping[str, list[str]] = field(default_factory=_new_str_list_str_dict)
     lease_rig_holder: str = ""
-    lease_axis_holders: Mapping[str, list[str]] = field(default_factory=dict)
+    lease_axis_holders: Mapping[str, list[str]] = field(default_factory=_new_str_list_str_dict)
     lease_denial_reason: str = ""
 
     # NEW
@@ -68,35 +104,47 @@ class TelemetrySnapshot:
     # Parameters (axis-agnostic v0.1)
     param_edit_active: bool = False
     param_edit_group: str = ""
-    params: Mapping[str, float] = field(default_factory=dict)
+    params: Mapping[str, float] = field(default_factory=_new_str_float_dict)
 
     # Raw PLC uplink payload (so HiP can decide what to use without changing decode again)
-    plc_uplink_fields: Mapping[str, str] = field(default_factory=dict)  # base fields (pre-EOD)
-    plc_uplink_tail: Mapping[str, str] = field(default_factory=dict)  # tail fields (post-EOD)
+    plc_uplink_fields: Mapping[str, str] = field(
+        default_factory=_new_str_str_dict
+    )  # base fields (pre-EOD)
+    plc_uplink_tail: Mapping[str, str] = field(
+        default_factory=_new_str_str_dict
+    )  # tail fields (post-EOD)
 
     # Axis-scoped UI telemetry caches (used in fanout mode so each HiP can resolve
     # attached-axis values without accidentally consuming whichever device updated last).
-    axis_estop_status_word: Mapping[str, int] = field(default_factory=dict)
-    axis_param_edit_active: Mapping[str, bool] = field(default_factory=dict)
-    axis_param_edit_group: Mapping[str, str] = field(default_factory=dict)
-    axis_params: Mapping[str, Mapping[str, float]] = field(default_factory=dict)
-    axis_plc_uplink_fields: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
-    axis_plc_uplink_tail: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
-    axis_param_commit_req_id: Mapping[str, str] = field(default_factory=dict)
-    axis_param_commit_group: Mapping[str, str] = field(default_factory=dict)
-    axis_param_commit_status: Mapping[str, str] = field(default_factory=dict)
-    axis_param_commit_age_ticks: Mapping[str, int] = field(default_factory=dict)
-    axis_param_commit_unmatched: Mapping[str, list[str]] = field(default_factory=dict)
+    axis_estop_status_word: Mapping[str, int] = field(default_factory=_new_str_int_dict)
+    axis_param_edit_active: Mapping[str, bool] = field(default_factory=_new_str_bool_dict)
+    axis_param_edit_group: Mapping[str, str] = field(default_factory=_new_str_str_dict)
+    axis_params: Mapping[str, Mapping[str, float]] = field(
+        default_factory=_new_nested_str_float_dict
+    )
+    axis_plc_uplink_fields: Mapping[str, Mapping[str, str]] = field(
+        default_factory=_new_nested_str_str_dict
+    )
+    axis_plc_uplink_tail: Mapping[str, Mapping[str, str]] = field(
+        default_factory=_new_nested_str_str_dict
+    )
+    axis_param_commit_req_id: Mapping[str, str] = field(default_factory=_new_str_str_dict)
+    axis_param_commit_group: Mapping[str, str] = field(default_factory=_new_str_str_dict)
+    axis_param_commit_status: Mapping[str, str] = field(default_factory=_new_str_str_dict)
+    axis_param_commit_age_ticks: Mapping[str, int] = field(default_factory=_new_str_int_dict)
+    axis_param_commit_unmatched: Mapping[str, list[str]] = field(
+        default_factory=_new_str_list_str_dict
+    )
 
     # HIP<->Core transactional acks (one-shot)
-    core_acks: list[str] = field(default_factory=list)
+    core_acks: list[str] = field(default_factory=_new_str_list)
 
     # Observed param commit status (Core-side inference from DenSi telemetry)
     param_commit_req_id: str = ""
     param_commit_group: str = ""
     param_commit_status: str = "idle"  # idle|pending|applied|timeout|cancelled
     param_commit_age_ticks: int = 0
-    param_commit_unmatched: list[str] = field(default_factory=list)
+    param_commit_unmatched: list[str] = field(default_factory=_new_str_list)
 
     # Joystick state (UI-only; not used for device telemetry)
     joy: JoyState = field(default_factory=JoyState)
@@ -137,7 +185,7 @@ class TelemetrySnapshot:
             for axis_id, ax in state.axes.items()
         }
 
-        densis = {}
+        densis: Dict[str, DensiTelemetry] = {}
         try:
             offline_after = int(state.densi_offline_after_ticks)
             for dev_id, d in dict(state.densi_registry).items():
@@ -157,7 +205,7 @@ class TelemetrySnapshot:
                     last_seen_age_ticks=int(age),
                 )
         except Exception:
-            densis = {}
+            densis: Dict[str, DensiTelemetry] = {}
 
         lease_rig = str(state.lease_rig)
         lease_axis: Dict[str, list[str]] = {}

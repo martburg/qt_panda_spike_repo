@@ -9,6 +9,7 @@ state write-back (SystemTime / PosDiffFor) to preserve legacy behavior.
 from __future__ import annotations
 
 import time
+from typing import Protocol
 
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.telemetry import TelemetrySnapshot
@@ -24,9 +25,27 @@ from ..panels.densi.densi_lifetick_vm import compute_densi_lifetick_vm
 from ..panels.densi.densi_readouts_vm import compute_densi_readouts_vm
 
 
+class EngineStateLike(Protocol):
+    estop: bool
+    params: dict[str, object]
+
+
+class EngineLike(Protocol):
+    state: EngineStateLike
+    cut_valid: bool
+    systemtime_tok: str
+    cut_pos_m: float
+    cut_vel_mps: float
+    taster_prev_disp: bool
+    taster_pressed_s: float | None
+    brake_handoff_grace_s: float
+
+    def _now_token(self) -> str: ...
+
+
 def compute_densi_view_model(
     *,
-    engine,
+    engine: EngineLike,
     axis_ids: list[str],
     force_refresh_checkboxes: bool,
     now_ns: int,
@@ -60,17 +79,13 @@ def compute_densi_view_model(
     except Exception:
         now_token = ""
     cut_vm = compute_densi_cut_markers_vm(
-        cut_valid=bool(getattr(engine, "cut_valid", False)),
-        estop_now=bool(getattr(engine.state, "estop", False)),
+        cut_valid=bool(engine.cut_valid),
+        estop_now=bool(engine.state.estop),
         now_token=str(now_token),
-        systemtime_tok=str(getattr(engine, "systemtime_tok", "") or "") or None,
+        systemtime_tok=str(engine.systemtime_tok or "") or None,
         systemtime_param=str(engine.state.params.get("SystemTime", "") or "") or None,
-        cut_pos_m=float(getattr(engine, "cut_pos_m", 0.0) or 0.0)
-        if bool(getattr(engine, "cut_valid", False))
-        else None,
-        cut_vel_mps=float(getattr(engine, "cut_vel_mps", 0.0) or 0.0)
-        if bool(getattr(engine, "cut_valid", False))
-        else None,
+        cut_pos_m=float(engine.cut_pos_m or 0.0) if bool(engine.cut_valid) else None,
+        cut_vel_mps=float(engine.cut_vel_mps or 0.0) if bool(engine.cut_valid) else None,
         pos_m=float(readouts_vm.pos_m) if readouts_vm is not None else None,
     )
     if cut_vm.effects.systemtime_tok is not None:
@@ -87,8 +102,8 @@ def compute_densi_view_model(
     taster = bool(bits.get("taster", False))
     ready = bool(bits.get("ready", False))
 
-    prev = bool(getattr(engine, "taster_prev_disp", taster))
-    pressed_s = getattr(engine, "taster_pressed_s", None)
+    prev = bool(engine.taster_prev_disp)
+    pressed_s = engine.taster_pressed_s
     st0 = TasterEdgeState(prev=prev, pressed_s=pressed_s if pressed_s is None else float(pressed_s))
     st1 = update_taster_edge_state(state=st0, taster=taster, now_s=float(time.monotonic()))
     engine.taster_prev_disp = bool(st1.prev)
@@ -97,7 +112,7 @@ def compute_densi_view_model(
     within_grace = within_brake_grace(
         state=st1,
         now_s=float(time.monotonic()),
-        grace_s=float(getattr(engine, "brake_handoff_grace_s", 2.0)),
+        grace_s=float(engine.brake_handoff_grace_s),
     )
 
     banner_vm = compute_densi_banner_vm(

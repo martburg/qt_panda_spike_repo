@@ -6,13 +6,13 @@ import socket
 import sys
 import time
 from dataclasses import dataclass
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, TextIO, Tuple, cast
 
 
 @dataclass(frozen=True)
 class DecodedDatagram:
     text: str
-    json_obj: Optional[Any] = None
+    json_obj: object | None = None
 
 
 def decode_datagram(data: bytes, encoding: str = "utf-8") -> DecodedDatagram:
@@ -65,14 +65,15 @@ def summarize_json(obj: Any, max_items: int = 12) -> str:
         return s if len(s) <= 200 else s[:197] + "..."
 
     parts: list[str] = []
+    obj_dict = cast(dict[str, object], obj)
 
-    axes = obj.get("axes")
+    axes = obj_dict.get("axes")
     if isinstance(axes, list):
         shown = " ".join(_fmt_float(v) for v in axes[:max_items])
         tail = "" if len(axes) <= max_items else f" …(+{len(axes) - max_items})"
         parts.append(f"axes[{len(axes)}]: {shown}{tail}")
 
-    buttons = obj.get("buttons")
+    buttons = obj_dict.get("buttons")
     if isinstance(buttons, list):
         # show indices of pressed buttons (value truthy)
         pressed = [str(i) for i, v in enumerate(buttons) if v]
@@ -83,14 +84,14 @@ def summarize_json(obj: Any, max_items: int = 12) -> str:
         else:
             parts.append("btn: -")
 
-    hats = obj.get("hats") or obj.get("hat")
+    hats = obj_dict.get("hats") or obj_dict.get("hat")
     if isinstance(hats, list):
         parts.append(f"hat: {hats[:max_items]}" + ("" if len(hats) <= max_items else "…"))
     elif hats is not None:
         parts.append(f"hat: {hats}")
 
     # include any extra keys (but avoid dumping huge stuff)
-    extras = [k for k in obj.keys() if k not in {"axes", "buttons", "hats", "hat"}]
+    extras = [k for k in obj_dict.keys() if k not in {"axes", "buttons", "hats", "hat"}]
     if extras:
         ex = ",".join(extras[:6])
         parts.append(f"extra: {ex}" + ("" if len(extras) <= 6 else "…"))
@@ -102,7 +103,7 @@ def summarize_json(obj: Any, max_items: int = 12) -> str:
 class LiveLinePrinter:
     """Overwrite previous line with a new one (no scrolling)."""
 
-    def __init__(self, stream):
+    def __init__(self, stream: TextIO) -> None:
         self.stream = stream
         self._last_len = 0
 
