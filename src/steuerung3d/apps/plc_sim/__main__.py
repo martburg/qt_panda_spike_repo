@@ -5,9 +5,9 @@ import socket
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
-TxValue = int | str
-
 from steuerung3d.adapters.plc.line_codec import PlcLineCodec, parse_bool, parse_float, parse_int
+
+TxValue = int | str
 
 
 @dataclass

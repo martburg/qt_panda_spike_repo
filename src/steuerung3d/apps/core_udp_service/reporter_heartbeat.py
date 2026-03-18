@@ -30,7 +30,6 @@ class _StateLike(Protocol):
 AxisClaimsMap = Mapping[object, object]
 
 
-
 def _age(now: float, ts: object) -> float | None:
     if ts is None:
         return None
@@ -42,7 +41,6 @@ def _age(now: float, ts: object) -> float | None:
         return None
     except Exception:
         return None
-
 
 
 def log_periodic_heartbeat(

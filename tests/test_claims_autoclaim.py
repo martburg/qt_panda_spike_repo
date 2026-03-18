@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.intents import ClaimAxis, EnableAxis, JogAxis, ReleaseAxis, RequestAxisLease

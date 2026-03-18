@@ -94,9 +94,7 @@ def test_start_runtime_cleans_residual_bind_ports(
     expand_processes = cast(Any, staticmethod(lambda spec, session_dir: [proc]))
     cleanup_ports = cast(Any, lambda ports: cleaned.append(list(cast(list[int], ports))) or [])
 
-    monkeypatch.setattr(
-        "steuerung3d.core.stack_runtime_boot.make_session_dir", make_session_dir
-    )
+    monkeypatch.setattr("steuerung3d.core.stack_runtime_boot.make_session_dir", make_session_dir)
     monkeypatch.setattr(
         "steuerung3d.core.stack_runtime_boot.write_runtime_meta", write_runtime_meta
     )

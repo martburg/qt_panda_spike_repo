@@ -92,9 +92,7 @@ def wire_signals(self: "HipQtBinder") -> None:
             bc.clicked.connect(_make_param_slot(self, "cancel", grp))
 
 
-def _make_param_slot(
-    self: "HipQtBinder", action: str, group: str
-) -> Callable[[bool], None]:
+def _make_param_slot(self: "HipQtBinder", action: str, group: str) -> Callable[[bool], None]:
     def _slot(_checked: bool = False) -> None:
         self._on_param_action(action, group)
 

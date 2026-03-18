@@ -15,7 +15,6 @@ class _StatusPayload(TypedDict):
     fields: dict[str, object]
 
 
-
 def _seed_axis_gate(st: MachineState, axis_id: str, *, ready: bool, fault: bool = False) -> None:
     st.core_axis_gate[axis_id] = {
         "in_scope": True,

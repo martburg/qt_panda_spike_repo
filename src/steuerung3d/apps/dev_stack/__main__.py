@@ -6,7 +6,7 @@ import socket
 import time
 import tomllib
 from pathlib import Path
-from typing import Any, Callable, Protocol, cast
+from typing import Callable, Protocol, cast
 
 from steuerung3d.adapters.plc.udp_device import UdpPlcDevice
 from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
@@ -34,7 +34,7 @@ _LoadFleet = Callable[[Path], _DeviceLike]
 
 def _load_plc_fleet(config_path: Path) -> _DeviceLike:
     mod = importlib.import_module("steuerung3d.adapters.plc_twincat_legacy.config")
-    loader = cast(_LoadFleet, getattr(mod, "load_plc_twincat_legacy_fleet_from_toml"))
+    loader = cast(_LoadFleet, mod.load_plc_twincat_legacy_fleet_from_toml)
     return loader(config_path)
 
 
@@ -72,7 +72,7 @@ def _load_device_from_config(config_path: Path, plant: SimAxisPlant) -> _DeviceL
                 f"using UDP SIM fallback for plc_twincat_legacy_fleet"
             )
             mod = importlib.import_module("steuerung3d.adapters.plc_twincat_legacy.udp_sim")
-            build_udp_sim = cast(Callable[..., _DeviceLike], getattr(mod, "build_udp_sim_fleet_from_toml"))
+            build_udp_sim = cast(Callable[..., _DeviceLike], mod.build_udp_sim_fleet_from_toml)
             # Returns an object with .step(...) and .close()
             return build_udp_sim(config_path, dt_s=0.01)
 

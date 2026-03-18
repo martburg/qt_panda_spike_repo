@@ -128,8 +128,6 @@ class BirdsEyeFields(TypedDict, total=False):
     axes: list[_BirdAxisFields]
 
 
-
-
 def _blocked_code_parts(item: object) -> tuple[str, str]:
     if not isinstance(item, dict):
         return "", ""

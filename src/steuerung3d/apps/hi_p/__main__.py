@@ -6,14 +6,12 @@ import sys
 from pathlib import Path
 from typing import Callable, cast
 
-from PySide6.QtWidgets import QApplication
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QApplication, QWidget
 
 # and import HiPController directly if you changed controllers/__init__.py:
 from steuerung3d.apps.yellow.controllers.hip_controller import HiPController
 from steuerung3d.apps.yellow.ui_shell import build_yellow_window
-from steuerung3d.config.toml_loader import TomlTable
-from steuerung3d.config.toml_loader import load_toml
+from steuerung3d.config.toml_loader import TomlTable, load_toml
 from steuerung3d.core.net import parse_hostport
 
 # from steuerung3d.protocol.transport import InMemTransport
@@ -22,9 +20,7 @@ from steuerung3d.util.app_bootstrap import bootstrap_logging
 
 log = logging.getLogger("hi_p")
 
-build_yellow_window = cast(
-    Callable[..., QWidget], build_yellow_window
-)
+build_yellow_window = cast(Callable[..., QWidget], build_yellow_window)
 
 
 def _load_config(path: str | None) -> TomlTable:
