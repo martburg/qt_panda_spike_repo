@@ -21,6 +21,26 @@ from steuerung3d.core.state import MachineState
 
 from .param_defaults import apply_densi_param_defaults
 
+MetaStore = dict[str, object]
+
+
+def _meta_int(meta: MetaStore, key: str, default: int = 0) -> int:
+    value = meta.get(key, default)
+    return (
+        int(value)
+        if isinstance(value, (int, float)) and not isinstance(value, bool)
+        else int(default)
+    )
+
+
+def _meta_float(meta: MetaStore, key: str, default: float = 0.0) -> float:
+    value = meta.get(key, default)
+    return (
+        float(value)
+        if isinstance(value, (int, float)) and not isinstance(value, bool)
+        else float(default)
+    )
+
 
 @dataclass(frozen=True)
 class PlcAntonVelCmdConfig:
@@ -81,12 +101,22 @@ def _soft_limit_cap(
     return v
 
 
-def _lifetick_is_stale(*, meta: dict, lifetick_rx: int, stale_after_ticks: int) -> bool:
-    step_tick = int(meta.get("plc_lifetick_step_tick", 0)) + 1
+def _lifetick_is_stale(*, meta: MetaStore, lifetick_rx: int, stale_after_ticks: int) -> bool:
+    step_tick = _meta_int(meta, "plc_lifetick_step_tick", 0) + 1
     meta["plc_lifetick_step_tick"] = int(step_tick)
 
-    last_rx = meta.get("plc_lifetick_rx", None)
-    last_rx_step = meta.get("plc_lifetick_rx_step_tick", None)
+    last_rx_raw = meta.get("plc_lifetick_rx", None)
+    last_rx = (
+        int(last_rx_raw)
+        if isinstance(last_rx_raw, (int, float)) and not isinstance(last_rx_raw, bool)
+        else None
+    )
+    last_rx_step_raw = meta.get("plc_lifetick_rx_step_tick", None)
+    last_rx_step = (
+        int(last_rx_step_raw)
+        if isinstance(last_rx_step_raw, (int, float)) and not isinstance(last_rx_step_raw, bool)
+        else None
+    )
 
     if last_rx is None or int(lifetick_rx) != int(last_rx):
         last_rx = int(lifetick_rx) & 0xFFFF
@@ -102,7 +132,7 @@ def _lifetick_is_stale(*, meta: dict, lifetick_rx: int, stale_after_ticks: int) 
 
 def _pid_trim(
     *,
-    meta: dict,
+    meta: MetaStore,
     pos_soll: float,
     pos_ist: float,
     p: float,
@@ -112,8 +142,8 @@ def _pid_trim(
     dt_s: float,
 ) -> float:
     pos_err = float(pos_soll) - float(pos_ist)
-    err_int = float(meta.get("plc_pos_err_int", 0.0)) + (pos_err * float(dt_s))
-    prev_err = float(meta.get("plc_pos_err_prev", pos_err))
+    err_int = _meta_float(meta, "plc_pos_err_int", 0.0) + (pos_err * float(dt_s))
+    prev_err = _meta_float(meta, "plc_pos_err_prev", pos_err)
     err_d = pos_err - prev_err
 
     meta["plc_pos_err_int"] = float(err_int)

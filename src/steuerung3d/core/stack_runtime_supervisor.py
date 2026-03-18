@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import time
-from typing import TYPE_CHECKING, List, cast
+from typing import IO, TYPE_CHECKING, List, cast
 
 from steuerung3d.ui.birdseye_format import (
     BirdsEyeFields,
@@ -16,6 +16,14 @@ from steuerung3d.ui.birdseye_format import (
 from .stack_preflight import cleanup_residual_bind_ports, extract_bind_ports
 from .stack_runtime_meta import write_runtime_meta
 from .status import env_for_process
+
+
+def _as_object_dict(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        return {}
+    mapping = cast(dict[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
+
 
 if TYPE_CHECKING:
     from .stack_runtime_impl import RunningProcess, StackRuntime
@@ -42,7 +50,7 @@ def spawn_process(rt: "StackRuntime", p: "ProcessSpec") -> None:
     env.update(p.env or {})
 
     if rt.new_console and os.name == "nt":
-        proc = subprocess.Popen(
+        proc: subprocess.Popen[bytes] = subprocess.Popen(
             p.argv,
             stdout=log_f,
             stderr=subprocess.STDOUT,
@@ -51,7 +59,7 @@ def spawn_process(rt: "StackRuntime", p: "ProcessSpec") -> None:
             creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0),
         )
     else:
-        proc = subprocess.Popen(
+        proc: subprocess.Popen[bytes] = subprocess.Popen(
             p.argv,
             stdout=log_f,
             stderr=subprocess.STDOUT,
@@ -74,15 +82,10 @@ def birds_eye_line(rt: "StackRuntime") -> str:
             if sm:
                 age = rt.status.age_s(svc, inst)
                 age_ms = int((age or 0.0) * 1000.0)
-                if isinstance(sm, dict):
-                    level = str(sm.get("level", ""))
-                    summary = str(sm.get("summary", ""))
-                    raw_fields = sm.get("fields", {})
-                    fields = raw_fields if isinstance(raw_fields, dict) else {}
-                else:
-                    level = str(getattr(sm, "level", ""))
-                    summary = str(getattr(sm, "summary", ""))
-                    fields = {}
+                sm_dict = _as_object_dict(sm)
+                level = str(sm_dict.get("level", ""))
+                summary = str(sm_dict.get("summary", ""))
+                fields = _as_object_dict(sm_dict.get("fields", {}))
                 parts.append(f"{rp.spec.name}: {level} {summary} ({age_ms}ms)")
                 if isinstance(fields, dict) and str(fields.get("component", "")) == "core":
                     parts.extend(build_frederik_panel_lines(cast(BirdsEyeFields, fields)))
@@ -180,7 +183,7 @@ def stop_runtime(rt: "StackRuntime") -> None:
     cleanup_residual_bind_ports(bind_ports)
 
     for rp in rt.processes:
-        fh = getattr(rp.popen, "_stack_log_fh", None)
+        fh = cast(IO[str] | None, getattr(rp.popen, "_stack_log_fh", None))
         try:
             if fh:
                 fh.close()

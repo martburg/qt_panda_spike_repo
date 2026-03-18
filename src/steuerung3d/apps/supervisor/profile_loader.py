@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import cast
 
 from steuerung3d.config.toml_loader import load_toml
 
@@ -38,26 +39,21 @@ def _as_str(value: object, default: str = "") -> str:
 def _as_table(value: object) -> dict[str, object]:
     if not isinstance(value, Mapping):
         return {}
-    return {str(k): v for k, v in value.items()}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
+
+
+def _as_object_list(value: object) -> list[object]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        return []
+    return list(cast(Sequence[object], value))
 
 
 def _axis_entries(raw: Mapping[str, object]) -> list[dict[str, object]]:
-    axis_items_obj = raw.get("axes", [])
-    axis_items = (
-        list(axis_items_obj)
-        if isinstance(axis_items_obj, Sequence)
-        and not isinstance(axis_items_obj, (str, bytes, bytearray))
-        else []
-    )
+    axis_items = _as_object_list(raw.get("axes", []))
     if axis_items:
         return [_as_table(item) for item in axis_items]
-    pair_items_obj = raw.get("pairs", [])
-    pair_items = (
-        list(pair_items_obj)
-        if isinstance(pair_items_obj, Sequence)
-        and not isinstance(pair_items_obj, (str, bytes, bytearray))
-        else []
-    )
+    pair_items = _as_object_list(raw.get("pairs", []))
     return [_as_table(item) for item in pair_items]
 
 
@@ -81,7 +77,7 @@ def _normalize_axis_entry(entry: dict[str, object]) -> AxisConfig:
 
 
 def load_profile(path: str | Path) -> SupervisorProfile:
-    raw = _as_table(load_toml(Path(path)))
+    raw = load_toml(Path(path))
     sup = _as_table(raw.get("supervisor", {}))
     axis_items = _axis_entries(raw)
     axes: list[AxisConfig] = []

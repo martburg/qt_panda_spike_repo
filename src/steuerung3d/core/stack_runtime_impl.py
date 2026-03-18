@@ -35,7 +35,7 @@ from .status import StatusCollector
 @dataclass
 class RunningProcess:
     spec: ProcessSpec
-    popen: subprocess.Popen
+    popen: subprocess.Popen[bytes]
 
 
 def expand_processes(spec: StackSpec, *, session_dir: Path) -> List[ProcessSpec]:

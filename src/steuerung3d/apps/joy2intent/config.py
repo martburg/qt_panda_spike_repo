@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import cast
 
 from steuerung3d.config.toml_loader import load_toml
 
@@ -12,17 +13,31 @@ def _hostport(s: str) -> tuple[str, int]:
     return host.strip(), int(port)
 
 
+def _as_table(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        return {}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
+
+
+def _as_object_list(value: object) -> list[object]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        return []
+    return list(cast(Sequence[object], value))
+
+
 def _require_value(mapping: Mapping[str, object], key: str, *, ctx: str) -> object:
     if key not in mapping or mapping[key] is None:
         raise ValueError(f"Missing required config key '{ctx}.{key}' in joy2intent config")
     return mapping[key]
 
 
-def _require_section(mapping: Mapping[str, object], key: str, *, ctx: str) -> Mapping[str, object]:
+def _require_section(mapping: Mapping[str, object], key: str, *, ctx: str) -> dict[str, object]:
     value = _require_value(mapping, key, ctx=ctx)
-    if not isinstance(value, Mapping):
+    table = _as_table(value)
+    if not table and not isinstance(value, Mapping):
         raise ValueError(f"Config key '{ctx}.{key}' must be a table in joy2intent config")
-    return value
+    return table
 
 
 def _require_str(mapping: Mapping[str, object], key: str, *, ctx: str) -> str:
@@ -48,10 +63,11 @@ def _require_int(mapping: Mapping[str, object], key: str, *, ctx: str) -> int:
 
 def _require_list_str(mapping: Mapping[str, object], key: str, *, ctx: str) -> list[str]:
     value = _require_value(mapping, key, ctx=ctx)
-    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+    items = _as_object_list(value)
+    if not items:
         raise ValueError(f"Config key '{ctx}.{key}' must be a list of strings in joy2intent config")
     result: list[str] = []
-    for item in value:
+    for item in items:
         if not isinstance(item, str):
             raise ValueError(
                 f"Config key '{ctx}.{key}' must be a list of strings in joy2intent config"
@@ -62,12 +78,13 @@ def _require_list_str(mapping: Mapping[str, object], key: str, *, ctx: str) -> l
 
 def _require_list_int(mapping: Mapping[str, object], key: str, *, ctx: str) -> list[int]:
     value = _require_value(mapping, key, ctx=ctx)
-    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+    items = _as_object_list(value)
+    if not items:
         raise ValueError(
             f"Config key '{ctx}.{key}' must be a list of integers in joy2intent config"
         )
     result: list[int] = []
-    for item in value:
+    for item in items:
         if not isinstance(item, int) or isinstance(item, bool):
             raise ValueError(
                 f"Config key '{ctx}.{key}' must be a list of integers in joy2intent config"
@@ -80,20 +97,20 @@ def _require_dict_str_int_or_int_list(
     mapping: Mapping[str, object], key: str, *, ctx: str
 ) -> dict[str, int | list[int]]:
     value = _require_value(mapping, key, ctx=ctx)
-    if not isinstance(value, Mapping):
+    table = _as_table(value)
+    if not table and not isinstance(value, Mapping):
         raise ValueError(
             f"Config key '{ctx}.{key}' must be a table of button bindings in joy2intent config"
         )
     result: dict[str, int | list[int]] = {}
-    for name, raw_value in value.items():
-        if not isinstance(name, str):
-            raise ValueError(f"Config key '{ctx}.{key}' must use string keys in joy2intent config")
+    for name, raw_value in table.items():
         if isinstance(raw_value, int) and not isinstance(raw_value, bool):
             result[name] = int(raw_value)
             continue
-        if isinstance(raw_value, Sequence) and not isinstance(raw_value, (str, bytes, bytearray)):
+        items = _as_object_list(raw_value)
+        if items:
             ints: list[int] = []
-            for item in raw_value:
+            for item in items:
                 if not isinstance(item, int) or isinstance(item, bool):
                     raise ValueError(
                         f"Config key '{ctx}.{key}.{name}' must be an int or list[int] in joy2intent config"
@@ -109,15 +126,12 @@ def _require_dict_str_int_or_int_list(
 
 def _require_dict_str_int(mapping: Mapping[str, object], key: str, *, ctx: str) -> dict[str, int]:
     value = _require_value(mapping, key, ctx=ctx)
-    if not isinstance(value, Mapping):
+    table = _as_table(value)
+    if not table and not isinstance(value, Mapping):
         raise ValueError(f"Config key '{ctx}.{key}' must be a table in joy2intent config")
     result: dict[str, int] = {}
-    for name, raw_value in value.items():
-        if (
-            not isinstance(name, str)
-            or not isinstance(raw_value, int)
-            or isinstance(raw_value, bool)
-        ):
+    for name, raw_value in table.items():
+        if not isinstance(raw_value, int) or isinstance(raw_value, bool):
             raise ValueError(
                 f"Config key '{ctx}.{key}' must be a table[str, int] in joy2intent config"
             )
@@ -136,11 +150,12 @@ def _optional_bool(mapping: Mapping[str, object], key: str, default: bool) -> bo
 
 def _require_dict_str_bool(mapping: Mapping[str, object], key: str, *, ctx: str) -> dict[str, bool]:
     value = _require_value(mapping, key, ctx=ctx)
-    if not isinstance(value, Mapping):
+    table = _as_table(value)
+    if not table and not isinstance(value, Mapping):
         raise ValueError(f"Config key '{ctx}.{key}' must be a table in joy2intent config")
     result: dict[str, bool] = {}
-    for name, raw_value in value.items():
-        if not isinstance(name, str) or not isinstance(raw_value, bool):
+    for name, raw_value in table.items():
+        if not isinstance(raw_value, bool):
             raise ValueError(
                 f"Config key '{ctx}.{key}' must be a table[str, bool] in joy2intent config"
             )
@@ -152,15 +167,12 @@ def _optional_dict_str_float(mapping: Mapping[str, object], key: str) -> dict[st
     raw_value = mapping.get(key)
     if raw_value is None:
         return {}
-    if not isinstance(raw_value, Mapping):
+    table = _as_table(raw_value)
+    if not table and not isinstance(raw_value, Mapping):
         raise ValueError(f"Config key '{key}' must be a table[str, float] in joy2intent config")
     result: dict[str, float] = {}
-    for name, item in raw_value.items():
-        if (
-            not isinstance(name, str)
-            or not isinstance(item, (int, float))
-            or isinstance(item, bool)
-        ):
+    for name, item in table.items():
+        if not isinstance(item, (int, float)) or isinstance(item, bool):
             raise ValueError(f"Config key '{key}' must be a table[str, float] in joy2intent config")
         result[name] = float(item)
     return result
@@ -190,8 +202,6 @@ class Joy2IntentConfig:
 
 def load_joy2intent_config(path: Path) -> Joy2IntentConfig:
     raw = load_toml(path)
-    if not isinstance(raw, Mapping):
-        raise ValueError("joy2intent config root must be a TOML table")
 
     io = _require_section(raw, "io", ctx="<root>")
     ident = _require_section(raw, "identity", ctx="<root>")
@@ -211,9 +221,12 @@ def load_joy2intent_config(path: Path) -> Joy2IntentConfig:
         raise ValueError("Missing or empty config key 'rig.select_buttons' in joy2intent config")
 
     lim_s = limits.get("sync")
-    if lim_s is not None and not isinstance(lim_s, Mapping):
+    lim_s_table = _as_table(lim_s)
+    if lim_s is not None and not lim_s_table and not isinstance(lim_s, Mapping):
         raise ValueError("Config key 'limits.sync' must be a table in joy2intent config")
-    sync_max_v = _optional_dict_str_float(lim_s, "max_v") if isinstance(lim_s, Mapping) else {}
+    sync_max_v: dict[str, float] = (
+        _optional_dict_str_float(lim_s_table, "max_v") if lim_s_table else {}
+    )
 
     return Joy2IntentConfig(
         raw_in=_hostport(_require_str(io, "raw_in", ctx="io")),

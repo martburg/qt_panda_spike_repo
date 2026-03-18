@@ -5,7 +5,7 @@ import time
 from collections.abc import Mapping
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, cast
 
 from steuerung3d.config.lifetick_config import LifetickTraceConfig, load_lifetick_config
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, ParamOp, coerce_param_ops
@@ -73,25 +73,26 @@ def _get_lifetick_logger() -> Optional[logging.Logger]:
     return _lifetick_logger
 
 
-def _as_bool_map(value: object) -> dict[str, bool]:
+def _as_object_dict(value: object) -> dict[str, object]:
     if not isinstance(value, Mapping):
         return {}
-    return {str(k): bool(v) for k, v in value.items()}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
+
+
+def _as_bool_map(value: object) -> dict[str, bool]:
+    return {str(k): bool(v) for k, v in _as_object_dict(value).items()}
 
 
 def _as_int_map(value: object) -> dict[str, int]:
-    if not isinstance(value, Mapping):
-        return {}
-    return {str(k): int(v) for k, v in value.items() if isinstance(v, int)}
+    return {str(k): int(v) for k, v in _as_object_dict(value).items() if isinstance(v, int)}
 
 
 def _as_param_ops_map(value: object) -> dict[str, list[ParamOp]]:
-    if not isinstance(value, Mapping):
-        return {}
     out: dict[str, list[ParamOp]] = {}
-    for k, v in value.items():
+    for k, v in _as_object_dict(value).items():
         if isinstance(v, list):
-            out[str(k)] = coerce_param_ops(v)
+            out[str(k)] = coerce_param_ops(cast(object, v))
     return out
 
 
@@ -128,13 +129,9 @@ def _compute_resync_by_axis(state: MachineState) -> dict[str, bool]:
 
 def _compute_estop_reset_any(state: MachineState) -> bool:
     """Return whether any estop-reset pulse should be emitted this tick."""
-    m = getattr(state, "estop_reset_req_by_axis", {})
-    if isinstance(m, dict):
-        try:
-            return any(bool(v) for v in m.values())
-        except Exception:
-            return False
-    return False
+    return any(
+        bool(v) for v in _as_object_dict(getattr(state, "estop_reset_req_by_axis", {})).values()
+    )
 
 
 def _compute_main_reset_by_axis(state: MachineState) -> dict[str, bool]:

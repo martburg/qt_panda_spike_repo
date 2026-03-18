@@ -5,9 +5,8 @@ import json
 import socket
 import sys
 import time
-from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Optional, TextIO, Tuple
+from typing import Optional, TextIO, Tuple, cast
 
 JSONScalar = None | bool | int | float | str
 JSONObject = dict[str, "JSONValue"]
@@ -26,7 +25,7 @@ def decode_datagram(data: bytes, encoding: str = "utf-8") -> DecodedDatagram:
     try:
         obj = json.loads(text)
         if isinstance(obj, (dict, list, str, int, float, bool)) or obj is None:
-            return DecodedDatagram(text=text, json_obj=obj)
+            return DecodedDatagram(text=text, json_obj=cast(JSONValue, obj))
         return DecodedDatagram(text=text, json_obj=None)
     except Exception:
         return DecodedDatagram(text=text, json_obj=None)
@@ -50,31 +49,39 @@ def listen_once(
         sock.close()
 
 
-def _fmt_float(x: Any) -> str:
-    try:
+def _fmt_float(x: object) -> str:
+    if isinstance(x, bool):
+        return f"{int(x): .3f}".strip()
+    if isinstance(x, (int, float)):
         return f"{float(x): .3f}".strip()
-    except Exception:
-        return str(x)
+    if isinstance(x, str):
+        try:
+            return f"{float(x): .3f}".strip()
+        except Exception:
+            return x
+    return str(x)
 
 
-def summarize_json(obj: Any, max_items: int = 12) -> str:
-    if not isinstance(obj, Mapping):
+def _json_array(value: JSONValue | None) -> JSONArray | None:
+    return value if isinstance(value, list) else None
+
+
+def summarize_json(obj: JSONValue, max_items: int = 12) -> str:
+    if not isinstance(obj, dict):
         s = str(obj)
         return s if len(s) <= 200 else s[:197] + "..."
 
     parts: list[str] = []
 
-    axes = obj.get("axes")
-    if isinstance(axes, Sequence) and not isinstance(axes, (str, bytes, bytearray)):
-        axes_list = list(axes)
-        shown = " ".join(_fmt_float(v) for v in axes_list[:max_items])
-        tail = "" if len(axes_list) <= max_items else f" …(+{len(axes_list) - max_items})"
-        parts.append(f"axes[{len(axes_list)}]: {shown}{tail}")
+    axes = _json_array(obj.get("axes"))
+    if axes is not None:
+        shown = " ".join(_fmt_float(v) for v in axes[:max_items])
+        tail = "" if len(axes) <= max_items else f" …(+{len(axes) - max_items})"
+        parts.append(f"axes[{len(axes)}]: {shown}{tail}")
 
-    buttons = obj.get("buttons")
-    if isinstance(buttons, Sequence) and not isinstance(buttons, (str, bytes, bytearray)):
-        buttons_list = list(buttons)
-        pressed = [str(i) for i, v in enumerate(buttons_list) if bool(v)]
+    buttons = _json_array(obj.get("buttons"))
+    if buttons is not None:
+        pressed = [str(i) for i, v in enumerate(buttons) if bool(v)]
         if pressed:
             parts.append(
                 f"btn: {','.join(pressed[:max_items])}" + ("" if len(pressed) <= max_items else "…")
@@ -82,19 +89,18 @@ def summarize_json(obj: Any, max_items: int = 12) -> str:
         else:
             parts.append("btn: -")
 
-    hats = obj.get("hats") if "hats" in obj else obj.get("hat")
-    if isinstance(hats, Sequence) and not isinstance(hats, (str, bytes, bytearray)):
-        hats_list = list(hats)
-        parts.append(f"hat: {hats_list[:max_items]}" + ("" if len(hats_list) <= max_items else "…"))
-    elif hats is not None:
-        parts.append(f"hat: {hats}")
+    hats = _json_array(obj.get("hats")) or _json_array(obj.get("hat"))
+    if hats is not None:
+        parts.append(f"hat: {hats[:max_items]}" + ("" if len(hats) <= max_items else "…"))
+    elif (hat_scalar := obj.get("hats") if "hats" in obj else obj.get("hat")) is not None:
+        parts.append(f"hat: {hat_scalar}")
 
-    extras = [str(k) for k in obj.keys() if str(k) not in {"axes", "buttons", "hats", "hat"}]
+    extras = [k for k in obj.keys() if k not in {"axes", "buttons", "hats", "hat"}]
     if extras:
         ex = ",".join(extras[:6])
         parts.append(f"extra: {ex}" + ("" if len(extras) <= 6 else "…"))
 
-    line = " | ".join(parts) if parts else str(dict(obj))
+    line = " | ".join(parts) if parts else str(obj)
     return line if len(line) <= 260 else line[:257] + "..."
 
 

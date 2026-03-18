@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, decode_param_ops
 from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
@@ -11,7 +11,14 @@ from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetryS
 def _as_object_dict(value: object) -> dict[str, object]:
     if not isinstance(value, Mapping):
         return {}
-    return {str(k): v for k, v in value.items()}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
+
+
+def _as_object_sequence(value: object) -> list[object]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        return []
+    return list(cast(Sequence[object], value))
 
 
 def _as_float(value: object, default: float = 0.0) -> float:
@@ -72,15 +79,13 @@ def _decode_axis_telemetry(value: object) -> AxisTelemetry | None:
 
 
 def _as_string_list(value: object) -> list[str]:
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        return [str(x) for x in value]
-    return []
+    return [str(x) for x in _as_object_sequence(value)]
 
 
 def _decode_anchor_xyz(value: object) -> tuple[float, float, float] | None:
-    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+    vals = _as_object_sequence(value)
+    if not vals:
         return None
-    vals = list(value)
     if len(vals) != 3:
         return None
     return (_as_float(vals[0]), _as_float(vals[1]), _as_float(vals[2]))
@@ -245,6 +250,7 @@ def _decode_nested_str_map(value: object) -> Dict[str, Dict[str, str]]:
 def _decode_list_map(value: object) -> Dict[str, list[str]]:
     out: Dict[str, list[str]] = {}
     for k, v in _as_object_dict(value).items():
-        if isinstance(v, Sequence) and not isinstance(v, (str, bytes, bytearray)):
-            out[str(k)] = [str(x) for x in v]
+        seq = _as_object_sequence(v)
+        if seq:
+            out[str(k)] = [str(x) for x in seq]
     return out
