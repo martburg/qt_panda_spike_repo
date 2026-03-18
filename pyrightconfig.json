@@ -1,12 +1,12 @@
 {
   "pythonVersion": "3.11",
   "typeCheckingMode": "strict",
-  "reportMissingImports": "none",
-  "reportMissingTypeStubs": "none",
+  "reportMissingImports": "information",
+  "reportMissingTypeStubs": "information",
   "reportUnknownMemberType": "warning",
   "reportUnknownArgumentType": "warning",
   "reportUnknownVariableType": "warning",
-  "reportUntypedFunctionDecorator": "none",
+  "reportUntypedFunctionDecorator": "warning",
   "reportPrivateUsage": "none",
   "exclude": [
     "**/.run/**",
