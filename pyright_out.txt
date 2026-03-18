@@ -125,26 +125,44 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\hi_p\__mai
     Argument corresponds to parameter "object" in function "__new__"
     Argument type is "Unknown | Literal['old']" (reportUnknownArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\inputd\config.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\inputd\config.py:16:17 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "map" in function "__init__"
-    Argument type is "dict[Unknown, Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\inputd\config.py:22:16 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
-    Type "object" is not assignable to type "ConvertibleToInt"
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\inputd\config.py:17:17 - warning: Argument type is unknown
+    Argument corresponds to parameter "object" in function "__new__" (reportUnknownArgumentType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\inputd\config.py:17:27 - warning: Type of "k" is unknown (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\inputd\config.py:17:30 - warning: Type of "v" is unknown (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\inputd\config.py:87:23 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+    Type "object" is not assignable to type "ConvertibleToFloat"
       "object" is not assignable to "str"
       "object" is incompatible with protocol "Buffer"
         "__buffer__" is not present
-      "object" is incompatible with protocol "SupportsInt"
-        "__int__" is not present
+      "object" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
       "object" is incompatible with protocol "SupportsIndex"
-        "__index__" is not present
-    ... (reportArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\inputd\config.py:22:16 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
-    Type "object" is not assignable to type "ConvertibleToInt"
+        "__index__" is not present (reportArgumentType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\inputd\config.py:95:24 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+    Type "object" is not assignable to type "ConvertibleToFloat"
       "object" is not assignable to "str"
       "object" is incompatible with protocol "Buffer"
         "__buffer__" is not present
-      "object" is incompatible with protocol "SupportsInt"
-        "__int__" is not present
+      "object" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+        "__index__" is not present (reportArgumentType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\inputd\config.py:96:20 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+    Type "object" is not assignable to type "ConvertibleToFloat"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+        "__index__" is not present (reportArgumentType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\inputd\config.py:97:31 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+    Type "object" is not assignable to type "ConvertibleToFloat"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
       "object" is incompatible with protocol "SupportsIndex"
         "__index__" is not present (reportArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\joy2intent\config.py
@@ -335,32 +353,11 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\bin
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder.py:148:45 - warning: Argument type is unknown
     Argument corresponds to parameter "state" in function "set_dot" (reportUnknownArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:56:9 - warning: Type of "attr" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:56:15 - warning: Type of "cls" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:56:20 - warning: Type of "name" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:80:23 - warning: Argument type is unknown
-    Argument corresponds to parameter "name" in function "setattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:80:48 - warning: Argument type is unknown
-    Argument corresponds to parameter "type" in function "findChild" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:80:53 - warning: Argument type is unknown
-    Argument corresponds to parameter "name" in function "findChild" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:150:28 - error: Argument of type "QComboBox" cannot be assigned to parameter "widget" of type "SupportsBlockSignals | None"
-    Type "QComboBox" is not assignable to type "SupportsBlockSignals | None"
-      "QComboBox" is incompatible with protocol "SupportsBlockSignals"
-        "blockSignals" is an incompatible type
-          Type "(b: bool, /) -> bool" is not assignable to type "(block: bool) -> bool"
-            Missing keyword parameter "block"
-      "QComboBox" is not assignable to "None" (reportArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:191:60 - warning: Type of "_set_dot" is partially unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:81:48 - error: Argument of type "type[object]" cannot be assigned to parameter "type" of type "type[PlaceholderType@findChild]" in function "findChild"
+    Type "object" is not assignable to type "QObject"
+      "object" is not assignable to "QObject" (reportArgumentType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:192:51 - warning: Type of "_set_dot" is partially unknown
     Type of "_set_dot" is "(object_name: str, state: Unknown) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:191:60 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "set_dot" in function "apply_densi_header_online_vm"
-    Argument type is "(object_name: str, state: Unknown) -> None" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:193:54 - warning: Type of "_set_dot" is partially unknown
-    Type of "_set_dot" is "(object_name: str, state: Unknown) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:193:54 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "set_dot" in function "apply_densi_estop_dots_vm"
-    Argument type is "(object_name: str, state: Unknown) -> None" (reportUnknownArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:58:5 - warning: Type of "_events" is partially unknown
     Type of "_events" is "list[Unknown]" (reportUnknownVariableType)
@@ -371,13 +368,6 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\bin
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:273:47 - warning: Argument type is unknown
     Argument corresponds to parameter "state" in function "set_dot" (reportUnknownArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_init_impl.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_init_impl.py:57:32 - error: Argument of type "QComboBox" cannot be assigned to parameter "widget" of type "SupportsBlockSignals | None"
-    Type "QComboBox" is not assignable to type "SupportsBlockSignals | None"
-      "QComboBox" is incompatible with protocol "SupportsBlockSignals"
-        "blockSignals" is an incompatible type
-          Type "(b: bool, /) -> bool" is not assignable to type "(block: bool) -> bool"
-            Missing keyword parameter "block"
-      "QComboBox" is not assignable to "None" (reportArgumentType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_init_impl.py:125:13 - warning: Type of "_set_dot" is partially unknown
     Type of "_set_dot" is "(object_name: str, state: Unknown) -> None" (reportUnknownMemberType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_init_impl.py:140:9 - warning: Type of "_set_dot" is partially unknown
@@ -492,40 +482,16 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\eng
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\densi\plc_anton_vel_cmd.py:116:22 - warning: Argument type is unknown
     Argument corresponds to parameter "x" in function "__new__" (reportUnknownArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:193:9 - warning: Type of "ax" is partially unknown
-    Type of "ax" is "Unknown | None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:193:14 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:197:32 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:217:9 - warning: Type of "ax" is partially unknown
-    Type of "ax" is "Unknown | None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:217:14 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:222:29 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:243:17 - warning: Argument type is unknown
-    Argument corresponds to parameter "object" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:243:45 - warning: Type of "k" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:243:48 - warning: Type of "v" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:243:60 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "iterable" in function "sorted"
-    Argument type is "dict_items[Unknown, Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:243:77 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "key" in function "sorted"
-    Argument type is "(x: tuple[Unknown, Unknown]) -> str" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:243:91 - warning: Argument type is unknown
-    Argument corresponds to parameter "object" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:246:41 - warning: Type of "v" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:246:53 - warning: Argument type is partially unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:244:41 - warning: Type of "v" is unknown (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:244:53 - warning: Argument type is partially unknown
     Argument corresponds to parameter "iterable" in function "sorted"
     Argument type is "set[Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:246:62 - warning: Argument type is partially unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:244:62 - warning: Argument type is partially unknown
     Argument corresponds to parameter "key" in function "sorted"
     Argument type is "(x: Unknown) -> str" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:246:76 - warning: Argument type is unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:244:76 - warning: Argument type is unknown
     Argument corresponds to parameter "object" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:248:41 - warning: Type of "v" is unknown (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:246:41 - warning: Type of "v" is unknown (reportUnknownVariableType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\param_ui.py
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\param_ui.py:74:29 - warning: Type of "append" is partially unknown
     Type of "append" is "(object: Unknown, /) -> None" (reportUnknownMemberType)
@@ -612,16 +578,9 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\run
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\runtimes\densi_runtime_impl.py:64:9 - warning: Type of "_dbg_rl" is partially unknown
     Type of "_dbg_rl" is "Unknown | None" (reportUnknownMemberType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\runtimes\densi_runtime_impl.py:160:16 - warning: Return type, "dict[Unknown, Unknown]", is partially unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\runtimes\densi_runtime_impl.py:204:20 - error: Argument of type "DenSiEngine" cannot be assigned to parameter "engine" of type "EngineLike" in function "compute_densi_view_model"
-    "DenSiEngine" is incompatible with protocol "EngineLike"
-      "state" is invariant because it is mutable
-      "state" is an incompatible type
-        "MachineState" is incompatible with protocol "EngineStateLike" (reportArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\runtimes\densi_runtime_viewmodel.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\runtimes\densi_runtime_viewmodel.py:73:51 - error: Argument of type "EngineStateLike" cannot be assigned to parameter "state" of type "MachineState" in function "compute_densi_lifetick_vm"
-    "EngineStateLike" is not assignable to "MachineState" (reportArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\runtimes\densi_runtime_viewmodel.py:74:51 - error: Argument of type "EngineStateLike" cannot be assigned to parameter "state" of type "MachineState" in function "compute_densi_readouts_vm"
-    "EngineStateLike" is not assignable to "MachineState" (reportArgumentType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\runtimes\densi_runtime_viewmodel.py:89:9 - error: Argument of type "str" cannot be assigned to parameter "value" of type "float" in function "__setitem__"
+    "str" is not assignable to "float" (reportArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\ui_shell.py
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\ui_shell.py:114:17 - warning: Type of "append" is partially unknown
     Type of "append" is "(object: Unknown, /) -> None" (reportUnknownMemberType)
@@ -744,23 +703,10 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\attach_tar
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\attach_targets.py:77:31 - warning: Argument type is unknown
     Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:10:17 - warning: Argument type is partially unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:14:17 - warning: Argument type is partially unknown
     Argument corresponds to parameter "map" in function "__init__"
     Argument type is "dict[Unknown, Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:71:9 - warning: Type of "item" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:74:9 - warning: Type of "item_dict" is partially unknown
-    Type of "item_dict" is "dict[Unknown, Unknown]" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:75:9 - warning: Type of "t" is partially unknown
-    Type of "t" is "Unknown | None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:75:13 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:77:66 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:77:66 - warning: Argument type is unknown
-    Argument corresponds to parameter "group" in function "coerce_param_group" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:80:36 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:81:38 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:19:22 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
     Type "object" is not assignable to type "ConvertibleToFloat"
       "object" is not assignable to "str"
       "object" is incompatible with protocol "Buffer"
@@ -769,15 +715,24 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_fr
         "__float__" is not present
       "object" is incompatible with protocol "SupportsIndex"
         "__index__" is not present (reportArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:85:46 - warning: Type of "get" is partially unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:77:9 - warning: Type of "item" is unknown (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:80:9 - warning: Type of "item_dict" is partially unknown
+    Type of "item_dict" is "dict[Unknown, Unknown]" (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:81:23 - warning: Type of "get" is partially unknown
     Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:85:46 - warning: Argument type is unknown
-    Argument corresponds to parameter "group" in function "coerce_param_group" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:90:63 - warning: Type of "get" is partially unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:81:23 - warning: Argument type is partially unknown
+    Argument corresponds to parameter "object" in function "__new__"
+    Argument type is "Unknown | Literal['']" (reportUnknownArgumentType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:82:40 - warning: Type of "get" is partially unknown
     Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:90:63 - warning: Argument type is unknown
-    Argument corresponds to parameter "group" in function "coerce_param_group" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:111:9 - warning: Type of "item" is unknown (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:82:40 - warning: Argument type is partially unknown
+    Argument corresponds to parameter "object" in function "__new__"
+    Argument type is "Unknown | Literal['pos']" (reportUnknownArgumentType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:86:36 - warning: Type of "get" is partially unknown
+    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:86:36 - warning: Argument type is unknown
+    Argument corresponds to parameter "value" in function "_as_object_dict" (reportUnknownArgumentType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\command_frame.py:100:9 - warning: Type of "item" is unknown (reportUnknownVariableType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\executor.py
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\core\executor.py:104:46 - warning: Argument type is partially unknown
     Argument corresponds to parameter "map" in function "__init__"
@@ -1079,65 +1034,19 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec.
     Type of "get" is "Overload[(key: str, default: None = None, /) -> (Unknown | None), (key: str, default: Unknown, /) -> Unknown, (key: str, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec.py:103:12 - warning: Return type is unknown (reportUnknownVariableType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:11:17 - warning: Argument type is partially unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:15:17 - warning: Argument type is partially unknown
     Argument corresponds to parameter "map" in function "__init__"
     Argument type is "dict[Unknown, Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:18:21 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:18:21 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:19:19 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:19:19 - warning: Argument type is unknown
-    Argument corresponds to parameter "x" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:27:19 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:27:19 - warning: Argument type is unknown
-    Argument corresponds to parameter "x" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:28:19 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:28:19 - warning: Argument type is unknown
-    Argument corresponds to parameter "x" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:29:22 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:29:22 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:30:20 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:30:20 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:31:23 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:31:23 - warning: Argument type is unknown
-    Argument corresponds to parameter "x" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:32:25 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:32:25 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:33:25 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:33:25 - warning: Argument type is unknown
-    Argument corresponds to parameter "x" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:34:25 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:34:25 - warning: Argument type is unknown
-    Argument corresponds to parameter "x" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:35:26 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:35:26 - warning: Argument type is unknown
-    Argument corresponds to parameter "x" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:36:25 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:36:25 - warning: Argument type is unknown
-    Argument corresponds to parameter "x" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:37:31 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:37:31 - warning: Argument type is unknown
-    Argument corresponds to parameter "x" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:43:21 - warning: Argument type is unknown
-    Argument corresponds to parameter "object" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:43:28 - warning: Type of "x" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:116:25 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:20:22 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+    Type "object" is not assignable to type "ConvertibleToFloat"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+        "__index__" is not present (reportArgumentType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:27:20 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
     Type "object" is not assignable to type "ConvertibleToInt"
       "object" is not assignable to "str"
       "object" is incompatible with protocol "Buffer"
@@ -1147,7 +1056,7 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_
       "object" is incompatible with protocol "SupportsIndex"
         "__index__" is not present
     ... (reportArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:116:25 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:27:20 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
     Type "object" is not assignable to type "ConvertibleToInt"
       "object" is not assignable to "str"
       "object" is incompatible with protocol "Buffer"
@@ -1156,73 +1065,17 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_
         "__int__" is not present
       "object" is incompatible with protocol "SupportsIndex"
         "__index__" is not present (reportArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:147:39 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:147:39 - warning: Argument type is unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:63:21 - warning: Argument type is unknown
     Argument corresponds to parameter "object" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:148:37 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:148:37 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:149:44 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:149:44 - warning: Argument type is unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:63:28 - warning: Type of "x" is unknown (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:171:24 - error: Argument of type "object | None" cannot be assigned to parameter "anchor_xyz" of type "tuple[float, float, float] | None" in function "__init__"
+    Type "object | None" is not assignable to type "tuple[float, float, float] | None"
+      Type "object" is not assignable to type "tuple[float, float, float] | None"
+        "object" is not assignable to "tuple[float, float, float]"
+        "object" is not assignable to "None" (reportArgumentType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:227:32 - warning: Argument type is unknown
     Argument corresponds to parameter "object" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:150:44 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:150:44 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:151:36 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:151:36 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "anchor_xyz" in function "__init__"
-    Argument type is "Unknown | None" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:152:49 - warning: Type of "get" is partially unknown
-    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:152:49 - warning: Argument type is unknown
-    Argument corresponds to parameter "x" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:168:41 - error: Argument of type "object" cannot be assigned to parameter "value" of type "float" in function "clamp_soll_speed"
-    "object" is not assignable to "float" (reportArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:179:27 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
-    Type "object" is not assignable to type "ConvertibleToFloat"
-      "object" is not assignable to "str"
-      "object" is incompatible with protocol "Buffer"
-        "__buffer__" is not present
-      "object" is incompatible with protocol "SupportsFloat"
-        "__float__" is not present
-      "object" is incompatible with protocol "SupportsIndex"
-        "__index__" is not present (reportArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:187:25 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
-    Type "object" is not assignable to type "ConvertibleToInt"
-      "object" is not assignable to "str"
-      "object" is incompatible with protocol "Buffer"
-        "__buffer__" is not present
-      "object" is incompatible with protocol "SupportsInt"
-        "__int__" is not present
-      "object" is incompatible with protocol "SupportsIndex"
-        "__index__" is not present
-    ... (reportArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:187:25 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
-    Type "object" is not assignable to type "ConvertibleToInt"
-      "object" is not assignable to "str"
-      "object" is incompatible with protocol "Buffer"
-        "__buffer__" is not present
-      "object" is incompatible with protocol "SupportsInt"
-        "__int__" is not present
-      "object" is incompatible with protocol "SupportsIndex"
-        "__index__" is not present (reportArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:192:33 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
-    Type "object" is not assignable to type "ConvertibleToFloat"
-      "object" is not assignable to "str"
-      "object" is incompatible with protocol "Buffer"
-        "__buffer__" is not present
-      "object" is incompatible with protocol "SupportsFloat"
-        "__float__" is not present
-      "object" is incompatible with protocol "SupportsIndex"
-        "__index__" is not present (reportArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:211:36 - warning: Argument type is unknown
-    Argument corresponds to parameter "object" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:211:43 - warning: Type of "x" is unknown (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\codec_decode_support.py:227:39 - warning: Type of "x" is unknown (reportUnknownVariableType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\inmem_bus.py
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\inmem_bus.py:13:5 - warning: Type of "_intent_q" is partially unknown
     Type of "_intent_q" is "deque[Unknown]" (reportUnknownVariableType)
@@ -1304,24 +1157,50 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\protocol\udp_pl
     Argument corresponds to parameter "x" in function "__new__"
     Argument type is "Unknown | Any" (reportUnknownArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:72:44 - warning: Type of "v" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:73:26 - warning: Argument type is partially unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:28:56 - warning: Argument type is partially unknown
+    Argument corresponds to parameter "json_obj" in function "__init__"
+    Argument type is "dict[Unknown, Unknown] | list[Unknown] | str | int | float | bool | Any" (reportUnknownArgumentType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:66:5 - warning: Type of "axes" is partially unknown
+    Type of "axes" is "Unknown | None" (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:66:12 - warning: Type of "get" is partially unknown
+    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:68:44 - warning: Type of "v" is unknown (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:69:26 - warning: Argument type is partially unknown
     Argument corresponds to parameter "obj" in function "len"
     Argument type is "list[Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:73:61 - warning: Argument type is partially unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:69:61 - warning: Argument type is partially unknown
     Argument corresponds to parameter "obj" in function "len"
     Argument type is "list[Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:74:34 - warning: Argument type is partially unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:70:34 - warning: Argument type is partially unknown
     Argument corresponds to parameter "obj" in function "len"
     Argument type is "list[Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:79:34 - warning: Type of "v" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:79:49 - warning: Argument type is partially unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:72:5 - warning: Type of "buttons" is partially unknown
+    Type of "buttons" is "Unknown | None" (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:72:15 - warning: Type of "get" is partially unknown
+    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:74:34 - warning: Type of "v" is unknown (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:74:49 - warning: Argument type is partially unknown
     Argument corresponds to parameter "iterable" in function "__new__"
     Argument type is "list[Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:89:62 - warning: Argument type is partially unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:82:5 - warning: Type of "hats" is partially unknown
+    Type of "hats" is "Unknown | None" (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:82:12 - warning: Type of "get" is partially unknown
+    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:82:31 - warning: Type of "get" is partially unknown
+    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:84:62 - warning: Argument type is partially unknown
     Argument corresponds to parameter "obj" in function "len"
     Argument type is "list[Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:99:48 - warning: Argument type is partially unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:88:5 - warning: Type of "extras" is partially unknown
+    Type of "extras" is "list[Unknown]" (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:88:21 - warning: Type of "k" is unknown (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:90:23 - warning: Argument type is partially unknown
+    Argument corresponds to parameter "iterable" in function "join"
+    Argument type is "list[Unknown]" (reportUnknownArgumentType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:91:50 - warning: Argument type is partially unknown
+    Argument corresponds to parameter "obj" in function "len"
+    Argument type is "list[Unknown]" (reportUnknownArgumentType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\tools\udp_listen.py:93:48 - warning: Argument type is partially unknown
     Argument corresponds to parameter "object" in function "__new__"
     Argument type is "dict[Unknown, Unknown]" (reportUnknownArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\ui\birdseye_format.py
@@ -1451,41 +1330,6 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_hip_logging.py
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_hip_logging.py:118:9 - warning: Argument type is partially unknown
     Argument corresponds to parameter "value" in function "setattr"
     Argument type is "(*args: Unknown, **kwargs: Unknown) -> None" (reportUnknownArgumentType)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:26:21 - warning: Type of "append" is partially unknown
-    Type of "append" is "(object: Unknown, /) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:26:21 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "on_snapshot" in function "__init__"
-    Argument type is "(object: Unknown, /) -> None" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:30:16 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "obj" in function "len"
-    Argument type is "list[Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:31:5 - warning: Type of "joy" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:31:11 - warning: Type of "joy" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:32:12 - warning: Type of "deadman" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:33:12 - warning: Type of "selected_axes" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:34:12 - warning: Type of "select_hip" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:35:16 - warning: Type of "soll_speed" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:35:16 - warning: Argument type is unknown
-    Argument corresponds to parameter "x" in function "abs" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:48:21 - warning: Type of "append" is partially unknown
-    Type of "append" is "(object: Unknown, /) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:48:21 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "on_snapshot" in function "__init__"
-    Argument type is "(object: Unknown, /) -> None" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:52:16 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "obj" in function "len"
-    Argument type is "list[Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:53:12 - warning: Type of "joy" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:67:21 - warning: Type of "append" is partially unknown
-    Type of "append" is "(object: Unknown, /) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:67:21 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "on_snapshot" in function "__init__"
-    Argument type is "(object: Unknown, /) -> None" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:71:16 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "obj" in function "len"
-    Argument type is "list[Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_joy_state_telemetry.py:72:12 - warning: Type of "core_mode" is unknown (reportUnknownMemberType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_local_axis_manual_request.py
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\test_local_axis_manual_request.py:72:13 - warning: Type of "payload" is partially unknown
     Type of "payload" is "dict[str, Unknown]" (reportUnknownMemberType)
@@ -1553,89 +1397,61 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_birdseye_
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_birdseye_status.py:53:12 - warning: Type of "get" is partially unknown
     Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:15:9 - warning: Type of "v" is partially unknown
-    Type of "v" is "dict[Unknown, Unknown]" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:15:18 - warning: Argument type is unknown
-    Argument corresponds to parameter "map" in function "__init__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:18:16 - warning: Return type, "dict[Unknown, Unknown]", is partially unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:21:16 - warning: Return type, "dict[Unknown, Unknown]", is partially unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:21:21 - warning: Argument type is unknown
-    Argument corresponds to parameter "map" in function "__init__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:25:9 - warning: Type of "v" is partially unknown
-    Type of "v" is "dict[Unknown, Unknown]" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:25:18 - warning: Argument type is unknown
-    Argument corresponds to parameter "map" in function "__init__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:27:32 - warning: Argument type is unknown
-    Argument corresponds to parameter "arg1" in function "min" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:28:16 - warning: Return type, "dict[Unknown, Unknown]", is partially unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:31:16 - warning: Return type, "dict[Unknown, Unknown]", is partially unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:31:21 - warning: Argument type is unknown
-    Argument corresponds to parameter "map" in function "__init__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:33:5 - warning: Type of "ops" is partially unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:34:5 - warning: Type of "ops" is partially unknown
     Type of "ops" is "list[Unknown]" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:40:19 - warning: Argument type is partially unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:41:19 - warning: Argument type is partially unknown
     Argument corresponds to parameter "param_ops" in function "apply_densi_param_ops"
     Argument type is "list[Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:42:29 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "normalize_pos_chain" in function "apply_densi_param_ops"
-    Argument type is "(vals: Unknown) -> dict[Unknown, Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:43:32 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "normalize_guider_range" in function "apply_densi_param_ops"
-    Argument type is "(vals: Unknown) -> dict[Unknown, Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:44:27 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "enforce_pos_chain" in function "apply_densi_param_ops"
-    Argument type is "(vals: Unknown) -> dict[Unknown, Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:45:31 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "enforce_guider_minmax" in function "apply_densi_param_ops"
-    Argument type is "(vals: Unknown) -> dict[Unknown, Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:59:16 - warning: Return type, "dict[Unknown, Unknown]", is partially unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:59:21 - warning: Argument type is unknown
-    Argument corresponds to parameter "map" in function "__init__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:65:29 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "normalize_pos_chain" in function "apply_densi_param_ops"
-    Argument type is "(vals: Unknown) -> dict[Unknown, Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:66:32 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "normalize_guider_range" in function "apply_densi_param_ops"
-    Argument type is "(vals: Unknown) -> dict[Unknown, Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:67:27 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "enforce_pos_chain" in function "apply_densi_param_ops"
-    Argument type is "(vals: Unknown) -> dict[Unknown, Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:68:31 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "enforce_guider_minmax" in function "apply_densi_param_ops"
-    Argument type is "(vals: Unknown) -> dict[Unknown, Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:85:29 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "normalize_pos_chain" in function "apply_densi_param_ops"
-    Argument type is "(vals: Unknown) -> NoReturn" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:86:32 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "normalize_guider_range" in function "apply_densi_param_ops"
-    Argument type is "(vals: Unknown) -> NoReturn" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:87:27 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "enforce_pos_chain" in function "apply_densi_param_ops"
-    Argument type is "(vals: Unknown) -> NoReturn" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_densi_param_ops_core.py:88:31 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "enforce_guider_minmax" in function "apply_densi_param_ops"
-    Argument type is "(vals: Unknown) -> NoReturn" (reportUnknownArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_frederik_panel.py
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_frederik_panel.py:10:5 - warning: Type of "fields" is partially unknown
     Type of "fields" is "dict[str, Unknown]" (reportUnknownVariableType)
+c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:12:12 - warning: Type of "tabs_enabled" is unknown (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:12:15 - error: Cannot access attribute "tabs_enabled" for class "object"
+    Attribute "tabs_enabled" is unknown (reportAttributeAccessIssue)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:13:12 - warning: Type of "setup_enabled" is unknown (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:13:15 - error: Cannot access attribute "setup_enabled" for class "object"
+    Attribute "setup_enabled" is unknown (reportAttributeAccessIssue)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:14:12 - warning: Type of "main_amp_reset_enabled" is unknown (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:14:15 - error: Cannot access attribute "main_amp_reset_enabled" for class "object"
+    Attribute "main_amp_reset_enabled" is unknown (reportAttributeAccessIssue)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:15:12 - warning: Type of "resync_enabled" is unknown (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:15:15 - error: Cannot access attribute "resync_enabled" for class "object"
+    Attribute "resync_enabled" is unknown (reportAttributeAccessIssue)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:16:12 - warning: Type of "estop_reset_enabled" is unknown (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:16:15 - error: Cannot access attribute "estop_reset_enabled" for class "object"
+    Attribute "estop_reset_enabled" is unknown (reportAttributeAccessIssue)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:24:12 - warning: Type of "tabs_enabled" is unknown (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:24:15 - error: Cannot access attribute "tabs_enabled" for class "object"
+    Attribute "tabs_enabled" is unknown (reportAttributeAccessIssue)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:25:12 - warning: Type of "setup_enabled" is unknown (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:25:15 - error: Cannot access attribute "setup_enabled" for class "object"
+    Attribute "setup_enabled" is unknown (reportAttributeAccessIssue)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:26:12 - warning: Type of "main_amp_reset_enabled" is unknown (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:26:15 - error: Cannot access attribute "main_amp_reset_enabled" for class "object"
+    Attribute "main_amp_reset_enabled" is unknown (reportAttributeAccessIssue)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:27:12 - warning: Type of "resync_enabled" is unknown (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:27:15 - error: Cannot access attribute "resync_enabled" for class "object"
+    Attribute "resync_enabled" is unknown (reportAttributeAccessIssue)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:28:12 - warning: Type of "estop_reset_enabled" is unknown (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:28:15 - error: Cannot access attribute "estop_reset_enabled" for class "object"
+    Attribute "estop_reset_enabled" is unknown (reportAttributeAccessIssue)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:42:12 - warning: Type of "resync_enabled" is unknown (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:42:21 - error: Cannot access attribute "resync_enabled" for class "object"
+    Attribute "resync_enabled" is unknown (reportAttributeAccessIssue)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:43:12 - warning: Type of "resync_enabled" is unknown (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:43:21 - error: Cannot access attribute "resync_enabled" for class "object"
+    Attribute "resync_enabled" is unknown (reportAttributeAccessIssue)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:44:12 - warning: Type of "resync_enabled" is unknown (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_engine.py:44:22 - error: Cannot access attribute "resync_enabled" for class "object"
+    Attribute "resync_enabled" is unknown (reportAttributeAccessIssue)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:20:9 - warning: Type of "calls" is partially unknown
-    Type of "calls" is "list[dict[Unknown, Unknown]]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:20:9 - warning: Type of "append" is partially unknown
-    Type of "append" is "(object: dict[Unknown, Unknown], /) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:20:79 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "map" in function "__init__"
-    Argument type is "dict[Unknown, Unknown]" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:88:12 - warning: Type of "calls" is partially unknown
-    Type of "calls" is "list[dict[Unknown, Unknown]]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:89:5 - warning: Type of "fields" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:89:14 - warning: Type of "calls" is partially unknown
-    Type of "calls" is "list[dict[Unknown, Unknown]]" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:90:12 - warning: Type of "get" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:91:12 - warning: Type of "get" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:92:12 - warning: Type of "get" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:93:12 - warning: Type of "get" is unknown (reportUnknownMemberType)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_udp_listen.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_udp_listen.py:19:12 - error: "__getitem__" method not defined on type "object" (reportIndexIssue)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_udp_listen.py:42:12 - error: "__getitem__" method not defined on type "object" (reportIndexIssue)
-17 errors, 704 warnings, 0 informations
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:91:12 - warning: Type of "get" is partially unknown
+    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:92:12 - warning: Type of "get" is partially unknown
+    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:93:12 - warning: Type of "get" is partially unknown
+    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:94:12 - warning: Type of "get" is partially unknown
+    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
+24 errors, 620 warnings, 0 informations

@@ -2,7 +2,7 @@ import socket
 import threading
 import time
 
-from steuerung3d.tools.udp_listen import decode_datagram, listen_once
+from steuerung3d.tools.udp_listen import JSONObject, decode_datagram, listen_once
 
 
 def _free_udp_port() -> int:
@@ -15,8 +15,11 @@ def _free_udp_port() -> int:
 
 def test_decode_datagram_json():
     dd = decode_datagram(b'{"axes":[0.1, -0.2], "buttons":[0,1]}')
-    assert dd.json_obj is not None
-    assert dd.json_obj["axes"][0] == 0.1
+    assert isinstance(dd.json_obj, dict)
+    json_obj: JSONObject = dd.json_obj
+    axes = json_obj.get("axes")
+    assert isinstance(axes, list)
+    assert axes[0] == 0.1
 
 
 def test_decode_datagram_non_json():
@@ -38,6 +41,7 @@ def test_listen_once_receives_packet():
     t.start()
 
     dd, addr = listen_once("127.0.0.1", port, timeout_s=1.0)
-    assert dd.json_obj is not None
-    assert dd.json_obj["ping"] == 1
+    assert isinstance(dd.json_obj, dict)
+    json_obj: JSONObject = dd.json_obj
+    assert json_obj.get("ping") == 1
     assert addr[0] == "127.0.0.1"

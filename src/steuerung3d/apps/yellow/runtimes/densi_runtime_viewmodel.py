@@ -12,6 +12,7 @@ import time
 from typing import Protocol
 
 from steuerung3d.core.command_frame import CommandFrame
+from steuerung3d.core.state import MachineState
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
 from ..domain.taster_edge_state import TasterEdgeState, update_taster_edge_state, within_brake_grace
@@ -25,13 +26,8 @@ from ..panels.densi.densi_lifetick_vm import compute_densi_lifetick_vm
 from ..panels.densi.densi_readouts_vm import compute_densi_readouts_vm
 
 
-class EngineStateLike(Protocol):
-    estop: bool
-    params: dict[str, object]
-
-
 class EngineLike(Protocol):
-    state: EngineStateLike
+    state: MachineState
     cut_valid: bool
     systemtime_tok: str
     cut_pos_m: float

@@ -5,9 +5,20 @@ from typing import Any, Dict, List, Literal, Mapping, Union
 
 from .param_groups import ParamGroup, coerce_param_group
 
+JsonMap = Mapping[object, object]
 
-def _as_object_dict(value: Any) -> dict[object, object]:
-    return dict(value) if isinstance(value, dict) else {}
+
+def _as_object_dict(value: object) -> dict[object, object]:
+    if not isinstance(value, dict):
+        return {}
+    return dict(value)
+
+
+def _as_float(value: object, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except Exception:
+        return float(default)
 
 
 def _new_str_float_dict() -> Dict[str, float]:
@@ -30,9 +41,6 @@ def _new_str_bool_dict() -> Dict[str, bool]:
 class AxisSetpoint:
     enable: bool
     vel: float  # units/s (placeholder)
-
-
-# -------- Parameters (axis-agnostic, v0.1) --------
 
 
 @dataclass(frozen=True)
@@ -62,49 +70,30 @@ def decode_param_ops(payload: Any) -> List[ParamOp]:
 
     We keep this tolerant: unknown ops are ignored.
     """
-    if payload is None:
-        return []
-    if not isinstance(payload, list):
+    if payload is None or not isinstance(payload, list):
         return []
 
     out: List[ParamOp] = []
     for item in payload:
         if not isinstance(item, dict):
             continue
-        item_dict: Mapping[object, object] = item
-        t = item_dict.get("type")
-        if t == "param_edit_begin":
-            out.append(ParamEditBeginOp(group=coerce_param_group(item_dict.get("group", "pos"))))
-        elif t == "param_write":
-            # ensure values is a dict[str,float]
+        item_dict: JsonMap = item
+        op_type = str(item_dict.get("type", "") or "")
+        group = coerce_param_group(str(item_dict.get("group", "pos") or "pos"))
+        if op_type == "param_edit_begin":
+            out.append(ParamEditBeginOp(group=group))
+        elif op_type == "param_write":
             vals = _as_object_dict(item_dict.get("values", {}))
-            cleaned = {str(k): float(v) for k, v in vals.items()}
-            out.append(
-                ParamWriteOp(
-                    type="param_write",
-                    group=coerce_param_group(item_dict.get("group", "pos")),
-                    values=cleaned,
-                )
-            )
-        elif t == "param_cancel":
-            out.append(ParamCancelOp(group=coerce_param_group(item_dict.get("group", "pos"))))
-        else:
-            continue
+            cleaned = {str(k): _as_float(v) for k, v in vals.items()}
+            out.append(ParamWriteOp(type="param_write", group=group, values=cleaned))
+        elif op_type == "param_cancel":
+            out.append(ParamCancelOp(group=group))
     return out
 
 
 def coerce_param_ops(ops: Any) -> List[ParamOp]:
-    """Coerce a mixed/legacy param-ops container into canonical ParamOp objects.
-
-    In the codebase, param_ops should be a list[ParamOp]. Historically,
-    some paths used JSON-like dicts (e.g. recordings, older emitters).
-
-    This helper centralizes tolerance so consumers don't need ad-hoc
-    getattr/op.get branches. Unknown items are ignored.
-    """
-    if ops is None:
-        return []
-    if not isinstance(ops, list):
+    """Coerce a mixed/legacy param-ops container into canonical ParamOp objects."""
+    if ops is None or not isinstance(ops, list):
         return []
 
     out: List[ParamOp] = []
@@ -113,10 +102,7 @@ def coerce_param_ops(ops: Any) -> List[ParamOp]:
             out.append(item)
             continue
         if isinstance(item, dict):
-            # decode_param_ops expects a list of dicts
             out.extend(decode_param_ops([item]))
-            continue
-        # ignore unknown
     return out
 
 
@@ -124,30 +110,17 @@ def coerce_param_ops(ops: Any) -> List[ParamOp]:
 class CommandFrame:
     tick: int
     t_s: float
-    estop: bool  # legacy/unused for authority (keep for now)
+    estop: bool
     fault: bool
     core_mode: str
     axes: Dict[str, AxisSetpoint]
-    # --- legacy downlink knobs (TwinCAT PLC protocol) ---
-    # Keep defaults so existing callers/tests remain stable.
-    # intent: controller "claim" bit (PLC expects "True"/"False" string)
     intent: bool = True
-    # resync: legacy wire-compat field (kept false by current core logic).
-    # Axis-targeted resync pulses are carried via ``resync_by_axis``.
     resync: bool = False
-    # gui_not_halt: legacy GUI Not-Halt input (placeholder until verified)
     gui_not_halt: bool = False
 
-    estop_reset: bool = False  # momentary request to clear device latch
-    # NEW: parameter editing/writing operations (axis-agnostic v0.1)
+    estop_reset: bool = False
     param_ops: List[ParamOp] = field(default_factory=_new_param_ops_list)
-
-    # NEW (optional): UI-originating livetick echo values by axis.
-    # Keep empty by default so existing regression fingerprints stay stable.
     lifetick_echo: Dict[str, int] = field(default_factory=_new_str_int_dict)
-    # NEW: per-axis resync pulses. Preferred over the legacy global resync bit
-    # in multi-axis / multi-HiP runs.
     resync_by_axis: Dict[str, bool] = field(default_factory=_new_str_bool_dict)
-    # NEW: per-axis amplifier reset pulses (bit-wrangled into ControlIN / GuideControlUI)
     main_reset_by_axis: Dict[str, bool] = field(default_factory=_new_str_bool_dict)
     guider_reset_by_axis: Dict[str, bool] = field(default_factory=_new_str_bool_dict)

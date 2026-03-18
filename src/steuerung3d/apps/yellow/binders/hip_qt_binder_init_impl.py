@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtWidgets import QComboBox, QLineEdit, QPushButton, QWidget
 
 from steuerung3d.protocol.estop_bits import ESTOP_SPECS
 
 from ..engines.hip.attach_state import NOT_ATTACHED
-from ..qtutil.binder_helpers import block_signals, safe_set_text
+from ..qtutil.binder_helpers import SupportsBlockSignals, block_signals, safe_set_text
 from ..qtutil.ui_contract import log_missing_required_once
 from ..qtutil.ui_panel_state import clear_line_edits, neutralize_dots, uncheck_checkboxes
 from ..qtutil.ui_update import set_state_by_object_name, set_state_property
@@ -54,7 +54,7 @@ def wire_signals(self: "HipQtBinder") -> None:
     if self._cmbAxis is not None:
         self._suppress_axis_signal = True
         try:
-            with block_signals(self._cmbAxis):
+            with block_signals(cast(SupportsBlockSignals, self._cmbAxis)):
                 self._cmbAxis.clear()
                 self._cmbAxis.addItems([NOT_ATTACHED])
                 self._cmbAxis.setCurrentText(NOT_ATTACHED)

@@ -7,6 +7,7 @@ from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.intents import JoyStateUpdate
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.state import MachineState
+from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.transport import InMemTransport
 
 
@@ -14,7 +15,7 @@ def test_joy_state_update_reaches_snapshot() -> None:
     tb = Timebase(dt_s=0.01)
     st = MachineState()
     bus = InMemTransport()
-    snaps = []
+    snaps: list[TelemetrySnapshot] = []
 
     bus.publish_intent(JoyStateUpdate(deadman=True, soll_speed=-0.75, selected_axes=("Anton",)))
 
@@ -38,7 +39,7 @@ def test_joy_state_update_reaches_snapshot() -> None:
 def test_joy_state_defaults_when_absent() -> None:
     tb = Timebase(dt_s=0.01)
     st = MachineState()
-    snaps = []
+    snaps: list[TelemetrySnapshot] = []
 
     eng = CoreEngine(
         timebase=tb,
@@ -57,7 +58,7 @@ def test_snapshot_includes_core_mode() -> None:
     tb = Timebase(dt_s=0.01)
     st = MachineState()
     st.core_mode = CoreMode.ARMED
-    snaps = []
+    snaps: list[TelemetrySnapshot] = []
 
     eng = CoreEngine(
         timebase=tb,

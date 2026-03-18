@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, cast
 
 from PySide6.QtWidgets import QAbstractSlider, QCheckBox, QComboBox, QLineEdit, QPushButton
 
@@ -24,7 +24,7 @@ from ..panels.densi.densi_estop_dots_render import apply_densi_estop_dots_vm
 from ..panels.densi.densi_header_online_render import apply_densi_header_online_vm
 from ..panels.densi.densi_lifetick_render import apply_densi_lifetick_vm
 from ..panels.densi.densi_readouts_render import DenSiReadoutsBindings, apply_densi_readouts_vm
-from ..qtutil.binder_helpers import block_signals, safe_set_text
+from ..qtutil.binder_helpers import SupportsBlockSignals, block_signals, safe_set_text
 from ..qtutil.param_widget_binder import ParamWidgetBinder
 from ..qtutil.ui_contract import log_missing_optional_once, log_missing_required_once
 from ..qtutil.ui_format import fmt_float_de
@@ -53,7 +53,7 @@ def post_init(self: "DenSiQtBinder") -> None:
 
 
 def discover_widgets(self: "DenSiQtBinder") -> None:
-    for attr, cls, name in [
+    widget_specs: list[tuple[str, type[object], str]] = [
         ("_txtTick", QLineEdit, "txtTick"),
         ("_txt_hdr_banner_left", QLineEdit, "txtHdrBannerLeft"),
         ("_txt_hdr_banner_right", QLineEdit, "txtHdrBannerRight"),
@@ -76,7 +76,8 @@ def discover_widgets(self: "DenSiQtBinder") -> None:
         ("_btn_estop_all_set", QPushButton, "btnEStopAllSet"),
         ("_btn_estop_all_clear", QPushButton, "btnEStopAllClear"),
         ("_cmbAxis", QComboBox, "cmbAxis"),
-    ]:
+    ]
+    for attr, cls, name in widget_specs:
         setattr(self, attr, self.win.findChild(cls, name))
 
 
@@ -147,7 +148,7 @@ def init_fixed_axis(self: "DenSiQtBinder") -> None:
         return
     label = self.axis_ids[0] if self.axis_ids else "?"
     try:
-        with block_signals(self._cmbAxis):
+        with block_signals(cast(SupportsBlockSignals, self._cmbAxis)):
             self._cmbAxis.clear()
             self._cmbAxis.addItems([label])
             self._cmbAxis.setCurrentText(label)
@@ -188,9 +189,10 @@ def reset_ui_startup(self: "DenSiQtBinder") -> None:
 
 
 def apply_view_model(self: "DenSiQtBinder", vm: DensiViewModel) -> None:
-    apply_densi_header_online_vm(vm.header_online, set_dot=self._set_dot)
+    set_dot = cast(Callable[[str, object], None], self._set_dot)
+    apply_densi_header_online_vm(vm.header_online, set_dot=set_dot)
     apply_densi_banner_vm(vm.banner, self._b_banner)
-    apply_densi_estop_dots_vm(vm.estop_dots, set_dot=self._set_dot)
+    apply_densi_estop_dots_vm(vm.estop_dots, set_dot=set_dot)
     apply_densi_readouts_vm(vm.readouts, self._b_readouts)
     apply_densi_cut_markers_vm(vm.cut_markers, self._b_cut_markers)
     apply_densi_lifetick_vm(vm.lifetick, txtTick=self._txtTick)

@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from dataclasses import asdict
-from typing import Any
+from typing import Any, Mapping, cast
 
 from steuerung3d.core.intents import EchoLifeTick, Intent
 from steuerung3d.core.telemetry import TelemetrySnapshot
@@ -83,7 +83,7 @@ class HipEngine:
         state = self._taster_state.get(axis_id, TasterEdgeState())
         return within_brake_grace(state=state, now_s=float(now_s), grace_s=float(grace_s))
 
-    def compute_attach_state(self, inputs: HipAttachInputs):
+    def compute_attach_state(self, inputs: HipAttachInputs) -> object:
         return compute_attach_state(inputs)
 
     def compute_banner_estate(self, inputs: HipBannerInputs) -> str:
@@ -187,10 +187,7 @@ class HipEngine:
 
     @staticmethod
     def _get_lifetick_age(*, snap: TelemetrySnapshot, axis_id: str) -> int | None:
-        axes = getattr(snap, "axes", None)
-        if not isinstance(axes, dict):
-            return None
-        ax = axes.get(axis_id)
+        ax = snap.axes.get(axis_id)
         if ax is None:
             return None
         try:
@@ -206,15 +203,14 @@ class HipEngine:
         selected_axis: str = "",
         last_lifetick_echo_sent: dict[str, int],
     ) -> tuple[list[Intent], dict[str, int]]:
-        axes = getattr(snap, "axes", None)
-        if not isinstance(axes, dict) or not axes:
+        if not snap.axes:
             return [], last_lifetick_echo_sent
 
         axis_id = str(selected_axis or "").strip()
         if not axis_id:
             return [], last_lifetick_echo_sent
 
-        ax = axes.get(axis_id)
+        ax = snap.axes.get(axis_id)
         if ax is None:
             return [], last_lifetick_echo_sent
 
@@ -239,8 +235,10 @@ def _normalize_value(val: Any) -> Any:
     if isinstance(val, (int, str, bool)) or val is None:
         return val
     if isinstance(val, dict):
+        val_dict = cast(Mapping[object, object], val)
         return {
-            str(k): _normalize_value(v) for k, v in sorted(val.items(), key=lambda x: str(x[0]))
+            str(k): _normalize_value(v)
+            for k, v in sorted(val_dict.items(), key=lambda item: str(item[0]))
         }
     if isinstance(val, set):
         return [_normalize_value(v) for v in sorted(val, key=lambda x: str(x))]

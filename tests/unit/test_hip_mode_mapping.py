@@ -12,10 +12,10 @@ from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 
 class _StatusSink:
     def __init__(self) -> None:
-        self.calls: list[dict] = []
+        self.calls: list[dict[str, object]] = []
 
     def emit_every(
-        self, *, level: str = "OK", summary: str = "", fields: dict | None = None
+        self, *, level: str = "OK", summary: str = "", fields: dict[str, object] | None = None
     ) -> None:
         self.calls.append({"level": level, "summary": summary, "fields": dict(fields or {})})
 
@@ -87,6 +87,7 @@ def test_hip_status_mode_uses_core_mode() -> None:
 
     assert status.calls
     fields = status.calls[-1]["fields"]
+    assert isinstance(fields, dict)
     assert fields.get("mode") == "IDLE"
     assert fields.get("estate") == "READY"
     assert fields.get("armed") is True

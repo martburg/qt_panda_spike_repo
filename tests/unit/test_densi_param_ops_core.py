@@ -1,4 +1,5 @@
 import sys
+from typing import Mapping
 
 sys.path.insert(0, "src")
 
@@ -10,24 +11,24 @@ from steuerung3d.core.state import MachineState
 def test_param_ops_begin_write_ends_session_and_applies_values():
     st = MachineState()
 
-    def norm_pos(vals):
+    def norm_pos(vals: Mapping[str, float]) -> dict[str, float]:
         # simulate normalization: swap min/max if needed
         v = dict(vals)
         if "HardMin" in v and "HardMax" in v and v["HardMin"] > v["HardMax"]:
             v["HardMin"], v["HardMax"] = v["HardMax"], v["HardMin"]
         return v
 
-    def norm_guider(vals):
+    def norm_guider(vals: Mapping[str, float]) -> dict[str, float]:
         return dict(vals)
 
-    def enf_pos(vals):
+    def enf_pos(vals: Mapping[str, float]) -> dict[str, float]:
         # simulate enforcement: clamp
         v = dict(vals)
         if "HardMax" in v:
             v["HardMax"] = min(v["HardMax"], 10.0)
         return v
 
-    def enf_guider(vals):
+    def enf_guider(vals: Mapping[str, float]) -> dict[str, float]:
         return dict(vals)
 
     ops = [
@@ -55,7 +56,7 @@ def test_param_ops_begin_write_ends_session_and_applies_values():
 def test_param_ops_rejects_mismatched_group_when_session_active():
     st = MachineState(param_edit_active=True, param_edit_group="pos")
 
-    def ident(vals):
+    def ident(vals: Mapping[str, float]) -> dict[str, float]:
         return dict(vals)
 
     res = apply_densi_param_ops(
@@ -75,7 +76,7 @@ def test_param_ops_rejects_mismatched_group_when_session_active():
 def test_param_ops_allow_false_ignores_everything():
     st = MachineState()
 
-    def boom(vals):
+    def boom(vals: Mapping[str, float]) -> dict[str, float]:
         raise AssertionError("should not be called")
 
     res = apply_densi_param_ops(
