@@ -19,7 +19,11 @@ SRC_DIR = REPO_ROOT / "src"
 from steuerung3d.core.intents import EchoLifeTick
 from steuerung3d.protocol.legacy_plc import encode_uplink
 from steuerung3d.protocol.plc_codec import decode_downlink
-from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn
+from steuerung3d.protocol.udp_channels import (
+    UdpIntentOut,
+    UdpTelemetryIn,
+    close_udp_json_endpoint,
+)
 
 
 def _as_object_dict(value: object) -> dict[str, object]:
@@ -103,6 +107,8 @@ def test_core_hip_livetick_echo_roundtrip_plc():
     )
 
     cmd_rx = None
+    telem_in: UdpTelemetryIn | None = None
+    intent_out: UdpIntentOut | None = None
     try:
         # Receive core downlink (PLC command telegrams)
         cmd_rx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -221,6 +227,10 @@ def test_core_hip_livetick_echo_roundtrip_plc():
         )
 
     finally:
+        if telem_in is not None:
+            close_udp_json_endpoint(telem_in)
+        if intent_out is not None:
+            close_udp_json_endpoint(intent_out)
         try:
             if cmd_rx is not None:
                 cmd_rx.close()

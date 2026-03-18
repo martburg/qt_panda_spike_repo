@@ -134,15 +134,18 @@ def test_refresh_hip_processes_releases_claim_and_lease_when_last_child_exits(
     )
 
     rt = runtime_mod.SupervisorRuntime(profile)
-    rt._hip_children = {"anton": [_DummyChild(0)]}
-    rt._refresh_hip_processes()
+    try:
+        rt._hip_children = {"anton": [_DummyChild(0)]}
+        rt._refresh_hip_processes()
 
-    assert rt.engine.hip_open_total == 0
-    assert any(
-        isinstance(i, ReleaseAxis) and i.axis_id == "Anton" and i.hip_id == "hip_anton"
-        for i in published
-    )
-    assert any(
-        isinstance(i, ReleaseAxisLease) and i.axis_id == "Anton" and i.hip_id == "hip_anton"
-        for i in published
-    )
+        assert rt.engine.hip_open_total == 0
+        assert any(
+            isinstance(i, ReleaseAxis) and i.axis_id == "Anton" and i.hip_id == "hip_anton"
+            for i in published
+        )
+        assert any(
+            isinstance(i, ReleaseAxisLease) and i.axis_id == "Anton" and i.hip_id == "hip_anton"
+            for i in published
+        )
+    finally:
+        rt.shutdown()

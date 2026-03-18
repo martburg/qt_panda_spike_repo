@@ -110,6 +110,16 @@ class StatusEmitter:
         self._last_emit_s = now
         self.emit(level=level, summary=summary, fields=fields)
 
+    def close(self) -> None:
+        sock = self._sock
+        self._sock = None
+        if sock is None:
+            return
+        try:
+            sock.close()
+        except OSError:
+            pass
+
 
 class StatusCollector:
     def __init__(self, bind: str):

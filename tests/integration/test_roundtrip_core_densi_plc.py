@@ -19,7 +19,11 @@ SRC_DIR = REPO_ROOT / "src"
 from steuerung3d.core.intents import ParamEditBegin, ParamWrite
 from steuerung3d.protocol.legacy_plc import encode_uplink
 from steuerung3d.protocol.plc_codec import decode_downlink
-from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn
+from steuerung3d.protocol.udp_channels import (
+    UdpIntentOut,
+    UdpTelemetryIn,
+    close_udp_json_endpoint,
+)
 
 
 def _pick_free_udp_port() -> int:
@@ -202,6 +206,8 @@ def test_core_densi_param_write_roundtrip_plc():
         dev_telem_port=dev_telem_port,
         dev_cmd_port=dev_cmd_port,
     )
+    telem_in: UdpTelemetryIn | None = None
+    intent_out: UdpIntentOut | None = None
 
     probe = _DenSiProbe(axis=axis, cmd_port=dev_cmd_port, telem_target_port=dev_telem_port)
     probe.start()
@@ -284,6 +290,10 @@ def test_core_densi_param_write_roundtrip_plc():
         )
 
     finally:
+        if telem_in is not None:
+            close_udp_json_endpoint(telem_in)
+        if intent_out is not None:
+            close_udp_json_endpoint(intent_out)
         probe.stop()
         core.terminate()
         core.wait(timeout=2.0)

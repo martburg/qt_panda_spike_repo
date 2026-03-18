@@ -10,6 +10,7 @@ from steuerung3d.protocol.udp_channels import (
     UdpTelemetryFanout,
     UdpTelemetryIn,
     UdpTelemetryOut,
+    close_udp_json_endpoint,
 )
 
 
@@ -37,22 +38,27 @@ def test_udp_telemetry_fanout_delivers_to_two_targets() -> None:
 
     rx1 = UdpTelemetryIn.bind(("127.0.0.1", p1))
     rx2 = UdpTelemetryIn.bind(("127.0.0.1", p2))
+    out1 = UdpTelemetryOut.connect(("127.0.0.1", p1))
+    out2 = UdpTelemetryOut.connect(("127.0.0.1", p2))
 
-    fanout = UdpTelemetryFanout(
-        outs=[
-            UdpTelemetryOut.connect(("127.0.0.1", p1)),
-            UdpTelemetryOut.connect(("127.0.0.1", p2)),
-        ]
-    )
+    try:
+        fanout = UdpTelemetryFanout(outs=[out1, out2])
 
-    snap = TelemetrySnapshot(tick=1, t_s=0.0, core_mode="IDLE", estop=False, fault=False, axes={})
-    fanout.publish_telemetry(snap)
+        snap = TelemetrySnapshot(
+            tick=1, t_s=0.0, core_mode="IDLE", estop=False, fault=False, axes={}
+        )
+        fanout.publish_telemetry(snap)
 
-    got1 = _drain_until(rx1)
-    got2 = _drain_until(rx2)
+        got1 = _drain_until(rx1)
+        got2 = _drain_until(rx2)
 
-    assert got1, "first fanout target did not receive telemetry"
-    assert got2, "second fanout target did not receive telemetry"
+        assert got1, "first fanout target did not receive telemetry"
+        assert got2, "second fanout target did not receive telemetry"
+    finally:
+        close_udp_json_endpoint(rx1)
+        close_udp_json_endpoint(rx2)
+        close_udp_json_endpoint(out1)
+        close_udp_json_endpoint(out2)
 
 
 class _FailingOut:
@@ -63,14 +69,21 @@ class _FailingOut:
 def test_udp_telemetry_fanout_continues_on_failure() -> None:
     p1 = _free_port()
     rx1 = UdpTelemetryIn.bind(("127.0.0.1", p1))
+    out1 = UdpTelemetryOut.connect(("127.0.0.1", p1))
 
-    outs: list[TelemetryOut] = [UdpTelemetryOut.connect(("127.0.0.1", p1))]
-    outs.extend(cast(TelemetryOut, _FailingOut()) for _ in range(7))
+    try:
+        outs: list[TelemetryOut] = [out1]
+        outs.extend(cast(TelemetryOut, _FailingOut()) for _ in range(7))
 
-    fanout = UdpTelemetryFanout(outs=outs)
-    snap = TelemetrySnapshot(tick=1, t_s=0.0, core_mode="IDLE", estop=False, fault=False, axes={})
+        fanout = UdpTelemetryFanout(outs=outs)
+        snap = TelemetrySnapshot(
+            tick=1, t_s=0.0, core_mode="IDLE", estop=False, fault=False, axes={}
+        )
 
-    fanout.publish_telemetry(snap)
+        fanout.publish_telemetry(snap)
 
-    got = _drain_until(rx1)
-    assert got, "reachable fanout target did not receive telemetry"
+        got = _drain_until(rx1)
+        assert got, "reachable fanout target did not receive telemetry"
+    finally:
+        close_udp_json_endpoint(rx1)
+        close_udp_json_endpoint(out1)
