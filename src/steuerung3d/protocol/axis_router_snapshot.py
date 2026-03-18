@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from steuerung3d.core.axis_id import normalize_axis_id
-from steuerung3d.core.joy_state import JoyState
+from steuerung3d.core.joy_state import JoyState, canonicalize_selected_axes
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.core.telemetry_projection import (
     project_device_surface_from_axis,
@@ -63,11 +63,13 @@ def project_joy_for_axis(snap: TelemetrySnapshot, axis_id: str) -> JoyState:
     joy = getattr(snap, "joy", JoyState())
     if not isinstance(joy, JoyState):
         joy = JoyState()
+    selected_axes = canonicalize_selected_axes(getattr(joy, "selected_axes", ()))
+    axis_key = normalize_axis_id(axis_id)
     return JoyState(
         deadman=bool(getattr(joy, "deadman", False)),
-        select_hip=normalize_axis_id(axis_id) in tuple(getattr(joy, "selected_axes", ()) or ()),
+        select_hip=axis_key in selected_axes,
         soll_speed=float(getattr(joy, "soll_speed", 0.0)),
-        selected_axes=getattr(joy, "selected_axes", ()),
+        selected_axes=selected_axes,
     )
 
 

@@ -1,6 +1,6 @@
 {
   "pythonVersion": "3.11",
-  "typeCheckingMode": "basic",
+  "typeCheckingMode": "strict",
   "reportMissingImports": "none",
   "reportMissingTypeStubs": "none",
   "reportUnknownMemberType": "warning",

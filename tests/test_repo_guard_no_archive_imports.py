@@ -11,7 +11,10 @@ def test_no_archive_or_legacy_imports() -> None:
     dependencies.
     """
 
-    import steuerung3d  # noqa: F401
+    import importlib
+
+    module = importlib.import_module("steuerung3d")
+    assert module.__name__ == "steuerung3d"
 
     bad_paths: list[str] = []
     for name, mod in list(sys.modules.items()):

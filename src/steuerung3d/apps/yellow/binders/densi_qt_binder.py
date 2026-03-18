@@ -70,10 +70,7 @@ class DenSiQtBinder:
         _support.post_init(self)
 
     def _require_param_binder(self) -> ParamWidgetBinder:
-        binder = self._param_binder
-        if binder is None:
-            raise RuntimeError("DenSiQtBinder parameter binder is not initialized")
-        return binder
+        return self._param_binder
 
     def seed_params_from_ui(self) -> dict[str, float]:
         return self._require_param_binder().read_all_values()

@@ -112,3 +112,6 @@ def _telemetry_close(a: TelemetrySnapshot, b: TelemetrySnapshot, eps: float = 1e
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+_STRICT_KEEP = _plant_integrate_x

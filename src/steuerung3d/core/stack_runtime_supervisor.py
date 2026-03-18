@@ -87,7 +87,7 @@ def birds_eye_line(rt: "StackRuntime") -> str:
                 summary = str(sm_dict.get("summary", ""))
                 fields = _as_object_dict(sm_dict.get("fields", {}))
                 parts.append(f"{rp.spec.name}: {level} {summary} ({age_ms}ms)")
-                if isinstance(fields, dict) and str(fields.get("component", "")) == "core":
+                if str(fields.get("component", "")) == "core":
                     parts.extend(build_frederik_panel_lines(cast(BirdsEyeFields, fields)))
             else:
                 t = rt.tailers.get(rp.spec.name)

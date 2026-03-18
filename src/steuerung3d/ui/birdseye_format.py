@@ -182,12 +182,11 @@ def build_frederik_panel_lines(fields: BirdsEyeFields, *, max_blocked: int = 3) 
     ]
 
     axes = fields.get("axes", [])
-    if isinstance(axes, list) and axes:
+    if axes:
         lines.append(
             "Frederik axes: axis in_scope estop fault started cmd_en cmd_vel taster_enabled armed ready owner age_ms"
         )
-        axes_list = cast(list[_BirdAxisFields], axes)
-        axes_sorted = sorted(axes_list, key=lambda a: str(a.get("axis_id", "")))
+        axes_sorted = sorted(axes, key=lambda a: str(a.get("axis_id", "")))
         for ax in axes_sorted:
             axis_id = str(ax.get("axis_id", "") or "")
             in_scope = _flag(ax.get("in_scope"))

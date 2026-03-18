@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import cast
 
 from PySide6.QtCore import QFile, QTimer
 from PySide6.QtUiTools import QUiLoader
@@ -52,8 +51,7 @@ def parse_role(argv: list[str]) -> str:
 
 
 def _refit_window_height_only(win: QWidget) -> None:
-    w_obj = win.window()
-    w = w_obj if isinstance(w_obj, QWidget) else win
+    w = win.window()
     cw = getattr(w, "centralWidget", None)
     central = cw() if callable(cw) else None
     if isinstance(central, QWidget):
@@ -79,9 +77,7 @@ def load_ui(path: Path) -> QWidget:
         w = loader.load(f, None)
     finally:
         f.close()
-    if not isinstance(w, QWidget):
-        raise RuntimeError(f"QUiLoader failed to load: {path}")
-    return cast(QWidget, w)
+    return w
 
 
 def _pretty_name(obj_name: str) -> str:

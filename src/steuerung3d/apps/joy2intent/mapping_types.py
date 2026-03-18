@@ -100,3 +100,6 @@ class RateFacts:
 @dataclass(frozen=True)
 class ActiveSelection:
     selected_ids: set[str]
+
+
+_STRICT_KEEP = (_JoyBindingsLike, _JoyLimitsLike, _JoyReportLike)

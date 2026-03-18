@@ -75,3 +75,6 @@ def list_attachable_leaf_targets(
         out.append(include_selected)
 
     return sorted(out)
+
+
+_STRICT_KEEP = _as_map

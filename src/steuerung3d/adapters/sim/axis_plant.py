@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import cast
 
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.state import MachineState
@@ -11,6 +10,10 @@ from steuerung3d.core.state import MachineState
 class AxisPlantParams:
     max_vel: float = 5.0  # units/s
     max_acc: float = 5.0  # units/s^2
+
+
+def _empty_params() -> dict[str, AxisPlantParams]:
+    return {}
 
 
 @dataclass
@@ -33,9 +36,7 @@ class SimAxisPlant:
       - Safety is handled in core (mode clamps), but we still treat missing setpoints as "disable".
     """
 
-    params: dict[str, AxisPlantParams] = field(
-        default_factory=lambda: cast(dict[str, AxisPlantParams], {})
-    )
+    params: dict[str, AxisPlantParams] = field(default_factory=_empty_params)
     default: AxisPlantParams = field(default_factory=AxisPlantParams)
 
     def step(self, state: MachineState, cmd: CommandFrame, dt: float) -> None:
@@ -59,7 +60,7 @@ class SimAxisPlant:
             meta["timetick_ms"] = lt
             meta["device_tick"] = lt  # TelemetrySnapshot/HiP expects this field
 
-            if hasattr(cmd, "lifetick_echo") and isinstance(cmd.lifetick_echo, dict):
+            if hasattr(cmd, "lifetick_echo"):
                 if axis_id in cmd.lifetick_echo:
                     meta["lifetick_rx"] = int(cmd.lifetick_echo[axis_id]) & 0xFFFF
                     # Not a strict RTT; just shows how stale the echo loop is.
@@ -67,7 +68,7 @@ class SimAxisPlant:
                         int(meta["lifetick_tx"]) - int(meta["lifetick_rx"])
                     ) & 0xFFFF
 
-            p = cast(AxisPlantParams, self.params.get(axis_id, self.default))
+            p = self.params.get(axis_id, self.default)
 
             sp = cmd.axes.get(axis_id)
             if sp is None:

@@ -221,7 +221,7 @@ def enforce_rig_invariants(state: MachineState) -> None:
         state.rig_mode = RigMode.ARMED_SYNC
 
 
-def rig_debug_dict(state: MachineState) -> dict:
+def rig_debug_dict(state: MachineState) -> dict[str, object]:
     """Convenience for debugging/telemetry."""
     out: dict[str, object] = {
         "rig_mode": str(_normalize_rig_mode(getattr(state, "rig_mode", RigMode.DISCOVERY))),

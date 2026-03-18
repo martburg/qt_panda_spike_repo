@@ -182,3 +182,6 @@ def resolve_session_dir(base_dir: Path, session: Optional[str]) -> Optional[Path
     if candidate.exists() and candidate.is_dir():
         return candidate
     return None
+
+
+_STRICT_KEEP = _now_s

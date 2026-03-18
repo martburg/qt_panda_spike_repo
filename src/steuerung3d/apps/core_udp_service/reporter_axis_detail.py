@@ -58,9 +58,7 @@ def _decode_estop_state(
     *, router: BirdsEyeRouterLike | None, snap: BirdsEyeSnapLike, axis_id: str
 ) -> tuple[dict[str, object], str]:
     last_dev_estop_word_by_axis = (
-        cast(Mapping[str, int], router.last_dev_estop_word_by_axis)
-        if router is not None
-        else cast(Mapping[str, int], {})
+        router.last_dev_estop_word_by_axis if router is not None else cast(Mapping[str, int], {})
     )
     estop_word = int(last_dev_estop_word_by_axis.get(axis_id, int(snap.estop_status_word)) or 0)
     try:

@@ -137,3 +137,6 @@ def ramp_step(inp: RampInputs, st: RampState) -> RampOutputs:
     # Legacy then sets Pos0 = PosSoll at top of next tick.
     next_state = RampState(pos0_m=pos_soll, vx_mps=vx, fahrbefehl_old=fahrbefehl_old)
     return RampOutputs(next_state=next_state, pos_soll_m=pos_soll, speed_soll_mps=vx)
+
+
+_STRICT_KEEP = _clamp

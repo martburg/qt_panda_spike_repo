@@ -36,12 +36,14 @@ class FakeCodec(PlcCodec):
         super().__init__(spec=spec)
 
     # Minimal PlcCodec surface (not used by this test)
-    def encode_command_frame(self, _cmd: CommandFrame) -> bytes:  # pragma: no cover
+    def encode_command_frame(self, cmd: CommandFrame) -> bytes:  # pragma: no cover
+        _ = cmd
         return b""
 
     def try_decode_telemetry(
-        self, _payload: bytes
+        self, payload: bytes
     ) -> Optional[TelemetrySnapshot]:  # pragma: no cover
+        _ = payload
         return None
 
 

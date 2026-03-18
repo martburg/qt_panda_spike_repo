@@ -80,7 +80,7 @@ def make_session_dir(
         pass
 
     # Rollover: keep only the newest N sessions.
-    if keep_last is not None and keep_last > 0:
+    if keep_last > 0:
         try:
             session_paths = [p for p in sessions_dir.iterdir() if p.is_dir()]
             # Name sort works because we use a sortable timestamp prefix.

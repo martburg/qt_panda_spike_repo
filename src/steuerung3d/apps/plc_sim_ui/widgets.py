@@ -38,7 +38,7 @@ class LedIndicator(QWidget):
     def isChecked(self) -> bool:
         return self._checked
 
-    def paintEvent(self, _evt) -> None:  # pragma: no cover (Qt)
+    def paintEvent(self, _evt: object) -> None:  # pragma: no cover (Qt)
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
 

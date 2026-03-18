@@ -6,8 +6,6 @@ from .densi_runtime_types import DensiRuntimeUiActionsLike
 
 def apply_ui_actions(rt: DensiRuntimeUiActionsLike, inputs: DensiInputs) -> None:
     ui = inputs.ui
-    if ui is None:
-        return
 
     if ui.es_start_clicked:
         try:

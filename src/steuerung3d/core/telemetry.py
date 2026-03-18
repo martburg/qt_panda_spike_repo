@@ -212,9 +212,7 @@ class TelemetrySnapshot:
         lease_axis_holders: Dict[str, list[str]] = {}
         try:
             lease_axis_holders = {
-                str(k): [str(x) for x in list(v)]
-                for k, v in dict(state.lease_axis_holders or {}).items()
-                if isinstance(v, (list, tuple))
+                str(k): [str(x) for x in v] for k, v in dict(state.lease_axis_holders or {}).items()
             }
         except Exception:
             lease_axis_holders = {}

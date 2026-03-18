@@ -6,6 +6,12 @@ import types
 from types import SimpleNamespace
 from typing import Any, Callable, cast
 
+
+class _NullSignal:
+    def connect(self, *_args: object, **_kwargs: object) -> None:
+        pass
+
+
 import pytest
 
 
@@ -41,7 +47,7 @@ def _qtwidgets_module() -> types.ModuleType:
             return None
 
         def __init__(self, *_args: object, **_kwargs: object) -> None:
-            self.aboutToQuit = SimpleNamespace(connect=lambda *_: None)
+            self.aboutToQuit = _NullSignal()
 
         def exec(self) -> int:
             return 0
@@ -53,25 +59,46 @@ def _qtwidgets_module() -> types.ModuleType:
 def _dummy_window_module() -> types.ModuleType:
     dummy_window_mod = cast(Any, types.ModuleType("steuerung3d.apps.supervisor.gui.window"))
     dummy_window_mod.SupervisorWindow = lambda: SimpleNamespace(
-        reset_estop_clicked=SimpleNamespace(connect=lambda *_: None),
-        estart_clicked=SimpleNamespace(connect=lambda *_: None),
-        resync_clicked=SimpleNamespace(connect=lambda *_: None),
-        recover_clicked=SimpleNamespace(connect=lambda *_: None),
-        chk_es_taster_changed=SimpleNamespace(connect=lambda *_: None),
-        pair_selected_changed=SimpleNamespace(connect=lambda *_: None),
-        open_hip_clicked=SimpleNamespace(connect=lambda *_: None),
-        status_label=SimpleNamespace(setText=lambda *_: None),
-        apply_snapshot=lambda *_: None,
-        show=lambda: None,
-        show_recover_placeholder=lambda: None,
+        reset_estop_clicked=_NullSignal(),
+        estart_clicked=_NullSignal(),
+        resync_clicked=_NullSignal(),
+        recover_clicked=_NullSignal(),
+        chk_es_taster_changed=_NullSignal(),
+        pair_selected_changed=_NullSignal(),
+        open_hip_clicked=_NullSignal(),
+        status_label=SimpleNamespace(setText=_noop_text),
+        apply_snapshot=_noop_apply_snapshot,
+        show=_noop_show,
+        show_recover_placeholder=_noop_show,
     )
     return cast(types.ModuleType, dummy_window_mod)
 
 
+def _noop_text(*_args: object) -> None:
+    pass
+
+
+def _noop_apply_snapshot(*_args: object) -> None:
+    pass
+
+
+def _noop_show() -> None:
+    pass
+
+
+def _noop_close() -> None:
+    pass
+
+
+def _drain_telemetry(limit: int = 50) -> list[object]:
+    _ = limit
+    return []
+
+
 def _drain_telemetry_stub(*_args: object, **_kwargs: object) -> object:
     return SimpleNamespace(
-        drain_telemetry=lambda limit=50: [],
-        rx=SimpleNamespace(link=SimpleNamespace(close=lambda: None)),
+        drain_telemetry=_drain_telemetry,
+        rx=SimpleNamespace(link=SimpleNamespace(close=_noop_close)),
     )
 
 
@@ -79,7 +106,7 @@ def _publish_intent_stub(published: list[object]) -> Callable[..., object]:
     def _connect(*_args: object, **_kwargs: object) -> object:
         return SimpleNamespace(
             publish_intent=published.append,
-            tx=SimpleNamespace(link=SimpleNamespace(close=lambda: None)),
+            tx=SimpleNamespace(link=SimpleNamespace(close=_noop_close)),
         )
 
     return _connect

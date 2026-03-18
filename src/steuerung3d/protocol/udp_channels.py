@@ -55,7 +55,7 @@ class UdpJsonIn(Generic[T]):
                 except Exception:
                     t = None
                 # limit raw size to keep logs readable
-                raw_preview = raw[:200] if isinstance(raw, (bytes, bytearray)) else b""
+                raw_preview = raw[:200]
                 log.warning("udp decode failed: type=%r err=%r raw=%r", t, e, raw_preview)
                 continue
         return out

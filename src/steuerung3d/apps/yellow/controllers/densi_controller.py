@@ -74,7 +74,7 @@ class DenSiController:
             axis_ids=list(self.axis_ids),
             stale_after_ms=int(self.stale_after_ms),
             log=log,
-            action_in=cast("DensiActionInLike | None", self.action_in),
+            action_in=self.action_in,
         )
         self._wd = PerfWatchdog(log, name="den_si")
 

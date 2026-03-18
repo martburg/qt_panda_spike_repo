@@ -57,7 +57,7 @@ def run_param_txn(
             intent = txn.make_begin_intent(axis_id=axis_id, group=group)
             txn.send(intent, group=group, kind="begin", publish=intents.append, now_ns=int(now_ns))
         elif kind == "write":
-            vals = dict(ui.param_values.get(group, {}) if isinstance(ui.param_values, dict) else {})
+            vals = dict(ui.param_values.get(group, {}))
             fixed = dict(vals)
             if group == "pos":
                 fixed = _normalize_pos_chain(fixed)

@@ -82,7 +82,7 @@ def compute_densi_view_model(
         systemtime_param=str(engine.state.params.get("SystemTime", "") or "") or None,
         cut_pos_m=float(engine.cut_pos_m or 0.0) if bool(engine.cut_valid) else None,
         cut_vel_mps=float(engine.cut_vel_mps or 0.0) if bool(engine.cut_valid) else None,
-        pos_m=float(readouts_vm.pos_m) if readouts_vm is not None else None,
+        pos_m=float(readouts_vm.pos_m),
     )
     if cut_vm.effects.systemtime_tok is not None:
         engine.systemtime_tok = cut_vm.effects.systemtime_tok

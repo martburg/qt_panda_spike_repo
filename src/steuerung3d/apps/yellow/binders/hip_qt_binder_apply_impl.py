@@ -27,18 +27,18 @@ if TYPE_CHECKING:
 def apply(b: Any, vm: HipViewModel) -> None:
     # Always-visible UI
     b.apply_tick_text(vm.tick_text)
-    b._set_joy_properties(vm.joy_deadman, vm.joy_select_hip)
-    b._apply_attach_state(vm)
+    b.set_joy_properties(vm.joy_deadman, vm.joy_select_hip)
+    b.apply_attach_state(vm)
 
-    # Always keep axis picker in sync (if you moved it into _apply_attach_combo)
-    b._apply_attach_combo(vm)
+    # Always keep axis picker in sync (if you moved it into apply_attach_combo)
+    b.apply_attach_combo(vm)
 
-    b._apply_banner(vm)
-    b._apply_header_dots(vm)
-    b._apply_estop_state(vm)
+    b.apply_banner(vm)
+    b.apply_header_dots(vm)
+    b.apply_estop_state(vm)
 
     # Joy speed is display-only; safe to apply always
-    b._apply_joy_speed(float(vm.joy_soll_speed))
+    b.apply_joy_speed(float(vm.joy_soll_speed))
 
     # Axis-dependent sections: only show/update when attached
     attached = (
@@ -49,18 +49,18 @@ def apply(b: Any, vm: HipViewModel) -> None:
         # but do NOT return early before rendering global widgets.
         return
 
-    b._apply_drive_status(vm)
-    b._apply_readouts(vm)
-    b._apply_sliders(vm)
-    b._apply_cut_markers(vm)
-    b._apply_params(vm)
+    b.apply_drive_status(vm)
+    b.apply_readouts(vm)
+    b.apply_sliders(vm)
+    b.apply_cut_markers(vm)
+    b.apply_params(vm)
 
 
 def apply_startup_state(b: Any) -> None:
     b.apply_tick_text("--")
     b._set_all_estop_unknown()
-    b._set_joy_properties(False, False)
-    b._apply_joy_speed(0.0)
+    b.set_joy_properties(False, False)
+    b.apply_joy_speed(0.0)
 
 
 def apply_tick_text(b: Any, text: str) -> None:
@@ -76,7 +76,7 @@ def apply_online_state(b: Any, state: str | None) -> None:
     b._set_dot("dotHdrOnline", state)
 
 
-def _set_joy_properties(b: Any, deadman: bool, select_hip: bool) -> None:
+def set_joy_properties(b: Any, deadman: bool, select_hip: bool) -> None:
     # Joy UI reflection: QSS uses joy_deadman/joy_select_hip dynamic properties.
     w = getattr(b, "_widgets", None)
     frame_footer = (
@@ -100,7 +100,7 @@ def _set_joy_properties(b: Any, deadman: bool, select_hip: bool) -> None:
         )
 
 
-def _apply_joy_speed(b: Any, soll_speed: float) -> None:
+def apply_joy_speed(b: Any, soll_speed: float) -> None:
     # sldVelCmd is display-only; updates are programmatic with signals blocked.
     w = getattr(b, "_widgets", None)
     sld = getattr(w, "sld_vel_cmd", None) if w is not None else getattr(b, "_sld_vel_cmd", None)
@@ -145,7 +145,7 @@ def _apply_joy_speed(b: Any, soll_speed: float) -> None:
 # ------------------------------------------------------------------
 
 
-def _apply_attach_combo(b: Any, vm: HipViewModel) -> None:
+def apply_attach_combo(b: Any, vm: HipViewModel) -> None:
     w = getattr(b, "_widgets", None)
     cmb = getattr(w, "cmb_axis", None) if w is not None else getattr(b, "_cmbAxis", None)
     if vm.attach_combo is None or cmb is None:
@@ -184,7 +184,7 @@ def _apply_attach_combo(b: Any, vm: HipViewModel) -> None:
     set_enabled(cmb, bool(vm.attach_combo.enabled))
 
 
-def _apply_attach_state(b: Any, vm: HipViewModel) -> None:
+def apply_attach_state(b: Any, vm: HipViewModel) -> None:
     if vm.attach_state is None:
         return
 
@@ -219,31 +219,31 @@ def _apply_attach_state(b: Any, vm: HipViewModel) -> None:
         b._clear_for_unattached()
 
 
-def _apply_drive_status(b: Any, vm: HipViewModel) -> None:
+def apply_drive_status(b: Any, vm: HipViewModel) -> None:
     if getattr(b, "_drive_status_bindings", None) is None:
         return
     apply_hip_drive_status(b._drive_status_bindings, vm)
 
 
-def _apply_banner(b: Any, vm: HipViewModel) -> None:
+def apply_banner(b: Any, vm: HipViewModel) -> None:
     if getattr(b, "_banner_bindings", None) is None:
         return
     apply_hip_banner(b._banner_bindings, vm)
 
 
-def _apply_header_dots(b: Any, vm: HipViewModel) -> None:
+def apply_header_dots(b: Any, vm: HipViewModel) -> None:
     if getattr(b, "_header_dots_bindings", None) is None:
         return
     apply_hip_header_dots(b._header_dots_bindings, vm)
 
 
-def _apply_estop_state(b: Any, vm: HipViewModel) -> None:
+def apply_estop_state(b: Any, vm: HipViewModel) -> None:
     if getattr(b, "_estop_bindings", None) is None:
         return
     apply_hip_estop(b._estop_bindings, vm)
 
 
-def _apply_readouts(b: Any, vm: HipViewModel) -> None:
+def apply_readouts(b: Any, vm: HipViewModel) -> None:
     if getattr(b, "_readouts_bindings", None) is None:
         return
     ro = getattr(vm, "readouts", None)
@@ -260,23 +260,37 @@ def _apply_readouts(b: Any, vm: HipViewModel) -> None:
     apply_hip_readouts(b._readouts_bindings, vm)
 
 
-def _apply_sliders(b: Any, vm: HipViewModel) -> None:
+def apply_sliders(b: Any, vm: HipViewModel) -> None:
     if getattr(b, "_sliders_bindings", None) is None:
         return
     apply_hip_sliders(b._sliders_bindings, vm)
 
 
-def _apply_cut_markers(b: Any, vm: HipViewModel) -> None:
+def apply_cut_markers(b: Any, vm: HipViewModel) -> None:
     if getattr(b, "_cut_markers_bindings", None) is None:
         return
     apply_hip_cut_markers(b._cut_markers_bindings, vm)
 
 
-def _apply_params(b: Any, vm: HipViewModel) -> None:
+def apply_params(b: Any, vm: HipViewModel) -> None:
     if getattr(b, "_param_ui_bindings", None) is None:
         return
     apply_param_ui(b._param_ui_bindings, vm)
 
+
+# Backward-compatible private aliases for existing tests/import sites.
+_set_joy_properties = set_joy_properties
+_apply_joy_speed = apply_joy_speed
+_apply_attach_combo = apply_attach_combo
+_apply_attach_state = apply_attach_state
+_apply_drive_status = apply_drive_status
+_apply_banner = apply_banner
+_apply_header_dots = apply_header_dots
+_apply_estop_state = apply_estop_state
+_apply_readouts = apply_readouts
+_apply_sliders = apply_sliders
+_apply_cut_markers = apply_cut_markers
+_apply_params = apply_params
 
 # ------------------------------------------------------------------
 # UI helpers

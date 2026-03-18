@@ -30,10 +30,8 @@ def button_aliases(value: int | Sequence[int] | None) -> set[int]:
     if isinstance(value, int):
         return {value}
     out: set[int] = set()
-    if isinstance(value, Sequence) and not isinstance(value, str | bytes):
-        for item in value:
-            if isinstance(item, int):
-                out.add(item)
+    for item in value:
+        out.add(item)
     return out
 
 
@@ -41,10 +39,8 @@ def select_aliases(entry: int | Sequence[int]) -> set[int]:
     if isinstance(entry, int):
         return {entry}
     out: set[int] = set()
-    if isinstance(entry, Sequence) and not isinstance(entry, str | bytes):
-        for item in entry:
-            if isinstance(item, int):
-                out.add(item)
+    for item in entry:
+        out.add(item)
     return out
 
 

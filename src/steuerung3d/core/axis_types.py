@@ -64,4 +64,4 @@ class AxisCommand:
 
     # optional write-extension:
     write_params: bool = False
-    params: Optional[dict] = None
+    params: Optional[dict[str, float]] = None

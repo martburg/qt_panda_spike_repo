@@ -242,8 +242,6 @@ class SupervisorWindow(QMainWindow):
             if idx >= len(cells):
                 break
             dot = cells[idx]
-            if not isinstance(dot, _TooltipDot):
-                continue
             state = states[idx] if idx < len(states) else None
             label = column.header
             self._set_dot_state(dot, state=state, label=label)

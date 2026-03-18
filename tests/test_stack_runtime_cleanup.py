@@ -89,13 +89,24 @@ def test_start_runtime_cleans_residual_bind_ports(
     rt = _FakeRT()
     cleaned: list[list[int]] = []
 
-    make_session_dir = cast(Any, lambda base, keep_last: tmp_path)
-    write_runtime_meta = cast(Any, lambda rt, stopped_at_s=None: None)
+    def _make_session_dir(base: Path, keep_last: int) -> Path:
+        _ = (base, keep_last)
+        return tmp_path
+
+    def _write_runtime_meta(rt: object, stopped_at_s: float | None = None) -> None:
+        _ = (rt, stopped_at_s)
+
+    make_session_dir = cast(Any, _make_session_dir)
+    write_runtime_meta = cast(Any, _write_runtime_meta)
 
     def _expand_processes(spec: StackSpec, *, session_dir: Path) -> list[ProcessSpec]:
         return [proc]
 
-    cleanup_ports = cast(Any, lambda ports: cleaned.append(list(cast(list[int], ports))) or [])
+    def _cleanup_ports(ports: object) -> list[object]:
+        cleaned.append(list(cast(list[int], ports)))
+        return []
+
+    cleanup_ports = cast(Any, _cleanup_ports)
 
     monkeypatch.setattr("steuerung3d.core.stack_runtime_boot.make_session_dir", make_session_dir)
     monkeypatch.setattr(
@@ -124,8 +135,16 @@ def test_stop_runtime_force_kills_and_closes_status(monkeypatch: pytest.MonkeyPa
     rt.status = _FakeStatus()
 
     cleaned: list[list[int]] = []
-    cleanup_ports = cast(Any, lambda ports: cleaned.append(list(cast(list[int], ports))) or [])
-    write_runtime_meta = cast(Any, lambda rt, stopped_at_s=None: None)
+
+    def _cleanup_ports(ports: object) -> list[object]:
+        cleaned.append(list(cast(list[int], ports)))
+        return []
+
+    def _write_runtime_meta(rt: object, stopped_at_s: float | None = None) -> None:
+        _ = (rt, stopped_at_s)
+
+    cleanup_ports = cast(Any, _cleanup_ports)
+    write_runtime_meta = cast(Any, _write_runtime_meta)
 
     monkeypatch.setattr(
         "steuerung3d.core.stack_runtime_supervisor.cleanup_residual_bind_ports",

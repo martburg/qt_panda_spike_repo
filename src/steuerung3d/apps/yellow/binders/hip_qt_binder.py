@@ -125,10 +125,7 @@ class HipQtBinder:
         _init_impl.post_init(self)
 
     def _require_param_binder(self) -> ParamWidgetBinder:
-        binder = self._param_binder
-        if binder is None:
-            raise RuntimeError("HipQtBinder parameter binder is not initialized")
-        return binder
+        return self._param_binder
 
     # ------------------------------------------------------------------
     # Signal wiring / input capture
@@ -217,45 +214,81 @@ class HipQtBinder:
     def apply_online_state(self, state: str | None) -> None:
         _apply_impl.apply_online_state(self, state)
 
+    def apply_attach_combo(self, vm: HipViewModel) -> None:
+        _apply_impl.apply_attach_combo(self, vm)
+
     def _apply_attach_combo(self, vm: HipViewModel) -> None:
-        _apply_impl._apply_attach_combo(self, vm)
+        self.apply_attach_combo(vm)
+
+    def set_joy_properties(self, deadman: bool, select_hip: bool) -> None:
+        _apply_impl.set_joy_properties(self, deadman, select_hip)
 
     def _set_joy_properties(self, deadman: bool, select_hip: bool) -> None:
-        _apply_impl._set_joy_properties(self, deadman, select_hip)
+        self.set_joy_properties(deadman, select_hip)
+
+    def apply_joy_speed(self, soll_speed: float) -> None:
+        _apply_impl.apply_joy_speed(self, soll_speed)
 
     def _apply_joy_speed(self, soll_speed: float) -> None:
-        _apply_impl._apply_joy_speed(self, soll_speed)
+        self.apply_joy_speed(soll_speed)
 
     # ------------------------------------------------------------------
     # Apply helpers
     # ------------------------------------------------------------------
 
+    def apply_attach_state(self, vm: HipViewModel) -> None:
+        _apply_impl.apply_attach_state(self, vm)
+
     def _apply_attach_state(self, vm: HipViewModel) -> None:
-        _apply_impl._apply_attach_state(self, vm)
+        self.apply_attach_state(vm)
+
+    def apply_drive_status(self, vm: HipViewModel) -> None:
+        _apply_impl.apply_drive_status(self, vm)
 
     def _apply_drive_status(self, vm: HipViewModel) -> None:
-        _apply_impl._apply_drive_status(self, vm)
+        self.apply_drive_status(vm)
+
+    def apply_banner(self, vm: HipViewModel) -> None:
+        _apply_impl.apply_banner(self, vm)
 
     def _apply_banner(self, vm: HipViewModel) -> None:
-        _apply_impl._apply_banner(self, vm)
+        self.apply_banner(vm)
+
+    def apply_header_dots(self, vm: HipViewModel) -> None:
+        _apply_impl.apply_header_dots(self, vm)
 
     def _apply_header_dots(self, vm: HipViewModel) -> None:
-        _apply_impl._apply_header_dots(self, vm)
+        self.apply_header_dots(vm)
+
+    def apply_estop_state(self, vm: HipViewModel) -> None:
+        _apply_impl.apply_estop_state(self, vm)
 
     def _apply_estop_state(self, vm: HipViewModel) -> None:
-        _apply_impl._apply_estop_state(self, vm)
+        self.apply_estop_state(vm)
+
+    def apply_readouts(self, vm: HipViewModel) -> None:
+        _apply_impl.apply_readouts(self, vm)
 
     def _apply_readouts(self, vm: HipViewModel) -> None:
-        _apply_impl._apply_readouts(self, vm)
+        self.apply_readouts(vm)
+
+    def apply_sliders(self, vm: HipViewModel) -> None:
+        _apply_impl.apply_sliders(self, vm)
 
     def _apply_sliders(self, vm: HipViewModel) -> None:
-        _apply_impl._apply_sliders(self, vm)
+        self.apply_sliders(vm)
+
+    def apply_cut_markers(self, vm: HipViewModel) -> None:
+        _apply_impl.apply_cut_markers(self, vm)
 
     def _apply_cut_markers(self, vm: HipViewModel) -> None:
-        _apply_impl._apply_cut_markers(self, vm)
+        self.apply_cut_markers(vm)
+
+    def apply_params(self, vm: HipViewModel) -> None:
+        _apply_impl.apply_params(self, vm)
 
     def _apply_params(self, vm: HipViewModel) -> None:
-        _apply_impl._apply_params(self, vm)
+        self.apply_params(vm)
 
     # ------------------------------------------------------------------
     # UI helpers

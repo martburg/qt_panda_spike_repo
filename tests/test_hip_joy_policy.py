@@ -39,18 +39,16 @@ def _snap(
     vel_max: float = 1.0,
     estop_word: int | None = None,
 ) -> TelemetrySnapshot:
-    densis = {}
-    if claimed_by is not None:
-        densis = {
-            axis_id: DensiTelemetry(
-                device_id=axis_id,
-                online=True,
-                claimed_by_hip=str(claimed_by or ""),
-                participating=False,
-                anchor_xyz=None,
-                last_seen_age_ticks=0,
-            )
-        }
+    densis = {
+        axis_id: DensiTelemetry(
+            device_id=axis_id,
+            online=True,
+            claimed_by_hip=str(claimed_by or ""),
+            participating=False,
+            anchor_xyz=None,
+            last_seen_age_ticks=0,
+        )
+    }
     return TelemetrySnapshot(
         tick=1,
         t_s=0.0,

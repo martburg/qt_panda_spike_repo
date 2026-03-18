@@ -174,7 +174,7 @@ def build_command_frame(state: MachineState) -> CommandFrame:
     now_s = time.monotonic()
     cfg = _get_lifetick_cfg()
     lifetick = _get_lifetick_logger()
-    every_s = float(cfg.every_s) if cfg.every_s is not None else 0.5
+    every_s = float(cfg.every_s)
     axis_ids = sorted(set(axes.keys()) | set(lifetick_echo.keys()))
     for axis_id in axis_ids:
         v = lifetick_echo.get(axis_id, None)

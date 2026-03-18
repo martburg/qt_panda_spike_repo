@@ -50,7 +50,6 @@ def apply_densi_param_ops(
     from steuerung3d.core.command_frame import (
         ParamCancelOp,
         ParamEditBeginOp,
-        ParamWriteOp,
         coerce_param_ops,
     )
 
@@ -69,7 +68,7 @@ def apply_densi_param_ops(
                 state.param_edit_active = False
                 state.param_edit_group = ""
 
-        elif isinstance(op, ParamWriteOp):
+        else:
             grp = str(op.group or "")
             vals = {str(k): float(v) for k, v in dict(op.values or {}).items()}
 

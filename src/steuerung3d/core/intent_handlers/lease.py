@@ -22,14 +22,10 @@ def set_lease_denial(state: MachineState, reason: str, req_id: str = "") -> None
 def axis_lease_holders(state: MachineState, axis_id: str) -> list[str]:
     holders = _as_object_map(getattr(state, "lease_axis_holders", {}) or {})
     vals_obj = holders.get(axis_id, [])
-    vals = (
-        cast(list[object] | tuple[object, ...], vals_obj)
-        if isinstance(vals_obj, (list, tuple))
-        else []
-    )
-    if not isinstance(vals, (list, tuple)):
+    if not isinstance(vals_obj, (list, tuple)):
         return []
-    return [str(x) for x in list(vals) if str(x)]
+    vals = cast(list[object] | tuple[object, ...], vals_obj)
+    return [str(x) for x in vals if str(x)]
 
 
 def axis_lease_allows(state: MachineState, axis_id: str, hip_id: str) -> bool:

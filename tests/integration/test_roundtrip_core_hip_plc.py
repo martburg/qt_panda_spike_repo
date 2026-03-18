@@ -8,7 +8,7 @@ import time
 from collections.abc import Mapping
 from contextlib import closing
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Callable, cast
 
 import pytest
 
@@ -72,7 +72,7 @@ def _start_core(
     )
 
 
-def _wait_for(condition, timeout_s: float = 3.5, sleep_s: float = 0.02) -> bool:
+def _wait_for(condition: Callable[[], bool], timeout_s: float = 3.5, sleep_s: float = 0.02) -> bool:
     t0 = time.time()
     while time.time() - t0 < timeout_s:
         if condition():

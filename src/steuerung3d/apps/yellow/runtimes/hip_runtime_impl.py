@@ -69,7 +69,7 @@ class HipRuntime:
         engine: HipEngine,
         hb: Heartbeat,
         ch: ChangeTracker,
-        status=None,
+        status: StatusEmitterLike | None = None,
         stale_after_ms: int,
         log: logging.Logger,
         hip_id: str,

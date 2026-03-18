@@ -36,17 +36,18 @@ def pytest_runtest_setup(item: Item) -> None:
 
 
 class _DummyQtType:
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: object, **kwargs: object) -> None:
         pass
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args: object, **kwargs: object) -> None:
         return None
 
 
 def _qt_module(name: str) -> types.ModuleType:
     mod = types.ModuleType(name)
 
-    def __getattr__(attr: str):
+    def __getattr__(attr: str) -> type[_DummyQtType]:
+        _ = attr
         return _DummyQtType
 
     mod.__getattr__ = __getattr__  # type: ignore[attr-defined]

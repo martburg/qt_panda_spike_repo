@@ -2,9 +2,12 @@ from steuerung3d.protocol.codec import decode_raw_controls, encode_raw_controls
 from steuerung3d.protocol.raw_controls import RawControls
 
 
-def test_udp_channels_import_smoke():
+def test_udp_channels_import_smoke() -> None:
     """Refactor tripwire: importing udp_channels must never fail."""
-    import steuerung3d.protocol.udp_channels  # noqa: F401
+    import importlib
+
+    module = importlib.import_module("steuerung3d.protocol.udp_channels")
+    assert module.__name__ == "steuerung3d.protocol.udp_channels"
 
 
 def test_raw_controls_codec_roundtrip():

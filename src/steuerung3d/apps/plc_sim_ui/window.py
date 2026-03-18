@@ -326,3 +326,6 @@ def main(argv: list[str] | None = None) -> int:
     w = YellowAxisWindow()
     w.show()
     return app.exec()
+
+
+_STRICT_KEEP = _AxisPanelRefs

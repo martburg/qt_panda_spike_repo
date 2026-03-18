@@ -1,5 +1,5 @@
 from typing import Any
-from .QtCore import QObject, QSize
+from .QtCore import QObject
 
 class QColor:
     def __init__(self, *args: Any, **kwargs: Any) -> None: ...
