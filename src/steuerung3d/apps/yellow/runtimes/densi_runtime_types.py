@@ -8,11 +8,12 @@ from steuerung3d.apps.supervisor.models import DensiRemoteAction
 from steuerung3d.apps.yellow.ports import CommandIn
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.telemetry import TelemetrySnapshot
-from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
+from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat, RateLimiter
 
 from ..engines.densi.engine_types import DenSiTickResult
 from ..engines.densi.inputs import DensiInputs
 from ..engines.densi.viewmodel import DensiViewModel
+from .runtime_utils import StatusEmitterLike
 
 
 @dataclass(frozen=True)
@@ -67,8 +68,8 @@ class DensiRuntimeStatusPayloadLike(Protocol):
 
 @runtime_checkable
 class DensiRuntimeStatusLike(DensiRuntimeStatusPayloadLike, Protocol):
-    _status: Any
-    _dbg_rl: Any
+    _status: StatusEmitterLike | None
+    _dbg_rl: RateLimiter | None
     _hb: Heartbeat
     _ch: ChangeTracker
     _log: Logger

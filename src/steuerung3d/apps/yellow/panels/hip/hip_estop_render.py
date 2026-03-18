@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from PySide6.QtWidgets import QCheckBox, QPushButton
 
@@ -15,6 +15,19 @@ class HipEstopBindings:
     btn_estop_reset: QPushButton | None
     estop_checks: dict[str, QCheckBox]
     set_dot: Callable[[str, str], None]
+
+
+def _active_keys(value: object) -> set[str]:
+    if isinstance(value, set):
+        items = cast(set[object], value)
+        return {str(k) for k in items}
+    if isinstance(value, list):
+        items = cast(list[object], value)
+        return {str(k) for k in items}
+    if isinstance(value, tuple):
+        items = cast(tuple[object, ...], value)
+        return {str(k) for k in items}
+    return set()
 
 
 def apply_hip_estop(bindings: HipEstopBindings, vm: Any) -> None:
@@ -34,7 +47,7 @@ def apply_hip_estop(bindings: HipEstopBindings, vm: Any) -> None:
         if bool(getattr(es, "profile_changed", False)):
             try:
                 f = cb.font()
-                active_keys = set(getattr(es, "active_keys", set()) or set())
+                active_keys = _active_keys(getattr(es, "active_keys", None))
                 f.setBold(key in active_keys)
                 cb.setFont(f)
             except Exception:

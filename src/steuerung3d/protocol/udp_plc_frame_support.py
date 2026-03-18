@@ -6,7 +6,7 @@ with no intended semantic changes.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, cast
 
 from steuerung3d.protocol.udp_plc_coerce import to_float
 
@@ -30,7 +30,8 @@ def frame_axis_id(frame: Any, default: str = "X") -> str:
         return default
     if isinstance(axes, Mapping) and axes:
         try:
-            return axis_id_or_default(str(next(iter(axes.keys()))), default)
+            axis_keys = cast(Mapping[object, object], axes).keys()
+            return axis_id_or_default(str(next(iter(axis_keys))), default)
         except Exception:
             return default
     return default
@@ -43,7 +44,15 @@ def frame_lifetick_ui_rx(frame: Any, axis_id: str) -> int:
         return 0
     if isinstance(echo, Mapping) and axis_id in echo:
         try:
-            return int(echo[axis_id])
+            echo_map = cast(Mapping[object, object], echo)
+            value = echo_map[axis_id]
+            if isinstance(value, (bool, int)):
+                return int(value)
+            if isinstance(value, float):
+                return int(value)
+            if isinstance(value, str):
+                return int(float(value))
+            return 0
         except Exception:
             return 0
     return 0

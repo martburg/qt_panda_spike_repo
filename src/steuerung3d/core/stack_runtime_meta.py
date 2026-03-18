@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 def write_runtime_meta(rt: "StackRuntime", *, stopped_at_s: float | None) -> None:
     if rt.session_dir is None:
         return
-    meta = {
+    meta: dict[str, object] = {
         "stack_name": rt.spec.name,
         "session_dir": str(rt.session_dir),
         "profile_path": str(rt.spec.profile_path) if getattr(rt.spec, "profile_path", None) else "",

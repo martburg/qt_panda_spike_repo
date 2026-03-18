@@ -68,7 +68,7 @@ def run_param_txn(
                 param_writeback_group = group
                 param_writeback_values = dict(fixed)
                 if group == "pos":
-                    lines = []
+                    lines: list[str] = []
                     for k in ("HardMax", "UserMax", "UserMin", "HardMin"):
                         if k in vals and k in fixed and float(vals[k]) != float(fixed[k]):
                             lines.append(f"{k}: {float(vals[k]):g} → {float(fixed[k]):g}")

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, cast
 
 from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
 from steuerung3d.adapters.sim.device import SimDevice
@@ -27,9 +28,9 @@ def _fingerprint(frames: list[CommandFrame]) -> str:
         d.pop("t_s", None)
         # Sort axes for stability
         axes_obj = d.get("axes", {})
-        if isinstance(axes_obj, dict):
-            axes = dict(axes_obj)
-            d["axes"] = {k: axes[k] for k in sorted(str(k) for k in axes.keys())}
+        if isinstance(axes_obj, Mapping):
+            axes = {str(k): v for k, v in cast(Mapping[object, object], axes_obj).items()}
+            d["axes"] = {k: axes[k] for k in sorted(axes)}
         payloads.append(d)
 
     blob = json.dumps(payloads, sort_keys=True, separators=(",", ":")).encode("utf-8")

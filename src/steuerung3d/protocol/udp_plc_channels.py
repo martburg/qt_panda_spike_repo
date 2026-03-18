@@ -60,9 +60,12 @@ PayloadSequence: TypeAlias = list[object] | tuple[object, ...]
 
 
 def _first_payload_item(payload: object) -> object:
-    if isinstance(payload, (list, tuple)) and payload:
-        seq = cast(PayloadSequence, payload)
-        return seq[0]
+    if isinstance(payload, list):
+        seq = cast(list[object], payload)
+        return seq[0] if seq else cast(object, payload)
+    if isinstance(payload, tuple):
+        seq = cast(tuple[object, ...], payload)
+        return seq[0] if seq else cast(object, payload)
     return payload
 
 
@@ -112,13 +115,14 @@ class UdpPlcTelemetryOut:
 
         # Batch handling
         if isinstance(payload, (list, tuple)):
-            if not payload:
+            seq = cast(PayloadSequence, payload)
+            if not seq:
                 return
-            if all(isinstance(x, str) for x in payload):
-                for line in [str(x) for x in payload]:
-                    self.publish_line(line)
+            if all(isinstance(x, str) for x in seq):
+                for line in seq:
+                    self.publish_line(cast(str, line))
                 return
-            payload = _first_payload_item(payload)
+            payload = _first_payload_item(seq)
 
         if isinstance(payload, str):
             self.publish_line(payload)

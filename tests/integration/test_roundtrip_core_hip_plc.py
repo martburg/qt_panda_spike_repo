@@ -5,6 +5,7 @@ import socket
 import subprocess
 import sys
 import time
+from collections.abc import Mapping
 from contextlib import closing
 from pathlib import Path
 from typing import Any, cast
@@ -22,7 +23,10 @@ from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn
 
 
 def _as_object_dict(value: object) -> dict[str, object]:
-    return cast(dict[str, object], value) if isinstance(value, dict) else {}
+    if not isinstance(value, Mapping):
+        return {}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
 
 
 def _pick_free_udp_port() -> int:
@@ -159,16 +163,14 @@ def test_core_hip_livetick_echo_roundtrip_plc():
 
                     # Params evidence (helps distinguish "uplink not processed" vs "tick not forwarded")
                     try:
-                        params_obj = getattr(s, "params", None) or {}
-                        params = _as_object_dict(params_obj)
+                        params = _as_object_dict(getattr(s, "params", None) or {})
                         if "P" in params:
                             observed["p"] = cast(float | str | int | None, params.get("P"))
                     except Exception:
                         pass
 
                     # Axis tick path: accept exact axis key match OR single-axis snapshots.
-                    axes_obj = getattr(s, "axes", None) or {}
-                    axes = cast(dict[str, Any], _as_object_dict(axes_obj))
+                    axes = cast(dict[str, Any], _as_object_dict(getattr(s, "axes", None) or {}))
                     ax_key: str | None = None
                     if axis in axes:
                         ax_key = axis

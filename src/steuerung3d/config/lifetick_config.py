@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from steuerung3d.config.toml_loader import load_toml
 
@@ -29,7 +30,8 @@ class LifetickTraceConfig:
 def _as_table(value: object) -> dict[str, object]:
     if not isinstance(value, Mapping):
         return {}
-    return {str(k): v for k, v in value.items()}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
 
 
 def _as_float(value: object, default: float) -> float:

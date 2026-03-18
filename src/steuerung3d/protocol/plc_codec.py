@@ -16,11 +16,11 @@ from steuerung3d.protocol.plc_codec_impl import (
     encode_uplink_from_snapshot,
 )
 
-__all__ = [
+__all__: tuple[str, ...] = (
     "DecodedDownlink",
-    _PARAM_KEYMAP,
+    "_PARAM_KEYMAP",
     "decode_downlink",
     "decode_uplink_to_snapshot",
     "encode_downlink",
     "encode_uplink_from_snapshot",
-]
+)

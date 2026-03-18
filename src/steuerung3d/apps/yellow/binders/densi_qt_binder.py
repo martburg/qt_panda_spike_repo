@@ -144,5 +144,5 @@ class DenSiQtBinder:
     def _find_line_edit(self, object_name: str) -> QLineEdit | None:
         return _support.find_line_edit(self, object_name)
 
-    def _set_dot(self, object_name: str, state) -> None:
+    def _set_dot(self, object_name: str, state: object) -> None:
         _support.set_dot(self, object_name, state)

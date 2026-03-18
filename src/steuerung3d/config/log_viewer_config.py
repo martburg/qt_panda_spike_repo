@@ -3,12 +3,19 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, cast
+from typing import Optional, Protocol, cast
+
+
+class _TomlModule(Protocol):
+    def loads(self, s: str, /) -> object: ...
+
 
 try:
-    import tomllib  # py3.11+
+    import tomllib as _toml_module  # py3.11+
 except ModuleNotFoundError:  # pragma: no cover
-    import tomli as tomllib  # type: ignore
+    import tomli as _toml_module  # type: ignore
+
+tomllib = cast(_TomlModule, _toml_module)
 
 
 def _as_table(value: object) -> dict[str, object]:

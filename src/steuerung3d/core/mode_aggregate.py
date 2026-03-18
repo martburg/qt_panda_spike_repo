@@ -35,11 +35,19 @@ class BlockedReason:
     detail: str | None = None
 
 
+def _empty_blocked_reasons() -> list[BlockedReason]:
+    return []
+
+
+def _empty_axis_gate() -> dict[str, dict[str, object]]:
+    return {}
+
+
 @dataclass(frozen=True)
 class AggregateResult:
     core_mode: CoreMode
-    blocked_by: list[BlockedReason] = field(default_factory=list)
-    axis_gate: dict[str, dict[str, object]] = field(default_factory=dict)
+    blocked_by: list[BlockedReason] = field(default_factory=_empty_blocked_reasons)
+    axis_gate: dict[str, dict[str, object]] = field(default_factory=_empty_axis_gate)
     motion_allowed: bool = False
 
 

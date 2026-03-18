@@ -50,12 +50,20 @@ if TYPE_CHECKING:
 from . import hip_qt_binder_apply_impl as _apply_impl, hip_qt_binder_init_impl as _init_impl
 
 
+def _empty_events() -> list[HipParamAction]:
+    return []
+
+
+def _empty_estop_checks() -> dict[str, QCheckBox]:
+    return {}
+
+
 @dataclass
 class HipQtBinder:
     win: QWidget
     log: logging.Logger
 
-    _events: list[HipParamAction] = field(default_factory=list)
+    _events: list[HipParamAction] = field(default_factory=_empty_events)
     _estop_reset_clicked: bool = False
     _resync_clicked: bool = False
     _main_reset_clicked: bool = False
@@ -75,7 +83,7 @@ class HipQtBinder:
     _param_binder: ParamWidgetBinder = field(init=False)
     _wcache: WidgetCache = field(init=False)
     _widgets: HipQtWidgets | None = None
-    _estop_checks: dict[str, QCheckBox] = field(default_factory=dict)
+    _estop_checks: dict[str, QCheckBox] = field(default_factory=_empty_estop_checks)
     _tabs_main: QTabWidget | None = None
     _cmbAxis: QComboBox | None = None
     _frame_footer: QFrame | None = None

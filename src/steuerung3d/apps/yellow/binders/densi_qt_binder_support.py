@@ -245,7 +245,7 @@ def find_line_edit(self: "DenSiQtBinder", object_name: str) -> QLineEdit | None:
         return w if isinstance(w, QLineEdit) else None
 
 
-def set_dot(self: "DenSiQtBinder", object_name: str, state) -> None:
+def set_dot(self: "DenSiQtBinder", object_name: str, state: object) -> None:
     if not object_name:
         return
     try:

@@ -2,14 +2,19 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, TypeAlias, cast
+from typing import Any, Protocol, TypeAlias, cast
+
+
+class _TomlModule(Protocol):
+    def loads(self, s: str, /) -> object: ...
+
 
 try:
     import tomllib as _tomllib  # py3.11+
 except Exception:  # pragma: no cover
     _tomllib = None
 
-tomllib = cast(Any, _tomllib)
+tomllib = cast(_TomlModule | None, _tomllib)
 
 TomlTable: TypeAlias = dict[str, object]
 
@@ -17,7 +22,8 @@ TomlTable: TypeAlias = dict[str, object]
 def _coerce_table(value: object) -> TomlTable:
     if not isinstance(value, Mapping):
         return {}
-    return {str(k): v for k, v in value.items()}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
 
 
 def parse_toml_value(s: str) -> Any:
@@ -31,7 +37,10 @@ def parse_toml_value(s: str) -> Any:
     if tomllib is None:  # pragma: no cover
         return s
     try:
-        return cast(Any, tomllib.loads(f"v = {s}"))["v"]
+        parsed = tomllib.loads(f"v = {s}")
+        if isinstance(parsed, Mapping):
+            return cast(Mapping[str, object], parsed).get("v", s)
+        return s
     except Exception:
         return s
 

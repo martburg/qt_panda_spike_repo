@@ -8,6 +8,7 @@ import threading
 import time
 from contextlib import closing
 from pathlib import Path
+from typing import Callable
 
 import pytest
 
@@ -29,7 +30,7 @@ def _pick_free_udp_port() -> int:
 
 def _start_core(
     *, axis: str, intent_port: int, ui_port: int, dev_telem_port: int, dev_cmd_port: int
-) -> subprocess.Popen:
+) -> subprocess.Popen[bytes]:
     # NOTE: relies on core supporting --intent-in (added by earlier patch).
     cmd = [
         sys.executable,
@@ -61,7 +62,7 @@ def _start_core(
     )
 
 
-def _wait_for(condition, timeout_s: float = 5.0, sleep_s: float = 0.02):
+def _wait_for(condition: Callable[[], bool], timeout_s: float = 5.0, sleep_s: float = 0.02) -> bool:
     t0 = time.time()
     while time.time() - t0 < timeout_s:
         if condition():
@@ -120,11 +121,12 @@ class _DenSiProbe(threading.Thread):
                 data, _ = self._cmd_rx.recvfrom(4096)
                 d = decode_downlink(data)
                 if d:
-                    self.last_seen_downlink = dict(d.fields)
+                    fields = {str(k): v for k, v in dict(d.fields).items()}
+                    self.last_seen_downlink = fields
                     if d.is_write:
                         # Reflect written filter fields if present.
-                        def _f(name, cur, _d=d):
-                            v = _d.fields.get(name, "")
+                        def _f(name: str, cur: float, fields_map: dict[str, str]) -> float:
+                            v = fields_map.get(name, "")
                             if v == "":
                                 return cur
                             try:
@@ -132,10 +134,10 @@ class _DenSiProbe(threading.Thread):
                             except Exception:
                                 return cur
 
-                        filt_p = _f("FilterP", filt_p)
-                        filt_i = _f("FilterI", filt_i)
-                        filt_d = _f("FilterD", filt_d)
-                        filt_il = _f("FilterIL", filt_il)
+                        filt_p = _f("FilterP", filt_p, fields)
+                        filt_i = _f("FilterI", filt_i, fields)
+                        filt_d = _f("FilterD", filt_d, fields)
+                        filt_il = _f("FilterIL", filt_il, fields)
             except socket.timeout:
                 pass
             except OSError:

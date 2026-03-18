@@ -98,6 +98,10 @@ def wire_densi_estop_checkboxes(
 
     for key, cb in bindings.by_key.items():
         try:
-            cb.toggled.connect(lambda checked, _k=key: on_toggled(_k, bool(checked)))
+
+            def _slot(checked: object = False, *, _k: str = key) -> None:
+                on_toggled(_k, bool(checked))
+
+            cb.toggled.connect(_slot)
         except Exception:
             continue

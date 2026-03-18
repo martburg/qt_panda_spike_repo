@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, cast
 
 from steuerung3d.config.toml_loader import load_toml
 
@@ -46,13 +47,22 @@ class PlcStackConfig:
 
 
 def _as_table(value: object) -> dict[str, Any]:
-    return dict(value) if isinstance(value, dict) else {}
+    if not isinstance(value, Mapping):
+        return {}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
 
 
 def _as_table_list(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
-    return [dict(item) for item in value if isinstance(item, dict)]
+    seq = cast(list[object], value)
+    tables: list[dict[str, Any]] = []
+    for item in seq:
+        table = _as_table(item)
+        if table:
+            tables.append(table)
+    return tables
 
 
 def load_plc_stack_config(path: Path) -> PlcStackConfig:
@@ -81,14 +91,17 @@ def load_plc_stack_config(path: Path) -> PlcStackConfig:
     elif not isinstance(endpoints_obj, list):
         raise ValueError("TOML: plc_endpoints must be a list (use [[plc_endpoints]]).")
     else:
-        endpoints_raw = _as_table_list(endpoints_obj)
+        endpoints_raw = _as_table_list(cast(list[object], endpoints_obj))
 
     endpoints: List[PlcEndpointConfig] = []
     for i, e in enumerate(endpoints_raw):
-        axis_ids = e.get("axis_ids", None)
-        if axis_ids is None:
+        axis_ids_obj = e.get("axis_ids", None)
+        if axis_ids_obj is None:
             raise ValueError(f"TOML: plc_endpoints[{i}].axis_ids is required")
-        axis_ids = [str(a).strip() for a in axis_ids if str(a).strip()]
+        if not isinstance(axis_ids_obj, list):
+            raise ValueError(f"TOML: plc_endpoints[{i}].axis_ids must be a list")
+        axis_id_values = cast(list[object], axis_ids_obj)
+        axis_ids = [str(a).strip() for a in axis_id_values if str(a).strip()]
 
         endpoints.append(
             PlcEndpointConfig(

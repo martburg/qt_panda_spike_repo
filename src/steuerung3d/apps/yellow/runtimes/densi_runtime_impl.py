@@ -16,7 +16,7 @@ import logging
 from steuerung3d.apps.yellow.ports import CommandIn, TelemetryOut
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.telemetry import TelemetrySnapshot
-from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
+from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat, RateLimiter
 
 from ..engines.densi.engine import DenSiEngine
 from ..engines.densi.engine_types import DenSiTickResult
@@ -32,6 +32,7 @@ from .densi_runtime_types import (
     DensiRuntimeStatusLike,
     DensiRuntimeTickLike,
     DensiRuntimeUiActionsLike,
+    StatusEmitterLike,
 )
 from .densi_runtime_ui_actions import apply_ui_actions
 from .densi_runtime_viewmodel import compute_densi_view_model
@@ -48,8 +49,8 @@ class DensiRuntime:
         telemetry_out: TelemetryOut,
         hb: Heartbeat,
         ch: ChangeTracker,
-        status=None,
-        dbg_rl=None,
+        status: StatusEmitterLike | None = None,
+        dbg_rl: RateLimiter | None = None,
         axis_ids: list[str],
         stale_after_ms: int,
         log: logging.Logger,
@@ -155,7 +156,7 @@ class DensiRuntime:
         )
 
     @staticmethod
-    def normalize_result(res: DensiRuntimeResult) -> dict:
+    def normalize_result(res: DensiRuntimeResult) -> dict[str, object]:
         snap = res.snap
         return {
             "cmd_rx_count": int(res.cmd_rx_count),
