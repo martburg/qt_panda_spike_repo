@@ -43,11 +43,21 @@ def _as_table(value: object) -> dict[str, object]:
 
 def _axis_entries(raw: Mapping[str, object]) -> list[dict[str, object]]:
     axis_items_obj = raw.get("axes", [])
-    axis_items = list(axis_items_obj) if isinstance(axis_items_obj, Sequence) and not isinstance(axis_items_obj, (str, bytes, bytearray)) else []
+    axis_items = (
+        list(axis_items_obj)
+        if isinstance(axis_items_obj, Sequence)
+        and not isinstance(axis_items_obj, (str, bytes, bytearray))
+        else []
+    )
     if axis_items:
         return [_as_table(item) for item in axis_items]
     pair_items_obj = raw.get("pairs", [])
-    pair_items = list(pair_items_obj) if isinstance(pair_items_obj, Sequence) and not isinstance(pair_items_obj, (str, bytes, bytearray)) else []
+    pair_items = (
+        list(pair_items_obj)
+        if isinstance(pair_items_obj, Sequence)
+        and not isinstance(pair_items_obj, (str, bytes, bytearray))
+        else []
+    )
     return [_as_table(item) for item in pair_items]
 
 

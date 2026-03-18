@@ -24,9 +24,9 @@ def service_args_with_config(svc: ServiceSpec) -> List[object]:
 
 def expand_processes(spec: StackSpec, *, session_dir: Path) -> List[ProcessSpec]:
     """Expand services into concrete process specs."""
-    stack_ctx = {"name": spec.name}
-    rig_ctx = {"axes": spec.axes, **(spec.rig or {})}
-    net_ctx = dict(spec.net)
+    stack_ctx: dict[str, object] = {"name": spec.name}
+    rig_ctx: dict[str, object] = {"axes": spec.axes, **(spec.rig or {})}
+    net_ctx: dict[str, object] = dict(spec.net)
 
     processes: List[ProcessSpec] = []
 

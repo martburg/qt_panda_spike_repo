@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Mapping
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from collections.abc import Mapping
 from typing import Dict, Optional
 
 from steuerung3d.config.lifetick_config import LifetickTraceConfig, load_lifetick_config

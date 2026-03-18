@@ -38,7 +38,7 @@ def discover_devices(rt: "StackRuntime", *, timeout_s: float) -> List[str]:
                 last_devices = [str(x) for x in devs if str(x).strip()]
         time.sleep(0.05)
     out: List[str] = []
-    seen = set()
+    seen: set[str] = set()
     for d in last_devices:
         if d not in seen:
             seen.add(d)
@@ -61,9 +61,9 @@ def start_hips_real(rt: "StackRuntime") -> None:
     else:
         n_hips = max(1, len(devices))
 
-    stack_ctx = {"name": rt.spec.name}
-    rig_ctx = {"axes": rt.spec.axes, **(rt.spec.rig or {})}
-    net_ctx = dict(rt.spec.net)
+    stack_ctx: dict[str, object] = {"name": rt.spec.name}
+    rig_ctx: dict[str, object] = {"axes": rt.spec.axes, **(rt.spec.rig or {})}
+    net_ctx: dict[str, object] = dict(rt.spec.net)
 
     for i in range(n_hips):
         name = f"hip-{i + 1}"

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import ast
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any, Iterable, List, TypeAlias
@@ -198,18 +199,18 @@ def render_argv(args: Iterable[Any], ctx: RenderContext) -> List[str]:
 
 def make_context(
     *,
-    stack: dict[str, object],
-    net: dict[str, object],
-    rig: dict[str, object],
+    stack: Mapping[str, object],
+    net: Mapping[str, object],
+    rig: Mapping[str, object],
     axis: str | None,
     axis_index: int | None,
     instance_index: int | None = None,
     instance_ordinal: int | None = None,
 ) -> RenderContext:
     return RenderContext(
-        stack=_ns(stack),
-        net=_ns(net),
-        rig=_ns(rig),
+        stack=_ns(dict(stack)),
+        net=_ns(dict(net)),
+        rig=_ns(dict(rig)),
         axis=axis,
         axis_index=axis_index,
         instance_index=instance_index,

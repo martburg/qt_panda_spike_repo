@@ -77,7 +77,11 @@ def decode_param_ops(payload: object) -> List[ParamOp]:
 
     We keep this tolerant: unknown ops are ignored.
     """
-    if payload is None or not isinstance(payload, Sequence) or isinstance(payload, (str, bytes, bytearray)):
+    if (
+        payload is None
+        or not isinstance(payload, Sequence)
+        or isinstance(payload, (str, bytes, bytearray))
+    ):
         return []
 
     out: List[ParamOp] = []

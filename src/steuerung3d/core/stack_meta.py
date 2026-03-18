@@ -9,10 +9,10 @@ from __future__ import annotations
 import json
 import os
 import time
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Optional, cast
 
 META_FILENAME = "stack_meta.json"
 
@@ -41,7 +41,36 @@ def _pid_is_alive(pid: int) -> bool:
 def _as_table(value: object) -> dict[str, object]:
     if not isinstance(value, Mapping):
         return {}
-    return {str(k): v for k, v in value.items()}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
+
+
+def _as_int(value: object, default: int = 0) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return default
+    return default
+
+
+def _as_float(value: object, default: float = 0.0) -> float:
+    if isinstance(value, bool):
+        return float(value)
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return default
+    return default
 
 
 @dataclass
@@ -60,7 +89,7 @@ class StackMeta:
     started_at_s: float
     supervisor_pid: int
     profile_path: str
-    children: Dict[str, ChildMeta]
+    children: dict[str, ChildMeta]
     stopped_at_s: Optional[float] = None
 
     def is_running(self) -> bool:
@@ -74,7 +103,7 @@ def meta_path(session_dir: Path) -> Path:
     return session_dir / META_FILENAME
 
 
-def write_meta(session_dir: Path, meta: Dict[str, Any]) -> None:
+def write_meta(session_dir: Path, meta: dict[str, Any]) -> None:
     p = meta_path(session_dir)
     p.write_text(json.dumps(meta, indent=2, sort_keys=True), encoding="utf-8")
 
@@ -83,27 +112,30 @@ def load_meta(session_dir: Path) -> StackMeta:
     data_obj: object = json.loads(meta_path(session_dir).read_text(encoding="utf-8"))
     data = _as_table(data_obj)
 
-    children: Dict[str, ChildMeta] = {}
+    children: dict[str, ChildMeta] = {}
     for name, cd_obj in _as_table(data.get("children") or {}).items():
         cd = _as_table(cd_obj)
-        argv_obj = cd.get("argv") or []
-        argv = [str(x) for x in argv_obj] if isinstance(argv_obj, list) else []
+        argv_raw = cd.get("argv")
+        argv_items = cast(list[object], argv_raw) if isinstance(argv_raw, list) else []
+        argv = [str(x) for x in argv_items]
+        returncode_obj = cd.get("returncode")
         children[name] = ChildMeta(
             name=name,
-            pid=int(cd.get("pid") or 0),
+            pid=_as_int(cd.get("pid"), 0),
             argv=argv,
             log_path=str(cd.get("log_path") or ""),
-            returncode=int(cd["returncode"]) if isinstance(cd.get("returncode"), int) else None,
+            returncode=returncode_obj if isinstance(returncode_obj, int) else None,
         )
 
     stopped_at = data.get("stopped_at_s")
-    stopped_at_s = float(stopped_at) if isinstance(stopped_at, (int, float)) else None
+    stopped_at_s = _as_float(stopped_at) if isinstance(stopped_at, (int, float, str)) else None
+    started_at = data.get("started_at_s")
 
     return StackMeta(
         stack_name=str(data.get("stack_name") or ""),
         session_dir=str(data.get("session_dir") or str(session_dir)),
-        started_at_s=float(data.get("started_at_s") or 0.0),
-        supervisor_pid=int(data.get("supervisor_pid") or 0),
+        started_at_s=_as_float(started_at, 0.0),
+        supervisor_pid=_as_int(data.get("supervisor_pid"), 0),
         profile_path=str(data.get("profile_path") or ""),
         children=children,
         stopped_at_s=stopped_at_s,

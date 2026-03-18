@@ -18,5 +18,7 @@
     "legacy/attic_src/**",
     "legacy/legacy_program/**",
     "tools/**"
-  ]
+  ],
+  "stubPath": "typings",
+  "reportMissingModuleSource": "none"
 }

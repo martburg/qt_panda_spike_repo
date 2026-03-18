@@ -2,7 +2,36 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Optional, Protocol, Tuple, cast
+
+
+class _PygameJoystickLike(Protocol):
+    def init(self) -> None: ...
+    def get_name(self) -> str: ...
+    def get_numaxes(self) -> int: ...
+    def get_numbuttons(self) -> int: ...
+    def get_numhats(self) -> int: ...
+    def get_axis(self, index: int) -> float: ...
+    def get_button(self, index: int) -> int: ...
+    def get_hat(self, index: int) -> tuple[int, int]: ...
+
+
+class _PygameJoystickModuleLike(Protocol):
+    def init(self) -> None: ...
+    def get_count(self) -> int: ...
+    def Joystick(self, index: int) -> _PygameJoystickLike: ...
+
+
+class _PygameEventModuleLike(Protocol):
+    def pump(self) -> None: ...
+
+
+class _PygameModuleLike(Protocol):
+    joystick: _PygameJoystickModuleLike
+    event: _PygameEventModuleLike
+
+    def get_init(self) -> bool: ...
+    def init(self) -> None: ...
 
 
 def clamp(x: float, lo: float = -1.0, hi: float = 1.0) -> float:
@@ -36,14 +65,14 @@ class PygameJoystick:
     """Small wrapper around pygame.joystick.Joystick with reconnection support."""
 
     def __init__(self) -> None:
-        self._pg = None
-        self._joy = None
+        self._pg: _PygameModuleLike | None = None
+        self._joy: _PygameJoystickLike | None = None
         self._last_open_attempt_s = 0.0
 
     def init(self) -> None:
         import pygame  # lazy
 
-        self._pg = pygame
+        self._pg = cast(_PygameModuleLike, pygame)
         # Be conservative: init only what we need
         if not pygame.get_init():
             pygame.init()

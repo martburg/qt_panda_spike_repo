@@ -27,8 +27,8 @@ from .presentation import compute_banner_estate
 from .step_impl import step as _step
 from .types import (
     HipAttachInputs,
-    HipBannerInputs,
     HipAttachState,
+    HipBannerInputs,
     HipParamAction,
     HipParamButtons,
     HipParamGroup,
