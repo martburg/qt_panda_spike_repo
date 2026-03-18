@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import cast
 
 from steuerung3d.apps.yellow.domain.banner_facts import derive_banner_estate_from_word
 from steuerung3d.apps.yellow.domain.estop_facts import encode_estop_word
@@ -86,8 +87,9 @@ def test_hip_status_mode_uses_core_mode() -> None:
     rt._emit_status(now_ns=0)
 
     assert status.calls
-    fields = status.calls[-1]["fields"]
-    assert isinstance(fields, dict)
+    raw_fields = status.calls[-1]["fields"]
+    assert isinstance(raw_fields, dict)
+    fields = cast(dict[str, object], raw_fields)
     assert fields.get("mode") == "IDLE"
     assert fields.get("estate") == "READY"
     assert fields.get("armed") is True

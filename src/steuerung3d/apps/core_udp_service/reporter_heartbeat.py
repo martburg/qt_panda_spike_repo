@@ -27,6 +27,10 @@ class _StateLike(Protocol):
     def axis_claims(self) -> object: ...
 
 
+AxisClaimsMap = Mapping[object, object]
+
+
+
 def _age(now: float, ts: object) -> float | None:
     if ts is None:
         return None
@@ -38,6 +42,7 @@ def _age(now: float, ts: object) -> float | None:
         return None
     except Exception:
         return None
+
 
 
 def log_periodic_heartbeat(
@@ -56,10 +61,8 @@ def log_periodic_heartbeat(
     age_c2 = _age(now, last_seen.get("c2_telem_ts"))
 
     axis_claims_obj = state.axis_claims
-    axis_claims = (
-        cast(Mapping[object, object], axis_claims_obj)
-        if isinstance(axis_claims_obj, Mapping)
-        else {}
+    axis_claims: AxisClaimsMap = (
+        cast(AxisClaimsMap, axis_claims_obj) if isinstance(axis_claims_obj, Mapping) else {}
     )
 
     log.info(

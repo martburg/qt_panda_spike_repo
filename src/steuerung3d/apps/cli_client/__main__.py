@@ -10,6 +10,7 @@ from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.intents import ClearFault, EnableAxis, JogAxis, SetEstop
 from steuerung3d.core.state import MachineState
+from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.core_runner import CoreRunner
 from steuerung3d.protocol.transport import InMemTransport
 
@@ -72,9 +73,9 @@ def main() -> int:
 
     device = SimDevice(SimAxisPlant())
 
-    latest = None
+    latest: TelemetrySnapshot | None = None
 
-    def on_snapshot(snap):
+    def on_snapshot(snap: TelemetrySnapshot) -> None:
         nonlocal latest
         latest = snap
         tr.publish_telemetry(snap)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import cast
 
 ControlMode = str  # 'setup_manual' | 'sync_live'
 
@@ -13,7 +14,7 @@ class JoyState:
 
     # For momentary multi-select (setup_manual): indices that were actively driven last tick.
     # This lets us emit hard-stops for winches that become deselected or when deadman is released.
-    prev_active_winch_idxs: set[int] = field(default_factory=set)
+    prev_active_winch_idxs: set[int] = field(default_factory=lambda: cast(set[int], set()))
 
     # previous button states for edge detection
     prev_deadman: bool = False

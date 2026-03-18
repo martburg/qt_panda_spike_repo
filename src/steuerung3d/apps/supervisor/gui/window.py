@@ -145,11 +145,7 @@ class SupervisorWindow(QMainWindow):
                 chk = self.table.cellWidget(row_idx, COL_SELECTED)
                 if not isinstance(chk, QCheckBox):
                     chk = QCheckBox()
-                    chk.toggled.connect(
-                        lambda checked, unit_id=row.unit_id: self._emit_unit_selected(
-                            unit_id, checked
-                        )
-                    )
+                    chk.toggled.connect(self._make_unit_selected_handler(row.unit_id))
                     self.table.setCellWidget(row_idx, COL_SELECTED, chk)
                 chk.blockSignals(True)
                 chk.setChecked(bool(row.selected))
@@ -173,11 +169,7 @@ class SupervisorWindow(QMainWindow):
                 btn = self.table.cellWidget(row_idx, COL_HIP)
                 if not isinstance(btn, QPushButton):
                     btn = QPushButton()
-                    btn.clicked.connect(
-                        lambda _checked=False, unit_id=row.unit_id: self.open_hip_clicked.emit(
-                            unit_id
-                        )
-                    )
+                    btn.clicked.connect(self._make_open_hip_handler(row.unit_id))
                     self.table.setCellWidget(row_idx, COL_HIP, btn)
                 btn.setText(self._hip_button_text(int(row.hip_open_count)))
             while self.table.rowCount() > len(rows):
@@ -198,6 +190,18 @@ class SupervisorWindow(QMainWindow):
 
     def _emit_pair_selected(self, pair_id: str, checked: bool) -> None:
         self._emit_unit_selected(pair_id, checked)
+
+    def _make_unit_selected_handler(self, unit_id: str):
+        def _on_toggled(checked: bool) -> None:
+            self._emit_unit_selected(unit_id, bool(checked))
+
+        return _on_toggled
+
+    def _make_open_hip_handler(self, unit_id: str):
+        def _on_clicked(_checked: bool = False) -> None:
+            self.open_hip_clicked.emit(unit_id)
+
+        return _on_clicked
 
     @staticmethod
     def _hip_button_text(open_count: int) -> str:

@@ -42,9 +42,7 @@ class JoyBindings:
     buttons: dict[str, int | Sequence[int]]
     deadzone: float
     expo: float
-    select_buttons: list[int | Sequence[int]] = field(
-        default_factory=lambda: list[int | Sequence[int]]()
-    )
+    select_buttons: list[int | Sequence[int]] = field(default_factory=lambda: list[int | Sequence[int]]())
     invert: dict[str, bool] = field(default_factory=lambda: dict[str, bool]())
 
 

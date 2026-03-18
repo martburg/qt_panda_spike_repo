@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Sequence
+from typing import cast
 
 from steuerung3d.core.core_mode import core_mode_value
 from steuerung3d.core.joy_facts import extract_joy_facts
@@ -40,7 +41,7 @@ def _as_str_list(value: object) -> list[str]:
     if not isinstance(value, Sequence):
         return []
     out: list[str] = []
-    for item in value:
+    for item in cast(Sequence[object], value):
         text = str(item).strip()
         if text:
             out.append(text)

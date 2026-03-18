@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import cast
 
 from steuerung3d.core.intents import EchoLifeTick, Intent, JoyStateUpdate, LocalAxisManualRequest
 from steuerung3d.core.telemetry import JoyState
@@ -16,14 +17,14 @@ def sync_manual_motion(
     selected_axis_ids: tuple[str, ...],
     manual_active_axis_ids: set[str],
 ) -> set[str]:
-    desired_manual_axis_ids = set() if locked else set(selected_axis_ids)
+    desired_manual_axis_ids: set[str] = set() if locked else set(selected_axis_ids)
     if (not bool(joy.deadman)) or locked:
         disable_axis_ids = sorted(manual_active_axis_ids)
         if disable_axis_ids:
             intents.append(
                 LocalAxisManualRequest(axis_ids=tuple(disable_axis_ids), enable=False, rate=0.0)
             )
-        return set()
+        return cast(set[str], set())
 
     disable_axis_ids = sorted(manual_active_axis_ids - desired_manual_axis_ids)
     if disable_axis_ids:

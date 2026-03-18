@@ -5,6 +5,8 @@ import socket
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
+TxValue = int | str
+
 from steuerung3d.adapters.plc.line_codec import PlcLineCodec, parse_bool, parse_float, parse_int
 
 
@@ -71,7 +73,7 @@ def run_server(host: str, port: int, dt_s: float, verbose: bool = False) -> int:
         except KeyboardInterrupt:
             return 0
 
-        resp_lines = []
+        resp_lines: list[str] = []
         for line in _iter_lines(payload):
             rx = codec.decode_rx(line)
 
@@ -85,7 +87,7 @@ def run_server(host: str, port: int, dt_s: float, verbose: bool = False) -> int:
 
             last_tick = tick
 
-            tx_map = {
+            tx_map: dict[str, TxValue] = {
                 "tick": tick,
                 "axis": axis,
                 "enabled": 1 if sim.enabled else 0,

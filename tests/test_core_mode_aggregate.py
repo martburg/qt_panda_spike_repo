@@ -3,6 +3,7 @@ from __future__ import annotations
 from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.mode_aggregate import (
     AggregateInputs,
+    AggregateResult,
     AxisSafetyFacts,
     aggregate_core_mode,
 )
@@ -33,7 +34,7 @@ def _axis(
     )
 
 
-def _codes(result) -> set[str]:
+def _codes(result: AggregateResult) -> set[str]:
     return {r.code for r in result.blocked_by}
 
 

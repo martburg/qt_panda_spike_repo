@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from steuerung3d.core.control_context import (
     ControlContext,
@@ -42,7 +42,11 @@ def _input_mapping_for_mode(mode: ControlContextMode) -> ControlContextInputMapp
 
 def _coerce_last_intents_meta(raw: dict[str, Any]) -> LastIntentsMetaLike:
     raw_types = raw.get("types", [])
-    types = [str(item) for item in raw_types] if isinstance(raw_types, (list, tuple)) else []
+    types = (
+        [str(item) for item in cast(list[object] | tuple[object, ...], raw_types)]
+        if isinstance(raw_types, (list, tuple))
+        else []
+    )
     return {
         "count": int(raw.get("count", 0) or 0),
         "types": types,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Protocol
+from typing import Protocol, cast
 
 from steuerung3d.core.joy_facts import extract_joy_facts
 from steuerung3d.core.mode_aggregate import AggregateInputs, AxisSafetyFacts
@@ -38,7 +38,8 @@ class _RouterLike(Protocol):
 def _coerce_registry(value: object) -> dict[str, object]:
     if not isinstance(value, Mapping):
         return {}
-    return {str(key): item for key, item in value.items()}
+    value_map = cast(Mapping[object, object], value)
+    return {str(key): item for key, item in value_map.items()}
 
 
 def _safe_axis_owner(*, state: _AggregateStateLike, axis_id: str) -> str:

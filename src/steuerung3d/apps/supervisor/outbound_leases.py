@@ -16,7 +16,7 @@ def sync_leases(
     leased_axis_ids: set[str],
 ) -> set[str]:
     selected_axis_ids = tuple(axis.axis_id for axis in selected_axes)
-    desired_leased_axis_ids = set() if locked else set(selected_axis_ids)
+    desired_leased_axis_ids: set[str] = set() if locked else set(selected_axis_ids)
 
     released_axis_ids = sorted(leased_axis_ids - desired_leased_axis_ids)
     for axis_id in released_axis_ids:

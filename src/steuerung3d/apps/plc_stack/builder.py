@@ -64,7 +64,7 @@ def collect_axes(cfg: PlcStackConfig) -> list[str]:
     for ep in cfg.plc_endpoints:
         axes.extend(ep.axis_ids)
     # de-dup while preserving order
-    seen = set()
+    seen: set[str] = set()
     out: list[str] = []
     for a in axes:
         if a not in seen:

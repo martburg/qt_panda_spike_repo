@@ -52,7 +52,7 @@ def test_claim_enforces_enable_and_jog():
     # Wrong HIP cannot enable (claim exists)
     apply_intent(st, EnableAxis(axis_id="Anton", enable=True, hip_id="hipB"))
     assert st.axis_cmd["Anton"].enable is False
-    assert st.axis_cmd["Anton"].vel == pytest.approx(0.0)
+    assert abs(st.axis_cmd["Anton"].vel - 0.0) < 1e-9
 
     # Owner can enable
     apply_intent(st, EnableAxis(axis_id="Anton", enable=True, hip_id="hipA"))
@@ -60,15 +60,15 @@ def test_claim_enforces_enable_and_jog():
 
     # Owner can jog (when enabled)
     apply_intent(st, JogAxis(axis_id="Anton", vel=0.5, hip_id="hipA"))
-    assert st.axis_cmd["Anton"].vel == pytest.approx(0.5)
+    assert abs(st.axis_cmd["Anton"].vel - 0.5) < 1e-9
 
     # Wrong HIP cannot override jog
     apply_intent(st, JogAxis(axis_id="Anton", vel=2.0, hip_id="hipB"))
-    assert st.axis_cmd["Anton"].vel == pytest.approx(0.5)
+    assert abs(st.axis_cmd["Anton"].vel - 0.5) < 1e-9
 
     # Backward-compat: if claim exists and hip_id missing -> ignored
     apply_intent(st, JogAxis(axis_id="Anton", vel=3.0, hip_id=""))
-    assert st.axis_cmd["Anton"].vel == pytest.approx(0.5)
+    assert abs(st.axis_cmd["Anton"].vel - 0.5) < 1e-9
 
 
 def test_claim_surface_is_mirrored_into_densi_registry_and_bulk_release() -> None:

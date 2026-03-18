@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 def _snap_list() -> list[TelemetrySnapshot]:
     return []
 
-
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
 from steuerung3d.protocol.axis_router import AxisRouter
 

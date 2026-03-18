@@ -197,7 +197,7 @@ class Joy2IntentConfig:
     invert: dict[str, bool]
     hip_id: str
     publish_local_manual: bool = True
-    sync_max_v: dict[str, float] = field(default_factory=dict)
+    sync_max_v: dict[str, float] = field(default_factory=lambda: cast(dict[str, float], {}))
 
 
 def load_joy2intent_config(path: Path) -> Joy2IntentConfig:

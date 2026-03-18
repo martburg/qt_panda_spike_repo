@@ -72,11 +72,12 @@ class PygameJoystick:
     def init(self) -> None:
         import pygame  # lazy
 
-        self._pg = cast(_PygameModuleLike, pygame)
+        pg = cast(_PygameModuleLike, pygame)
+        self._pg = pg
         # Be conservative: init only what we need
-        if not pygame.get_init():
-            pygame.init()
-        pygame.joystick.init()
+        if not pg.get_init():
+            pg.init()
+        pg.joystick.init()
 
     def list_devices(self) -> List[DeviceInfo]:
         if self._pg is None:

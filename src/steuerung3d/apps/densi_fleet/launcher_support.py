@@ -8,7 +8,7 @@ import time
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 from steuerung3d.core.net import parse_hostport
 
@@ -34,7 +34,7 @@ def sanitize_axis_id(s: str) -> str:
     return s
 
 
-def popen(cmd: list[str], *, new_console: bool) -> subprocess.Popen:
+def popen(cmd: list[str], *, new_console: bool) -> subprocess.Popen[Any]:
     if is_windows() and new_console:
         return subprocess.Popen(cmd, creationflags=0x00000010)
     return subprocess.Popen(cmd)
@@ -45,7 +45,7 @@ class Child:
     kind: str
     axis: str
     cmd: list[str]
-    p: subprocess.Popen
+    p: subprocess.Popen[Any]
 
 
 def fmt_cmd(cmd: Sequence[str]) -> str:

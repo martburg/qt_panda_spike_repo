@@ -45,7 +45,7 @@ def test_densi_birdseye_includes_debug_payload() -> None:
 
     assert payload.fields["axis"] == "Anton"
     assert payload.fields["cmd_enable"] is True
-    debug = payload.fields.get("debug")
+    debug = cast(dict[str, object], payload.fields.get("debug"))
     assert isinstance(debug, dict)
     assert debug.get("axis_selected") == "Anton"
     assert debug.get("cmd_vel") == 0.5

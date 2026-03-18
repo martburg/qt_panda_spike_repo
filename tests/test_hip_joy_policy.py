@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from steuerung3d.apps.yellow.engines.hip.engine import HipEngine, HipStepInputs, HipUiInputs
-from steuerung3d.core.intents import ClaimAxis, EnableAxis, JogAxis, JogWinch
+from steuerung3d.core.intents import ClaimAxis, EnableAxis, Intent, JogAxis, JogWinch
 from steuerung3d.core.joy_state import JoyState
 from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
 from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS, encode_estop_word
@@ -67,7 +67,7 @@ def _snap(
 
 def test_deadman_false_gates_motion_intents() -> None:
     eng = HipEngine(hip_id="hip-test")
-    intents = [
+    intents: list[Intent] = [
         ClaimAxis(axis_id="Anton", hip_id="hip-test"),
         JogAxis(axis_id="Anton", vel=1.0, hip_id="hip-test"),
     ]

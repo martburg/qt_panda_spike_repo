@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypedDict
+from typing import TypedDict, cast
 
 
 def birdseye_multiline_default() -> bool:
@@ -128,10 +128,12 @@ class BirdsEyeFields(TypedDict, total=False):
     axes: list[_BirdAxisFields]
 
 
+
+
 def _blocked_code_parts(item: object) -> tuple[str, str]:
     if not isinstance(item, dict):
         return "", ""
-    item_map = item
+    item_map = cast(dict[object, object], item)
     axis_id = str(item_map.get("axis_id", "") or "")
     code = str(item_map.get("code", "") or "")
     return axis_id, code
@@ -144,7 +146,7 @@ def _normalize_blocked_codes(
         return ""
 
     blocked_codes: list[str] = []
-    for item in blocked_in:
+    for item in cast(list[_BirdBlockedCode | str], blocked_in):
         axis_id, code = _blocked_code_parts(item)
         if axis_id:
             blocked_codes.append(f"{axis_id}:{code}" if code else axis_id)
@@ -186,7 +188,8 @@ def build_frederik_panel_lines(fields: BirdsEyeFields, *, max_blocked: int = 3) 
         lines.append(
             "Frederik axes: axis in_scope estop fault started cmd_en cmd_vel taster_enabled armed ready owner age_ms"
         )
-        axes_sorted = sorted(axes, key=lambda a: str(a.get("axis_id", "")))
+        axes_list = cast(list[_BirdAxisFields], axes)
+        axes_sorted = sorted(axes_list, key=lambda a: str(a.get("axis_id", "")))
         for ax in axes_sorted:
             axis_id = str(ax.get("axis_id", "") or "")
             in_scope = _flag(ax.get("in_scope"))

@@ -35,7 +35,8 @@ from ..runtimes.densi_runtime import DensiRuntime
 from .controller_utils import GuardedControllerOps, init_observability, start_poll_timer
 
 if TYPE_CHECKING:
-    from ..runtimes.densi_runtime_types import DensiActionInLike, DensiRuntimeResult
+    from ..runtimes.densi_runtime_types import DensiActionInLike
+    from ..runtimes.densi_runtime_types import DensiRuntimeResult
 
 log = logging.getLogger("den_si")
 
@@ -130,15 +131,11 @@ class DenSiController:
     def _init_state_and_sim(self) -> None:
         self._disconnect_after_s = 2.0
 
-        normalize_pos_chain = cast(
-            Callable[[dict[str, float]], dict[str, float]], self._normalize_pos_chain
-        )
+        normalize_pos_chain = cast(Callable[[dict[str, float]], dict[str, float]], self._normalize_pos_chain)
         normalize_guider_range = cast(
             Callable[[dict[str, float]], dict[str, float]], self._normalize_guider_range
         )
-        enforce_pos_chain = cast(
-            Callable[[dict[str, float]], dict[str, float]], self._enforce_pos_chain
-        )
+        enforce_pos_chain = cast(Callable[[dict[str, float]], dict[str, float]], self._enforce_pos_chain)
         enforce_guider_minmax = cast(
             Callable[[dict[str, float]], dict[str, float]], self._enforce_guider_minmax
         )

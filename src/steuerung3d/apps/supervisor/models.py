@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import cast
 
 from steuerung3d.core.intents import Intent
 from steuerung3d.core.telemetry import JoyState
@@ -197,5 +198,7 @@ class DensiRemoteAction:
 @dataclass(frozen=True)
 class OutboundBatch:
     intents: tuple[Intent, ...] = ()
-    densi_actions: dict[str, tuple[DensiRemoteAction, ...]] = field(default_factory=dict)
+    densi_actions: dict[str, tuple[DensiRemoteAction, ...]] = field(
+        default_factory=lambda: cast(dict[str, tuple[DensiRemoteAction, ...]], {})
+    )
     joy_update_changed: bool = False

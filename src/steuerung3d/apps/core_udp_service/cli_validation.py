@@ -6,7 +6,7 @@ from typing import List, Tuple
 def uniq_axes_or_error(axis_ids: List[str]) -> tuple[list[str], str | None]:
     """Return (unique_axes, error_message_if_any)."""
 
-    seen = set()
+    seen: set[str] = set()
     dupes: list[str] = []
     uniq: list[str] = []
     for a in axis_ids:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 from steuerung3d.apps.yellow.engines.hip.presentation_extract import (
     parse_estop_word_from_snapshot,
@@ -90,11 +91,12 @@ def _build_axis_row_facts(
     stale_after_ms: int,
 ) -> _AxisRowFacts:
     scoped = axis_scoped_snapshot(snap, axis_id)
-    axis_word_map = getattr(snap, "axis_estop_status_word", {}) or {}
+    axis_word_map = cast(dict[str, object], getattr(snap, "axis_estop_status_word", {}) or {})
     raw_word = axis_word_map.get(axis_id)
     fields = getattr(scoped, "plc_uplink_fields", None)
-    if isinstance(fields, dict) and fields.get("EStopStatus") is not None:
-        raw_word = fields.get("EStopStatus")
+    fields_map = cast(dict[str, object], fields) if isinstance(fields, dict) else None
+    if fields_map is not None and fields_map.get("EStopStatus") is not None:
+        raw_word = fields_map.get("EStopStatus")
     has_estop_info = raw_word is not None
     estop_word = int(parse_estop_word_from_snapshot(scoped))
     bits = decode_estop_word(estop_word)

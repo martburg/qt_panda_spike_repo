@@ -4,7 +4,7 @@ import logging
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Protocol
+from typing import Any, Callable, Dict, Protocol, cast
 
 from steuerung3d.core.control_context import ControlContext
 from steuerung3d.core.state import MachineState
@@ -153,7 +153,9 @@ class SnapshotHandler:
     log: logging.Logger
 
     state_ch: ChangeTracker = field(default_factory=ChangeTracker)
-    lt_last_ui_log_s_by_axis: dict[str, float] = field(default_factory=dict)
+    lt_last_ui_log_s_by_axis: dict[str, float] = field(
+        default_factory=lambda: cast(dict[str, float], {})
+    )
     context_seq: int = 0
 
     def _log_state_changes(self, snap: TelemetrySnapshot) -> None:
