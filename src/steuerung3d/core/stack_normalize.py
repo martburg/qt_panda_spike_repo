@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import cast
 
 from .stack_spec import FanoutMode, ServiceSpec, StackSpec
 
@@ -9,19 +10,21 @@ from .stack_spec import FanoutMode, ServiceSpec, StackSpec
 def _as_dict(value: object) -> dict[str, object]:
     if not isinstance(value, Mapping):
         return {}
-    return {str(k): v for k, v in value.items()}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
 
 
 def _as_list(value: object) -> list[object]:
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        return list(value)
+        return list(cast(Sequence[object], value))
     return []
 
 
 def _as_env_dict(value: object) -> dict[str, str]:
     if not isinstance(value, Mapping):
         return {}
-    return {str(k): str(v) for k, v in value.items()}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): str(v) for k, v in mapping.items()}
 
 
 def _as_fanout_mode(value: object) -> FanoutMode:

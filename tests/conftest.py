@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from _pytest.config import Config
+from _pytest.nodes import Item
 
 # Ensure `src/` layout works when running `pytest` directly (no editable install).
 # This keeps test collection robust in fresh environments and CI.
@@ -14,7 +16,7 @@ if _SRC.is_dir() and str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
 
-def pytest_configure(config):
+def pytest_configure(config: Config) -> None:
     config.addinivalue_line("markers", "integration: integration-style UDP roundtrip tests")
     config.addinivalue_line(
         "markers",
@@ -22,7 +24,7 @@ def pytest_configure(config):
     )
 
 
-def pytest_runtest_setup(item):
+def pytest_runtest_setup(item: Item) -> None:
     marker = item.get_closest_marker("requires_module")
     if not marker:
         return

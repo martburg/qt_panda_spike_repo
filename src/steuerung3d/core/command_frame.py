@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Dict, List, Literal, TypeAlias, Union
+from typing import Dict, List, Literal, TypeAlias, Union, cast
 
 from .param_groups import ParamGroup, coerce_param_group
 
@@ -12,7 +12,8 @@ JsonMap: TypeAlias = Mapping[str, object]
 def _as_object_dict(value: object) -> dict[str, object]:
     if not isinstance(value, Mapping):
         return {}
-    return {str(k): v for k, v in value.items()}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
 
 
 def _as_float(value: object, default: float = 0.0) -> float:
@@ -85,7 +86,7 @@ def decode_param_ops(payload: object) -> List[ParamOp]:
         return []
 
     out: List[ParamOp] = []
-    for item in payload:
+    for item in cast(Sequence[object], payload):
         item_dict = _as_object_dict(item)
         if not item_dict:
             continue
@@ -108,12 +109,13 @@ def coerce_param_ops(ops: object) -> List[ParamOp]:
         return []
 
     out: List[ParamOp] = []
-    for item in ops:
+    for item in cast(Sequence[object], ops):
         if isinstance(item, (ParamEditBeginOp, ParamWriteOp, ParamCancelOp)):
             out.append(item)
             continue
         if isinstance(item, Mapping):
-            out.extend(decode_param_ops([dict(item)]))
+            item_map = cast(Mapping[object, object], item)
+            out.extend(decode_param_ops([_as_object_dict(item_map)]))
     return out
 
 

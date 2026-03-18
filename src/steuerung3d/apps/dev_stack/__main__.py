@@ -1,23 +1,41 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import socket
 import time
 import tomllib
 from pathlib import Path
+from typing import Callable, Protocol, cast
 
 from steuerung3d.adapters.plc.udp_device import UdpPlcDevice
-from steuerung3d.adapters.plc_twincat_legacy.config import load_plc_twincat_legacy_fleet_from_toml
 from steuerung3d.adapters.sim.axis_plant import SimAxisPlant
 from steuerung3d.adapters.sim.device import SimDevice
 from steuerung3d.common.timebase import Timebase
+from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.engine import CoreEngine
 from steuerung3d.core.intent_handler import apply_intent
 from steuerung3d.core.intents import EnableAxis, JogAxis, SetEstop
 from steuerung3d.core.state import MachineState
+from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.core_runner import CoreRunner
 from steuerung3d.protocol.recording import JsonlRecorder, LoggedTransport
 from steuerung3d.protocol.transport import InMemTransport
+
+
+class _DeviceLike(Protocol):
+    def step(self, state: MachineState, cmd: CommandFrame, dt: float) -> None: ...
+
+    def close(self) -> None: ...
+
+
+_LoadFleet = Callable[[Path], _DeviceLike]
+
+
+def _load_plc_fleet(config_path: Path) -> _DeviceLike:
+    mod = importlib.import_module("steuerung3d.adapters.plc_twincat_legacy.config")
+    loader = cast(_LoadFleet, mod.load_plc_twincat_legacy_fleet_from_toml)
+    return loader(config_path)
 
 
 def _can_bind_ip(ip: str) -> bool:
@@ -36,14 +54,14 @@ def _can_bind_ip(ip: str) -> bool:
         return False
 
 
-def _load_device_from_config(config_path: Path, plant: SimAxisPlant):
-    cfg = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    device_cfg = cfg.get("device", {})
-    kind = device_cfg.get("kind", "sim")
+def _load_device_from_config(config_path: Path, plant: SimAxisPlant) -> _DeviceLike:
+    cfg = cast(dict[str, object], tomllib.loads(config_path.read_text(encoding="utf-8")))
+    device_cfg = cast(dict[str, object], cfg.get("device", {}) or {})
+    kind = str(device_cfg.get("kind", "sim") or "sim")
 
     if kind == "plc_twincat_legacy_fleet":
-        fleet_cfg = device_cfg.get("plc_twincat_legacy_fleet", {})
-        defaults = fleet_cfg.get("defaults", {})
+        fleet_cfg = cast(dict[str, object], device_cfg.get("plc_twincat_legacy_fleet", {}) or {})
+        defaults = cast(dict[str, object], fleet_cfg.get("defaults", {}) or {})
         controller_ip = str(defaults.get("controller_ip", "0.0.0.0"))
 
         # If the controller_ip isn't present on this host (common on laptops/off-network),
@@ -53,30 +71,30 @@ def _load_device_from_config(config_path: Path, plant: SimAxisPlant):
                 f"[dev_stack] controller_ip={controller_ip} not present on this host -> "
                 f"using UDP SIM fallback for plc_twincat_legacy_fleet"
             )
-            from steuerung3d.adapters.plc_twincat_legacy.udp_sim import (
-                build_udp_sim_fleet_from_toml,
-            )
-
+            mod = importlib.import_module("steuerung3d.adapters.plc_twincat_legacy.udp_sim")
+            build_udp_sim = cast(Callable[..., _DeviceLike], mod.build_udp_sim_fleet_from_toml)
             # Returns an object with .step(...) and .close()
-            return build_udp_sim_fleet_from_toml(config_path, dt_s=0.01)
+            return build_udp_sim(config_path, dt_s=0.01)
 
-        return load_plc_twincat_legacy_fleet_from_toml(config_path)
+        return _load_plc_fleet(config_path)
 
     if kind == "udp_plc_toy":
-        toy = device_cfg.get("udp_plc_toy", {})
+        toy = cast(dict[str, object], device_cfg.get("udp_plc_toy", {}) or {})
         remote_ip = str(toy.get("remote_ip", "127.0.0.1"))
-        remote_port = int(toy.get("remote_port", 55001))
-        return UdpPlcDevice(remote=(remote_ip, remote_port))
+        remote_port = int(str(toy.get("remote_port", 55001) or 55001))
+        return cast(_DeviceLike, UdpPlcDevice(remote=(remote_ip, remote_port)))
 
     # default: sim
-    return SimDevice(plant)
+    return cast(_DeviceLike, SimDevice(plant))
 
 
 def _axis_ids_from_config(config_path: Path) -> list[str]:
     """Extract axis ids from plc_twincat_legacy_fleet config (fallback to ['X'])."""
     try:
-        cfg = tomllib.loads(config_path.read_text(encoding="utf-8"))
-        fleet_axes = cfg.get("device", {}).get("plc_twincat_legacy_fleet", {}).get("axes", [])
+        cfg = cast(dict[str, object], tomllib.loads(config_path.read_text(encoding="utf-8")))
+        device_cfg = cast(dict[str, object], cfg.get("device", {}) or {})
+        fleet_cfg = cast(dict[str, object], device_cfg.get("plc_twincat_legacy_fleet", {}) or {})
+        fleet_axes = cast(list[dict[str, object]], fleet_cfg.get("axes", []) or [])
         axis_ids = [str(a.get("axis_id")) for a in fleet_axes if a.get("axis_id")]
         return axis_ids if axis_ids else ["X"]
     except Exception:
@@ -105,7 +123,7 @@ def main() -> int:
     for aid in axis_ids:
         st.ensure_axis(aid)
 
-    def on_snapshot(snap) -> None:
+    def on_snapshot(snap: TelemetrySnapshot) -> None:
         transport.publish_telemetry(snap)
 
     eng = CoreEngine(
@@ -163,7 +181,7 @@ def main() -> int:
         runner.stop()
         runner.join(timeout=1.0)
 
-        close = getattr(device, "close", None)
+        close = cast(Callable[[], None] | None, getattr(device, "close", None))
         if callable(close):
             close()
 

@@ -46,8 +46,8 @@ class Heartbeat:
     name: str
     interval_s: float = 1.0
     last_emit_s: float = field(default_factory=_now_s)
-    counters: Dict[str, int] = field(default_factory=dict)
-    fields: Dict[str, Any] = field(default_factory=dict)
+    counters: Dict[str, int] = field(default_factory=lambda: {})
+    fields: Dict[str, Any] = field(default_factory=lambda: {})
 
     def inc(self, key: str, n: int = 1) -> None:
         self.counters[key] = int(self.counters.get(key, 0)) + int(n)
@@ -98,7 +98,7 @@ class Heartbeat:
 class ChangeTracker:
     """Track last values and report changes."""
 
-    last: Dict[str, Any] = field(default_factory=dict)
+    last: Dict[str, Any] = field(default_factory=lambda: {})
 
     def changed(self, key: str, value: Any) -> bool:
         prev = self.last.get(key, object())
@@ -109,7 +109,7 @@ class ChangeTracker:
 
 
 def _fmt_kv(m: Mapping[str, Any]) -> str:
-    items = []
+    items: list[str] = []
     for k, v in m.items():
         try:
             items.append(f"{k}={v}")

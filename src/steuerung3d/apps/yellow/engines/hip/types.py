@@ -112,19 +112,19 @@ class HipParamCommitDialog:
 @dataclass
 class HipState:
     prev_device_tick: int | None = None
-    last_lifetick_echo_sent: dict[str, int] = field(default_factory=dict)
+    last_lifetick_echo_sent: dict[str, int] = field(default_factory=lambda: {})
     selected_axis: str = ""
     fixed_axis_applied: bool = False
     last_ui_axis_selected: str = ""
     prev_estop_profile: str = ""
     pending_commit_req_id: str = ""
     pending_commit_group: str = ""
-    pending_commit_values: dict[str, float] = field(default_factory=dict)
-    commit_dialog_shown_for: set[str] = field(default_factory=set)
+    pending_commit_values: dict[str, float] = field(default_factory=lambda: {})
+    commit_dialog_shown_for: set[str] = field(default_factory=set[str])
     joy: JoyState = field(default_factory=JoyState)
-    last_claim_attempt_ns_by_axis: dict[str, int] = field(default_factory=dict)
-    last_sent_speed_by_axis: dict[str, float] = field(default_factory=dict)
-    last_sent_enable_by_axis: dict[str, bool] = field(default_factory=dict)
+    last_claim_attempt_ns_by_axis: dict[str, int] = field(default_factory=lambda: {})
+    last_sent_speed_by_axis: dict[str, float] = field(default_factory=lambda: {})
+    last_sent_enable_by_axis: dict[str, bool] = field(default_factory=lambda: {})
     joy_jog_active: bool = False
     joy_jog_axis: str = ""
 
@@ -153,7 +153,7 @@ class HipStepResult:
     intents: list[Intent]
     resync_ignored: bool
     resync_block_reason: str
-    txn_events: list[RetryEvent] = field(default_factory=list)
+    txn_events: list[RetryEvent] = field(default_factory=list[RetryEvent])
 
 
 @dataclass(frozen=True)

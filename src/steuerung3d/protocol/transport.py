@@ -63,8 +63,10 @@ class InMemTransport:
     Later we add UDP/ZMQ/WebSocket transports implementing the same interface.
     """
 
-    _intent_q: Queue[Intent] = field(default_factory=Queue)
-    _telemetry_q: Queue[TelemetrySnapshot] = field(default_factory=Queue)
+    _intent_q: Queue[Intent] = field(default_factory=lambda: Queue[Intent]())
+    _telemetry_q: Queue[TelemetrySnapshot] = field(
+        default_factory=lambda: Queue[TelemetrySnapshot]()
+    )
 
     # --- intents ---
     def publish_intent(self, intent: Intent) -> None:
@@ -104,10 +106,12 @@ class InMemTransportV2:
       - telemetry (core/device -> UI)
     """
 
-    _raw_q: Queue[RawControls] = field(default_factory=Queue)
-    _intent_q: Queue[Intent] = field(default_factory=Queue)
-    _cmd_q: Queue[CommandFrame] = field(default_factory=Queue)
-    _telemetry_q: Queue[TelemetrySnapshot] = field(default_factory=Queue)
+    _raw_q: Queue[RawControls] = field(default_factory=lambda: Queue[RawControls]())
+    _intent_q: Queue[Intent] = field(default_factory=lambda: Queue[Intent]())
+    _cmd_q: Queue[CommandFrame] = field(default_factory=lambda: Queue[CommandFrame]())
+    _telemetry_q: Queue[TelemetrySnapshot] = field(
+        default_factory=lambda: Queue[TelemetrySnapshot]()
+    )
 
     # --- raw controls ---
     def publish_raw_controls(self, rc: RawControls) -> None:

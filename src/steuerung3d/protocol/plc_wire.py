@@ -17,9 +17,17 @@ enables/disables the HiP's E-stop reset incorrectly.
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from collections.abc import Mapping
+from typing import Any, Dict, cast
 
 from steuerung3d.protocol.legacy_plc import encode_uplink
+
+
+def _as_object_map(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        return {}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
 
 
 def _f(x: object, default: float = 0.0) -> float:
@@ -41,16 +49,14 @@ def encode_plc_telemetry(snapshot: Any) -> str:
     """Encode a TelemetrySnapshot-like object into a canonical PLC uplink line."""
 
     # Choose first axis entry
-    axes = getattr(snapshot, "axes", {}) or {}
-    if isinstance(axes, dict) and axes:
+    axes = _as_object_map(getattr(snapshot, "axes", {}) or {})
+    if axes:
         axis_id, ax = next(iter(axes.items()))
     else:
         axis_id, ax = ("X", None)
 
     # Params dict
-    params = getattr(snapshot, "params", {}) or {}
-    if not isinstance(params, dict):
-        params = {}
+    params = _as_object_map(getattr(snapshot, "params", {}) or {})
 
     def p(name: str, default: float = 0.0) -> float:
         return _f(params.get(name, default), default)
@@ -65,8 +71,9 @@ def encode_plc_telemetry(snapshot: Any) -> str:
         if ax is None:
             return int(default)
         meta = getattr(ax, "meta", None)
-        if isinstance(meta, dict) and name in meta:
-            return _i(meta.get(name, default), default)
+        meta_map = _as_object_map(meta)
+        if name in meta_map:
+            return _i(meta_map.get(name, default), default)
         return _i(getattr(ax, name, default), default)
 
     # Device ticks (DenSi uses meta; real devices might attach attributes)
@@ -136,7 +143,7 @@ def encode_plc_telemetry(snapshot: Any) -> str:
         # Real PLC uses N_/L_ prefixed strings; our decoder should not rely on parsing this.
         "SystemTime": (
             str(snapshot.params.get("SystemTime", ""))
-            if isinstance(getattr(snapshot, "params", None), dict)
+            if isinstance(getattr(snapshot, "params", None), Mapping)
             and str(snapshot.params.get("SystemTime", ""))
             else f"{t_s:.3f}"
         ),

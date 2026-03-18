@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 try:
     import tomllib  # py3.11+
@@ -14,7 +14,8 @@ except ModuleNotFoundError:  # pragma: no cover
 def _as_table(value: object) -> dict[str, object]:
     if not isinstance(value, Mapping):
         return {}
-    return {str(k): v for k, v in value.items()}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
 
 
 def _as_optional_int(value: object) -> Optional[int]:
@@ -37,7 +38,7 @@ def _as_optional_axes(value: object) -> Optional[Sequence[str]]:
         return None
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         raise ValueError("log_viewer config: [view].axes must be a list of strings")
-    return [str(x) for x in value]
+    return [str(x) for x in cast(Sequence[object], value)]
 
 
 @dataclass(frozen=True)

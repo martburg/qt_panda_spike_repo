@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Callable, TypeVar, cast
 
 from PySide6.QtWidgets import QWidget
 
@@ -35,9 +35,11 @@ from ..runtimes.densi_runtime import DensiRuntime
 from .controller_utils import GuardedControllerOps, init_observability, start_poll_timer
 
 if TYPE_CHECKING:
-    from ..runtimes.densi_runtime_types import DensiActionInLike
+    from ..runtimes.densi_runtime_types import DensiActionInLike, DensiRuntimeResult
 
 log = logging.getLogger("den_si")
+
+_T = TypeVar("_T")
 
 
 @dataclass
@@ -103,10 +105,10 @@ class DenSiController:
     def _bump_soft_error(self, key: str) -> None:
         self._guard_ops.bump(key)
 
-    def _best_effort(self, key: str, func) -> None:
+    def _best_effort(self, key: str, func: Callable[[], None]) -> None:
         self._guard_ops.best_effort(key, func)
 
-    def _read_or_fallback(self, key: str, func, *, fallback):
+    def _read_or_fallback(self, key: str, func: Callable[[], _T], *, fallback: _T) -> _T:
         return self._guard_ops.read_or_fallback(key, func, fallback=fallback)
 
     # ------------------------------------------------------------------
@@ -128,13 +130,26 @@ class DenSiController:
     def _init_state_and_sim(self) -> None:
         self._disconnect_after_s = 2.0
 
+        normalize_pos_chain = cast(
+            Callable[[dict[str, float]], dict[str, float]], self._normalize_pos_chain
+        )
+        normalize_guider_range = cast(
+            Callable[[dict[str, float]], dict[str, float]], self._normalize_guider_range
+        )
+        enforce_pos_chain = cast(
+            Callable[[dict[str, float]], dict[str, float]], self._enforce_pos_chain
+        )
+        enforce_guider_minmax = cast(
+            Callable[[dict[str, float]], dict[str, float]], self._enforce_guider_minmax
+        )
+
         self.engine = DenSiEngine.build_default(
             axis_ids=list(self.axis_ids),
             dt_s=float(self.dt_s),
-            normalize_pos_chain=self._normalize_pos_chain,
-            normalize_guider_range=self._normalize_guider_range,
-            enforce_pos_chain=self._enforce_pos_chain,
-            enforce_guider_minmax=self._enforce_guider_minmax,
+            normalize_pos_chain=normalize_pos_chain,
+            normalize_guider_range=normalize_guider_range,
+            enforce_pos_chain=enforce_pos_chain,
+            enforce_guider_minmax=enforce_guider_minmax,
         )
         self.engine.disconnect_after_s = float(self._disconnect_after_s)
 
@@ -170,7 +185,7 @@ class DenSiController:
 
             self._emit_birdseye(runtime_res)
 
-    def _emit_birdseye(self, runtime_res) -> None:
+    def _emit_birdseye(self, runtime_res: "DensiRuntimeResult") -> None:
         status = getattr(self, "_status", None)
         if status is None:
             return
@@ -185,14 +200,14 @@ class DenSiController:
         except Exception:
             dev_id = ""
 
-        axes = []
+        axes: list[str] = []
         try:
             axes = list(getattr(getattr(runtime_res, "snap", None), "axes", {}) or {})
         except Exception:
             axes = []
 
         summary = f"den_si dev={dev_id or '-'} axes={len(axes)} soft_err={soft_total}"
-        fields = {
+        fields: dict[str, object] = {
             "component": "den_si",
             "device_id": dev_id,
             "axes_count": int(len(axes)),

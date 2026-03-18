@@ -5,7 +5,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence, cast
 
 try:
     import tomllib
@@ -199,7 +199,8 @@ def _config_paths_from_argv(argv: Sequence[object]) -> list[Path]:
 def _add_inbound_ports_from_mapping(mapping: object, ports: list[int], seen: set[int]) -> None:
     if not isinstance(mapping, dict):
         return
-    for key, value in mapping.items():
+    typed_mapping = cast(dict[object, object], mapping)
+    for key, value in typed_mapping.items():
         key_s = str(key).strip().lower()
         if key_s.endswith("_in"):
             _append_unique_int(ports, seen, _parse_port(value))
@@ -207,7 +208,7 @@ def _add_inbound_ports_from_mapping(mapping: object, ports: list[int], seen: set
 
 def _extract_bind_ports_from_config(path: Path) -> list[int]:
     try:
-        data = tomllib.loads(path.read_text(encoding="utf-8"))
+        data = cast(dict[str, Any], tomllib.loads(path.read_text(encoding="utf-8")))
     except Exception:
         return []
     ports: list[int] = []

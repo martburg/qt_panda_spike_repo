@@ -4,13 +4,14 @@ import argparse
 import logging
 import sys
 from pathlib import Path
+from typing import Callable, cast
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QWidget
 
 # and import HiPController directly if you changed controllers/__init__.py:
 from steuerung3d.apps.yellow.controllers.hip_controller import HiPController
 from steuerung3d.apps.yellow.ui_shell import build_yellow_window
-from steuerung3d.config.toml_loader import load_toml
+from steuerung3d.config.toml_loader import TomlTable, load_toml
 from steuerung3d.core.net import parse_hostport
 
 # from steuerung3d.protocol.transport import InMemTransport
@@ -19,8 +20,10 @@ from steuerung3d.util.app_bootstrap import bootstrap_logging
 
 log = logging.getLogger("hi_p")
 
+build_yellow_window = cast(Callable[..., QWidget], build_yellow_window)
 
-def _load_config(path: str | None) -> dict:
+
+def _load_config(path: str | None) -> TomlTable:
     if not path:
         return {}
     try:
@@ -52,7 +55,7 @@ def main() -> int:
     bootstrap_logging(role="hi_p", axis=(args.axis or ""), log_level=args.log_level)
     log.info("log level = %s", str(args.log_level).upper())
     cfg = _load_config(args.config or None)
-    engine_cfg = cfg.get("engine", {}) or {}
+    engine_cfg = cast(TomlTable, cfg.get("engine", {}) or {})
     shadow_mode = str(engine_cfg.get("shadow_mode", "old") or "old").strip().lower()
     if shadow_mode not in ("old", "shadow", "new"):
         shadow_mode = "old"

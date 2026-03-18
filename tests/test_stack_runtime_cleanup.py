@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
+
 from steuerung3d.core.stack_runtime_boot import start_runtime
 from steuerung3d.core.stack_runtime_supervisor import stop_runtime
 from steuerung3d.core.stack_spec import ProcessSpec, ServiceSpec, StackSpec
@@ -57,9 +59,9 @@ class _FakeRT:
             services={"core": ServiceSpec(enabled=True, module="x")},
         )
         self.keep_last_sessions = 1
-        self.session_dir = None
-        self.processes = []
-        self.tailers = {}
+        self.session_dir: Path | None = None
+        self.processes: list[_RP] = []
+        self.tailers: dict[str, object] = {}
         self.status: _FakeStatus | None = None
 
     @staticmethod
@@ -76,7 +78,9 @@ class _RP:
         self.popen = popen
 
 
-def test_start_runtime_cleans_residual_bind_ports(monkeypatch, tmp_path: Path) -> None:
+def test_start_runtime_cleans_residual_bind_ports(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     proc = ProcessSpec(
         name="core",
         argv=["python", "-m", "core", "--intent-in", "127.0.0.1:51001"],
@@ -85,18 +89,19 @@ def test_start_runtime_cleans_residual_bind_ports(monkeypatch, tmp_path: Path) -
     rt = _FakeRT()
     cleaned: list[list[int]] = []
 
+    make_session_dir = cast(Any, lambda base, keep_last: tmp_path)
+    write_runtime_meta = cast(Any, lambda rt, stopped_at_s=None: None)
+    expand_processes = cast(Any, staticmethod(lambda spec, session_dir: [proc]))
+    cleanup_ports = cast(Any, lambda ports: cleaned.append(list(cast(list[int], ports))) or [])
+
+    monkeypatch.setattr("steuerung3d.core.stack_runtime_boot.make_session_dir", make_session_dir)
     monkeypatch.setattr(
-        "steuerung3d.core.stack_runtime_boot.make_session_dir", lambda base, keep_last: tmp_path
+        "steuerung3d.core.stack_runtime_boot.write_runtime_meta", write_runtime_meta
     )
-    monkeypatch.setattr(
-        "steuerung3d.core.stack_runtime_boot.write_runtime_meta", lambda rt, stopped_at_s=None: None
-    )
-    monkeypatch.setattr(
-        _FakeRT, "expand_processes_static", staticmethod(lambda spec, session_dir: [proc])
-    )
+    monkeypatch.setattr(_FakeRT, "expand_processes_static", expand_processes)
     monkeypatch.setattr(
         "steuerung3d.core.stack_runtime_boot.cleanup_residual_bind_ports",
-        lambda ports: cleaned.append(list(ports)) or [],
+        cleanup_ports,
     )
 
     start_runtime(cast(Any, rt))
@@ -104,7 +109,7 @@ def test_start_runtime_cleans_residual_bind_ports(monkeypatch, tmp_path: Path) -
     assert cleaned == [[51001]]
 
 
-def test_stop_runtime_force_kills_and_closes_status(monkeypatch) -> None:
+def test_stop_runtime_force_kills_and_closes_status(monkeypatch: pytest.MonkeyPatch) -> None:
     proc_spec = ProcessSpec(
         name="core",
         argv=["python", "-m", "core", "--intent-in", "127.0.0.1:51001"],
@@ -116,13 +121,16 @@ def test_stop_runtime_force_kills_and_closes_status(monkeypatch) -> None:
     rt.status = _FakeStatus()
 
     cleaned: list[list[int]] = []
+    cleanup_ports = cast(Any, lambda ports: cleaned.append(list(cast(list[int], ports))) or [])
+    write_runtime_meta = cast(Any, lambda rt, stopped_at_s=None: None)
+
     monkeypatch.setattr(
         "steuerung3d.core.stack_runtime_supervisor.cleanup_residual_bind_ports",
-        lambda ports: cleaned.append(list(ports)) or [],
+        cleanup_ports,
     )
     monkeypatch.setattr(
         "steuerung3d.core.stack_runtime_supervisor.write_runtime_meta",
-        lambda rt, stopped_at_s=None: None,
+        write_runtime_meta,
     )
 
     stop_runtime(cast(Any, rt))

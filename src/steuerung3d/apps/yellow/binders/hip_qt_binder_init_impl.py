@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Callable, cast
 
 from PySide6.QtWidgets import QComboBox, QLineEdit, QPushButton, QWidget
 
@@ -85,11 +85,18 @@ def wire_signals(self: "HipQtBinder") -> None:
         bw = self._find_button(b_write)
         bc = self._find_button(b_cancel)
         if be is not None:
-            be.clicked.connect(lambda _=False, g=grp: self._on_param_action("edit", g))
+            be.clicked.connect(_make_param_slot(self, "edit", grp))
         if bw is not None:
-            bw.clicked.connect(lambda _=False, g=grp: self._on_param_action("write", g))
+            bw.clicked.connect(_make_param_slot(self, "write", grp))
         if bc is not None:
-            bc.clicked.connect(lambda _=False, g=grp: self._on_param_action("cancel", g))
+            bc.clicked.connect(_make_param_slot(self, "cancel", grp))
+
+
+def _make_param_slot(self: "HipQtBinder", action: str, group: str) -> Callable[[bool], None]:
+    def _slot(_checked: bool = False) -> None:
+        self._on_param_action(action, group)
+
+    return _slot
 
 
 def find_button(self: "HipQtBinder", object_name: str) -> QPushButton | None:
@@ -106,7 +113,7 @@ def require_widget(widget: QWidget | None, object_name: str) -> QWidget:
     return widget
 
 
-def set_dot(self: "HipQtBinder", object_name: str, state) -> None:
+def set_dot(self: "HipQtBinder", object_name: str, state: object) -> None:
     if not object_name:
         return
     try:

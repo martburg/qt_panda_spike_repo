@@ -15,8 +15,9 @@ we prefer “don’t crash” over “strict schema enforcement”.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, cast
 
 from steuerung3d.adapters.links.udp_link import UdpLink
 from steuerung3d.protocol.udp_plc_channel_support import (
@@ -44,6 +45,19 @@ def _from_bytes(raw: bytes) -> str:
 
 def _stringify_payload(payload: Any) -> str:
     return str(payload)
+
+
+def _as_field_map(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        return {}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
+
+
+def _first_payload_item(payload: object) -> object:
+    if isinstance(payload, (list, tuple)) and payload:
+        return cast(list[object] | tuple[object, ...], payload)[0]
+    return payload
 
 
 @dataclass
@@ -93,10 +107,10 @@ class UdpPlcTelemetryOut:
             if not payload:
                 return
             if all(isinstance(x, str) for x in payload):
-                for line in payload:
+                for line in cast(list[str], payload):
                     self.publish_line(line)
                 return
-            payload = payload[0]
+            payload = _first_payload_item(payload)
 
         if isinstance(payload, str):
             self.publish_line(payload)
@@ -155,8 +169,8 @@ class UdpPlcCommandIn:
                 dec = decode_downlink(raw)
                 if dec is None:
                     continue
-                fields = dec.fields or {}
-                if not isinstance(fields, dict):
+                fields = _as_field_map(dec.fields or {})
+                if not fields:
                     continue
 
                 decoded = decode_command_fields(fields, axis_id=axis_id)

@@ -17,10 +17,10 @@ from __future__ import annotations
 
 import ast
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any, Iterable, List, TypeAlias
+from typing import Any, Iterable, List, TypeAlias, cast
 
 _BRACE_RE = re.compile(r"\{([^{}]+)\}")
 SafeFunc: TypeAlias = Any
@@ -41,7 +41,8 @@ def _csv(xs: Any) -> str:
     if xs is None:
         return ""
     if isinstance(xs, (list, tuple)):
-        return ",".join([str(x) for x in xs])
+        seq = cast(Sequence[object], xs)
+        return ",".join([str(x) for x in seq])
     return str(xs)
 
 
@@ -54,9 +55,12 @@ def _repeat(flag: str, xs: Any) -> list[object]:
     out: list[object] = []
     if xs is None:
         return out
-    if not isinstance(xs, (list, tuple)):
-        xs = [xs]
-    for x in xs:
+    seq: Sequence[object]
+    if isinstance(xs, (list, tuple)):
+        seq = cast(Sequence[object], xs)
+    else:
+        seq = [xs]
+    for x in seq:
         out.append(flag)
         out.append(x)
     return out
@@ -75,28 +79,28 @@ class _SafeEval(ast.NodeVisitor):
     def __init__(self, names: dict[str, Any]):
         self.names = names
 
-    def visit(self, node: ast.AST):  # type: ignore[override]
+    def visit(self, node: ast.AST) -> Any:  # type: ignore[override]
         return super().visit(node)
 
-    def visit_Expression(self, node: ast.Expression):
+    def visit_Expression(self, node: ast.Expression) -> Any:
         return self.visit(node.body)
 
-    def visit_Constant(self, node: ast.Constant):
+    def visit_Constant(self, node: ast.Constant) -> Any:
         return node.value
 
-    def visit_Name(self, node: ast.Name):
+    def visit_Name(self, node: ast.Name) -> Any:
         if node.id in self.names:
             return self.names[node.id]
         raise ValueError(f"Unknown name: {node.id}")
 
-    def visit_Attribute(self, node: ast.Attribute):
+    def visit_Attribute(self, node: ast.Attribute) -> Any:
         base = self.visit(node.value)
         try:
             return getattr(base, node.attr)
         except Exception as e:
             raise ValueError(f"Bad attribute access: {node.attr}") from e
 
-    def visit_BinOp(self, node: ast.BinOp):
+    def visit_BinOp(self, node: ast.BinOp) -> Any:
         left = self.visit(node.left)
         right = self.visit(node.right)
         op = node.op
@@ -114,7 +118,7 @@ class _SafeEval(ast.NodeVisitor):
             return left % right
         raise ValueError(f"Operator not allowed: {type(op).__name__}")
 
-    def visit_UnaryOp(self, node: ast.UnaryOp):
+    def visit_UnaryOp(self, node: ast.UnaryOp) -> Any:
         operand = self.visit(node.operand)
         if isinstance(node.op, ast.UAdd):
             return +operand
@@ -122,7 +126,7 @@ class _SafeEval(ast.NodeVisitor):
             return -operand
         raise ValueError(f"Unary operator not allowed: {type(node.op).__name__}")
 
-    def visit_Call(self, node: ast.Call):
+    def visit_Call(self, node: ast.Call) -> Any:
         fn = self.visit(node.func)
         if fn not in _SAFE_FUNCS.values():
             raise ValueError("Only safe functions allowed")
@@ -138,10 +142,12 @@ class _SafeEval(ast.NodeVisitor):
 def _ns(obj: Any) -> Any:
     if isinstance(obj, SimpleNamespace):
         return obj
-    if isinstance(obj, dict):
-        return SimpleNamespace(**{str(k): _ns(v) for k, v in obj.items()})
+    if isinstance(obj, Mapping):
+        mapping = cast(Mapping[object, object], obj)
+        return SimpleNamespace(**{str(k): _ns(v) for k, v in mapping.items()})
     if isinstance(obj, list):
-        return [_ns(v) for v in obj]
+        seq = cast(list[object], obj)
+        return [_ns(v) for v in seq]
     return obj
 
 
@@ -191,7 +197,7 @@ def render_argv(args: Iterable[Any], ctx: RenderContext) -> List[str]:
         if r is None:
             continue
         if isinstance(r, list):
-            out.extend([str(x) for x in r])
+            out.extend([str(x) for x in cast(list[object], r)])
         else:
             out.append(str(r))
     return out

@@ -1,9 +1,24 @@
 from __future__ import annotations
 
-from typing import Mapping
+from collections.abc import Mapping
+from typing import cast
 
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
 from steuerung3d.util.tick import compute_time_tick
+
+
+def _float_from_mapping(mapping: Mapping[str, object], key: str, default: float) -> float:
+    try:
+        value = mapping.get(key, default)
+        if value is None:
+            return float(default)
+        if isinstance(value, bool):
+            return float(int(value))
+        if isinstance(value, (int, float, str)):
+            return float(value)
+        return float(default)
+    except Exception:
+        return float(default)
 
 
 def compute_tick_text(
@@ -41,8 +56,9 @@ def get_lifetick_age(*, snap: TelemetrySnapshot, axis_id: str) -> int | None:
 
 def parse_estop_word_from_snapshot(snap: TelemetrySnapshot) -> int:
     fields = getattr(snap, "plc_uplink_fields", None)
-    if isinstance(fields, dict):
-        v = fields.get("EStopStatus")
+    if isinstance(fields, Mapping):
+        fields_map = cast(Mapping[str, object], fields)
+        v = fields_map.get("EStopStatus")
         if v is not None:
             try:
                 return int(str(v).strip())
@@ -54,8 +70,9 @@ def parse_estop_word_from_snapshot(snap: TelemetrySnapshot) -> int:
 def raw_uplink_float(snap: TelemetrySnapshot, key: str, default: float) -> float:
     try:
         raw = getattr(snap, "plc_uplink_fields", None)
-        if isinstance(raw, dict) and key in raw:
-            return float(raw.get(key, default) or default)
+        if isinstance(raw, Mapping) and key in raw:
+            raw_map = cast(Mapping[str, object], raw)
+            return _float_from_mapping(raw_map, key, default)
     except Exception:
         pass
     return float(default)
@@ -64,8 +81,9 @@ def raw_uplink_float(snap: TelemetrySnapshot, key: str, default: float) -> float
 def raw_tail_token(snap: TelemetrySnapshot, key: str) -> str:
     try:
         tail = getattr(snap, "plc_uplink_tail", {}) or {}
-        if isinstance(tail, dict):
-            v = tail.get(key, "") or ""
+        if isinstance(tail, Mapping):
+            tail_map = cast(Mapping[str, object], tail)
+            v = tail_map.get(key, "") or ""
             return str(v)
     except Exception:
         pass

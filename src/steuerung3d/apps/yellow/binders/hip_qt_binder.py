@@ -269,7 +269,7 @@ class HipQtBinder:
     def _require_widget(widget: QWidget | None, object_name: str) -> QWidget:
         return _init_impl.require_widget(widget, object_name)
 
-    def _set_dot(self, object_name: str, state) -> None:
+    def _set_dot(self, object_name: str, state: object) -> None:
         _init_impl.set_dot(self, object_name, state)
 
     def _set_all_estop_unknown(self) -> None:

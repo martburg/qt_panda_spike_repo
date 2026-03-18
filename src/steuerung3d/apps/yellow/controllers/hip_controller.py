@@ -15,7 +15,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
-from typing import cast
+from typing import Callable, TypeVar, cast
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QWidget
@@ -54,6 +54,8 @@ except Exception:  # pragma: no cover
 
 
 log = logging.getLogger("hi_p")
+
+_T = TypeVar("_T")
 
 
 @dataclass
@@ -102,7 +104,7 @@ class HiPController:
         self.ui = YellowBindings.from_window(self.win)
 
         # Soft-error counters for swallowed exceptions (binder/UI)
-        self._soft_errors: dict[str, int] = {}
+        self._soft_errors = dict[str, int]()
         self._guard_ops = GuardedControllerOps(self._soft_errors)
 
         # --- Qt binder (UI-only) ---
@@ -142,10 +144,10 @@ class HiPController:
     def _bump_soft_error(self, key: str) -> None:
         self._guard_ops.bump(key)
 
-    def _best_effort(self, key: str, func) -> None:
+    def _best_effort(self, key: str, func: Callable[[], None]) -> None:
         self._guard_ops.best_effort(key, func)
 
-    def _read_or_fallback(self, key: str, func, *, fallback):
+    def _read_or_fallback(self, key: str, func: Callable[[], _T], *, fallback: _T) -> _T:
         return self._guard_ops.read_or_fallback(key, func, fallback=fallback)
 
     # -------------------------------------------------------------------------

@@ -106,7 +106,7 @@ def _pretty_name(obj_name: str) -> str:
             s = s[len(prefix) :]
             break
     # split camelCase-ish and underscores
-    out = []
+    out: list[str] = []
     buf = ""
     for ch in s:
         if ch == "_":
@@ -121,7 +121,7 @@ def _pretty_name(obj_name: str) -> str:
             buf += ch
     if buf:
         out.append(buf)
-    return " ".join(w.capitalize() for w in out if w)
+    return " ".join(str(w).capitalize() for w in out if w)
 
 
 def apply_tooltips(win: QWidget) -> None:
@@ -174,7 +174,7 @@ def apply_tooltips(win: QWidget) -> None:
             w.setToolTip(f"Control: {pretty}.")
 
 
-def build_yellow_window(*, role: str, ui_path=None):
+def build_yellow_window(*, role: str, ui_path: str | Path | None = None) -> QWidget:
     """Build the Yellow window (view shell only).
 
     This function owns only presentation concerns (QSS, role title, setup toggle, tooltips).

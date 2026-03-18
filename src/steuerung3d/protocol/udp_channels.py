@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from typing import Callable, Generic, List, Protocol, Sequence, Tuple, TypeVar
+from typing import Callable, Generic, List, Protocol, Sequence, Tuple, TypeVar, cast
 
 from steuerung3d.adapters.links.udp_link import UdpLink
 from steuerung3d.core.command_frame import CommandFrame
@@ -29,10 +29,14 @@ log = logging.getLogger("udp")
 T = TypeVar("T")
 
 
+def _as_json_dict(value: object) -> dict[str, object]:
+    return cast(dict[str, object], value) if isinstance(value, dict) else {}
+
+
 @dataclass
 class UdpJsonIn(Generic[T]):
     link: UdpLink
-    decode: Callable[[dict], T]
+    decode: Callable[[dict[str, object]], T]
 
     def drain(self, limit: int = 1000) -> List[T]:
         out: List[T] = []
@@ -40,12 +44,14 @@ class UdpJsonIn(Generic[T]):
             payload = None
             try:
                 payload = json.loads(raw.decode("utf-8"))
-                if isinstance(payload, dict):
-                    out.append(self.decode(payload))
+                payload_dict = _as_json_dict(payload)
+                if payload_dict:
+                    out.append(self.decode(payload_dict))
             except Exception as e:
                 # IMPORTANT: don't swallow decode problems silently (breaks debugging)
                 try:
-                    t = payload.get("type") if isinstance(payload, dict) else None
+                    payload_dict = _as_json_dict(payload)
+                    t = payload_dict.get("type") if payload_dict else None
                 except Exception:
                     t = None
                 # limit raw size to keep logs readable
@@ -58,7 +64,7 @@ class UdpJsonIn(Generic[T]):
 @dataclass
 class UdpJsonOut(Generic[T]):
     link: UdpLink
-    encode: Callable[[T], dict]
+    encode: Callable[[T], dict[str, object]]
 
     def send(self, obj: T) -> None:
         payload = self.encode(obj)

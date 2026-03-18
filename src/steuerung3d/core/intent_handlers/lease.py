@@ -1,6 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import cast
+
 from steuerung3d.core.state import MachineState
+
+
+def _as_object_map(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        return {}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
 
 
 def set_lease_denial(state: MachineState, reason: str, req_id: str = "") -> None:
@@ -10,8 +20,13 @@ def set_lease_denial(state: MachineState, reason: str, req_id: str = "") -> None
 
 
 def axis_lease_holders(state: MachineState, axis_id: str) -> list[str]:
-    holders = getattr(state, "lease_axis_holders", {}) or {}
-    vals = holders.get(axis_id, []) if isinstance(holders, dict) else []
+    holders = _as_object_map(getattr(state, "lease_axis_holders", {}) or {})
+    vals_obj = holders.get(axis_id, [])
+    vals = (
+        cast(list[object] | tuple[object, ...], vals_obj)
+        if isinstance(vals_obj, (list, tuple))
+        else []
+    )
     if not isinstance(vals, (list, tuple)):
         return []
     return [str(x) for x in list(vals) if str(x)]
@@ -35,8 +50,8 @@ def axis_lease_allows(state: MachineState, axis_id: str, hip_id: str) -> bool:
         return True
 
     # Fallback to legacy claim owner if present.
-    claims = getattr(state, "axis_claims", {}) or {}
-    claim = claims.get(str(axis_id or "")) if isinstance(claims, dict) else None
+    claims = _as_object_map(getattr(state, "axis_claims", {}) or {})
+    claim = claims.get(str(axis_id or ""))
     if not claim:
         return False
     if isinstance(claim, str):
@@ -67,8 +82,8 @@ def axis_lease_allows_any(state: MachineState, axis_id: str) -> bool:
     if holders:
         return True
 
-    claims = getattr(state, "axis_claims", {}) or {}
-    if isinstance(claims, dict) and axis_id in claims and claims.get(axis_id) is not None:
+    claims = _as_object_map(getattr(state, "axis_claims", {}) or {})
+    if axis_id in claims and claims.get(axis_id) is not None:
         return True
 
     return False

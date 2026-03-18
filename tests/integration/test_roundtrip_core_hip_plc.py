@@ -7,6 +7,7 @@ import sys
 import time
 from contextlib import closing
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -20,6 +21,10 @@ from steuerung3d.protocol.plc_codec import decode_downlink
 from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn
 
 
+def _as_object_dict(value: object) -> dict[str, object]:
+    return cast(dict[str, object], value) if isinstance(value, dict) else {}
+
+
 def _pick_free_udp_port() -> int:
     with closing(socket.socket(socket.AF_INET, socket.SOCK_DGRAM)) as s:
         s.bind(("127.0.0.1", 0))
@@ -28,7 +33,7 @@ def _pick_free_udp_port() -> int:
 
 def _start_core(
     *, axis: str, intent_port: int, ui_port: int, dev_telem_port: int, dev_cmd_port: int
-) -> subprocess.Popen:
+) -> subprocess.Popen[bytes]:
     # NOTE: relies on core supporting --intent-in and --ui-telem-target.
     cmd = [
         sys.executable,
@@ -154,15 +159,17 @@ def test_core_hip_livetick_echo_roundtrip_plc():
 
                     # Params evidence (helps distinguish "uplink not processed" vs "tick not forwarded")
                     try:
-                        params = getattr(s, "params", None) or {}
+                        params_obj = getattr(s, "params", None) or {}
+                        params = _as_object_dict(params_obj)
                         if "P" in params:
-                            observed["p"] = params.get("P")
+                            observed["p"] = cast(float | str | int | None, params.get("P"))
                     except Exception:
                         pass
 
                     # Axis tick path: accept exact axis key match OR single-axis snapshots.
-                    axes = getattr(s, "axes", None) or {}
-                    ax_key = None
+                    axes_obj = getattr(s, "axes", None) or {}
+                    axes = cast(dict[str, Any], _as_object_dict(axes_obj))
+                    ax_key: str | None = None
                     if axis in axes:
                         ax_key = axis
                     elif len(axes) == 1:
