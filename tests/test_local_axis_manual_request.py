@@ -1,10 +1,18 @@
 from __future__ import annotations
 
+from typing import TypedDict
+
 from steuerung3d.core.core_mode import CoreMode
 from steuerung3d.core.intent_handler import apply_intent, enforce_core_mode_actions
 from steuerung3d.core.intents import JoyStateUpdate, LocalAxisManualRequest
 from steuerung3d.core.rig_types import DensiRuntime
 from steuerung3d.core.state import MachineState
+
+
+class _StatusPayload(TypedDict):
+    level: str
+    summary: str
+    fields: dict[str, object]
 
 
 def _seed_axis_gate(st: MachineState, axis_id: str, *, ready: bool, fault: bool = False) -> None:
@@ -66,9 +74,9 @@ def test_local_axis_manual_request_birds_eye_selected_axis_reports_local_manual_
 
     class _Status:
         def __init__(self) -> None:
-            self.payload = None
+            self.payload: _StatusPayload | None = None
 
-        def emit_every(self, *, level, summary, fields):
+        def emit_every(self, *, level: str, summary: str, fields: dict[str, object]) -> None:
             self.payload = {"level": level, "summary": summary, "fields": fields}
 
     st = MachineState()

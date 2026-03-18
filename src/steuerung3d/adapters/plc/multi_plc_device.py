@@ -11,6 +11,10 @@ from steuerung3d.core.telemetry import TelemetrySnapshot
 from .plc_endpoint import PlcEndpoint
 
 
+def _tick_by_endpoint() -> Dict[str, Optional[int]]:
+    return {}
+
+
 @dataclass
 class MultiPlcDevice:
     """
@@ -30,7 +34,7 @@ class MultiPlcDevice:
     endpoints: list[PlcEndpoint]
 
     # diagnostics
-    last_rx_tick_by_endpoint: Dict[str, Optional[int]] = field(default_factory=dict)
+    last_rx_tick_by_endpoint: Dict[str, Optional[int]] = field(default_factory=_tick_by_endpoint)
 
     def __post_init__(self) -> None:
         if not self.last_rx_tick_by_endpoint:

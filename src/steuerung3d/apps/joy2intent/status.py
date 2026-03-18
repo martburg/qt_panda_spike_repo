@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Protocol
+
+
+class Joy2IntentStatusLike(Protocol):
+    def emit_every(self, *, level: str, summary: str, fields: dict[str, object]) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -52,5 +57,5 @@ def build_status_payload(
     )
 
 
-def emit_status(*, status, payload: Joy2IntentStatusPayload) -> None:
+def emit_status(*, status: Joy2IntentStatusLike, payload: Joy2IntentStatusPayload) -> None:
     status.emit_every(level=payload.level, summary=payload.summary, fields=payload.fields)

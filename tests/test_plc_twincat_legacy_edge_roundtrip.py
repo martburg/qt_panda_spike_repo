@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any, cast
 
 import pytest
 
@@ -15,6 +16,9 @@ import time
 
 from steuerung3d.adapters.plc_twincat_legacy.edge import TwinCATLegacyWinchEdge
 from steuerung3d.adapters.plc_twincat_legacy.udp_sim import TwinCATLegacyPlcUdpSim
+
+TwinCATLegacyWinchEdge = cast(Any, TwinCATLegacyWinchEdge)
+TwinCATLegacyPlcUdpSim = cast(Any, TwinCATLegacyPlcUdpSim)
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
 from steuerung3d.protocol.udp_channels import (
     UdpCommandIn,
@@ -36,7 +40,9 @@ def _free_udp_port() -> int:
 def test_edge_roundtrip_with_udp_sim():
     # --- PLC sim endpoint ---
     plc_port = _free_udp_port()
-    plc = TwinCATLegacyPlcUdpSim(axis_id="Anton", bind=("127.0.0.1", plc_port), dt_s=0.01)
+    plc = cast(
+        Any, TwinCATLegacyPlcUdpSim(axis_id="Anton", bind=("127.0.0.1", plc_port), dt_s=0.01)
+    )
     plc.start()
 
     # --- internal transport seam ---
@@ -51,13 +57,16 @@ def test_edge_roundtrip_with_udp_sim():
         telem_out=UdpTelemetryOut.connect(("127.0.0.1", telem_port)),
     )
 
-    edge = TwinCATLegacyWinchEdge(
-        axis_id="Anton",
-        transport=tr,
-        plc_remote=("127.0.0.1", plc_port),
-        local_bind=("127.0.0.1", _free_udp_port()),
-        dt_s=0.01,
-        timeout_s=0.1,
+    edge = cast(
+        Any,
+        TwinCATLegacyWinchEdge(
+            axis_id="Anton",
+            transport=tr,
+            plc_remote=("127.0.0.1", plc_port),
+            local_bind=("127.0.0.1", _free_udp_port()),
+            dt_s=0.01,
+            timeout_s=0.1,
+        ),
     )
 
     try:

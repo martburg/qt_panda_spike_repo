@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from steuerung3d.core.command_frame import (
     ParamCancelOp,
     ParamEditBeginOp,
@@ -31,7 +33,7 @@ def test_coerce_param_ops_dicts_to_dataclasses():
 
 
 def test_coerce_param_ops_mixed_list_keeps_objects():
-    in_ops = [
+    in_ops: list[Any] = [
         ParamEditBeginOp(group="vel"),
         {"type": "param_write", "group": "vel", "values": {"VelMax": 3}},
     ]

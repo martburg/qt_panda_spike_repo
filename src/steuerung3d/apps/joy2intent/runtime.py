@@ -16,16 +16,28 @@ from .status import build_status_payload, emit_status
 log = logging.getLogger("joy2intent")
 
 
+def _int_list() -> list[int]:
+    return []
+
+
+def _float_list() -> list[float]:
+    return []
+
+
+def _str_list() -> list[str]:
+    return []
+
+
 @dataclass
 class RuntimeState:
     next_t: float
     last_rx_ns: int | None = None
     sent_stale_zero: bool = False
-    last_buttons: list[int] = field(default_factory=list)
-    last_axes: list[float] = field(default_factory=list)
-    last_axis_pairs: list[str] = field(default_factory=list)
-    last_selected_axes: list[str] = field(default_factory=list)
-    last_select_map: list[str] = field(default_factory=list)
+    last_buttons: list[int] = field(default_factory=_int_list)
+    last_axes: list[float] = field(default_factory=_float_list)
+    last_axis_pairs: list[str] = field(default_factory=_str_list)
+    last_selected_axes: list[str] = field(default_factory=_str_list)
+    last_select_map: list[str] = field(default_factory=_str_list)
     latest_ctx: ControlContext | None = None
 
 

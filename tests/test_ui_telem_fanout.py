@@ -2,13 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+
+def _snap_list() -> list[TelemetrySnapshot]:
+    return []
+
+
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
 from steuerung3d.protocol.axis_router import AxisRouter
 
 
 @dataclass
 class _Sink:
-    snaps: list[TelemetrySnapshot] = field(default_factory=list)
+    snaps: list[TelemetrySnapshot] = field(default_factory=_snap_list)
 
     def publish_telemetry(self, snap: TelemetrySnapshot) -> None:
         self.snaps.append(snap)

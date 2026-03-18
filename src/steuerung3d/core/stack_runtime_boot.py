@@ -4,7 +4,7 @@ import sys
 import time
 from dataclasses import replace
 from pathlib import Path
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Any, List, Mapping, cast
 
 from steuerung3d.ui.birdseye_format import LogTailer
 
@@ -31,11 +31,16 @@ def discover_devices(rt: "StackRuntime", *, timeout_s: float) -> List[str]:
     while time.time() < deadline:
         rt.status.poll()
         msg = rt.status.get("core", "")
-        if msg:
-            fields = msg.get("fields", {}) if isinstance(msg, dict) else {}
+        if isinstance(msg, dict):
+            msg_map = cast(Mapping[object, object], msg)
+            fields_any = msg_map.get("fields", {})
+            fields: Mapping[object, object] = (
+                cast(Mapping[object, object], fields_any) if isinstance(fields_any, dict) else {}
+            )
             devs = fields.get("devices")
             if isinstance(devs, list) and devs:
-                last_devices = [str(x) for x in devs if str(x).strip()]
+                dev_list = [str(x) for x in cast(list[Any], devs) if str(x).strip()]
+                last_devices = dev_list
         time.sleep(0.05)
     out: List[str] = []
     seen: set[str] = set()

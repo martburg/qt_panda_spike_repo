@@ -61,7 +61,7 @@ class UdpPlcDevice:
         sock = self._ensure_sock()
 
         # Encode setpoints
-        out_lines = []
+        out_lines: list[str] = []
         tick = int(state.tick)
         for axis_id, sp in cmd.axes.items():
             out_lines.append(

@@ -44,13 +44,15 @@ class UdpDensiActionOut:
         self.tx.send(action)
 
 
-def _decode_action(payload: dict) -> DensiRemoteAction:
+def _decode_action(payload: dict[str, object]) -> DensiRemoteAction:
+    value = payload.get("value")
     return DensiRemoteAction(
-        action=str(payload.get("action", "") or ""), value=payload.get("value")
+        action=str(payload.get("action", "") or ""),
+        value=(bool(value) if value is not None else None),
     )
 
 
-def _encode_action(action: DensiRemoteAction) -> dict:
+def _encode_action(action: DensiRemoteAction) -> dict[str, object]:
     payload: dict[str, object] = {"type": "densi_remote_action", "action": str(action.action)}
     if action.value is not None:
         payload["value"] = bool(action.value)

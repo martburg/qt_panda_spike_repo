@@ -9,7 +9,8 @@ JsonMap: TypeAlias = dict[str, object]
 def _as_map(value: object) -> JsonMap:
     if not isinstance(value, Mapping):
         return {}
-    return {str(k): v for k, v in value.items()}
+    mapping = cast(Mapping[object, object], value)
+    return {str(k): v for k, v in mapping.items()}
 
 
 def deep_merge(base: Mapping[str, object], override: Mapping[str, object]) -> JsonMap:
@@ -23,7 +24,7 @@ def deep_merge(base: Mapping[str, object], override: Mapping[str, object]) -> Js
     for k, v in dict(override or {}).items():
         cur = out.get(k)
         if isinstance(cur, Mapping) and isinstance(v, Mapping):
-            out[k] = deep_merge(_as_map(cur), _as_map(v))
+            out[k] = deep_merge(_as_map(cast(object, cur)), _as_map(cast(object, v)))
         else:
             out[k] = v
     return out

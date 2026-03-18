@@ -42,8 +42,10 @@ class JoyBindings:
     buttons: dict[str, int | Sequence[int]]
     deadzone: float
     expo: float
-    select_buttons: list[int | Sequence[int]] = field(default_factory=list)
-    invert: dict[str, bool] = field(default_factory=dict)
+    select_buttons: list[int | Sequence[int]] = field(
+        default_factory=lambda: list[int | Sequence[int]]()
+    )
+    invert: dict[str, bool] = field(default_factory=lambda: dict[str, bool]())
 
 
 @dataclass(frozen=True)
@@ -70,8 +72,8 @@ class JoyRig:
     If both are provided, `winches` wins.
     """
 
-    winches: list[str] = field(default_factory=list)
-    winch_ids: list[str] = field(default_factory=list)
+    winches: list[str] = field(default_factory=lambda: list[str]())
+    winch_ids: list[str] = field(default_factory=lambda: list[str]())
 
     def ordered_winch_ids(self) -> list[str]:
         return self.winches if self.winches else self.winch_ids

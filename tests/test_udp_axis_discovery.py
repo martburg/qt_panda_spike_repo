@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 class FakeSock:
     def __init__(self, rx_bytes: bytes):
         self._rx = rx_bytes
-        self.sent = []
+        self.sent: list[tuple[bytes, tuple[str, int]]] = []
 
     def settimeout(self, value: float | None, /) -> None:
         return

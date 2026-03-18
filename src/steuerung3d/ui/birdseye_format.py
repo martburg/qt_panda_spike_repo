@@ -128,6 +128,15 @@ class BirdsEyeFields(TypedDict, total=False):
     axes: list[_BirdAxisFields]
 
 
+def _blocked_code_parts(item: object) -> tuple[str, str]:
+    if not isinstance(item, dict):
+        return "", ""
+    item_map = item
+    axis_id = str(item_map.get("axis_id", "") or "")
+    code = str(item_map.get("code", "") or "")
+    return axis_id, code
+
+
 def _normalize_blocked_codes(
     blocked_in: list[_BirdBlockedCode | str] | object, *, max_blocked: int
 ) -> str:
@@ -136,17 +145,16 @@ def _normalize_blocked_codes(
 
     blocked_codes: list[str] = []
     for item in blocked_in:
-        if isinstance(item, dict):
-            code = str(item.get("code", "") or "")
-            axis_id = str(item.get("axis_id", "") or "")
-            if axis_id:
-                blocked_codes.append(f"{axis_id}:{code}" if code else axis_id)
-            elif code:
-                blocked_codes.append(code)
-        else:
-            value = str(item).strip()
-            if value:
-                blocked_codes.append(value)
+        axis_id, code = _blocked_code_parts(item)
+        if axis_id:
+            blocked_codes.append(f"{axis_id}:{code}" if code else axis_id)
+            continue
+        if code:
+            blocked_codes.append(code)
+            continue
+        value = str(item).strip()
+        if value:
+            blocked_codes.append(value)
     return ",".join(blocked_codes[: int(max_blocked)])
 
 
