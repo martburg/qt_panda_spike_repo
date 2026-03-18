@@ -19,9 +19,10 @@ import ast
 import re
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any, Iterable, List
+from typing import Any, Iterable, List, TypeAlias
 
 _BRACE_RE = re.compile(r"\{([^{}]+)\}")
+SafeFunc: TypeAlias = Any
 
 
 @dataclass(frozen=True)
@@ -43,13 +44,13 @@ def _csv(xs: Any) -> str:
     return str(xs)
 
 
-def _repeat(flag: str, xs: Any) -> list:
+def _repeat(flag: str, xs: Any) -> list[object]:
     """Return argv fragments that repeat a flag for every element.
 
     Example: repeat('--axis', ['Anton','Debby']) ->
       ['--axis','Anton','--axis','Debby']
     """
-    out: list = []
+    out: list[object] = []
     if xs is None:
         return out
     if not isinstance(xs, (list, tuple)):
@@ -60,7 +61,13 @@ def _repeat(flag: str, xs: Any) -> list:
     return out
 
 
-_SAFE_FUNCS = {"len": len, "int": int, "str": str, "csv": _csv, "repeat": _repeat}
+_SAFE_FUNCS: dict[str, SafeFunc] = {
+    "len": len,
+    "int": int,
+    "str": str,
+    "csv": _csv,
+    "repeat": _repeat,
+}
 
 
 class _SafeEval(ast.NodeVisitor):
@@ -131,7 +138,7 @@ def _ns(obj: Any) -> Any:
     if isinstance(obj, SimpleNamespace):
         return obj
     if isinstance(obj, dict):
-        return SimpleNamespace(**{k: _ns(v) for k, v in obj.items()})
+        return SimpleNamespace(**{str(k): _ns(v) for k, v in obj.items()})
     if isinstance(obj, list):
         return [_ns(v) for v in obj]
     return obj
@@ -139,7 +146,7 @@ def _ns(obj: Any) -> Any:
 
 def eval_expr(expr: str, ctx: RenderContext) -> Any:
     """Evaluate a single brace expression."""
-    names = {
+    names: dict[str, Any] = {
         "stack": ctx.stack,
         "net": ctx.net,
         "rig": ctx.rig,
@@ -191,9 +198,9 @@ def render_argv(args: Iterable[Any], ctx: RenderContext) -> List[str]:
 
 def make_context(
     *,
-    stack: dict,
-    net: dict,
-    rig: dict,
+    stack: dict[str, object],
+    net: dict[str, object],
+    rig: dict[str, object],
     axis: str | None,
     axis_index: int | None,
     instance_index: int | None = None,

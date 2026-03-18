@@ -9,7 +9,7 @@ state write-back (SystemTime / PosDiffFor) to preserve legacy behavior.
 from __future__ import annotations
 
 import time
-from typing import Protocol
+from typing import Protocol, cast
 
 from steuerung3d.core.command_frame import CommandFrame
 from steuerung3d.core.state import MachineState
@@ -86,7 +86,7 @@ def compute_densi_view_model(
     )
     if cut_vm.effects.systemtime_tok is not None:
         engine.systemtime_tok = cut_vm.effects.systemtime_tok
-        engine.state.params["SystemTime"] = cut_vm.effects.systemtime_tok
+        cast(dict[str, object], engine.state.params)["SystemTime"] = cut_vm.effects.systemtime_tok
     if cut_vm.effects.posdiff_for is not None:
         try:
             engine.state.params["PosDiffFor"] = float(cut_vm.effects.posdiff_for)

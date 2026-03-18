@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Callable, cast
 
-from PySide6.QtWidgets import QAbstractSlider, QCheckBox, QComboBox, QLineEdit, QPushButton
+from PySide6.QtWidgets import QAbstractSlider, QCheckBox, QComboBox, QLineEdit, QPushButton, QWidget
 
 from steuerung3d.protocol.estop_bits import decode_estop_word, iter_specs
 
@@ -53,7 +53,7 @@ def post_init(self: "DenSiQtBinder") -> None:
 
 
 def discover_widgets(self: "DenSiQtBinder") -> None:
-    widget_specs: list[tuple[str, type[object], str]] = [
+    widget_specs: list[tuple[str, type[QWidget], str]] = [
         ("_txtTick", QLineEdit, "txtTick"),
         ("_txt_hdr_banner_left", QLineEdit, "txtHdrBannerLeft"),
         ("_txt_hdr_banner_right", QLineEdit, "txtHdrBannerRight"),
@@ -127,7 +127,7 @@ def log_widget_contracts(self: "DenSiQtBinder") -> None:
         context="den_si:required",
     )
     log_missing_optional_once(
-        self.log, self._wcache, [(object, "dotHdrOnline")], context="den_si:hdr"
+        self.log, self._wcache, [(QWidget, "dotHdrOnline")], context="den_si:hdr"
     )
     log_missing_optional_once(
         self.log,

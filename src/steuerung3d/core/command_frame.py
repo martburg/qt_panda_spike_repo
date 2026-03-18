@@ -1,24 +1,31 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Mapping, Union
+from typing import Dict, List, Literal, TypeAlias, Union
 
 from .param_groups import ParamGroup, coerce_param_group
 
-JsonMap = Mapping[object, object]
+JsonMap: TypeAlias = Mapping[str, object]
 
 
-def _as_object_dict(value: object) -> dict[object, object]:
-    if not isinstance(value, dict):
+def _as_object_dict(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping):
         return {}
-    return dict(value)
+    return {str(k): v for k, v in value.items()}
 
 
 def _as_float(value: object, default: float = 0.0) -> float:
-    try:
+    if isinstance(value, bool):
+        return float(int(value))
+    if isinstance(value, (int, float)):
         return float(value)
-    except Exception:
-        return float(default)
+    if isinstance(value, str):
+        try:
+            return float(value.strip())
+        except Exception:
+            return float(default)
+    return float(default)
 
 
 def _new_str_float_dict() -> Dict[str, float]:
@@ -65,19 +72,19 @@ class ParamCancelOp:
 ParamOp = Union[ParamEditBeginOp, ParamWriteOp, ParamCancelOp]
 
 
-def decode_param_ops(payload: Any) -> List[ParamOp]:
+def decode_param_ops(payload: object) -> List[ParamOp]:
     """Decode param operations from a JSON-like structure.
 
     We keep this tolerant: unknown ops are ignored.
     """
-    if payload is None or not isinstance(payload, list):
+    if payload is None or not isinstance(payload, Sequence) or isinstance(payload, (str, bytes, bytearray)):
         return []
 
     out: List[ParamOp] = []
     for item in payload:
-        if not isinstance(item, dict):
+        item_dict = _as_object_dict(item)
+        if not item_dict:
             continue
-        item_dict: JsonMap = item
         op_type = str(item_dict.get("type", "") or "")
         group = coerce_param_group(str(item_dict.get("group", "pos") or "pos"))
         if op_type == "param_edit_begin":
@@ -91,9 +98,9 @@ def decode_param_ops(payload: Any) -> List[ParamOp]:
     return out
 
 
-def coerce_param_ops(ops: Any) -> List[ParamOp]:
+def coerce_param_ops(ops: object) -> List[ParamOp]:
     """Coerce a mixed/legacy param-ops container into canonical ParamOp objects."""
-    if ops is None or not isinstance(ops, list):
+    if ops is None or not isinstance(ops, Sequence) or isinstance(ops, (str, bytes, bytearray)):
         return []
 
     out: List[ParamOp] = []
@@ -101,8 +108,8 @@ def coerce_param_ops(ops: Any) -> List[ParamOp]:
         if isinstance(item, (ParamEditBeginOp, ParamWriteOp, ParamCancelOp)):
             out.append(item)
             continue
-        if isinstance(item, dict):
-            out.extend(decode_param_ops([item]))
+        if isinstance(item, Mapping):
+            out.extend(decode_param_ops([dict(item)]))
     return out
 
 

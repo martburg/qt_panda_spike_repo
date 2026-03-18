@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
@@ -35,6 +36,12 @@ def _pid_is_alive(pid: int) -> bool:
         return False
     else:
         return True
+
+
+def _as_table(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(k): v for k, v in value.items()}
 
 
 @dataclass
@@ -73,17 +80,24 @@ def write_meta(session_dir: Path, meta: Dict[str, Any]) -> None:
 
 
 def load_meta(session_dir: Path) -> StackMeta:
-    data = json.loads(meta_path(session_dir).read_text(encoding="utf-8"))
+    data_obj: object = json.loads(meta_path(session_dir).read_text(encoding="utf-8"))
+    data = _as_table(data_obj)
 
     children: Dict[str, ChildMeta] = {}
-    for name, cd in (data.get("children") or {}).items():
+    for name, cd_obj in _as_table(data.get("children") or {}).items():
+        cd = _as_table(cd_obj)
+        argv_obj = cd.get("argv") or []
+        argv = [str(x) for x in argv_obj] if isinstance(argv_obj, list) else []
         children[name] = ChildMeta(
             name=name,
             pid=int(cd.get("pid") or 0),
-            argv=list(cd.get("argv") or []),
+            argv=argv,
             log_path=str(cd.get("log_path") or ""),
-            returncode=cd.get("returncode"),
+            returncode=int(cd["returncode"]) if isinstance(cd.get("returncode"), int) else None,
         )
+
+    stopped_at = data.get("stopped_at_s")
+    stopped_at_s = float(stopped_at) if isinstance(stopped_at, (int, float)) else None
 
     return StackMeta(
         stack_name=str(data.get("stack_name") or ""),
@@ -92,7 +106,7 @@ def load_meta(session_dir: Path) -> StackMeta:
         supervisor_pid=int(data.get("supervisor_pid") or 0),
         profile_path=str(data.get("profile_path") or ""),
         children=children,
-        stopped_at_s=data.get("stopped_at_s"),
+        stopped_at_s=stopped_at_s,
     )
 
 

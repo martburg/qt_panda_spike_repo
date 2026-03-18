@@ -1,32 +1,45 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Mapping
+from collections.abc import Mapping, Sequence
+from typing import Any, Dict
 
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame, decode_param_ops
 from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
 from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
 
-JsonMap = Mapping[object, object]
 
-
-def _as_object_dict(value: object) -> dict[object, object]:
-    if not isinstance(value, dict):
+def _as_object_dict(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping):
         return {}
-    return dict(value)
+    return {str(k): v for k, v in value.items()}
 
 
 def _as_float(value: object, default: float = 0.0) -> float:
-    try:
+    if isinstance(value, bool):
+        return float(int(value))
+    if isinstance(value, (int, float)):
         return float(value)
-    except Exception:
-        return float(default)
+    if isinstance(value, str):
+        try:
+            return float(value.strip())
+        except Exception:
+            return float(default)
+    return float(default)
 
 
 def _as_int(value: object, default: int = 0) -> int:
-    try:
+    if isinstance(value, bool):
         return int(value)
-    except Exception:
-        return int(default)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(float(value.strip()))
+        except Exception:
+            return int(default)
+    return int(default)
 
 
 def _decode_axis_setpoint(value: object) -> AxisSetpoint | None:
@@ -59,9 +72,18 @@ def _decode_axis_telemetry(value: object) -> AxisTelemetry | None:
 
 
 def _as_string_list(value: object) -> list[str]:
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         return [str(x) for x in value]
     return []
+
+
+def _decode_anchor_xyz(value: object) -> tuple[float, float, float] | None:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        return None
+    vals = list(value)
+    if len(vals) != 3:
+        return None
+    return (_as_float(vals[0]), _as_float(vals[1]), _as_float(vals[2]))
 
 
 def decode_telemetry_payload(payload: Dict[str, Any]) -> TelemetrySnapshot:
@@ -168,7 +190,7 @@ def _decode_densis(value: object) -> Dict[str, DensiTelemetry]:
             online=bool(d_dict.get("online", False)),
             claimed_by_hip=str(d_dict.get("claimed_by_hip", "")),
             participating=bool(d_dict.get("participating", False)),
-            anchor_xyz=d_dict.get("anchor_xyz", None),
+            anchor_xyz=_decode_anchor_xyz(d_dict.get("anchor_xyz", None)),
             last_seen_age_ticks=_as_int(d_dict.get("last_seen_age_ticks", 0)),
         )
     return densis_out
@@ -223,6 +245,6 @@ def _decode_nested_str_map(value: object) -> Dict[str, Dict[str, str]]:
 def _decode_list_map(value: object) -> Dict[str, list[str]]:
     out: Dict[str, list[str]] = {}
     for k, v in _as_object_dict(value).items():
-        if isinstance(v, (list, tuple)):
+        if isinstance(v, Sequence) and not isinstance(v, (str, bytes, bytearray)):
             out[str(k)] = [str(x) for x in v]
     return out

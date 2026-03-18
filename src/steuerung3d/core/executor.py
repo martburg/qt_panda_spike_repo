@@ -4,6 +4,7 @@ import logging
 import time
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from collections.abc import Mapping
 from typing import Dict, Optional
 
 from steuerung3d.config.lifetick_config import LifetickTraceConfig, load_lifetick_config
@@ -72,6 +73,28 @@ def _get_lifetick_logger() -> Optional[logging.Logger]:
     return _lifetick_logger
 
 
+def _as_bool_map(value: object) -> dict[str, bool]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(k): bool(v) for k, v in value.items()}
+
+
+def _as_int_map(value: object) -> dict[str, int]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(k): int(v) for k, v in value.items() if isinstance(v, int)}
+
+
+def _as_param_ops_map(value: object) -> dict[str, list[ParamOp]]:
+    if not isinstance(value, Mapping):
+        return {}
+    out: dict[str, list[ParamOp]] = {}
+    for k, v in value.items():
+        if isinstance(v, list):
+            out[str(k)] = coerce_param_ops(v)
+    return out
+
+
 def _supervisor_manual_active_axes(state: MachineState, *, joy_deadman: bool) -> set[str]:
     if not bool(joy_deadman):
         return set()
@@ -100,8 +123,7 @@ def _compute_resync_any(state: MachineState) -> bool:
 
 
 def _compute_resync_by_axis(state: MachineState) -> dict[str, bool]:
-    m = getattr(state, "resync_req_by_axis", {})
-    return {str(k): bool(v) for k, v in dict(m).items()} if isinstance(m, dict) else {}
+    return _as_bool_map(getattr(state, "resync_req_by_axis", {}))
 
 
 def _compute_estop_reset_any(state: MachineState) -> bool:
@@ -116,13 +138,11 @@ def _compute_estop_reset_any(state: MachineState) -> bool:
 
 
 def _compute_main_reset_by_axis(state: MachineState) -> dict[str, bool]:
-    m = getattr(state, "main_reset_req_by_axis", {})
-    return dict(m) if isinstance(m, dict) else {}
+    return _as_bool_map(getattr(state, "main_reset_req_by_axis", {}))
 
 
 def _compute_guider_reset_by_axis(state: MachineState) -> dict[str, bool]:
-    m = getattr(state, "guider_reset_req_by_axis", {})
-    return dict(m) if isinstance(m, dict) else {}
+    return _as_bool_map(getattr(state, "guider_reset_req_by_axis", {}))
 
 
 def _compute_param_ops_any(state: MachineState) -> list[ParamOp]:
@@ -134,12 +154,9 @@ def _compute_param_ops_any(state: MachineState) -> list[ParamOp]:
       legacy/global param-op fallback anymore.
     """
     ops: list[ParamOp] = []
-    per_axis = getattr(state, "pending_param_ops_by_axis", {})
-    if isinstance(per_axis, dict):
-        for axis_id in sorted(per_axis.keys()):
-            v = per_axis.get(axis_id) or []
-            if isinstance(v, list):
-                ops.extend(v)
+    per_axis = _as_param_ops_map(getattr(state, "pending_param_ops_by_axis", {}))
+    for axis_id in sorted(per_axis.keys()):
+        ops.extend(per_axis.get(axis_id, []))
     return ops
 
 
@@ -154,7 +171,7 @@ def build_command_frame(state: MachineState) -> CommandFrame:
             axes[axis_id] = AxisSetpoint(enable=False, vel=0.0)
             continue
         axes[axis_id] = AxisSetpoint(enable=cmd.enable, vel=cmd.vel)
-    lifetick_echo = dict(getattr(state, "lifetick_echo_by_axis", {}))
+    lifetick_echo = _as_int_map(getattr(state, "lifetick_echo_by_axis", {}))
 
     # LIFETICK trace: Core -> devices (via CommandFrame.lifetick_echo)
     now_s = time.monotonic()
@@ -188,7 +205,7 @@ def build_command_frame(state: MachineState) -> CommandFrame:
     core_mode = core_mode_value(getattr(state, "core_mode", ""))
     joy = getattr(state, "joy", None)
     joy_deadman = bool(getattr(joy, "deadman", False)) if joy is not None else False
-    selected_axes = (
+    selected_axes: set[str] = (
         set(canonicalize_selected_axes(getattr(joy, "selected_axes", ())))
         if joy is not None
         else set()
@@ -199,13 +216,13 @@ def build_command_frame(state: MachineState) -> CommandFrame:
     #   axis is individually ready, even if global core_mode is below LIVE.
     if selected_axes and joy_deadman:
         if core_mode == CoreMode.LIVE.value:
-            active_axes = set(selected_axes)
+            active_axes: set[str] = set(selected_axes)
         else:
             active_axes = {
                 axis_id for axis_id in selected_axes if axis_local_motion_allowed(state, axis_id)
             }
     else:
-        active_axes = set()
+        active_axes: set[str] = set()
 
     active_axes |= _supervisor_manual_active_axes(state, joy_deadman=joy_deadman)
 

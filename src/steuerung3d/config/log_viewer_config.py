@@ -1,13 +1,43 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Optional
 
 try:
     import tomllib  # py3.11+
 except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib  # type: ignore
+
+
+def _as_table(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(k): v for k, v in value.items()}
+
+
+def _as_optional_int(value: object) -> Optional[int]:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except Exception:
+            return None
+    return None
+
+
+def _as_optional_axes(value: object) -> Optional[Sequence[str]]:
+    if value is None:
+        return None
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        raise ValueError("log_viewer config: [view].axes must be a list of strings")
+    return [str(x) for x in value]
 
 
 @dataclass(frozen=True)
@@ -29,19 +59,15 @@ def load_log_viewer_config(path: Path) -> LogViewerConfig:
     if not path.exists():
         return LogViewerConfig()
 
-    data = tomllib.loads(path.read_text(encoding="utf-8"))
-    view = data.get("view", {}) if isinstance(data, dict) else {}
-
-    axes = view.get("axes")
-    if axes is not None and not isinstance(axes, list):
-        raise ValueError("log_viewer config: [view].axes must be a list of strings")
+    data = _as_table(tomllib.loads(path.read_text(encoding="utf-8")))
+    view = _as_table(data.get("view", {}))
 
     return LogViewerConfig(
         view=LogViewerView(
-            from_tick=view.get("from_tick"),
-            to_tick=view.get("to_tick"),
-            every=view.get("every"),
-            axes=axes,
+            from_tick=_as_optional_int(view.get("from_tick")),
+            to_tick=_as_optional_int(view.get("to_tick")),
+            every=_as_optional_int(view.get("every")),
+            axes=_as_optional_axes(view.get("axes")),
             show_pos=bool(view.get("show_pos", True)),
         )
     )

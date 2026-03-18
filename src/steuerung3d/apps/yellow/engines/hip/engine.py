@@ -28,6 +28,7 @@ from .step_impl import step as _step
 from .types import (
     HipAttachInputs,
     HipBannerInputs,
+    HipAttachState,
     HipParamAction,
     HipParamButtons,
     HipParamGroup,
@@ -83,7 +84,7 @@ class HipEngine:
         state = self._taster_state.get(axis_id, TasterEdgeState())
         return within_brake_grace(state=state, now_s=float(now_s), grace_s=float(grace_s))
 
-    def compute_attach_state(self, inputs: HipAttachInputs) -> object:
+    def compute_attach_state(self, inputs: HipAttachInputs) -> HipAttachState:
         return compute_attach_state(inputs)
 
     def compute_banner_estate(self, inputs: HipBannerInputs) -> str:
@@ -241,7 +242,8 @@ def _normalize_value(val: Any) -> Any:
             for k, v in sorted(val_dict.items(), key=lambda item: str(item[0]))
         }
     if isinstance(val, set):
-        return [_normalize_value(v) for v in sorted(val, key=lambda x: str(x))]
+        val_set = cast(set[object], val)
+        return [_normalize_value(v) for v in sorted(val_set, key=lambda x: str(x))]
     if isinstance(val, (list, tuple)):
         return [_normalize_value(v) for v in val]
     try:

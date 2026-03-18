@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,7 +13,7 @@ def _hostport(s: str) -> tuple[str, int]:
 
 
 def _as_table(value: object) -> dict[str, object]:
-    if not isinstance(value, dict):
+    if not isinstance(value, Mapping):
         return {}
     return {str(k): v for k, v in value.items()}
 
@@ -39,6 +40,19 @@ def _as_optional_str(value: object) -> str | None:
         return None
     s = str(value)
     return s or None
+
+
+def _as_float(value: object, default: float) -> float:
+    if isinstance(value, bool):
+        return float(int(value))
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip())
+        except Exception:
+            return float(default)
+    return float(default)
 
 
 def _int_bool_map(d: dict[str, object] | None) -> dict[int, bool]:
@@ -84,7 +98,7 @@ def load_inputd_config(path: Path) -> InputdConfig:
 
     return InputdConfig(
         out_addr=_hostport(str(io.get("out", "127.0.0.1:50100"))),
-        tick_hz=float(io.get("tick_hz", 60.0)),
+        tick_hz=_as_float(io.get("tick_hz", 60.0), 60.0),
         device_index=_as_optional_int(dev.get("index", None)),
         name_contains=_as_optional_str(dev.get("name_contains", None)),
         src=str(dev.get("src", "gamepad")),
@@ -92,7 +106,7 @@ def load_inputd_config(path: Path) -> InputdConfig:
         max_axes=_as_optional_int(opt.get("max_axes", None)),
         max_buttons=_as_optional_int(opt.get("max_buttons", None)),
         invert_axes=_int_bool_map(_as_table(norm.get("invert_axes", {}))),
-        deadzone=float(filt.get("deadzone", 0.0)),
-        expo=float(filt.get("expo", 0.0)),
-        smoothing_alpha=float(filt.get("smoothing_alpha", 0.0)),
+        deadzone=_as_float(filt.get("deadzone", 0.0), 0.0),
+        expo=_as_float(filt.get("expo", 0.0), 0.0),
+        smoothing_alpha=_as_float(filt.get("smoothing_alpha", 0.0), 0.0),
     )

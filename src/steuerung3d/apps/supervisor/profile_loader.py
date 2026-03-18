@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from steuerung3d.config.toml_loader import load_toml
@@ -34,12 +35,20 @@ def _as_str(value: object, default: str = "") -> str:
     return str(value)
 
 
-def _axis_entries(raw: dict) -> list[dict]:
-    axis_items = list(raw.get("axes", []) or [])
+def _as_table(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(k): v for k, v in value.items()}
+
+
+def _axis_entries(raw: Mapping[str, object]) -> list[dict[str, object]]:
+    axis_items_obj = raw.get("axes", [])
+    axis_items = list(axis_items_obj) if isinstance(axis_items_obj, Sequence) and not isinstance(axis_items_obj, (str, bytes, bytearray)) else []
     if axis_items:
-        return [dict(item or {}) for item in axis_items]
-    pair_items = list(raw.get("pairs", []) or [])
-    return [dict(item or {}) for item in pair_items]
+        return [_as_table(item) for item in axis_items]
+    pair_items_obj = raw.get("pairs", [])
+    pair_items = list(pair_items_obj) if isinstance(pair_items_obj, Sequence) and not isinstance(pair_items_obj, (str, bytes, bytearray)) else []
+    return [_as_table(item) for item in pair_items]
 
 
 def _normalize_axis_entry(entry: dict[str, object]) -> AxisConfig:
@@ -62,8 +71,8 @@ def _normalize_axis_entry(entry: dict[str, object]) -> AxisConfig:
 
 
 def load_profile(path: str | Path) -> SupervisorProfile:
-    raw = dict(load_toml(Path(path)))
-    sup = dict(raw.get("supervisor", {}) or {})
+    raw = _as_table(load_toml(Path(path)))
+    sup = _as_table(raw.get("supervisor", {}))
     axis_items = _axis_entries(raw)
     axes: list[AxisConfig] = []
     seen_unit_ids: set[str] = set()
@@ -77,7 +86,7 @@ def load_profile(path: str | Path) -> SupervisorProfile:
         seen_unit_ids.add(axis.unit_id)
         seen_axis_ids.add(axis.axis_id)
         axes.append(axis)
-    launch = dict(raw.get("launch", {}) or {})
+    launch = _as_table(raw.get("launch", {}))
     profile = SupervisorProfile(
         supervisor_id=_as_str(sup.get("id", "supervisor")).strip() or "supervisor",
         title=_as_str(sup.get("title", sup.get("id", "Supervisor"))).strip() or "Supervisor",

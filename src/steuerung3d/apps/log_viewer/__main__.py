@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 from pathlib import Path
-from typing import Dict, List, Sequence
+from typing import Dict, List, Sequence, TextIO
 
 from steuerung3d.config.log_viewer_config import LogViewerConfig, load_log_viewer_config
 from steuerung3d.core.command_frame import CommandFrame
@@ -81,15 +81,14 @@ def main() -> int:
     elif cfg.view.axes:
         axes = list(cfg.view.axes)
     else:
-        # derive from first telemetry/command record
-        sample_axes = set()
+        sample_axes: set[str] = set()
         if telem_by_tick:
-            sample_axes |= set(next(iter(telem_by_tick.values())).axes.keys())
+            sample_axes.update(next(iter(telem_by_tick.values())).axes.keys())
         if cmd_by_tick:
-            sample_axes |= set(next(iter(cmd_by_tick.values())).axes.keys())
+            sample_axes.update(next(iter(cmd_by_tick.values())).axes.keys())
         axes = sorted(sample_axes) if sample_axes else ["X"]
 
-    rows = []
+    rows: list[int] = []
     for t in all_ticks:
         if tick_from is not None and t < tick_from:
             continue
@@ -135,7 +134,7 @@ def _print_csv(
     show_pos: bool,
     show_intents: bool,
 ) -> None:
-    header = ["tick", "t_s", "core_mode", "estop", "fault"]
+    header: list[object] = ["tick", "t_s", "core_mode", "estop", "fault"]
     if show_intents:
         header.append("intents")
     for a in axes:
@@ -156,7 +155,7 @@ def _print_csv(
         estop = snap.estop if snap else (cf.estop if cf else False)
         fault = snap.fault if snap else (cf.fault if cf else False)
 
-        row = [t, f"{t_s:.6f}", mode, int(estop), int(fault)]
+        row: list[object] = [t, f"{t_s:.6f}", mode, int(estop), int(fault)]
         if show_intents:
             row.append(intent_count_by_tick.get(t, 0))
 
@@ -184,7 +183,7 @@ def _print_table(
     show_intents: bool,
 ) -> None:
     # Simple fixed-width table (no external deps).
-    cols = ["tick", "t_s", "core_mode", "E", "F"]
+    cols: list[str] = ["tick", "t_s", "core_mode", "E", "F"]
     if show_intents:
         cols.append("I")
     for a in axes:
@@ -205,7 +204,7 @@ def _print_table(
         estop = snap.estop if snap else (cf.estop if cf else False)
         fault = snap.fault if snap else (cf.fault if cf else False)
 
-        row = [str(t), f"{t_s:.3f}", mode, fmt_bool(estop), fmt_bool(fault)]
+        row: list[str] = [str(t), f"{t_s:.3f}", mode, fmt_bool(estop), fmt_bool(fault)]
         if show_intents:
             row.append(str(intent_count_by_tick.get(t, 0)))
 
@@ -227,16 +226,16 @@ def _print_table(
         for i, cell in enumerate(row):
             widths[i] = max(widths[i], len(cell))
 
-    def join_row(row: Sequence[str]) -> str:
-        return " ".join(cell.rjust(widths[i]) for i, cell in enumerate(row))
+    def render_row(row: Sequence[str]) -> str:
+        return "  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row))
 
-    print(join_row(cols))
-    print(" ".join("-" * w for w in widths))
+    print(render_row(cols))
+    print(render_row(["-" * w for w in widths]))
     for row in lines:
-        print(join_row(row))
+        print(render_row(row))
 
 
-def _stdout():
+def _stdout() -> TextIO:
     import sys
 
     return sys.stdout

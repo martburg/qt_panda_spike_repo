@@ -5,6 +5,7 @@ import json
 import socket
 import sys
 import time
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Optional, TextIO, Tuple
 
@@ -57,21 +58,23 @@ def _fmt_float(x: Any) -> str:
 
 
 def summarize_json(obj: Any, max_items: int = 12) -> str:
-    if not isinstance(obj, dict):
+    if not isinstance(obj, Mapping):
         s = str(obj)
         return s if len(s) <= 200 else s[:197] + "..."
 
     parts: list[str] = []
 
     axes = obj.get("axes")
-    if isinstance(axes, list):
-        shown = " ".join(_fmt_float(v) for v in axes[:max_items])
-        tail = "" if len(axes) <= max_items else f" …(+{len(axes) - max_items})"
-        parts.append(f"axes[{len(axes)}]: {shown}{tail}")
+    if isinstance(axes, Sequence) and not isinstance(axes, (str, bytes, bytearray)):
+        axes_list = list(axes)
+        shown = " ".join(_fmt_float(v) for v in axes_list[:max_items])
+        tail = "" if len(axes_list) <= max_items else f" …(+{len(axes_list) - max_items})"
+        parts.append(f"axes[{len(axes_list)}]: {shown}{tail}")
 
     buttons = obj.get("buttons")
-    if isinstance(buttons, list):
-        pressed = [str(i) for i, v in enumerate(buttons) if v]
+    if isinstance(buttons, Sequence) and not isinstance(buttons, (str, bytes, bytearray)):
+        buttons_list = list(buttons)
+        pressed = [str(i) for i, v in enumerate(buttons_list) if bool(v)]
         if pressed:
             parts.append(
                 f"btn: {','.join(pressed[:max_items])}" + ("" if len(pressed) <= max_items else "…")
@@ -79,18 +82,19 @@ def summarize_json(obj: Any, max_items: int = 12) -> str:
         else:
             parts.append("btn: -")
 
-    hats = obj.get("hats") or obj.get("hat")
-    if isinstance(hats, list):
-        parts.append(f"hat: {hats[:max_items]}" + ("" if len(hats) <= max_items else "…"))
+    hats = obj.get("hats") if "hats" in obj else obj.get("hat")
+    if isinstance(hats, Sequence) and not isinstance(hats, (str, bytes, bytearray)):
+        hats_list = list(hats)
+        parts.append(f"hat: {hats_list[:max_items]}" + ("" if len(hats_list) <= max_items else "…"))
     elif hats is not None:
         parts.append(f"hat: {hats}")
 
-    extras = [k for k in obj.keys() if k not in {"axes", "buttons", "hats", "hat"}]
+    extras = [str(k) for k in obj.keys() if str(k) not in {"axes", "buttons", "hats", "hat"}]
     if extras:
         ex = ",".join(extras[:6])
         parts.append(f"extra: {ex}" + ("" if len(extras) <= 6 else "…"))
 
-    line = " | ".join(parts) if parts else str(obj)
+    line = " | ".join(parts) if parts else str(dict(obj))
     return line if len(line) <= 260 else line[:257] + "..."
 
 

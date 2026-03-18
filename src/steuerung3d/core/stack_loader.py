@@ -34,6 +34,7 @@ Notes:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
 from typing import List
@@ -42,6 +43,12 @@ from .stack_merge import apply_sets, deep_merge
 from .stack_normalize import stack_spec_from_data
 from .stack_spec import StackSpec
 from .stack_toml import load_toml, parse_toml_value
+
+
+def _as_table(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(k): v for k, v in value.items()}
 
 
 def load_stack_profile(
@@ -66,12 +73,12 @@ def load_stack_profile(
     if base_dir is None:
         base_dir = Path.cwd()
 
-    data = load_toml(profile_path)
+    data: dict[str, object] = _as_table(load_toml(profile_path))
     for ov in overrides or []:
         ov_path = Path(ov)
         if not ov_path.exists():
             raise FileNotFoundError(ov_path)
-        data = deep_merge(data, load_toml(ov_path))
+        data = deep_merge(data, _as_table(load_toml(ov_path)))
     if sets:
         data = apply_sets(data, sets, parse_value=parse_toml_value)
 

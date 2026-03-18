@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from steuerung3d.config.toml_loader import load_toml
 
@@ -26,6 +26,40 @@ class LifetickTraceConfig:
     backup_count: int = 5
 
 
+def _as_table(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(k): v for k, v in value.items()}
+
+
+def _as_float(value: object, default: float) -> float:
+    if isinstance(value, bool):
+        return float(int(value))
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip())
+        except Exception:
+            return float(default)
+    return float(default)
+
+
+def _as_int(value: object, default: int) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(float(value.strip()))
+        except Exception:
+            return int(default)
+    return int(default)
+
+
 def load_lifetick_config(path: Path) -> LifetickTraceConfig:
     """Load lifetick trace config from TOML.
 
@@ -37,30 +71,21 @@ def load_lifetick_config(path: Path) -> LifetickTraceConfig:
         return LifetickTraceConfig()
 
     data = load_toml(path)
-    root = data.get("lifetick", {}) if isinstance(data, dict) else {}
-    if not isinstance(root, dict):
+    root = _as_table(data.get("lifetick", {}))
+    if not root:
         return LifetickTraceConfig()
 
     def _get_bool(key: str, default: bool) -> bool:
-        v = root.get(key, default)
-        return bool(v)
+        return bool(root.get(key, default))
 
     def _get_float(key: str, default: float) -> float:
-        v = root.get(key, default)
-        try:
-            return float(v)
-        except Exception:
-            return float(default)
+        return _as_float(root.get(key, default), default)
 
     def _get_int(key: str, default: int) -> int:
-        v = root.get(key, default)
-        try:
-            return int(v)
-        except Exception:
-            return int(default)
+        return _as_int(root.get(key, default), default)
 
     def _get_str(key: str, default: str) -> str:
-        v: Any = root.get(key, default)
+        v = root.get(key, default)
         return str(v) if v is not None else str(default)
 
     every_s = max(0.0, _get_float("every_s", LifetickTraceConfig.every_s))

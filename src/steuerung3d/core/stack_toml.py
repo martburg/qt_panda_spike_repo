@@ -1,12 +1,21 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias, cast
 
 try:
     import tomllib  # py3.11+
 except Exception:  # pragma: no cover
     tomllib = None  # type: ignore
+
+TomlTable: TypeAlias = dict[str, object]
+
+
+def _coerce_table(value: object) -> TomlTable:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(k): v for k, v in value.items()}
 
 
 def parse_toml_value(s: str) -> Any:
@@ -20,12 +29,13 @@ def parse_toml_value(s: str) -> Any:
     if tomllib is None:  # pragma: no cover
         return s
     try:
-        return tomllib.loads(f"v = {s}")["v"]
+        return cast(Any, tomllib.loads(f"v = {s}"))["v"]
     except Exception:
         return s
 
 
-def load_toml(path: Path) -> dict:
+def load_toml(path: Path) -> TomlTable:
     if tomllib is None:  # pragma: no cover
         raise RuntimeError("tomllib not available (requires Python 3.11+)")
-    return tomllib.loads(Path(path).read_text(encoding="utf-8"))
+    data: object = tomllib.loads(Path(path).read_text(encoding="utf-8"))
+    return _coerce_table(data)
