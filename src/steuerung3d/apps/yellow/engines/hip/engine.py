@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from dataclasses import asdict
-from typing import Any, Mapping, cast
+from typing import Any, Mapping, Sequence, cast
 
 from steuerung3d.core.intents import EchoLifeTick, Intent
 from steuerung3d.core.telemetry import TelemetrySnapshot
@@ -245,7 +245,8 @@ def _normalize_value(val: Any) -> Any:
         val_set = cast(set[object], val)
         return [_normalize_value(v) for v in sorted(val_set, key=lambda x: str(x))]
     if isinstance(val, (list, tuple)):
-        return [_normalize_value(v) for v in val]
+        val_seq = cast(Sequence[object], val)
+        return [_normalize_value(v) for v in val_seq]
     try:
         return str(val)
     except Exception:

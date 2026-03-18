@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Callable
 
+from steuerung3d.core.state import MachineState
+
 from ...domain import estop_facts
 from ...domain.banner_facts import BANNER_DYNAMIC_EXCLUDE, derive_banner_estate_from_word
 from ...domain.estop_facts import (
@@ -176,7 +178,7 @@ def compute_estop_edge_and_update_state(
     estate: EStopState,
     prev_estop_state: bool,
     estop_word: int,
-    state,
+    state: MachineState,
 ) -> bool:
     state.estop = bool(estate in (EStopState.STOPPING, EStopState.ESTOP))
     state.estop_status_word = int(estop_word)

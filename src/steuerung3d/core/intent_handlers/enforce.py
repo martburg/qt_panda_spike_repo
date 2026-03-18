@@ -36,7 +36,7 @@ def enforce_core_mode_actions(state: MachineState) -> None:
     ):
         joy = getattr(state, "joy", None)
         joy_deadman = bool(getattr(joy, "deadman", False)) if joy is not None else False
-        selected_axes = (
+        selected_axes: set[str] = (
             set(canonicalize_selected_axes(getattr(joy, "selected_axes", ())))
             if joy is not None
             else set()

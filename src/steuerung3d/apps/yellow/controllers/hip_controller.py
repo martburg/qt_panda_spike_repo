@@ -58,6 +58,10 @@ log = logging.getLogger("hi_p")
 _T = TypeVar("_T")
 
 
+def _new_soft_error_counts() -> dict[str, int]:
+    return {}
+
+
 @dataclass
 class HiPController:
     win: QWidget
@@ -90,7 +94,7 @@ class HiPController:
     _hip_engine: HipEngine = field(init=False)
     _hip_runtime: HipRuntime = field(init=False)
     _binder: HipQtBinder = field(init=False)
-    _soft_errors: dict[str, int] = field(init=False, default_factory=dict)
+    _soft_errors: dict[str, int] = field(init=False, default_factory=_new_soft_error_counts)
     _wd: PerfWatchdog = field(init=False)
     _fixed_axis: str = field(init=False, default="")
     _lock_axis_combo: bool = field(init=False, default=False)
@@ -104,7 +108,7 @@ class HiPController:
         self.ui = YellowBindings.from_window(self.win)
 
         # Soft-error counters for swallowed exceptions (binder/UI)
-        self._soft_errors = dict[str, int]()
+        self._soft_errors = _new_soft_error_counts()
         self._guard_ops = GuardedControllerOps(self._soft_errors)
 
         # --- Qt binder (UI-only) ---

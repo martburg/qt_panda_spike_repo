@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from importlib import import_module
 from typing import Any, cast
 
 import pytest
@@ -14,15 +15,14 @@ if os.getenv("RUN_LEGACY_TWINCAT_TESTS", "0") != "1":
 import socket
 import time
 
-from steuerung3d.adapters.plc_twincat_legacy.edge import (
-    TwinCATLegacyWinchEdge as _TwinCATLegacyWinchEdge,
+TwinCATLegacyWinchEdge = cast(
+    Any,
+    import_module("steuerung3d.adapters.plc_twincat_legacy.edge").TwinCATLegacyWinchEdge,
 )
-from steuerung3d.adapters.plc_twincat_legacy.udp_sim import (
-    TwinCATLegacyPlcUdpSim as _TwinCATLegacyPlcUdpSim,
+TwinCATLegacyPlcUdpSim = cast(
+    Any,
+    import_module("steuerung3d.adapters.plc_twincat_legacy.udp_sim").TwinCATLegacyPlcUdpSim,
 )
-
-TwinCATLegacyWinchEdge = cast(Any, _TwinCATLegacyWinchEdge)
-TwinCATLegacyPlcUdpSim = cast(Any, _TwinCATLegacyPlcUdpSim)
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
 from steuerung3d.protocol.udp_channels import (
     UdpCommandIn,

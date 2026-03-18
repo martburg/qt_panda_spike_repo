@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from importlib import import_module
 from pathlib import Path
 from typing import Any, cast
 
@@ -13,9 +14,10 @@ if os.getenv("RUN_LEGACY_TWINCAT_TESTS", "0") != "1":
     )
 
 
-from steuerung3d.adapters.plc_twincat_legacy.udp_sim import build_udp_sim_fleet_from_toml
-
-build_udp_sim_fleet_from_toml = cast(Any, build_udp_sim_fleet_from_toml)
+build_udp_sim_fleet_from_toml = cast(
+    Any,
+    import_module("steuerung3d.adapters.plc_twincat_legacy.udp_sim").build_udp_sim_fleet_from_toml,
+)
 from steuerung3d.core.command_frame import AxisSetpoint, CommandFrame
 from steuerung3d.core.state import MachineState
 

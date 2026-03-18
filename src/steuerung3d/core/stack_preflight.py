@@ -5,14 +5,23 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Iterable, Sequence, cast
+from typing import Any, Callable, Iterable, Sequence, cast
 
 try:
-    import tomllib
+    import tomllib as _toml_module_raw
 except ModuleNotFoundError:  # pragma: no cover
-    import tomli as tomllib
+    import tomli as _toml_module_raw
 
 from .stack_spec import ProcessSpec
+
+_toml_module: Any = _toml_module_raw
+_TomlLoads = Callable[[str], dict[str, Any]]
+_TOML_LOADS = cast(_TomlLoads, _toml_module.loads)
+
+
+def _toml_loads(text: str) -> dict[str, Any]:
+    return _TOML_LOADS(text)
+
 
 _BIND_FLAGS_EXACT = {
     "--intent-in",
@@ -208,7 +217,7 @@ def _add_inbound_ports_from_mapping(mapping: object, ports: list[int], seen: set
 
 def _extract_bind_ports_from_config(path: Path) -> list[int]:
     try:
-        data = cast(dict[str, Any], tomllib.loads(path.read_text(encoding="utf-8")))
+        data = _toml_loads(path.read_text(encoding="utf-8"))
     except Exception:
         return []
     ports: list[int] = []

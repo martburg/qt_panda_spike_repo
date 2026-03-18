@@ -17,7 +17,7 @@ trigger repeated tree walks.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional, TypeVar
+from typing import Optional, TypeVar
 
 from PySide6.QtWidgets import (
     QAbstractSlider,
@@ -33,10 +33,14 @@ T = TypeVar("T", bound=QWidget)
 _MISSING = object()
 
 
+def _new_widget_cache_store() -> dict[tuple[type[QWidget], str], object]:
+    return {}
+
+
 @dataclass
 class WidgetCache:
     root: QWidget
-    _cache: dict[tuple[type, str], Any] = field(default_factory=dict)
+    _cache: dict[tuple[type[QWidget], str], object] = field(default_factory=_new_widget_cache_store)
 
     def get(self, cls: type[T], object_name: str) -> Optional[T]:
         """Return a cached child widget by class + objectName."""

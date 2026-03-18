@@ -12,6 +12,10 @@ from typing import Dict, Literal
 from .param_groups import ParamGroup
 
 
+def _new_param_values() -> Dict[str, float]:
+    return {}
+
+
 def _require_param_axis_id(axis_id: str, *, intent_type: str) -> str:
     axis = str(axis_id or "").strip()
     if not axis:
@@ -46,7 +50,7 @@ class ParamWrite:
     axis_id: str = ""
     hip_id: str = ""
     group: ParamGroup = "pos"
-    values: Dict[str, float] = field(default_factory=dict)
+    values: Dict[str, float] = field(default_factory=_new_param_values)
     req_id: str = ""
     session_id: str = ""
 

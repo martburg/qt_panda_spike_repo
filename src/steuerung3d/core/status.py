@@ -83,7 +83,7 @@ class StatusEmitter:
     def emit(
         self, *, level: str = "OK", summary: str = "", fields: Optional[Dict[str, Any]] = None
     ) -> None:
-        msg = {
+        msg: Dict[str, Any] = {
             "v": 1,
             "stack": self.stack,
             "service": self.service,

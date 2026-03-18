@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Callable, cast
 
 
 def install_log_context(*, role: str | None = None, axis: str | None = None) -> None:
@@ -29,9 +30,9 @@ def install_log_context(*, role: str | None = None, axis: str | None = None) -> 
     role_s = (role or os.getenv("ST3D_ROLE") or "app").strip() or "app"
     axis_s = (axis if axis is not None else os.getenv("ST3D_AXIS") or "-").strip() or "-"
 
-    base_factory = logging.getLogRecordFactory()
+    base_factory = cast(Callable[..., logging.LogRecord], logging.getLogRecordFactory())
 
-    def record_factory(*args, **kwargs):  # type: ignore[no-untyped-def]
+    def record_factory(*args: object, **kwargs: object) -> logging.LogRecord:
         record = base_factory(*args, **kwargs)
         # These names must match the Formatter keys used in apps.
         record.role = role_s
@@ -42,7 +43,7 @@ def install_log_context(*, role: str | None = None, axis: str | None = None) -> 
     # (This keeps it predictable if a module imports+installs twice.)
     current = logging.getLogRecordFactory()
     if current is not record_factory:
-        logging.setLogRecordFactory(record_factory)
+        logging.setLogRecordFactory(cast(Callable[..., logging.LogRecord], record_factory))
 
 
 def child_env(*, role: str, axis: str | None = None) -> dict[str, str]:
