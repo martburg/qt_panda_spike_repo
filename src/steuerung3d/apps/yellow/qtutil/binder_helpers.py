@@ -8,12 +8,12 @@ from typing import Iterator
 from .ui_update import set_text
 
 
-def safe_set_text(widget, text: str) -> None:
+def safe_set_text(widget: object | None, text: str) -> None:
     set_text(widget, str(text))
 
 
 @contextmanager
-def block_signals(widget) -> Iterator[None]:
+def block_signals(widget: object | None) -> Iterator[None]:
     if widget is None:
         yield
         return

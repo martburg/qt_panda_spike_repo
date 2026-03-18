@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from ..._lazy_exports import resolve_lazy_export
 
 __all__ = [
@@ -12,6 +14,12 @@ __all__ = [
     "compute_hip_estop_vm",
     "compute_hip_header_dots_vm",
 ]
+
+if TYPE_CHECKING:  # pragma: no cover
+    from ...engines.hip.viewmodel import HipBannerState, HipEstopState, HipHeaderDots
+    from .hip_banner_vm import compute_hip_banner_vm
+    from .hip_estop_vm import compute_hip_estop_vm
+    from .hip_header_dots_vm import compute_hip_header_dots_vm
 
 _EXPORTS = {
     "compute_hip_banner_vm": (
@@ -32,5 +40,5 @@ _EXPORTS = {
 }
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     return resolve_lazy_export(name, _EXPORTS)

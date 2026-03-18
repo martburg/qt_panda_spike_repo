@@ -14,18 +14,21 @@ If you want controllers, import them directly:
 from __future__ import annotations
 
 from importlib import import_module
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 __all__ = ["YellowBindings", "IntentOut", "TelemetryIn", "CommandIn", "TelemetryOut"]
 
 
 if TYPE_CHECKING:  # pragma: no cover
-    # For typing only; runtime access is provided via __getattr__.
-    from .bindings import YellowBindings
-    from .ports import CommandIn, IntentOut, TelemetryIn, TelemetryOut
+    # Keep names visible to static analyzers without forcing PySide imports.
+    YellowBindings = Any
+    CommandIn = Any
+    IntentOut = Any
+    TelemetryIn = Any
+    TelemetryOut = Any
 
 
-def __getattr__(name: str):  # pragma: no cover
+def __getattr__(name: str) -> Any:  # pragma: no cover
     """Lazy exports for convenience imports.
 
     This lets callers do:

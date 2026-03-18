@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from .._lazy_exports import resolve_lazy_export
 
 __all__ = [
@@ -16,6 +18,14 @@ __all__ = [
     "set_enabled",
     "update_slider",
 ]
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .binder_helpers import block_signals, safe_set_text
+    from .modal_lock import ModalLock
+    from .param_ui_apply import ParamUiBindings, apply_param_ui
+    from .param_widget_binder import ParamWidgetBinder
+    from .ui_update import set_enabled, set_text, update_slider
+    from .widget_cache import WidgetCache
 
 _EXPORTS = {
     "WidgetCache": ("steuerung3d.apps.yellow.qtutil.widget_cache", "WidgetCache"),
@@ -34,5 +44,5 @@ _EXPORTS = {
 }
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     return resolve_lazy_export(name, _EXPORTS)

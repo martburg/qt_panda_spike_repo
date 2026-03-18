@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from ..._lazy_exports import resolve_lazy_export
 
 __all__ = [
@@ -18,6 +20,20 @@ __all__ = [
     "HipStepResult",
 ]
 
+if TYPE_CHECKING:  # pragma: no cover
+    from .engine import (
+        HipAttachInputs,
+        HipBannerInputs,
+        HipEngine,
+        HipParamAction,
+        HipState,
+        HipStepInputs,
+        HipStepResult,
+        HipUiInputs,
+        HipViewModel,
+    )
+    from .types import HipAttachState, HipParamCommitDialog
+
 _EXPORTS = {
     "HipEngine": ("steuerung3d.apps.yellow.engines.hip.engine", "HipEngine"),
     "HipAttachInputs": ("steuerung3d.apps.yellow.engines.hip.engine", "HipAttachInputs"),
@@ -33,5 +49,5 @@ _EXPORTS = {
 }
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     return resolve_lazy_export(name, _EXPORTS)

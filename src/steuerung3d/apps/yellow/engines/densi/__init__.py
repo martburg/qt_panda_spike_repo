@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from ..._lazy_exports import resolve_lazy_export
 
 __all__ = [
@@ -16,6 +18,13 @@ __all__ = [
     "DensiViewModel",
     "normalize_densi_view_model",
 ]
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .engine import DenSiEngine
+    from .engine_types import DenSiTickResult
+    from .inputs import DensiEstopToggle, DensiInputs, DensiUiInputs
+    from .types import EStopState, L0Sub, L0Top
+    from .viewmodel import DensiViewModel, normalize_densi_view_model
 
 _EXPORTS = {
     "DenSiEngine": ("steuerung3d.apps.yellow.engines.densi.engine", "DenSiEngine"),
@@ -34,5 +43,5 @@ _EXPORTS = {
 }
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     return resolve_lazy_export(name, _EXPORTS)

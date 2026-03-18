@@ -313,10 +313,10 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\supervisor
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\supervisor\cli.py:8:28 - warning: Argument type is unknown
     Argument corresponds to parameter "path" in function "load_profile" (reportUnknownArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\supervisor\gui\window.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\supervisor\gui\window.py:150:25 - warning: Argument type is partially unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\supervisor\gui\window.py:149:25 - warning: Argument type is partially unknown
     Argument corresponds to parameter "slot" in function "connect"
     Argument type is "(checked: Unknown, unit_id: str = row.unit_id) -> None" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\supervisor\gui\window.py:151:38 - warning: Argument type is unknown
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\supervisor\gui\window.py:150:38 - warning: Argument type is unknown
     Argument corresponds to parameter "checked" in function "_emit_unit_selected" (reportUnknownArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\supervisor\models.py
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\supervisor\models.py:200:5 - warning: Type of "densi_actions" is partially unknown
@@ -383,14 +383,6 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\bin
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder.py:148:45 - warning: Argument type is unknown
     Argument corresponds to parameter "state" in function "set_dot" (reportUnknownArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:27:37 - warning: Type of "block_signals" is partially unknown
-    Type of "block_signals" is "(widget: Unknown) -> _GeneratorContextManager[None, None, None]" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:27:52 - warning: Type of "safe_set_text" is partially unknown
-    Type of "safe_set_text" is "(widget: Unknown, text: str) -> None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:29:34 - warning: Type of "log_missing_optional_once" is partially unknown
-    Type of "log_missing_optional_once" is "(logger: Unknown, cache: WidgetCache, specs: Iterable[tuple[type[object], str]], *, context: str) -> None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:29:61 - warning: Type of "log_missing_required_once" is partially unknown
-    Type of "log_missing_required_once" is "(logger: Unknown, cache: WidgetCache, specs: Iterable[tuple[type[object], str]], *, context: str) -> None" (reportUnknownVariableType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:56:9 - warning: Type of "attr" is unknown (reportUnknownVariableType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:56:15 - warning: Type of "cls" is unknown (reportUnknownVariableType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\densi_qt_binder_support.py:56:20 - warning: Type of "name" is unknown (reportUnknownVariableType)
@@ -415,226 +407,11 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\bin
     Type of "_events" is "list[Unknown]" (reportUnknownVariableType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:78:5 - warning: Type of "_estop_checks" is partially unknown
     Type of "_estop_checks" is "dict[Unknown, Unknown]" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:201:9 - warning: Type of "apply" is partially unknown
-    Type of "apply" is "(b: Unknown, vm: HipViewModel) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:204:9 - warning: Type of "apply_startup_state" is partially unknown
-    Type of "apply_startup_state" is "(b: Unknown) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:207:9 - warning: Type of "apply_tick_text" is partially unknown
-    Type of "apply_tick_text" is "(b: Unknown, text: str) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:210:9 - warning: Type of "apply_online_state" is partially unknown
-    Type of "apply_online_state" is "(b: Unknown, state: str | None) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:213:9 - warning: Type of "_apply_attach_combo" is partially unknown
-    Type of "_apply_attach_combo" is "(b: Unknown, vm: HipViewModel) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:216:9 - warning: Type of "_set_joy_properties" is partially unknown
-    Type of "_set_joy_properties" is "(b: Unknown, deadman: bool, select_hip: bool) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:219:9 - warning: Type of "_apply_joy_speed" is partially unknown
-    Type of "_apply_joy_speed" is "(b: Unknown, soll_speed: float) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:226:9 - warning: Type of "_apply_attach_state" is partially unknown
-    Type of "_apply_attach_state" is "(b: Unknown, vm: HipViewModel) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:229:9 - warning: Type of "_apply_drive_status" is partially unknown
-    Type of "_apply_drive_status" is "(b: Unknown, vm: HipViewModel) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:232:9 - warning: Type of "_apply_banner" is partially unknown
-    Type of "_apply_banner" is "(b: Unknown, vm: HipViewModel) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:235:9 - warning: Type of "_apply_header_dots" is partially unknown
-    Type of "_apply_header_dots" is "(b: Unknown, vm: HipViewModel) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:238:9 - warning: Type of "_apply_estop_state" is partially unknown
-    Type of "_apply_estop_state" is "(b: Unknown, vm: HipViewModel) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:241:9 - warning: Type of "_apply_readouts" is partially unknown
-    Type of "_apply_readouts" is "(b: Unknown, vm: HipViewModel) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:244:9 - warning: Type of "_apply_sliders" is partially unknown
-    Type of "_apply_sliders" is "(b: Unknown, vm: HipViewModel) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:247:9 - warning: Type of "_apply_cut_markers" is partially unknown
-    Type of "_apply_cut_markers" is "(b: Unknown, vm: HipViewModel) -> None" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:250:9 - warning: Type of "_apply_params" is partially unknown
-    Type of "_apply_params" is "(b: Unknown, vm: HipViewModel) -> None" (reportUnknownMemberType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:273:9 - warning: Type of "set_dot" is partially unknown
     Type of "set_dot" is "(self: HipQtBinder, object_name: str, state: Unknown) -> None" (reportUnknownMemberType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder.py:273:47 - warning: Argument type is unknown
     Argument corresponds to parameter "state" in function "set_dot" (reportUnknownArgumentType)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:7:44 - warning: Type of "apply_hip_banner" is partially unknown
-    Type of "apply_hip_banner" is "(bindings: HipBannerBindings, banner_or_vm: Unknown) -> None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:8:49 - warning: Type of "apply_hip_cut_markers" is partially unknown
-    Type of "apply_hip_cut_markers" is "(bindings: HipCutMarkersBindings, vm_or_fragment: Unknown) -> None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:9:50 - warning: Type of "apply_hip_drive_status" is partially unknown
-    Type of "apply_hip_drive_status" is "(bindings: HipDriveStatusBindings, vm_or_fragment: Unknown) -> None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:10:43 - warning: Type of "apply_hip_estop" is partially unknown
-    Type of "apply_hip_estop" is "(bindings: HipEstopBindings, vm: Unknown) -> None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:11:49 - warning: Type of "apply_hip_header_dots" is partially unknown
-    Type of "apply_hip_header_dots" is "(bindings: HipHeaderDotsBindings, vm_or_fragment: Unknown) -> None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:12:46 - warning: Type of "apply_hip_readouts" is partially unknown
-    Type of "apply_hip_readouts" is "(bindings: HipReadoutsBindings, vm: Unknown) -> None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:13:45 - warning: Type of "apply_hip_sliders" is partially unknown
-    Type of "apply_hip_sliders" is "(bindings: HipSlidersBindings, vm: Unknown) -> None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:14:37 - warning: Type of "block_signals" is partially unknown
-    Type of "block_signals" is "(widget: Unknown) -> _GeneratorContextManager[None, None, None]" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:14:52 - warning: Type of "safe_set_text" is partially unknown
-    Type of "safe_set_text" is "(widget: Unknown, text: str) -> None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:15:37 - warning: Type of "apply_param_ui" is partially unknown
-    Type of "apply_param_ui" is "(bindings: ParamUiBindings, vm: Unknown) -> None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:29:5 - warning: Type of "apply_tick_text" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:30:5 - warning: Type of "_set_joy_properties" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:31:5 - warning: Type of "_apply_attach_state" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:34:5 - warning: Type of "_apply_attach_combo" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:36:5 - warning: Type of "_apply_banner" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:37:5 - warning: Type of "_apply_header_dots" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:38:5 - warning: Type of "_apply_estop_state" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:41:5 - warning: Type of "_apply_joy_speed" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:52:5 - warning: Type of "_apply_drive_status" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:53:5 - warning: Type of "_apply_readouts" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:54:5 - warning: Type of "_apply_sliders" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:55:5 - warning: Type of "_apply_cut_markers" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:56:5 - warning: Type of "_apply_params" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:60:5 - warning: Type of "apply_tick_text" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:61:5 - warning: Type of "_set_all_estop_unknown" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:62:5 - warning: Type of "_set_joy_properties" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:63:5 - warning: Type of "_apply_joy_speed" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:67:17 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:68:70 - warning: Type of "_txtTick" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:74:5 - warning: Type of "_set_dot" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:79:17 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:80:5 - warning: Type of "frame_footer" is partially unknown
-    Type of "frame_footer" is "Any | Unknown | None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:80:75 - warning: Type of "_frame_footer" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:81:5 - warning: Type of "frame_header" is partially unknown
-    Type of "frame_header" is "Any | Unknown | None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:81:75 - warning: Type of "_frame_header" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:85:13 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "widget" in function "set_state_property"
-    Argument type is "Any | Unknown" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:91:13 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "widget" in function "set_state_property"
-    Argument type is "Any | Unknown" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:99:17 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:100:5 - warning: Type of "sld" is partially unknown
-    Type of "sld" is "Any | Unknown | None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:100:65 - warning: Type of "_sld_vel_cmd" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:113:21 - warning: Type of "minimum" is partially unknown
-    Type of "minimum" is "Any | Unknown" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:113:21 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "x" in function "__new__"
-    Argument type is "Any | Unknown" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:114:21 - warning: Type of "maximum" is partially unknown
-    Type of "maximum" is "Any | Unknown" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:114:21 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "x" in function "__new__"
-    Argument type is "Any | Unknown" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:123:23 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "slider" in function "update_slider"
-    Argument type is "Any | Unknown" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:134:19 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "slider" in function "update_slider"
-    Argument type is "Any | Unknown" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:143:17 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:144:5 - warning: Type of "cmb" is partially unknown
-    Type of "cmb" is "Any | Unknown | None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:144:62 - warning: Type of "_cmbAxis" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:165:5 - warning: Type of "existing" is partially unknown
-    Type of "existing" is "list[Any | Unknown]" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:165:17 - warning: Type of "itemText" is partially unknown
-    Type of "itemText" is "Any | Unknown" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:165:48 - warning: Type of "count" is partially unknown
-    Type of "count" is "Any | Unknown" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:165:48 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "stop" in function "__new__"
-    Argument type is "Any | Unknown" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:166:5 - warning: Type of "need_rebuild" is partially unknown
-    Type of "need_rebuild" is "Any | Unknown | Literal[True]" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:166:44 - warning: Type of "currentText" is partially unknown
-    Type of "currentText" is "Any | Unknown" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:166:44 - warning: Type of "strip" is partially unknown
-    Type of "strip" is "Any | Unknown" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:172:17 - warning: Type of "clear" is partially unknown
-    Type of "clear" is "Any | Unknown" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:173:17 - warning: Type of "addItems" is partially unknown
-    Type of "addItems" is "Any | Unknown" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:174:17 - warning: Type of "setCurrentText" is partially unknown
-    Type of "setCurrentText" is "Any | Unknown" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:178:17 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "widget" in function "set_enabled"
-    Argument type is "Any | Unknown" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:185:8 - warning: Type of "_tabs_main" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:186:21 - warning: Type of "_tabs_main" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:186:21 - warning: Argument type is unknown
-    Argument corresponds to parameter "widget" in function "set_enabled" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:188:5 - warning: Type of "btn_setup" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:188:17 - warning: Type of "_find_button" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:189:5 - warning: Type of "btnMainReset" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:189:20 - warning: Type of "_find_button" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:190:5 - warning: Type of "btnGuiderReset" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:190:22 - warning: Type of "_find_button" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:191:5 - warning: Type of "btn_rec" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:191:15 - warning: Type of "_find_button" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:193:21 - warning: Argument type is unknown
-    Argument corresponds to parameter "widget" in function "set_enabled" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:195:21 - warning: Argument type is unknown
-    Argument corresponds to parameter "widget" in function "set_enabled" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:198:13 - warning: Argument type is unknown
-    Argument corresponds to parameter "widget" in function "set_enabled" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:201:21 - warning: Argument type is unknown
-    Argument corresponds to parameter "widget" in function "set_enabled" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:203:8 - warning: Type of "_btn_diag_resync" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:204:21 - warning: Type of "_btn_diag_resync" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:204:21 - warning: Argument type is unknown
-    Argument corresponds to parameter "widget" in function "set_enabled" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:206:8 - warning: Type of "_btn_estop_reset" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:207:21 - warning: Type of "_btn_estop_reset" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:207:21 - warning: Argument type is unknown
-    Argument corresponds to parameter "widget" in function "set_enabled" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:210:9 - warning: Type of "_clear_for_unattached" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:214:8 - warning: Type of "_drive_status_bindings" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:216:28 - warning: Type of "_drive_status_bindings" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:216:28 - warning: Argument type is unknown
-    Argument corresponds to parameter "bindings" in function "apply_hip_drive_status" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:220:8 - warning: Type of "_banner_bindings" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:222:22 - warning: Type of "_banner_bindings" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:222:22 - warning: Argument type is unknown
-    Argument corresponds to parameter "bindings" in function "apply_hip_banner" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:226:8 - warning: Type of "_header_dots_bindings" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:228:27 - warning: Type of "_header_dots_bindings" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:228:27 - warning: Argument type is unknown
-    Argument corresponds to parameter "bindings" in function "apply_hip_header_dots" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:232:8 - warning: Type of "_estop_bindings" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:234:21 - warning: Type of "_estop_bindings" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:234:21 - warning: Argument type is unknown
-    Argument corresponds to parameter "bindings" in function "apply_hip_estop" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:238:8 - warning: Type of "_readouts_bindings" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:241:19 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:241:46 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:246:26 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:247:24 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:249:29 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:251:24 - warning: Type of "_readouts_bindings" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:251:24 - warning: Argument type is unknown
-    Argument corresponds to parameter "bindings" in function "apply_hip_readouts" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:255:8 - warning: Type of "_sliders_bindings" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:257:23 - warning: Type of "_sliders_bindings" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:257:23 - warning: Argument type is unknown
-    Argument corresponds to parameter "bindings" in function "apply_hip_sliders" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:261:8 - warning: Type of "_cut_markers_bindings" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:263:27 - warning: Type of "_cut_markers_bindings" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:263:27 - warning: Argument type is unknown
-    Argument corresponds to parameter "bindings" in function "apply_hip_cut_markers" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:267:8 - warning: Type of "_param_ui_bindings" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:269:20 - warning: Type of "_param_ui_bindings" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_apply_impl.py:269:20 - warning: Argument type is unknown
-    Argument corresponds to parameter "bindings" in function "apply_param_ui" (reportUnknownArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_init_impl.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_init_impl.py:10:37 - warning: Type of "block_signals" is partially unknown
-    Type of "block_signals" is "(widget: Unknown) -> _GeneratorContextManager[None, None, None]" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_init_impl.py:10:52 - warning: Type of "safe_set_text" is partially unknown
-    Type of "safe_set_text" is "(widget: Unknown, text: str) -> None" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_init_impl.py:11:34 - warning: Type of "log_missing_required_once" is partially unknown
-    Type of "log_missing_required_once" is "(logger: Unknown, cache: WidgetCache, specs: Iterable[tuple[type[object], str]], *, context: str) -> None" (reportUnknownVariableType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_init_impl.py:125:13 - warning: Type of "_set_dot" is partially unknown
     Type of "_set_dot" is "(object_name: str, state: Unknown) -> None" (reportUnknownMemberType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_init_impl.py:140:9 - warning: Type of "_set_dot" is partially unknown
@@ -653,12 +430,6 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\bin
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\binders\hip_qt_binder_init_support.py:164:17 - warning: Argument type is partially unknown
     Argument corresponds to parameter "set_dot" in function "__init__"
     Argument type is "(object_name: str, state: Unknown) -> None" (reportUnknownArgumentType)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\controllers\__init__.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\controllers\__init__.py:24:27 - warning: Type of "YellowBindings" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\controllers\__init__.py:25:24 - warning: Type of "CommandIn" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\controllers\__init__.py:25:35 - warning: Type of "IntentOut" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\controllers\__init__.py:25:46 - warning: Type of "TelemetryIn" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\controllers\__init__.py:25:59 - warning: Type of "TelemetryOut" is unknown (reportUnknownVariableType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\controllers\densi_controller.py
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\controllers\densi_controller.py:86:16 - warning: Type of "_read_or_fallback" is partially unknown
     Type of "_read_or_fallback" is "(key: str, func: Unknown, *, fallback: Unknown) -> Unknown" (reportUnknownMemberType)
@@ -704,17 +475,6 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\dom
     Type of "_session_by_group" is "dict[Unknown, Unknown]" (reportUnknownVariableType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\domain\param_txn.py:65:5 - warning: Type of "_pending_txn" is partially unknown
     Type of "_pending_txn" is "dict[Unknown, Unknown]" (reportUnknownVariableType)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\densi\__init__.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\densi\__init__.py:8:5 - warning: "DenSiEngine" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\densi\__init__.py:9:5 - warning: "DenSiTickResult" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\densi\__init__.py:10:5 - warning: "DensiInputs" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\densi\__init__.py:11:5 - warning: "DensiUiInputs" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\densi\__init__.py:12:5 - warning: "DensiEstopToggle" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\densi\__init__.py:13:5 - warning: "EStopState" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\densi\__init__.py:14:5 - warning: "L0Top" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\densi\__init__.py:15:5 - warning: "L0Sub" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\densi\__init__.py:16:5 - warning: "DensiViewModel" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\densi\__init__.py:17:5 - warning: "normalize_densi_view_model" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\densi\engine_core.py
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\densi\engine_core.py:150:33 - warning: Argument type is unknown
     Argument corresponds to parameter "normalize_pos_chain" in function "__init__" (reportUnknownArgumentType)
@@ -765,18 +525,6 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\eng
     Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\densi\plc_anton_vel_cmd.py:116:22 - warning: Argument type is unknown
     Argument corresponds to parameter "x" in function "__new__" (reportUnknownArgumentType)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\__init__.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\__init__.py:8:5 - warning: "HipEngine" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\__init__.py:9:5 - warning: "HipAttachInputs" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\__init__.py:10:5 - warning: "HipAttachState" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\__init__.py:11:5 - warning: "HipBannerInputs" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\__init__.py:12:5 - warning: "HipParamAction" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\__init__.py:13:5 - warning: "HipParamCommitDialog" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\__init__.py:14:5 - warning: "HipState" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\__init__.py:15:5 - warning: "HipUiInputs" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\__init__.py:16:5 - warning: "HipViewModel" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\__init__.py:17:5 - warning: "HipStepInputs" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\__init__.py:18:5 - warning: "HipStepResult" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\engine.py:193:9 - warning: Type of "ax" is partially unknown
     Type of "ax" is "Unknown | None" (reportUnknownVariableType)
@@ -868,191 +616,35 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\eng
     Type of "limit_values" is "dict[Unknown, Unknown]" (reportUnknownVariableType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\engines\hip\viewmodel.py:101:5 - warning: Type of "param_writeback_values" is partially unknown
     Type of "param_writeback_values" is "dict[Unknown, Unknown]" (reportUnknownVariableType)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\__init__.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\__init__.py:8:5 - warning: "DenSiBannerVM" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\__init__.py:9:5 - warning: "DenSiCutMarkersVM" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\__init__.py:10:5 - warning: "CutMarkerEffects" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\__init__.py:11:5 - warning: "DenSiEstopDotsVM" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\__init__.py:12:5 - warning: "DenSiHeaderOnlineVM" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\__init__.py:13:5 - warning: "DenSiLifeTickVM" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\__init__.py:14:5 - warning: "DenSiLimitsVM" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\__init__.py:15:5 - warning: "DenSiReadoutsVM" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\__init__.py:16:5 - warning: "compute_densi_banner_vm" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\__init__.py:17:5 - warning: "compute_densi_cut_markers_vm" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\__init__.py:18:5 - warning: "compute_densi_estop_dots_vm" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\__init__.py:19:5 - warning: "compute_densi_header_online_vm" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\__init__.py:20:5 - warning: "compute_densi_lifetick_vm" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\__init__.py:21:5 - warning: "compute_densi_limits_vm" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\__init__.py:22:5 - warning: "compute_densi_readouts_vm" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\densi_estop_checkboxes_render.py
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\densi_estop_checkboxes_render.py:101:32 - warning: Argument type is partially unknown
     Argument corresponds to parameter "slot" in function "connect"
     Argument type is "(checked: Unknown, _k: str = key) -> None" (reportUnknownArgumentType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\densi\densi_estop_checkboxes_render.py:101:76 - warning: Argument type is unknown
     Argument corresponds to parameter "o" in function "__new__" (reportUnknownArgumentType)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\__init__.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\__init__.py:8:5 - warning: "HipBannerState" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\__init__.py:9:5 - warning: "HipEstopState" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\__init__.py:10:5 - warning: "HipHeaderDots" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\__init__.py:11:5 - warning: "compute_hip_banner_vm" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\__init__.py:12:5 - warning: "compute_hip_estop_vm" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\__init__.py:13:5 - warning: "compute_hip_header_dots_vm" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_banner_render.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_banner_render.py:21:22 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_banner_render.py:21:46 - warning: Argument type is unknown
-    Argument corresponds to parameter "default" in function "getattr" (reportUnknownArgumentType)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_cut_markers_render.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_cut_markers_render.py:21:19 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_cut_markers_render.py:21:50 - warning: Argument type is unknown
-    Argument corresponds to parameter "default" in function "getattr" (reportUnknownArgumentType)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_drive_status_render.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_drive_status_render.py:19:18 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_drive_status_render.py:19:50 - warning: Argument type is unknown
-    Argument corresponds to parameter "default" in function "getattr" (reportUnknownArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_estop_render.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_estop_render.py:21:18 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_estop_render.py:25:9 - warning: Type of "dot" is partially unknown
-    Type of "dot" is "Unknown | Any" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_estop_render.py:25:14 - warning: Type of "state" is partially unknown
-    Type of "state" is "Unknown | Any" (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_estop_render.py:26:30 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "object" in function "__new__"
-    Argument type is "Unknown | Any" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_estop_render.py:26:36 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "__p1"
-    Argument type is "Unknown | Any" (reportUnknownArgumentType)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_header_dots_render.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_header_dots_render.py:28:22 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_header_dots_render.py:28:53 - warning: Argument type is unknown
-    Argument corresponds to parameter "default" in function "getattr" (reportUnknownArgumentType)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_readouts_render.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_readouts_render.py:25:18 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_sliders_render.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_sliders_render.py:21:18 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "getattr" (reportUnknownArgumentType)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\__init__.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\__init__.py:8:5 - warning: "WidgetCache" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\__init__.py:9:5 - warning: "ModalLock" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\__init__.py:10:5 - warning: "ParamWidgetBinder" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\__init__.py:11:5 - warning: "ParamUiBindings" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\__init__.py:12:5 - warning: "apply_param_ui" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\__init__.py:13:5 - warning: "safe_set_text" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\__init__.py:14:5 - warning: "block_signals" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\__init__.py:15:5 - warning: "set_text" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\__init__.py:16:5 - warning: "set_enabled" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\__init__.py:17:5 - warning: "update_slider" is specified in __all__ but is not present in module (reportUnsupportedDunderAll)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_estop_render.py:37:17 - warning: Type of "active_keys" is partially unknown
+    Type of "active_keys" is "set[Unknown]" (reportUnknownVariableType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_estop_render.py:37:35 - warning: Argument type is partially unknown
+    Argument corresponds to parameter "iterable" in function "__init__"
+    Argument type is "Any | set[Unknown]" (reportUnknownArgumentType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\panels\hip\hip_estop_render.py:37:62 - warning: Argument type is partially unknown
+    Argument corresponds to parameter "default" in function "getattr"
+    Argument type is "set[Unknown]" (reportUnknownArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\binder_helpers.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\binder_helpers.py:12:14 - warning: Argument type is unknown
-    Argument corresponds to parameter "widget" in function "set_text" (reportUnknownArgumentType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\binder_helpers.py:20:5 - warning: Type of "was" is unknown (reportUnknownVariableType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\binder_helpers.py:20:11 - warning: Type of "blockSignals" is unknown (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\binder_helpers.py:20:18 - error: Cannot access attribute "blockSignals" for class "object"
+    Attribute "blockSignals" is unknown (reportAttributeAccessIssue)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\binder_helpers.py:24:9 - warning: Type of "blockSignals" is unknown (reportUnknownMemberType)
+  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\binder_helpers.py:24:16 - error: Cannot access attribute "blockSignals" for class "object"
+    Attribute "blockSignals" is unknown (reportAttributeAccessIssue)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\modal_lock.py
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\modal_lock.py:19:5 - warning: Type of "_prev_enabled" is partially unknown
     Type of "_prev_enabled" is "dict[Unknown, Unknown]" (reportUnknownVariableType)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:27:8 - warning: Type of "param_ui" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:30:25 - warning: Type of "param_ui" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:30:25 - warning: Type of "modal_lock_active" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:30:25 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:31:23 - warning: Type of "param_ui" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:31:23 - warning: Type of "modal_lock_group" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:31:23 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "object" in function "__new__"
-    Argument type is "Unknown | Literal['']" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:36:13 - warning: Type of "group" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:36:20 - warning: Type of "gstate" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:36:30 - warning: Type of "items" is partially unknown
-    Type of "items" is "Unknown | (() -> dict_items[Unknown, Unknown])" (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:36:31 - warning: Type of "param_ui" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:36:31 - warning: Type of "groups" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:37:38 - warning: Argument type is unknown
-    Argument corresponds to parameter "group" in function "_set_param_group_enabled" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:37:50 - warning: Type of "fields_enabled" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:37:50 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:38:37 - warning: Argument type is unknown
-    Argument corresponds to parameter "group" in function "_set_param_button_state" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:38:44 - warning: Type of "buttons" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:38:44 - warning: Argument type is unknown
-    Argument corresponds to parameter "buttons" in function "_set_param_button_state" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:40:8 - warning: Type of "param_values" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:42:13 - warning: Type of "param_values" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:42:13 - warning: Argument type is unknown
-    Argument corresponds to parameter "params" in function "apply_param_values" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:43:30 - warning: Type of "param_freeze_group" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:43:30 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "object" in function "__new__"
-    Argument type is "Unknown | Literal['']" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:48:8 - warning: Type of "param_writeback_values" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:48:38 - warning: Type of "param_writeback_group" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:50:13 - warning: Type of "param_writeback_values" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:50:13 - warning: Argument type is unknown
-    Argument corresponds to parameter "params" in function "apply_param_values" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:51:30 - warning: Type of "param_writeback_group" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:51:30 - warning: Argument type is partially unknown
-    Argument corresponds to parameter "object" in function "__new__"
-    Argument type is "Unknown | Literal['']" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:55:12 - warning: Type of "param_writeback_message" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:59:21 - warning: Type of "param_writeback_message" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:59:21 - warning: Argument type is unknown
-    Argument corresponds to parameter "object" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:62:8 - warning: Type of "param_commit_dialog" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:63:9 - warning: Type of "dlg" is unknown (reportUnknownVariableType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:63:15 - warning: Type of "param_commit_dialog" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:64:16 - warning: Type of "level" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:64:16 - warning: Argument type is unknown
-    Argument corresponds to parameter "object" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:65:51 - warning: Type of "title" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:65:51 - warning: Argument type is unknown
-    Argument corresponds to parameter "object" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:65:67 - warning: Type of "message" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:65:67 - warning: Argument type is unknown
-    Argument corresponds to parameter "object" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:67:55 - warning: Type of "title" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:67:55 - warning: Argument type is unknown
-    Argument corresponds to parameter "object" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:67:71 - warning: Type of "message" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:67:71 - warning: Argument type is unknown
-    Argument corresponds to parameter "object" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:69:8 - warning: Type of "limit_values" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:71:13 - warning: Type of "limit_values" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:71:13 - warning: Argument type is unknown
-    Argument corresponds to parameter "values" in function "apply_limit_values" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:143:30 - warning: Type of "edit_enabled" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:143:30 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:145:30 - warning: Type of "write_enabled" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:145:30 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "__new__" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:147:30 - warning: Type of "cancel_enabled" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\param_ui_apply.py:147:30 - warning: Argument type is unknown
-    Argument corresponds to parameter "o" in function "__new__" (reportUnknownArgumentType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\perf_watchdog.py
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\perf_watchdog.py:33:5 - warning: Type of "_segments" is partially unknown
     Type of "_segments" is "list[Unknown]" (reportUnknownVariableType)
-c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\ui_contract.py
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\ui_contract.py:45:30 - warning: Argument type is unknown
-    Argument corresponds to parameter "logger" in function "log_missing_required" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\ui_contract.py:65:13 - warning: Type of "warning" is unknown (reportUnknownMemberType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\ui_contract.py:78:22 - error: Argument of type "type[QWidget] | type[object]" cannot be assigned to parameter "cls" of type "type[T@get]" in function "get"
-    Type "QWidget | object" is not assignable to type "QWidget"
-      Type "QWidget | object" is not assignable to type "QWidget"
-        "object" is not assignable to "QWidget" (reportArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\ui_contract.py:96:30 - warning: Argument type is unknown
-    Argument corresponds to parameter "logger" in function "log_missing_optional" (reportUnknownArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\ui_contract.py:117:26 - error: Argument of type "type[QWidget] | type[object]" cannot be assigned to parameter "cls" of type "type[T@get]" in function "get"
-    Type "QWidget | object" is not assignable to type "QWidget"
-      Type "QWidget | object" is not assignable to type "QWidget"
-        "object" is not assignable to "QWidget" (reportArgumentType)
-  c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\ui_contract.py:120:13 - warning: Type of "debug" is unknown (reportUnknownMemberType)
 c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\widget_cache.py
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\src\steuerung3d\apps\yellow\qtutil\widget_cache.py:39:5 - warning: Type of "_cache" is partially unknown
     Type of "_cache" is "dict[Unknown, Unknown]" (reportUnknownVariableType)
@@ -2241,4 +1833,4 @@ c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mappin
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:91:12 - warning: Type of "get" is unknown (reportUnknownMemberType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:92:12 - warning: Type of "get" is unknown (reportUnknownMemberType)
   c:\Users\Martin\Documents\Steuerung3d_Remake\dev\tests\unit\test_hip_mode_mapping.py:93:12 - warning: Type of "get" is unknown (reportUnknownMemberType)
-2 errors, 1123 warnings, 0 informations
+2 errors, 861 warnings, 0 informations

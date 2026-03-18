@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable
 
 from PySide6.QtWidgets import QCheckBox, QPushButton
 
@@ -17,23 +17,25 @@ class HipEstopBindings:
     set_dot: Callable[[str, str], None]
 
 
-def apply_hip_estop(bindings: HipEstopBindings, vm) -> None:
+def apply_hip_estop(bindings: HipEstopBindings, vm: Any) -> None:
     es = getattr(vm, "estop_state", None)
     if es is None:
         return
 
-    for dot, state in (es.dots or {}).items():
-        bindings.set_dot(str(dot), state)
+    for dot, state in dict(getattr(es, "dots", {}) or {}).items():
+        bindings.set_dot(str(dot), str(state))
     if bindings.btn_estop_reset is not None:
         set_enabled(bindings.btn_estop_reset, bool(es.reset_enabled))
 
     for key, cb in (bindings.estop_checks or {}).items():
-        v = bool(es.checkbox_states.get(key, False))
+        checkbox_states = dict(getattr(es, "checkbox_states", {}) or {})
+        v = bool(checkbox_states.get(key, False))
         set_checked(cb, v, block_signals=True)
-        if es.profile_changed:
+        if bool(getattr(es, "profile_changed", False)):
             try:
                 f = cb.font()
-                f.setBold(key in es.active_keys)
+                active_keys = set(getattr(es, "active_keys", set()) or set())
+                f.setBold(key in active_keys)
                 cb.setFont(f)
             except Exception:
                 pass

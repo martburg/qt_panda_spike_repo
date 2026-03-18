@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from PySide6.QtWidgets import QAbstractSlider
 
@@ -17,32 +18,32 @@ class HipSlidersBindings:
     sld_guider_speed: QAbstractSlider
 
 
-def apply_hip_sliders(bindings: HipSlidersBindings, vm) -> None:
+def apply_hip_sliders(bindings: HipSlidersBindings, vm: Any) -> None:
     ro = getattr(vm, "readouts", None)
     if ro is None:
         return
 
     update_slider(
         bindings.sld_vel_cmd,
-        minimum=ro.vel_cmd_min,
-        maximum=ro.vel_cmd_max,
-        value=ro.vel_cmd_val,
+        minimum=int(ro.vel_cmd_min),
+        maximum=int(ro.vel_cmd_max),
+        value=int(ro.vel_cmd_val),
     )
     update_slider(
         bindings.sld_limit_range,
-        minimum=ro.limit_min,
-        maximum=ro.limit_max,
-        value=ro.limit_val,
+        minimum=int(ro.limit_min),
+        maximum=int(ro.limit_max),
+        value=int(ro.limit_val),
     )
     update_slider(
         bindings.sld_guider_range,
-        minimum=ro.guider_range_min,
-        maximum=ro.guider_range_max,
-        value=ro.guider_range_val,
+        minimum=int(ro.guider_range_min),
+        maximum=int(ro.guider_range_max),
+        value=int(ro.guider_range_val),
     )
     update_slider(
         bindings.sld_guider_speed,
-        minimum=ro.guider_speed_min,
-        maximum=ro.guider_speed_max,
-        value=ro.guider_speed_val,
+        minimum=int(ro.guider_speed_min),
+        maximum=int(ro.guider_speed_max),
+        value=int(ro.guider_speed_val),
     )

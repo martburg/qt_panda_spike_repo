@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from PySide6.QtWidgets import QLineEdit
 
@@ -15,7 +16,7 @@ class HipDriveStatusBindings:
     txt_slave_amp_status: QLineEdit | None
 
 
-def apply_hip_drive_status(bindings: HipDriveStatusBindings, vm_or_fragment) -> None:
+def apply_hip_drive_status(bindings: HipDriveStatusBindings, vm_or_fragment: Any) -> None:
     ds = getattr(vm_or_fragment, "drive_status", vm_or_fragment)
     if ds is None:
         return

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..engines.hip.attach_state import NOT_ATTACHED
 from ..panels.hip.hip_banner_render import apply_hip_banner
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from ..engines.hip.engine import HipViewModel
 
 
-def apply(b, vm: HipViewModel) -> None:
+def apply(b: Any, vm: HipViewModel) -> None:
     # Always-visible UI
     b.apply_tick_text(vm.tick_text)
     b._set_joy_properties(vm.joy_deadman, vm.joy_select_hip)
@@ -56,29 +56,35 @@ def apply(b, vm: HipViewModel) -> None:
     b._apply_params(vm)
 
 
-def apply_startup_state(b) -> None:
+def apply_startup_state(b: Any) -> None:
     b.apply_tick_text("--")
     b._set_all_estop_unknown()
     b._set_joy_properties(False, False)
     b._apply_joy_speed(0.0)
 
 
-def apply_tick_text(b, text: str) -> None:
+def apply_tick_text(b: Any, text: str) -> None:
     w = getattr(b, "_widgets", None)
-    safe_set_text(getattr(w, "txt_tick", None) if w is not None else b._txtTick, text)
+    safe_set_text(
+        getattr(w, "txt_tick", None) if w is not None else getattr(b, "_txtTick", None), text
+    )
 
 
-def apply_online_state(b, state: str | None) -> None:
+def apply_online_state(b: Any, state: str | None) -> None:
     if state is None:
         return
     b._set_dot("dotHdrOnline", state)
 
 
-def _set_joy_properties(b, deadman: bool, select_hip: bool) -> None:
+def _set_joy_properties(b: Any, deadman: bool, select_hip: bool) -> None:
     # Joy UI reflection: QSS uses joy_deadman/joy_select_hip dynamic properties.
     w = getattr(b, "_widgets", None)
-    frame_footer = getattr(w, "frame_footer", None) if w is not None else b._frame_footer
-    frame_header = getattr(w, "frame_header", None) if w is not None else b._frame_header
+    frame_footer = (
+        getattr(w, "frame_footer", None) if w is not None else getattr(b, "_frame_footer", None)
+    )
+    frame_header = (
+        getattr(w, "frame_header", None) if w is not None else getattr(b, "_frame_header", None)
+    )
 
     if frame_footer is not None:
         set_state_property(
@@ -94,10 +100,10 @@ def _set_joy_properties(b, deadman: bool, select_hip: bool) -> None:
         )
 
 
-def _apply_joy_speed(b, soll_speed: float) -> None:
+def _apply_joy_speed(b: Any, soll_speed: float) -> None:
     # sldVelCmd is display-only; updates are programmatic with signals blocked.
     w = getattr(b, "_widgets", None)
-    sld = getattr(w, "sld_vel_cmd", None) if w is not None else b._sld_vel_cmd
+    sld = getattr(w, "sld_vel_cmd", None) if w is not None else getattr(b, "_sld_vel_cmd", None)
     if sld is None:
         return
     try:
@@ -139,9 +145,9 @@ def _apply_joy_speed(b, soll_speed: float) -> None:
 # ------------------------------------------------------------------
 
 
-def _apply_attach_combo(b, vm: HipViewModel) -> None:
+def _apply_attach_combo(b: Any, vm: HipViewModel) -> None:
     w = getattr(b, "_widgets", None)
-    cmb = getattr(w, "cmb_axis", None) if w is not None else b._cmbAxis
+    cmb = getattr(w, "cmb_axis", None) if w is not None else getattr(b, "_cmbAxis", None)
     if vm.attach_combo is None or cmb is None:
         return
 
@@ -162,8 +168,8 @@ def _apply_attach_combo(b, vm: HipViewModel) -> None:
     if desired not in items:
         desired = NOT_ATTACHED
 
-    existing = [cmb.itemText(i) for i in range(cmb.count())]
-    need_rebuild = (existing != items) or (cmb.currentText().strip() != desired)
+    existing = [str(cmb.itemText(i)) for i in range(int(cmb.count()))]
+    need_rebuild = (existing != items) or (str(cmb.currentText()).strip() != desired)
 
     if need_rebuild:
         b._suppress_axis_signal = True
@@ -178,11 +184,11 @@ def _apply_attach_combo(b, vm: HipViewModel) -> None:
     set_enabled(cmb, bool(vm.attach_combo.enabled))
 
 
-def _apply_attach_state(b, vm: HipViewModel) -> None:
+def _apply_attach_state(b: Any, vm: HipViewModel) -> None:
     if vm.attach_state is None:
         return
 
-    if b._tabs_main is not None and vm.attach_state.tabs_enabled is not None:
+    if getattr(b, "_tabs_main", None) is not None and vm.attach_state.tabs_enabled is not None:
         set_enabled(b._tabs_main, bool(vm.attach_state.tabs_enabled))
 
     btn_setup = b._find_button("btnSetupToggle")
@@ -200,42 +206,45 @@ def _apply_attach_state(b, vm: HipViewModel) -> None:
     if btn_rec is not None:
         set_enabled(btn_rec, False)
 
-    if b._btn_diag_resync is not None:
+    if getattr(b, "_btn_diag_resync", None) is not None:
         set_enabled(b._btn_diag_resync, bool(vm.attach_state.resync_enabled))
 
-    if b._btn_estop_reset is not None and vm.attach_state.estop_reset_enabled is not None:
+    if (
+        getattr(b, "_btn_estop_reset", None) is not None
+        and vm.attach_state.estop_reset_enabled is not None
+    ):
         set_enabled(b._btn_estop_reset, bool(vm.attach_state.estop_reset_enabled))
 
     if not bool(vm.attach_state.attached):
         b._clear_for_unattached()
 
 
-def _apply_drive_status(b, vm: HipViewModel) -> None:
-    if b._drive_status_bindings is None:
+def _apply_drive_status(b: Any, vm: HipViewModel) -> None:
+    if getattr(b, "_drive_status_bindings", None) is None:
         return
     apply_hip_drive_status(b._drive_status_bindings, vm)
 
 
-def _apply_banner(b, vm: HipViewModel) -> None:
-    if b._banner_bindings is None:
+def _apply_banner(b: Any, vm: HipViewModel) -> None:
+    if getattr(b, "_banner_bindings", None) is None:
         return
     apply_hip_banner(b._banner_bindings, vm)
 
 
-def _apply_header_dots(b, vm: HipViewModel) -> None:
-    if b._header_dots_bindings is None:
+def _apply_header_dots(b: Any, vm: HipViewModel) -> None:
+    if getattr(b, "_header_dots_bindings", None) is None:
         return
     apply_hip_header_dots(b._header_dots_bindings, vm)
 
 
-def _apply_estop_state(b, vm: HipViewModel) -> None:
-    if b._estop_bindings is None:
+def _apply_estop_state(b: Any, vm: HipViewModel) -> None:
+    if getattr(b, "_estop_bindings", None) is None:
         return
     apply_hip_estop(b._estop_bindings, vm)
 
 
-def _apply_readouts(b, vm: HipViewModel) -> None:
-    if b._readouts_bindings is None:
+def _apply_readouts(b: Any, vm: HipViewModel) -> None:
+    if getattr(b, "_readouts_bindings", None) is None:
         return
     ro = getattr(vm, "readouts", None)
     log = getattr(b, "log", None) or getattr(b, "_log", None)
@@ -251,20 +260,20 @@ def _apply_readouts(b, vm: HipViewModel) -> None:
     apply_hip_readouts(b._readouts_bindings, vm)
 
 
-def _apply_sliders(b, vm: HipViewModel) -> None:
-    if b._sliders_bindings is None:
+def _apply_sliders(b: Any, vm: HipViewModel) -> None:
+    if getattr(b, "_sliders_bindings", None) is None:
         return
     apply_hip_sliders(b._sliders_bindings, vm)
 
 
-def _apply_cut_markers(b, vm: HipViewModel) -> None:
-    if b._cut_markers_bindings is None:
+def _apply_cut_markers(b: Any, vm: HipViewModel) -> None:
+    if getattr(b, "_cut_markers_bindings", None) is None:
         return
     apply_hip_cut_markers(b._cut_markers_bindings, vm)
 
 
-def _apply_params(b, vm: HipViewModel) -> None:
-    if b._param_ui_bindings is None:
+def _apply_params(b: Any, vm: HipViewModel) -> None:
+    if getattr(b, "_param_ui_bindings", None) is None:
         return
     apply_param_ui(b._param_ui_bindings, vm)
 

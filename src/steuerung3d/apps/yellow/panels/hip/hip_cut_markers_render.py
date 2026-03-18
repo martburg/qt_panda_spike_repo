@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from PySide6.QtWidgets import QLineEdit
 
@@ -17,15 +18,15 @@ class HipCutMarkersBindings:
     txt_posdiff: QLineEdit | None
 
 
-def apply_hip_cut_markers(bindings: HipCutMarkersBindings, vm_or_fragment) -> None:
+def apply_hip_cut_markers(bindings: HipCutMarkersBindings, vm_or_fragment: Any) -> None:
     cut = getattr(vm_or_fragment, "cut_markers", vm_or_fragment)
     if cut is None:
         return
     if bindings.txt_cut_time is not None:
-        set_text(bindings.txt_cut_time, cut.cut_time_text)
+        set_text(bindings.txt_cut_time, str(cut.cut_time_text))
     if bindings.txt_cut_pos is not None:
-        set_text(bindings.txt_cut_pos, cut.cut_pos_text)
+        set_text(bindings.txt_cut_pos, str(cut.cut_pos_text))
     if bindings.txt_cut_vel is not None:
-        set_text(bindings.txt_cut_vel, cut.cut_vel_text)
+        set_text(bindings.txt_cut_vel, str(cut.cut_vel_text))
     if bindings.txt_posdiff is not None:
-        set_text(bindings.txt_posdiff, cut.posdiff_text)
+        set_text(bindings.txt_posdiff, str(cut.posdiff_text))
