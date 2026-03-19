@@ -28,10 +28,7 @@ def _build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--profile",
         default="configs/supervisor/smoke_2pairs_motion.toml",
-        help=(
-            "Supervisor profile path "
-            "(default: configs/supervisor/smoke_2pairs_motion.toml)"
-        ),
+        help=("Supervisor profile path (default: configs/supervisor/smoke_2pairs_motion.toml)"),
     )
     ap.add_argument("--startup-timeout-s", type=float, default=20.0)
     ap.add_argument("--ready-grace-s", type=float, default=1.0)
@@ -87,14 +84,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[smoke] session={result.session_dir}")
     print(f"[smoke] selected axes={', '.join(result.selected_axis_ids) or '<none>'}")
     print(f"[smoke] reset publish cycles={result.reset_publish_count}")
-    print(
-        "[smoke] observed reset logs=" + (", ".join(result.observed_reset_log_names) or "<none>")
-    )
+    print("[smoke] observed reset logs=" + (", ".join(result.observed_reset_log_names) or "<none>"))
     print(f"[smoke] estart publish cycles={result.estart_publish_count}")
     print(f"[smoke] resync publish cycles={result.resync_publish_count}")
     print(
-        "[smoke] observed estart logs="
-        + (", ".join(result.observed_estart_log_names) or "<none>")
+        "[smoke] observed estart logs=" + (", ".join(result.observed_estart_log_names) or "<none>")
     )
     print(
         "[smoke] observed running system time axes="
@@ -107,13 +101,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(f"[smoke] motion start commands={result.motion_command_publish_count}")
     print(
-        "[smoke] observed motion axes="
-        + (", ".join(result.observed_motion_axis_ids) or "<none>")
+        "[smoke] observed motion axes=" + (", ".join(result.observed_motion_axis_ids) or "<none>")
     )
-    print(
-        "[smoke] observed stop axes="
-        + (", ".join(result.observed_stop_axis_ids) or "<none>")
-    )
+    print("[smoke] observed stop axes=" + (", ".join(result.observed_stop_axis_ids) or "<none>"))
     first_by_axis = dict(result.system_time_first_by_axis or {})
     last_by_axis = dict(result.system_time_last_by_axis or {})
     first_tick_by_axis = dict(result.system_time_first_tick_by_axis or {})

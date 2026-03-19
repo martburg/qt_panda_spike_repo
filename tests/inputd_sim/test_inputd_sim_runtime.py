@@ -65,9 +65,17 @@ def test_inputd_sim_runner_progresses_and_holds_final_state() -> None:
 def test_apply_control_start_is_idempotent_and_restart_resets() -> None:
     runner = InputdSimRunner(prepared=_prepared())
 
-    assert _apply_control(runner=runner, command=InputdSimControl(action="start"), now=1.0) == "start"
-    assert _apply_control(runner=runner, command=InputdSimControl(action="start"), now=1.5) == "start_ignored"
-    assert _apply_control(runner=runner, command=InputdSimControl(action="restart"), now=2.0) == "restart"
+    assert (
+        _apply_control(runner=runner, command=InputdSimControl(action="start"), now=1.0) == "start"
+    )
+    assert (
+        _apply_control(runner=runner, command=InputdSimControl(action="start"), now=1.5)
+        == "start_ignored"
+    )
+    assert (
+        _apply_control(runner=runner, command=InputdSimControl(action="restart"), now=2.0)
+        == "restart"
+    )
     assert runner.start_t == 2.0
     assert _apply_control(runner=runner, command=InputdSimControl(action="idle"), now=3.0) == "idle"
     assert runner.active is False

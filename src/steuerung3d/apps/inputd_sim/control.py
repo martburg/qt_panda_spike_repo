@@ -38,9 +38,7 @@ class UdpInputdSimControlIn:
     @staticmethod
     def bind(addr: tuple[str, int]) -> "UdpInputdSimControlIn":
         link = UdpLink(bind=addr, target=addr)
-        return UdpInputdSimControlIn(
-            rx=UdpJsonIn(link=link, decode=decode_inputd_sim_control)
-        )
+        return UdpInputdSimControlIn(rx=UdpJsonIn(link=link, decode=decode_inputd_sim_control))
 
     def drain_commands(self, limit: int = 1000) -> list[InputdSimControl]:
         return self.rx.drain(limit=limit)
@@ -55,9 +53,7 @@ class UdpInputdSimControlOut:
         target: tuple[str, int], *, bind: tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpInputdSimControlOut":
         link = UdpLink(bind=bind, target=target)
-        return UdpInputdSimControlOut(
-            tx=UdpJsonOut(link=link, encode=encode_inputd_sim_control)
-        )
+        return UdpInputdSimControlOut(tx=UdpJsonOut(link=link, encode=encode_inputd_sim_control))
 
     def publish_command(self, command: InputdSimControl) -> None:
         self.tx.send(command)

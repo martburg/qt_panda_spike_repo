@@ -178,7 +178,6 @@ def test_refresh_hip_processes_releases_claim_and_lease_when_last_child_exits(
         rt.shutdown()
 
 
-
 def test_supervisor_smoke_action_input_can_latch_chk_es_taster(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -226,7 +225,12 @@ def test_supervisor_smoke_action_input_can_latch_chk_es_taster(
 
     from steuerung3d.apps.supervisor.models import PairConfig, SupervisorProfile
     from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
-    from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS, ESTOP_SPECS, encode_estop_word
+    from steuerung3d.protocol.estop_bits import (
+        ESTOP_CAUSE_KEYS,
+        ESTOP_OK_KEYS,
+        ESTOP_SPECS,
+        encode_estop_word,
+    )
 
     bits: dict[str, bool] = {}
     for key in ESTOP_SPECS:

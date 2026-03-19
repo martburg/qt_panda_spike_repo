@@ -115,7 +115,9 @@ class InputdSimObservation:
     buttons: tuple[int, ...]
 
 
-def _publish_sample(*, out: UdpRawControlsOut, cfg: InputdSimConfig, sample: InputdSimSample) -> None:
+def _publish_sample(
+    *, out: UdpRawControlsOut, cfg: InputdSimConfig, sample: InputdSimSample
+) -> None:
     out.publish_raw_controls(
         RawControls(
             t_ns=time.monotonic_ns(),

@@ -17,8 +17,10 @@ from steuerung3d.protocol.udp_channels import (
     close_udp_json_endpoint,
 )
 
-from .actions_transport import UdpDensiActionIn as UdpDensiActionIn
-from .actions_transport import UdpDensiActionOut as UdpDensiActionOut
+from .actions_transport import (
+    UdpDensiActionIn as UdpDensiActionIn,
+    UdpDensiActionOut as UdpDensiActionOut,
+)
 from .engine import SupervisorEngine
 from .gui.window import SupervisorWindow
 from .models import SupervisorProfile
@@ -105,12 +107,16 @@ class SupervisorRuntime(QObject):
         self.telemetry_in, self.intent_out, self.action_outs_by_unit_id = init_transports(
             profile=self.profile
         )
-        smoke_action_in_addr = str(os.environ.get("STEUERUNG3D_SUPERVISOR_ACTION_IN", "") or "").strip()
+        smoke_action_in_addr = str(
+            os.environ.get("STEUERUNG3D_SUPERVISOR_ACTION_IN", "") or ""
+        ).strip()
         if smoke_action_in_addr:
             try:
                 self._smoke_action_in = UdpDensiActionIn.bind(parse_hostport(smoke_action_in_addr))
             except Exception:
-                log.exception("failed to bind supervisor smoke action input %s", smoke_action_in_addr)
+                log.exception(
+                    "failed to bind supervisor smoke action input %s", smoke_action_in_addr
+                )
                 self._smoke_action_in = None
 
     def _init_window_and_signals(self) -> None:
@@ -140,7 +146,6 @@ class SupervisorRuntime(QObject):
         if merged is None:
             return
         self.engine.ingest(merged)
-
 
     def _ingest_smoke_actions(self) -> None:
         if self._smoke_action_in is None:

@@ -17,8 +17,8 @@ from steuerung3d.core.intents import RequestEstopReset, RequestResync
 from steuerung3d.core.net import parse_hostport
 from steuerung3d.core.process_liveness import pid_is_alive
 from steuerung3d.core.stack_loader import load_stack_profile
-from steuerung3d.core.stack_spec import StackSpec
 from steuerung3d.core.stack_meta import ChildMeta, StackMeta, find_latest_session_dir, load_meta
+from steuerung3d.core.stack_spec import StackSpec
 from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn, close_udp_json_endpoint
 
 from .actions_transport import UdpDensiActionOut
@@ -145,8 +145,6 @@ def build_selected_estop_reset_intents(profile: SupervisorProfile) -> tuple[Requ
     return tuple(intents)
 
 
-
-
 def build_selected_resync_intents(profile: SupervisorProfile) -> tuple[RequestResync, ...]:
     intents: list[RequestResync] = []
     for axis in profile.axes:
@@ -160,6 +158,7 @@ def build_selected_resync_intents(profile: SupervisorProfile) -> tuple[RequestRe
             )
         )
     return tuple(intents)
+
 
 def build_selected_estart_targets(profile: SupervisorProfile) -> tuple[_SelectedActionTarget, ...]:
     targets: list[_SelectedActionTarget] = []
@@ -214,9 +213,7 @@ def system_time_tokens_advanced(previous: str, current: str) -> bool:
     return curr_raw != prev_raw
 
 
-def extract_axis_system_time_tokens(
-    snap: object, axis_ids: Sequence[str]
-) -> dict[str, str]:
+def extract_axis_system_time_tokens(snap: object, axis_ids: Sequence[str]) -> dict[str, str]:
     tail_by_axis = getattr(snap, "axis_plc_uplink_tail", {}) or {}
     if not isinstance(tail_by_axis, Mapping):
         return {}
@@ -461,13 +458,12 @@ def _launch_supervisor(config: SmokeSequenceConfig) -> _LaunchedSupervisor:
     )
 
 
-
-
 def _reserve_loopback_udp_addr() -> str:
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.bind(("127.0.0.1", 0))
         host, port = sock.getsockname()[:2]
     return f"{host}:{int(port)}"
+
 
 def _required_process_names(profile: SupervisorProfile, *, stack_spec: StackSpec) -> set[str]:
     names = {"core"}
@@ -584,7 +580,9 @@ def _drive_estop_reset_until_observed(
     )
 
 
-def _bind_observer_telemetry_in(profile: SupervisorProfile) -> tuple[UdpTelemetryIn, tuple[str, int]]:
+def _bind_observer_telemetry_in(
+    profile: SupervisorProfile,
+) -> tuple[UdpTelemetryIn, tuple[str, int]]:
     last_error: OSError | None = None
     for addr in infer_observer_telemetry_candidates(profile):
         try:
@@ -592,12 +590,16 @@ def _bind_observer_telemetry_in(profile: SupervisorProfile) -> tuple[UdpTelemetr
         except OSError as exc:
             last_error = exc
             continue
-    candidates = ", ".join(f"{host}:{port}" for host, port in infer_observer_telemetry_candidates(profile))
+    candidates = ", ".join(
+        f"{host}:{port}" for host, port in infer_observer_telemetry_candidates(profile)
+    )
     if last_error is not None:
         raise SmokeSequenceError(
             f"unable to bind smoke telemetry observer on any of [{candidates}]: {last_error}"
         )
-    raise SmokeSequenceError(f"unable to infer smoke telemetry observer address from {profile.telem_in}")
+    raise SmokeSequenceError(
+        f"unable to infer smoke telemetry observer address from {profile.telem_in}"
+    )
 
 
 def _drive_resync_until_system_time_observed(
@@ -630,7 +632,9 @@ def _drive_resync_until_system_time_observed(
     last_tick_by_axis: dict[str, int] = {}
     try:
         while time.monotonic() < deadline:
-            _raise_if_process_exited(process, "supervisor exited while observing running SystemTime after Resync")
+            _raise_if_process_exited(
+                process, "supervisor exited while observing running SystemTime after Resync"
+            )
             now = time.monotonic()
             if now >= next_publish_at:
                 for intent in intents:
@@ -725,7 +729,9 @@ def _drive_chk_es_taster_until_ready(
 
     try:
         while time.monotonic() < baseline_deadline and len(before_by_axis) < len(axis_id_set):
-            _raise_if_process_exited(process, "supervisor exited while observing pre-chkEsTaster idle state")
+            _raise_if_process_exited(
+                process, "supervisor exited while observing pre-chkEsTaster idle state"
+            )
             snaps = observer_in.drain_telemetry(limit=50)
             for snap in snaps:
                 estates = extract_axis_estates(snap, axis_ids)
@@ -739,7 +745,9 @@ def _drive_chk_es_taster_until_ready(
         next_publish_at = time.monotonic()
         pending = set(axis_id_set)
         while time.monotonic() < ready_deadline:
-            _raise_if_process_exited(process, "supervisor exited while observing chkEsTaster phase progression")
+            _raise_if_process_exited(
+                process, "supervisor exited while observing chkEsTaster phase progression"
+            )
             now = time.monotonic()
             if now >= next_publish_at:
                 control_out.publish_action(action)
@@ -761,7 +769,11 @@ def _drive_chk_es_taster_until_ready(
                         armed_seen.add(axis_id)
                     if estate == "READY":
                         ready_seen.add(axis_id)
-                pending = {axis_id for axis_id in axis_id_set if not (axis_id in armed_seen and axis_id in ready_seen)}
+                pending = {
+                    axis_id
+                    for axis_id in axis_id_set
+                    if not (axis_id in armed_seen and axis_id in ready_seen)
+                }
                 if not pending:
                     return (
                         ChkEsTasterObservation(
@@ -830,7 +842,9 @@ def _drive_motion_until_stopped(
 
     try:
         while time.monotonic() < baseline_deadline and len(start_pos_by_axis) < len(axis_id_set):
-            _raise_if_process_exited(process, "supervisor exited while observing pre-motion positions")
+            _raise_if_process_exited(
+                process, "supervisor exited while observing pre-motion positions"
+            )
             for snap in observer_in.drain_telemetry(limit=50):
                 positions = extract_axis_positions(snap, axis_ids)
                 for axis_id, pos in positions.items():
@@ -842,7 +856,9 @@ def _drive_motion_until_stopped(
             raise SmokeSequenceError(f"timed out waiting for baseline positions in {missing}")
 
         while time.monotonic() < motion_deadline:
-            _raise_if_process_exited(process, "supervisor exited while observing motion after chkEsTaster")
+            _raise_if_process_exited(
+                process, "supervisor exited while observing motion after chkEsTaster"
+            )
             now = time.monotonic()
             if now >= next_publish_at and not axis_id_set.issubset(moving_axis_ids):
                 control_out.publish_command(start_command)
@@ -868,7 +884,9 @@ def _drive_motion_until_stopped(
                     )
                     if axis_id in moving_axis_ids and abs_vel <= float(vel_zero_eps):
                         stop_candidate_since.setdefault(axis_id, sample_time)
-                        if sample_time - float(stop_candidate_since[axis_id]) >= float(release_settle_s):
+                        if sample_time - float(stop_candidate_since[axis_id]) >= float(
+                            release_settle_s
+                        ):
                             stopped_axis_ids.add(axis_id)
                     else:
                         stop_candidate_since.pop(axis_id, None)
@@ -939,7 +957,9 @@ def _drive_estart_until_observed(
 ) -> tuple[set[str], int]:
     targets = build_selected_estart_targets(profile)
     if not targets:
-        raise SmokeSequenceError("no selected supervisor axes with densi_action_out available for ESStart")
+        raise SmokeSequenceError(
+            "no selected supervisor axes with densi_action_out available for ESStart"
+        )
 
     pending = {target.densi_process_name for target in targets}
     observed: set[str] = set()
@@ -956,7 +976,9 @@ def _drive_estart_until_observed(
     action = DensiRemoteAction("estart")
     try:
         while time.monotonic() < deadline:
-            _raise_if_process_exited(process, "supervisor exited while observing densi ESStart logs")
+            _raise_if_process_exited(
+                process, "supervisor exited while observing densi ESStart logs"
+            )
             now = time.monotonic()
             if now >= next_publish_at:
                 for tx in tx_by_name.values():

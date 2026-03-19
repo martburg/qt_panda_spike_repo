@@ -19,7 +19,12 @@ from steuerung3d.apps.supervisor.smoke_sequence_support import (
     system_time_tokens_advanced,
 )
 from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
-from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS, ESTOP_SPECS, encode_estop_word
+from steuerung3d.protocol.estop_bits import (
+    ESTOP_CAUSE_KEYS,
+    ESTOP_OK_KEYS,
+    ESTOP_SPECS,
+    encode_estop_word,
+)
 
 
 def _profile() -> SupervisorProfile:
@@ -71,14 +76,13 @@ def test_build_selected_estop_reset_intents_uses_supervisor_actor_and_selected_a
     assert all(intent.actor_kind == "supervisor" for intent in intents)
 
 
-
-
 def test_build_selected_resync_intents_uses_supervisor_actor_and_selected_axes() -> None:
     intents = build_selected_resync_intents(_profile())
 
     assert [intent.axis_id for intent in intents] == ["Anton", "Cecil"]
     assert all(intent.hip_id == "sup_smoke" for intent in intents)
     assert all(intent.actor_kind == "supervisor" for intent in intents)
+
 
 def test_build_selected_estart_targets_uses_only_selected_axes_with_action_out() -> None:
     targets = build_selected_estart_targets(_profile())
@@ -164,7 +168,7 @@ def test_extract_axis_estates_reads_axis_estop_word_cache() -> None:
 
 def test_smoke_sequence_result_exposes_publish_counts_for_cli_feedback() -> None:
     result = SmokeSequenceResult(
-        session_dir=Path('.run/example'),
+        session_dir=Path(".run/example"),
         selected_axis_ids=("Anton",),
         observed_reset_log_names=("densi-Anton",),
         observed_estart_log_names=("densi-Anton",),
@@ -243,7 +247,7 @@ def test_extract_axis_positions_and_velocities_read_axis_cache() -> None:
 
 def test_smoke_sequence_result_exposes_systemtime_tick_ranges_for_cli_feedback() -> None:
     result = SmokeSequenceResult(
-        session_dir=Path('.run/example'),
+        session_dir=Path(".run/example"),
         selected_axis_ids=("Anton",),
         observed_reset_log_names=("densi-Anton",),
         observed_estart_log_names=("densi-Anton",),
