@@ -33,6 +33,8 @@ from steuerung3d.protocol.udp_plc_channel_support import (
 )
 from steuerung3d.protocol.udp_plc_frame_support import axis_id_or_default
 
+from .udp_link_scaffold import bind_udp_link, connect_udp_link
+
 
 def _to_bytes(line: str) -> bytes:
     # PLC traffic is ASCII-ish. Keep it permissive.
@@ -76,7 +78,7 @@ class UdpPlcTelemetryIn:
     @staticmethod
     def bind(addr: Tuple[str, int]) -> "UdpPlcTelemetryIn":
         # target unused for rx
-        return UdpPlcTelemetryIn(link=UdpLink(bind=addr, target=addr))
+        return UdpPlcTelemetryIn(link=bind_udp_link(addr))
 
     def drain_lines(self, limit: int = 1000) -> List[str]:
         return [_from_bytes(b) for b in self.link.poll(limit=limit)]
@@ -97,7 +99,7 @@ class UdpPlcTelemetryOut:
     def connect(
         target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpPlcTelemetryOut":
-        return UdpPlcTelemetryOut(link=UdpLink(bind=bind, target=target))
+        return UdpPlcTelemetryOut(link=connect_udp_link(target, bind=bind))
 
     def publish_line(self, line: str) -> None:
         self.link.send(_to_bytes(line))
@@ -145,7 +147,7 @@ class UdpPlcCommandIn:
 
     @staticmethod
     def bind(addr: Tuple[str, int], axis_id: Optional[str] = None) -> "UdpPlcCommandIn":
-        return UdpPlcCommandIn(link=UdpLink(bind=addr, target=addr), axis_id=axis_id)
+        return UdpPlcCommandIn(link=bind_udp_link(addr), axis_id=axis_id)
 
     def drain_lines(self, limit: int = 1000) -> List[str]:
         return [_from_bytes(b) for b in self.link.poll(limit=limit)]
@@ -229,7 +231,7 @@ class UdpPlcCommandOut:
     def connect(
         target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpPlcCommandOut":
-        return UdpPlcCommandOut(link=UdpLink(bind=bind, target=target))
+        return UdpPlcCommandOut(link=connect_udp_link(target, bind=bind))
 
     def publish_line(self, line: str) -> None:
         self.link.send(_to_bytes(line))

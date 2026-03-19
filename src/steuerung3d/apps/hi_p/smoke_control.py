@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, cast
 
-from steuerung3d.adapters.links.udp_link import UdpLink
 from steuerung3d.protocol.udp_channels import UdpJsonIn, UdpJsonOut
+from steuerung3d.protocol.udp_link_scaffold import bind_udp_link, connect_udp_link
 
 
 def _empty_float_dict() -> dict[str, float]:
@@ -64,7 +64,7 @@ class UdpHiPSmokeControlIn:
 
     @staticmethod
     def bind(addr: tuple[str, int]) -> "UdpHiPSmokeControlIn":
-        link = UdpLink(bind=addr, target=addr)
+        link = bind_udp_link(addr)
         return UdpHiPSmokeControlIn(rx=UdpJsonIn(link=link, decode=decode_hip_smoke_command))
 
     def drain_commands(self, limit: int = 1000) -> list[HiPSmokeCommand]:
@@ -79,7 +79,7 @@ class UdpHiPSmokeControlOut:
     def connect(
         target: tuple[str, int], *, bind: tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpHiPSmokeControlOut":
-        link = UdpLink(bind=bind, target=target)
+        link = connect_udp_link(target, bind=bind)
         return UdpHiPSmokeControlOut(tx=UdpJsonOut(link=link, encode=encode_hip_smoke_command))
 
     def publish_command(self, command: HiPSmokeCommand) -> None:

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from steuerung3d.adapters.links.udp_link import UdpLink
 from steuerung3d.protocol.udp_channels import UdpJsonIn, UdpJsonOut
+from steuerung3d.protocol.udp_link_scaffold import bind_udp_link, connect_udp_link
 
 from .models import DensiRemoteAction
 
@@ -14,7 +14,7 @@ class UdpDensiActionIn:
 
     @staticmethod
     def bind(addr: tuple[str, int]) -> "UdpDensiActionIn":
-        link = UdpLink(bind=addr, target=addr)
+        link = bind_udp_link(addr)
         return UdpDensiActionIn(rx=UdpJsonIn(link=link, decode=_decode_action))
 
     def drain_actions(self, limit: int = 1000) -> list[DensiRemoteAction]:
@@ -35,7 +35,7 @@ class UdpDensiActionOut:
     def connect(
         target: tuple[str, int], *, bind: tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpDensiActionOut":
-        link = UdpLink(bind=bind, target=target)
+        link = connect_udp_link(target, bind=bind)
         return UdpDensiActionOut(tx=UdpJsonOut(link=link, encode=_encode_action))
 
     def publish_action(self, action: DensiRemoteAction) -> None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Sequence
 
 from steuerung3d.apps.supervisor.engine import SupervisorEngine
-from steuerung3d.apps.supervisor.models import PairConfig, PairPhase, SupervisorProfile
+from steuerung3d.apps.supervisor.models import AxisConfig, AxisPhase, SupervisorProfile
 from steuerung3d.core.intents import (
     EchoLifeTick,
     Intent,
@@ -60,9 +60,9 @@ def _profile() -> SupervisorProfile:
         cycle_ms=50,
         telem_in="127.0.0.1:51002",
         intent_out="127.0.0.1:51001",
-        pairs=(
-            PairConfig(
-                pair_id="anton",
+        axes=(
+            AxisConfig(
+                unit_id="anton",
                 axis_id="Anton",
                 densi_id="Anton",
                 hip_id="hip_anton",
@@ -125,7 +125,7 @@ def test_engine_maps_ready_live_and_stale() -> None:
     eng = SupervisorEngine(_profile())
     eng.ingest(_snap(estop_word=(1 << 11) | (1 << 27) | (1 << 13) | (1 << 20) | (1 << 21), vel=0.0))
     row = eng.snapshot().rows[0]
-    assert row.phase in (PairPhase.ARMED, PairPhase.READY, PairPhase.ESTOP)
+    assert row.phase in (AxisPhase.ARMED, AxisPhase.READY, AxisPhase.ESTOP)
 
     eng.ingest(
         _snap(
@@ -135,10 +135,10 @@ def test_engine_maps_ready_live_and_stale() -> None:
             soll_speed=0.5,
         )
     )
-    assert eng.snapshot().rows[0].phase == PairPhase.LIVE
+    assert eng.snapshot().rows[0].phase == AxisPhase.LIVE
 
     eng.ingest(_snap(estop_word=(1 << 11), age_ticks=50))
-    assert eng.snapshot().rows[0].phase == PairPhase.STALE
+    assert eng.snapshot().rows[0].phase == AxisPhase.STALE
 
 
 def test_selection_changes_joy_update_selected_axes() -> None:
@@ -166,8 +166,8 @@ def test_status_line_uses_arming_when_pair_is_armed() -> None:
     eng = SupervisorEngine(_profile())
     eng.ingest(_snap(estop_word=_healthy_word(taster=True, brk_ok=False)))
     snap = eng.snapshot()
-    assert snap.rows[0].phase in (PairPhase.ARMED, PairPhase.READY)
-    if snap.rows[0].phase == PairPhase.ARMED:
+    assert snap.rows[0].phase in (AxisPhase.ARMED, AxisPhase.READY)
+    if snap.rows[0].phase == AxisPhase.ARMED:
         assert "System: ARMING" in snap.status_text
 
 

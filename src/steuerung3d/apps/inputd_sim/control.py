@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from steuerung3d.adapters.links.udp_link import UdpLink
 from steuerung3d.protocol.udp_channels import UdpJsonIn, UdpJsonOut
+from steuerung3d.protocol.udp_link_scaffold import bind_udp_link, connect_udp_link
 
 InputdSimControlAction = Literal["start", "restart", "idle"]
 
@@ -37,7 +37,7 @@ class UdpInputdSimControlIn:
 
     @staticmethod
     def bind(addr: tuple[str, int]) -> "UdpInputdSimControlIn":
-        link = UdpLink(bind=addr, target=addr)
+        link = bind_udp_link(addr)
         return UdpInputdSimControlIn(rx=UdpJsonIn(link=link, decode=decode_inputd_sim_control))
 
     def drain_commands(self, limit: int = 1000) -> list[InputdSimControl]:
@@ -52,7 +52,7 @@ class UdpInputdSimControlOut:
     def connect(
         target: tuple[str, int], *, bind: tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpInputdSimControlOut":
-        link = UdpLink(bind=bind, target=target)
+        link = connect_udp_link(target, bind=bind)
         return UdpInputdSimControlOut(tx=UdpJsonOut(link=link, encode=encode_inputd_sim_control))
 
     def publish_command(self, command: InputdSimControl) -> None:

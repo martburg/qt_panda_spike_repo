@@ -188,9 +188,6 @@ class SupervisorWindow(QMainWindow):
         self.unit_selected_changed.emit(normalized_unit_id, normalized_checked)
         self.pair_selected_changed.emit(normalized_unit_id, normalized_checked)
 
-    def _emit_pair_selected(self, pair_id: str, checked: bool) -> None:
-        self._emit_unit_selected(pair_id, checked)
-
     def _make_unit_selected_handler(self, unit_id: str):
         def _on_toggled(checked: bool) -> None:
             self._emit_unit_selected(unit_id, bool(checked))

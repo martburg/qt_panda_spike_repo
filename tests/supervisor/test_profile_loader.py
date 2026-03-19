@@ -7,7 +7,7 @@ import pytest
 from steuerung3d.apps.supervisor.profile_loader import load_profile
 
 
-def test_load_profile_parses_pairs(tmp_path: Path) -> None:
+def test_load_profile_parses_axes(tmp_path: Path) -> None:
     p = tmp_path / "sup.toml"
     p.write_text(
         """
@@ -18,8 +18,8 @@ cycle_ms = 60
 telem_in = "127.0.0.1:51002"
 intent_out = "127.0.0.1:51001"
 
-[[pairs]]
-pair_id = "anton"
+[[axes]]
+unit_id = "anton"
 axis_id = "Anton"
 densi_id = "Anton"
 hip_id = "hip_anton"
@@ -33,10 +33,10 @@ densi_action_out = "127.0.0.1:53001"
     assert prof.title == "Main Supervisor"
     assert prof.axes[0].unit_id == "anton"
     assert prof.axes[0].densi_action_out == "127.0.0.1:53001"
-    assert prof.pairs[0].pair_id == "anton"
+    assert prof.axes[0].unit_id == "anton"
 
 
-def test_load_profile_parses_axes(tmp_path: Path) -> None:
+def test_load_profile_parses_multiple_axes(tmp_path: Path) -> None:
     p = tmp_path / "sup.toml"
     p.write_text(
         """
@@ -60,7 +60,27 @@ selected = false
     assert [axis.axis_id for axis in prof.axes] == ["Anton", "Debby"]
 
 
-def test_load_profile_rejects_duplicate_pair_ids(tmp_path: Path) -> None:
+def test_load_profile_parses_legacy_pairs(tmp_path: Path) -> None:
+    p = tmp_path / "sup.toml"
+    p.write_text(
+        """
+[supervisor]
+id = "sup_main"
+
+[[pairs]]
+pair_id = "anton"
+axis_id = "Anton"
+selected = true
+""",
+        encoding="utf-8",
+    )
+    prof = load_profile(p)
+    assert prof.axes[0].unit_id == "anton"
+    assert prof.axes[0].axis_id == "Anton"
+    assert prof.pairs[0].pair_id == "anton"
+
+
+def test_load_profile_rejects_duplicate_unit_ids_from_legacy_pairs(tmp_path: Path) -> None:
     p = tmp_path / "sup.toml"
     p.write_text(
         """

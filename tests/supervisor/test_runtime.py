@@ -64,6 +64,7 @@ def _dummy_window_module() -> types.ModuleType:
         resync_clicked=_NullSignal(),
         recover_clicked=_NullSignal(),
         chk_es_taster_changed=_NullSignal(),
+        unit_selected_changed=_NullSignal(),
         pair_selected_changed=_NullSignal(),
         open_hip_clicked=_NullSignal(),
         status_label=SimpleNamespace(setText=_noop_text),
@@ -131,7 +132,7 @@ def test_refresh_hip_processes_releases_claim_and_lease_when_last_child_exits(
     monkeypatch.setattr(runtime_mod.UdpTelemetryIn, "bind", _drain_telemetry_stub)
     monkeypatch.setattr(runtime_mod.UdpIntentOut, "connect", _publish_intent_stub(published))
 
-    from steuerung3d.apps.supervisor.models import PairConfig, SupervisorProfile
+    from steuerung3d.apps.supervisor.models import AxisConfig, SupervisorProfile
     from steuerung3d.core.intents import ReleaseAxis, ReleaseAxisLease
 
     class _DummyChild:
@@ -148,9 +149,9 @@ def test_refresh_hip_processes_releases_claim_and_lease_when_last_child_exits(
         telem_in="127.0.0.1:51002",
         intent_out="127.0.0.1:51001",
         gui=False,
-        pairs=(
-            PairConfig(
-                pair_id="anton",
+        axes=(
+            AxisConfig(
+                unit_id="anton",
                 axis_id="Anton",
                 densi_id="Anton",
                 hip_id="hip_anton",
@@ -223,7 +224,7 @@ def test_supervisor_smoke_action_input_can_latch_chk_es_taster(
     monkeypatch.setattr(runtime_mod.UdpDensiActionIn, "bind", _action_in_bind)
     monkeypatch.setenv("STEUERUNG3D_SUPERVISOR_ACTION_IN", "127.0.0.1:55001")
 
-    from steuerung3d.apps.supervisor.models import PairConfig, SupervisorProfile
+    from steuerung3d.apps.supervisor.models import AxisConfig, SupervisorProfile
     from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
     from steuerung3d.protocol.estop_bits import (
         ESTOP_CAUSE_KEYS,
@@ -250,9 +251,9 @@ def test_supervisor_smoke_action_input_can_latch_chk_es_taster(
         telem_in="127.0.0.1:51002",
         intent_out="127.0.0.1:51001",
         gui=False,
-        pairs=(
-            PairConfig(
-                pair_id="anton",
+        axes=(
+            AxisConfig(
+                unit_id="anton",
                 axis_id="Anton",
                 densi_id="Anton",
                 hip_id="hip_anton",
@@ -343,7 +344,7 @@ def test_supervisor_smoke_action_input_can_open_hip(
     monkeypatch.setattr(runtime_mod.UdpDensiActionIn, "bind", _action_in_bind)
     monkeypatch.setenv("STEUERUNG3D_SUPERVISOR_ACTION_IN", "127.0.0.1:55001")
 
-    from steuerung3d.apps.supervisor.models import PairConfig, SupervisorProfile
+    from steuerung3d.apps.supervisor.models import AxisConfig, SupervisorProfile
 
     profile = SupervisorProfile(
         supervisor_id="sup",
@@ -352,11 +353,10 @@ def test_supervisor_smoke_action_input_can_open_hip(
         telem_in="127.0.0.1:51002",
         intent_out="127.0.0.1:51001",
         gui=False,
-        pairs=(
-            PairConfig(
-                pair_id="anton",
-                axis_id="Anton",
+        axes=(
+            AxisConfig(
                 unit_id="anton",
+                axis_id="Anton",
                 densi_id="Anton",
                 hip_id="hip_anton",
                 selected=True,

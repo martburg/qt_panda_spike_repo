@@ -24,6 +24,8 @@ from steuerung3d.protocol.codec import (
 )
 from steuerung3d.protocol.raw_controls import RawControls
 
+from .udp_link_scaffold import bind_udp_link, connect_udp_link
+
 log = logging.getLogger("udp")
 
 T = TypeVar("T")
@@ -95,7 +97,7 @@ class UdpRawControlsIn:
 
     @staticmethod
     def bind(addr: Tuple[str, int]) -> "UdpRawControlsIn":
-        link = UdpLink(bind=addr, target=addr)
+        link = bind_udp_link(addr)
         return UdpRawControlsIn(rx=UdpJsonIn(link=link, decode=decode_raw_controls))
 
     def drain_raw_controls(self, limit: int = 1000) -> List[RawControls]:
@@ -110,7 +112,7 @@ class UdpRawControlsOut:
     def connect(
         target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpRawControlsOut":
-        link = UdpLink(bind=bind, target=target)
+        link = connect_udp_link(target, bind=bind)
         return UdpRawControlsOut(tx=UdpJsonOut(link=link, encode=encode_raw_controls))
 
     def publish_raw_controls(self, rc: RawControls) -> None:
@@ -124,7 +126,7 @@ class UdpIntentIn:
 
     @staticmethod
     def bind(addr: Tuple[str, int]) -> "UdpIntentIn":
-        link = UdpLink(bind=addr, target=addr)  # target unused for rx
+        link = bind_udp_link(addr)
         return UdpIntentIn(rx=UdpJsonIn(link=link, decode=decode_intent))
 
     def drain_intents(self, limit: int = 1000) -> List[Intent]:
@@ -139,7 +141,7 @@ class UdpIntentOut:
     def connect(
         target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpIntentOut":
-        link = UdpLink(bind=bind, target=target)
+        link = connect_udp_link(target, bind=bind)
         return UdpIntentOut(tx=UdpJsonOut(link=link, encode=encode_intent))
 
     def publish_intent(self, intent: Intent) -> None:
@@ -152,7 +154,7 @@ class UdpControlContextIn:
 
     @staticmethod
     def bind(addr: Tuple[str, int]) -> "UdpControlContextIn":
-        link = UdpLink(bind=addr, target=addr)
+        link = bind_udp_link(addr)
         return UdpControlContextIn(rx=UdpJsonIn(link=link, decode=decode_control_context))
 
     def drain_contexts(self, limit: int = 1000) -> List[ControlContext]:
@@ -167,7 +169,7 @@ class UdpControlContextOut:
     def connect(
         target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpControlContextOut":
-        link = UdpLink(bind=bind, target=target)
+        link = connect_udp_link(target, bind=bind)
         return UdpControlContextOut(tx=UdpJsonOut(link=link, encode=encode_control_context))
 
     def publish_control_context(self, ctx: ControlContext) -> None:
@@ -180,7 +182,7 @@ class UdpTelemetryIn:
 
     @staticmethod
     def bind(addr: Tuple[str, int]) -> "UdpTelemetryIn":
-        link = UdpLink(bind=addr, target=addr)
+        link = bind_udp_link(addr)
         return UdpTelemetryIn(rx=UdpJsonIn(link=link, decode=decode_telemetry))
 
     def drain_telemetry(self, limit: int = 1000) -> List[TelemetrySnapshot]:
@@ -195,7 +197,7 @@ class UdpTelemetryOut:
     def connect(
         target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpTelemetryOut":
-        link = UdpLink(bind=bind, target=target)
+        link = connect_udp_link(target, bind=bind)
         return UdpTelemetryOut(tx=UdpJsonOut(link=link, encode=encode_telemetry))
 
     def publish_telemetry(self, snap: TelemetrySnapshot) -> None:
@@ -225,7 +227,7 @@ class UdpCommandIn:
 
     @staticmethod
     def bind(addr: Tuple[str, int]) -> "UdpCommandIn":
-        link = UdpLink(bind=addr, target=addr)
+        link = bind_udp_link(addr)
         return UdpCommandIn(rx=UdpJsonIn(link=link, decode=decode_command_frame))
 
     def drain_command_frames(self, limit: int = 1000) -> List[CommandFrame]:
@@ -240,7 +242,7 @@ class UdpCommandOut:
     def connect(
         target: Tuple[str, int], *, bind: Tuple[str, int] = ("127.0.0.1", 0)
     ) -> "UdpCommandOut":
-        link = UdpLink(bind=bind, target=target)
+        link = connect_udp_link(target, bind=bind)
         return UdpCommandOut(tx=UdpJsonOut(link=link, encode=encode_command_frame))
 
     def publish_command_frame(self, frame: CommandFrame) -> None:
