@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import subprocess
-import time
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
@@ -25,6 +24,7 @@ from .smoke_sequence_extract import (
     extract_axis_velocities,
     system_time_tokens_advanced,
 )
+from .smoke_sequence_polling import PublishCadence, monotonic_deadline, poll_until_result
 from .smoke_sequence_targets import (
     build_selected_estart_targets,
     build_selected_estop_reset_intents,
@@ -57,23 +57,24 @@ def drive_estop_reset_until_observed(
     pending = {str(name) for name in densi_process_names}
     observed: set[str] = set()
     publish_count = 0
-    deadline = time.monotonic() + max(0.1, float(timeout_s))
-    next_publish_at = time.monotonic()
-    publish_every_s = max(0.05, float(publish_interval_s))
-    settle = max(0.0, float(settle_s))
+    deadline = monotonic_deadline(timeout_s)
 
     intent_out = UdpIntentOut.connect(parse_hostport(profile.intent_out))
+    cadence = PublishCadence(
+        deadline=deadline,
+        interval_s=float(publish_interval_s),
+        settle_s=float(settle_s),
+    )
     try:
-        while time.monotonic() < deadline:
-            _raise_if_process_exited(process, "supervisor exited while observing densi reset logs")
-            now = time.monotonic()
-            if now >= next_publish_at:
-                for intent in intents:
-                    intent_out.publish_intent(intent)
+
+        def _publish_intents() -> None:
+            for intent in intents:
+                intent_out.publish_intent(intent)
+
+        def _observe() -> tuple[set[str], int] | None:
+            nonlocal publish_count
+            if cadence.maybe_publish(_publish_intents):
                 publish_count += 1
-                next_publish_at = now + publish_every_s
-                if settle > 0.0:
-                    time.sleep(min(settle, max(0.0, deadline - time.monotonic())))
 
             meta = _try_load_meta(session_dir)
             if meta is not None:
@@ -86,7 +87,17 @@ def drive_estop_reset_until_observed(
                         observed.add(name)
                 if not pending:
                     return observed, publish_count
-            time.sleep(0.05)
+            return None
+
+        result = poll_until_result(
+            deadline=deadline,
+            check_alive=lambda: _raise_if_process_exited(
+                process, "supervisor exited while observing densi reset logs"
+            ),
+            observe=_observe,
+        )
+        if result is not None:
+            return result
     finally:
         close_udp_json_endpoint(intent_out)
 
@@ -115,10 +126,12 @@ def drive_resync_until_system_time_observed(
 
     observer_in, _observer_addr = bind_observer_telemetry_in(profile)
     intent_out = UdpIntentOut.connect(parse_hostport(profile.intent_out))
-    deadline = time.monotonic() + max(0.1, float(timeout_s))
-    next_publish_at = time.monotonic()
-    publish_every_s = max(0.05, float(publish_interval_s))
-    settle = max(0.0, float(settle_s))
+    deadline = monotonic_deadline(timeout_s)
+    cadence = PublishCadence(
+        deadline=deadline,
+        interval_s=float(publish_interval_s),
+        settle_s=float(settle_s),
+    )
     publish_count = 0
     pending = {str(axis_id) for axis_id in axis_ids}
     first_by_axis: dict[str, str] = {}
@@ -126,18 +139,15 @@ def drive_resync_until_system_time_observed(
     first_tick_by_axis: dict[str, int] = {}
     last_tick_by_axis: dict[str, int] = {}
     try:
-        while time.monotonic() < deadline:
-            _raise_if_process_exited(
-                process, "supervisor exited while observing running SystemTime after Resync"
-            )
-            now = time.monotonic()
-            if now >= next_publish_at:
-                for intent in intents:
-                    intent_out.publish_intent(intent)
+
+        def _publish_intents() -> None:
+            for intent in intents:
+                intent_out.publish_intent(intent)
+
+        def _observe() -> tuple[SystemTimeProgressObservation, int] | None:
+            nonlocal publish_count
+            if cadence.maybe_publish(_publish_intents):
                 publish_count += 1
-                next_publish_at = now + publish_every_s
-                if settle > 0.0:
-                    time.sleep(min(settle, max(0.0, deadline - time.monotonic())))
 
             snaps = observer_in.drain_telemetry(limit=50)
             for snap in snaps:
@@ -171,7 +181,17 @@ def drive_resync_until_system_time_observed(
                         ),
                         publish_count,
                     )
-            time.sleep(0.05)
+            return None
+
+        result = poll_until_result(
+            deadline=deadline,
+            check_alive=lambda: _raise_if_process_exited(
+                process, "supervisor exited while observing running SystemTime after Resync"
+            ),
+            observe=_observe,
+        )
+        if result is not None:
+            return result
     finally:
         close_udp_json_endpoint(observer_in)
         close_udp_json_endpoint(intent_out)
@@ -215,17 +235,18 @@ def drive_chk_es_taster_until_ready(
     armed_seen: set[str] = set()
     ready_seen: set[str] = set()
     publish_count = 0
-    baseline_deadline = time.monotonic() + min(1.0, max(0.25, float(timeout_s) * 0.25))
-    publish_every_s = max(0.05, float(publish_interval_s))
-    settle = max(0.0, float(settle_s))
-    next_publish_at = 0.0
+    baseline_deadline = monotonic_deadline(min(1.0, max(0.25, float(timeout_s) * 0.25)))
+    ready_deadline = monotonic_deadline(max(0.1, float(brake_grace_s) + 0.5))
+    cadence = PublishCadence(
+        deadline=ready_deadline,
+        interval_s=float(publish_interval_s),
+        settle_s=float(settle_s),
+    )
     action = DensiRemoteAction("chk_es_taster", value=True)
 
     try:
-        while time.monotonic() < baseline_deadline and len(before_by_axis) < len(axis_id_set):
-            _raise_if_process_exited(
-                process, "supervisor exited while observing pre-chkEsTaster idle state"
-            )
+
+        def _observe_baseline() -> bool | None:
             snaps = observer_in.drain_telemetry(limit=50)
             for snap in snaps:
                 estates = extract_axis_estates(snap, axis_ids)
@@ -233,21 +254,22 @@ def drive_chk_es_taster_until_ready(
                     final_by_axis[axis_id] = estate
                     if axis_id not in before_by_axis and estate == "IDLE":
                         before_by_axis[axis_id] = estate
-            time.sleep(0.05)
+            if len(before_by_axis) >= len(axis_id_set):
+                return True
+            return None
 
-        ready_deadline = time.monotonic() + max(0.1, float(brake_grace_s) + 0.5)
-        next_publish_at = time.monotonic()
-        while time.monotonic() < ready_deadline:
-            _raise_if_process_exited(
-                process, "supervisor exited while observing chkEsTaster phase progression"
-            )
-            now = time.monotonic()
-            if now >= next_publish_at:
-                control_out.publish_action(action)
+        poll_until_result(
+            deadline=baseline_deadline,
+            check_alive=lambda: _raise_if_process_exited(
+                process, "supervisor exited while observing pre-chkEsTaster idle state"
+            ),
+            observe=_observe_baseline,
+        )
+
+        def _observe_ready() -> tuple[ChkEsTasterObservation, int] | None:
+            nonlocal publish_count
+            if cadence.maybe_publish(lambda: control_out.publish_action(action)):
                 publish_count += 1
-                next_publish_at = now + publish_every_s
-                if settle > 0.0:
-                    time.sleep(min(settle, max(0.0, ready_deadline - time.monotonic())))
 
             snaps = observer_in.drain_telemetry(limit=50)
             for snap in snaps:
@@ -279,7 +301,17 @@ def drive_chk_es_taster_until_ready(
                         ),
                         publish_count,
                     )
-            time.sleep(0.05)
+            return None
+
+        result = poll_until_result(
+            deadline=ready_deadline,
+            check_alive=lambda: _raise_if_process_exited(
+                process, "supervisor exited while observing chkEsTaster phase progression"
+            ),
+            observe=_observe_ready,
+        )
+        if result is not None:
+            return result
     finally:
         close_udp_json_endpoint(observer_in)
         close_udp_json_endpoint(control_out)
@@ -327,42 +359,44 @@ def drive_motion_until_stopped(
     stopped_axis_ids: set[str] = set()
     stop_candidate_since: dict[str, float] = {}
     publish_count = 0
-    baseline_deadline = time.monotonic() + min(1.5, max(0.5, float(timeout_s) * 0.25))
+    baseline_deadline = monotonic_deadline(min(1.5, max(0.5, float(timeout_s) * 0.25)))
     start_command = InputdSimControl(action="start")
-    publish_every_s = max(0.05, float(publish_interval_s))
-    next_publish_at = time.monotonic()
-    motion_deadline = time.monotonic() + max(0.5, float(timeout_s))
+    motion_deadline = monotonic_deadline(max(0.5, float(timeout_s)))
+    cadence = PublishCadence(deadline=motion_deadline, interval_s=float(publish_interval_s))
 
     try:
-        while time.monotonic() < baseline_deadline and len(start_pos_by_axis) < len(axis_id_set):
-            _raise_if_process_exited(
-                process, "supervisor exited while observing pre-motion positions"
-            )
+
+        def _observe_baseline() -> bool | None:
             for snap in observer_in.drain_telemetry(limit=50):
                 positions = extract_axis_positions(snap, axis_ids)
                 for axis_id, pos in positions.items():
                     start_pos_by_axis.setdefault(axis_id, float(pos))
                     end_pos_by_axis[axis_id] = float(pos)
-            time.sleep(0.05)
+            if len(start_pos_by_axis) >= len(axis_id_set):
+                return True
+            return None
+
+        poll_until_result(
+            deadline=baseline_deadline,
+            check_alive=lambda: _raise_if_process_exited(
+                process, "supervisor exited while observing pre-motion positions"
+            ),
+            observe=_observe_baseline,
+        )
         if len(start_pos_by_axis) < len(axis_id_set):
             missing = ", ".join(sorted(axis_id_set - set(start_pos_by_axis))) or "<none>"
             raise SmokeSequenceError(f"timed out waiting for baseline positions in {missing}")
 
-        while time.monotonic() < motion_deadline:
-            _raise_if_process_exited(
-                process, "supervisor exited while observing motion after chkEsTaster"
-            )
-            now = time.monotonic()
-            if now >= next_publish_at and not axis_id_set.issubset(moving_axis_ids):
-                control_out.publish_command(start_command)
-                publish_count += 1
-                next_publish_at = now + publish_every_s
+        def _observe_motion() -> tuple[MotionObservation, int] | None:
+            nonlocal publish_count
+            if not axis_id_set.issubset(moving_axis_ids):
+                if cadence.maybe_publish(lambda: control_out.publish_command(start_command)):
+                    publish_count += 1
 
-            snaps = observer_in.drain_telemetry(limit=50)
-            for snap in snaps:
+            for snap in observer_in.drain_telemetry(limit=50):
                 positions = extract_axis_positions(snap, axis_ids)
                 velocities = extract_axis_velocities(snap, axis_ids)
-                sample_time = time.monotonic()
+                sample_time = monotonic_deadline(0.0, minimum_s=0.0)
                 for axis_id, pos in positions.items():
                     end_pos_by_axis[axis_id] = float(pos)
                     start_pos = float(start_pos_by_axis.get(axis_id, pos))
@@ -415,7 +449,17 @@ def drive_motion_until_stopped(
                         ),
                         publish_count,
                     )
-            time.sleep(0.05)
+            return None
+
+        result = poll_until_result(
+            deadline=motion_deadline,
+            check_alive=lambda: _raise_if_process_exited(
+                process, "supervisor exited while observing motion after chkEsTaster"
+            ),
+            observe=_observe_motion,
+        )
+        if result is not None:
+            return result
     finally:
         close_udp_json_endpoint(observer_in)
         close_udp_json_endpoint(control_out)
@@ -457,29 +501,28 @@ def drive_estart_until_observed(
     pending = {target.densi_process_name for target in targets}
     observed: set[str] = set()
     publish_count = 0
-    deadline = time.monotonic() + max(0.1, float(timeout_s))
-    next_publish_at = time.monotonic()
-    publish_every_s = max(0.05, float(publish_interval_s))
-    settle = max(0.0, float(settle_s))
+    deadline = monotonic_deadline(timeout_s)
 
     tx_by_name = {
         target.densi_process_name: UdpDensiActionOut.connect(parse_hostport(target.action_out_addr))
         for target in targets
     }
     action = DensiRemoteAction("estart")
+    cadence = PublishCadence(
+        deadline=deadline,
+        interval_s=float(publish_interval_s),
+        settle_s=float(settle_s),
+    )
     try:
-        while time.monotonic() < deadline:
-            _raise_if_process_exited(
-                process, "supervisor exited while observing densi ESStart logs"
-            )
-            now = time.monotonic()
-            if now >= next_publish_at:
-                for tx in tx_by_name.values():
-                    tx.publish_action(action)
+
+        def _publish_estart() -> None:
+            for tx in tx_by_name.values():
+                tx.publish_action(action)
+
+        def _observe() -> tuple[set[str], int] | None:
+            nonlocal publish_count
+            if cadence.maybe_publish(_publish_estart):
                 publish_count += 1
-                next_publish_at = now + publish_every_s
-                if settle > 0.0:
-                    time.sleep(min(settle, max(0.0, deadline - time.monotonic())))
 
             meta = _try_load_meta(session_dir)
             if meta is not None:
@@ -492,7 +535,17 @@ def drive_estart_until_observed(
                         observed.add(name)
                 if not pending:
                     return observed, publish_count
-            time.sleep(0.05)
+            return None
+
+        result = poll_until_result(
+            deadline=deadline,
+            check_alive=lambda: _raise_if_process_exited(
+                process, "supervisor exited while observing densi ESStart logs"
+            ),
+            observe=_observe,
+        )
+        if result is not None:
+            return result
     finally:
         for tx in tx_by_name.values():
             close_udp_json_endpoint(tx)
@@ -511,15 +564,26 @@ def wait_for_core_log_token(
     token: str,
     timeout_s: float,
 ) -> None:
-    deadline = time.monotonic() + max(0.1, float(timeout_s))
-    while time.monotonic() < deadline:
-        _raise_if_process_exited(process, "supervisor exited while waiting for core readiness")
+    deadline = monotonic_deadline(timeout_s)
+
+    def _observe() -> bool | None:
         meta = _try_load_meta(session_dir)
-        if meta is not None:
-            child = meta.children.get("core")
-            if child is not None and _log_contains_token(child, token):
-                return
-        time.sleep(0.05)
+        if meta is None:
+            return None
+        child = meta.children.get("core")
+        if child is not None and _log_contains_token(child, token):
+            return True
+        return None
+
+    result = poll_until_result(
+        deadline=deadline,
+        check_alive=lambda: _raise_if_process_exited(
+            process, "supervisor exited while waiting for core readiness"
+        ),
+        observe=_observe,
+    )
+    if result is not None:
+        return
     raise SmokeSequenceError(f"timed out waiting for core log token {token!r}")
 
 

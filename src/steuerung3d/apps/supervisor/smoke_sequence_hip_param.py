@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import subprocess
-import time
 from pathlib import Path
 
 from steuerung3d.apps.hi_p.smoke_control import HiPSmokeCommand, UdpHiPSmokeControlOut
@@ -24,6 +23,7 @@ from .smoke_sequence_extract import (
     extract_axis_param_commit_status,
     extract_axis_param_value,
 )
+from .smoke_sequence_polling import monotonic_deadline, poll_until_result
 from .smoke_sequence_types import (
     HiPOpenObservation,
     HiPParamObservation,
@@ -170,6 +170,7 @@ def _drive_open_hip_until_owned(
     hip_smoke_control_base: int,
     timeout_s: float,
 ) -> tuple[HiPOpenObservation, int]:
+    del hip_smoke_control_base
     if not supervisor_action_in_addr:
         raise SmokeSequenceError("no supervisor smoke action input available for open_hip")
     axis_cfg = axis_config_by_axis_id(profile, axis_id)
@@ -182,9 +183,10 @@ def _drive_open_hip_until_owned(
     try:
         command = DensiRemoteAction(f"open_hip:{getattr(axis_cfg, 'unit_id', axis_id)}")
         control_out.publish_action(command)
-        deadline = time.monotonic() + max(0.5, float(timeout_s))
-        while time.monotonic() < deadline:
-            _raise_if_process_exited(process, "supervisor exited while opening HiP")
+        deadline = monotonic_deadline(timeout_s, minimum_s=0.5)
+
+        def _observe() -> HiPOpenObservation | None:
+            nonlocal owner_before, owner_after
             for snap in observer_in.drain_telemetry(limit=50):
                 current_owner = extract_axis_owner(snap, axis_id)
                 if not owner_before:
@@ -193,13 +195,23 @@ def _drive_open_hip_until_owned(
                     owner_after = current_owner
                     return HiPOpenObservation(
                         axis_id=axis_id, owner_before=owner_before, owner_after=owner_after
-                    ), 1
+                    )
             if _core_log_reports_owner(session_dir, axis_id=axis_id, hip_id=hip_id):
                 owner_after = hip_id
                 return HiPOpenObservation(
                     axis_id=axis_id, owner_before=owner_before, owner_after=owner_after
-                ), 1
-            time.sleep(0.05)
+                )
+            return None
+
+        result = poll_until_result(
+            deadline=deadline,
+            check_alive=lambda: _raise_if_process_exited(
+                process, "supervisor exited while opening HiP"
+            ),
+            observe=_observe,
+        )
+        if result is not None:
+            return result, 1
     finally:
         close_udp_json_endpoint(observer_in)
         close_udp_json_endpoint(control_out)
@@ -218,14 +230,24 @@ def _read_axis_param_baseline(
 ) -> float:
     observer_in, _ = bind_hip_observer_telemetry_in(profile)
     try:
-        deadline = time.monotonic() + max(0.5, float(timeout_s))
-        while time.monotonic() < deadline:
-            _raise_if_process_exited(process, "supervisor exited while reading parameter baseline")
+        deadline = monotonic_deadline(timeout_s, minimum_s=0.5)
+
+        def _observe() -> float | None:
             for snap in observer_in.drain_telemetry(limit=50):
                 value = extract_axis_param_value(snap, axis_id, param_name)
                 if value is not None:
                     return float(value)
-            time.sleep(0.05)
+            return None
+
+        result = poll_until_result(
+            deadline=deadline,
+            check_alive=lambda: _raise_if_process_exited(
+                process, "supervisor exited while reading parameter baseline"
+            ),
+            observe=_observe,
+        )
+        if result is not None:
+            return result
     finally:
         close_udp_json_endpoint(observer_in)
     raise SmokeSequenceError(
@@ -276,11 +298,9 @@ def _drive_hip_param_command_until_observed(
                 action="edit_write", group=group, values={param_name: float(desired_value)}
             )
         )
-        deadline = time.monotonic() + max(0.5, float(timeout_s))
-        while time.monotonic() < deadline:
-            _raise_if_process_exited(
-                process, "supervisor exited while waiting for HiP parameter write"
-            )
+        deadline = monotonic_deadline(timeout_s, minimum_s=0.5)
+
+        def _observe() -> HiPParamObservation | None:
             for snap in observer_in.drain_telemetry(limit=50):
                 value = extract_axis_param_value(snap, axis_id, param_name)
                 status = extract_axis_param_commit_status(snap, axis_id)
@@ -292,11 +312,11 @@ def _drive_hip_param_command_until_observed(
                 ):
                     return HiPParamObservation(
                         observed_value=float(value), commit_status=str(status)
-                    ), 1
+                    )
                 if value is None and status_norm == "applied":
                     return HiPParamObservation(
                         observed_value=float(desired_value), commit_status=str(status)
-                    ), 1
+                    )
             if _densi_log_reports_param_apply(
                 session_dir,
                 axis_id=axis_id,
@@ -305,8 +325,18 @@ def _drive_hip_param_command_until_observed(
             ):
                 return HiPParamObservation(
                     observed_value=float(desired_value), commit_status="applied(log)"
-                ), 1
-            time.sleep(0.05)
+                )
+            return None
+
+        result = poll_until_result(
+            deadline=deadline,
+            check_alive=lambda: _raise_if_process_exited(
+                process, "supervisor exited while waiting for HiP parameter write"
+            ),
+            observe=_observe,
+        )
+        if result is not None:
+            return result, 1
     finally:
         close_udp_json_endpoint(observer_in)
         close_udp_json_endpoint(control_out)

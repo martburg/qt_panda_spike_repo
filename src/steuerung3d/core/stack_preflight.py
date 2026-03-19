@@ -7,9 +7,9 @@ import sys
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence, cast
 
-try:
+if sys.version_info >= (3, 11):
     import tomllib as _toml_module_raw
-except ModuleNotFoundError:  # pragma: no cover
+else:  # pragma: no cover
     import tomli as _toml_module_raw
 
 from .stack_spec import ProcessSpec

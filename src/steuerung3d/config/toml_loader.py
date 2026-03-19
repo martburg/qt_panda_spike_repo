@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Protocol, TypeAlias, cast
@@ -18,13 +19,14 @@ def _coerce_table(value: object) -> TomlTable:
     return {str(k): v for k, v in mapping.items()}
 
 
+if sys.version_info >= (3, 11):
+    import tomllib as _toml_module
+else:  # pragma: no cover
+    import tomli as _toml_module
+
+
 def load_toml(path: Path) -> TomlTable:
     """Load TOML from *path* using stdlib tomllib (Py>=3.11) or tomli fallback."""
     text = path.read_text(encoding="utf-8")
-    try:
-        import tomllib as _toml_module
-    except ModuleNotFoundError:
-        import tomli as _toml_module
-
     data = cast(_TomlModule, _toml_module).loads(text)
     return _coerce_table(data)
