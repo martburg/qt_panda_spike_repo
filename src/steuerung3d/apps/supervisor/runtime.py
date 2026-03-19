@@ -85,9 +85,26 @@ class SupervisorRuntime(QObject):
                 pass
             return
 
-        child = launch_hip_child(cmd_text=cmd_text)
+        env_overrides: dict[str, str] = {}
+        smoke_addr = self._hip_smoke_control_addr_for_unit_id(axis.unit_id)
+        if smoke_addr:
+            env_overrides["STEUERUNG3D_HIP_SMOKE_CONTROL_IN"] = smoke_addr
+        child = launch_hip_child(cmd_text=cmd_text, env_overrides=env_overrides or None)
         self._hip_children.setdefault(axis.unit_id, []).append(child)
         self.engine.set_hip_open_count(axis.unit_id, len(self._hip_children.get(axis.unit_id, [])))
+
+    def _hip_smoke_control_addr_for_unit_id(self, unit_id: str) -> str:
+        base_raw = str(os.environ.get("STEUERUNG3D_SUPERVISOR_HIP_SMOKE_BASE", "") or "").strip()
+        if not base_raw:
+            return ""
+        try:
+            base = int(base_raw)
+        except ValueError:
+            return ""
+        for idx, axis in enumerate(self.profile.axes):
+            if str(axis.unit_id) == str(unit_id):
+                return f"127.0.0.1:{base + idx}"
+        return ""
 
     def _refresh_hip_processes(self) -> None:
         refresh_hip_processes(
@@ -167,6 +184,8 @@ class SupervisorRuntime(QObject):
                 self.engine.set_chk_requested(bool(getattr(action, "value", False)))
             elif name == "recover":
                 self.engine.queue_recover()
+            elif name.startswith("open_hip:"):
+                self.open_hip_for_axis(name.split(":", 1)[1])
 
     def _apply_window_snapshot(self) -> None:
         snapshot = self.engine.snapshot()

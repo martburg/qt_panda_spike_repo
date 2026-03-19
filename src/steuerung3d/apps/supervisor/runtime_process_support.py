@@ -42,8 +42,12 @@ def launch_children(*, profile: SupervisorProfile) -> list[subprocess.Popen[str]
     return children
 
 
-def launch_hip_child(*, cmd_text: str) -> subprocess.Popen[str]:
+def launch_hip_child(
+    *, cmd_text: str, env_overrides: Mapping[str, str] | None = None
+) -> subprocess.Popen[str]:
     env = dict(os.environ)
+    if env_overrides:
+        env.update({str(k): str(v) for k, v in env_overrides.items()})
     argv = shlex.split(str(cmd_text).strip())
     return subprocess.Popen(argv, cwd=os.getcwd(), env=env, text=True)
 

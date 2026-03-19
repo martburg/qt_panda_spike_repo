@@ -16,10 +16,13 @@ This module does not touch Qt.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Callable, Mapping, Sequence
 
 from steuerung3d.core.state import MachineState
+
+log = logging.getLogger("den_si")
 
 
 @dataclass(frozen=True)
@@ -89,6 +92,14 @@ def apply_densi_param_ops(
 
             state.params.update(vals)
             applied.update(vals)
+            try:
+                value_tokens = " ".join(
+                    f"{str(k)}={float(v):g}"
+                    for k, v in sorted(vals.items(), key=lambda item: str(item[0]))
+                )
+                log.info("param_write_applied group=%s %s", grp, value_tokens)
+            except Exception:
+                log.info("param_write_applied group=%s", grp)
 
             # end edit session after a successful write
             state.param_edit_active = False

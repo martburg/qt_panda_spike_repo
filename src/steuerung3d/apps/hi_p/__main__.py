@@ -2,19 +2,21 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Callable, cast
 
 from PySide6.QtWidgets import QApplication, QWidget
 
+# from steuerung3d.protocol.transport import InMemTransport
+from steuerung3d.apps.hi_p.smoke_control import UdpHiPSmokeControlIn
+
 # and import HiPController directly if you changed controllers/__init__.py:
 from steuerung3d.apps.yellow.controllers.hip_controller import HiPController
 from steuerung3d.apps.yellow.ui_shell import build_yellow_window
 from steuerung3d.config.toml_loader import TomlTable, load_toml
 from steuerung3d.core.net import parse_hostport
-
-# from steuerung3d.protocol.transport import InMemTransport
 from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn
 from steuerung3d.util.app_bootstrap import bootstrap_logging
 
@@ -69,6 +71,12 @@ def main() -> int:
 
     intent_out = UdpIntentOut.connect(intent_out_addr)
     telemetry_in = UdpTelemetryIn.bind(telem_in_addr)
+    smoke_control_addr = str(os.environ.get("STEUERUNG3D_HIP_SMOKE_CONTROL_IN", "") or "").strip()
+    smoke_control_in = (
+        UdpHiPSmokeControlIn.bind(parse_hostport(smoke_control_addr))
+        if smoke_control_addr
+        else None
+    )
 
     ctl = HiPController(
         win=win,
@@ -77,6 +85,7 @@ def main() -> int:
         shadow_mode=shadow_mode,
         hip_id=str(args.hip_id or ""),
     )
+    ctl.set_smoke_control_in(smoke_control_in)
     axis_label = str(args.axis).strip() or "*"
     if str(args.axis).strip():
         ctl.set_fixed_axis(str(args.axis).strip(), lock_combo=True)

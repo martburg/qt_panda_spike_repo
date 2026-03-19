@@ -206,11 +206,11 @@ def test_supervisor_smoke_action_input_can_latch_chk_es_taster(
     def _action_in_bind(*_args: object, **_kwargs: object) -> object:
         from steuerung3d.apps.supervisor.models import DensiRemoteAction
 
-        actions: list[DensiRemoteAction] = [DensiRemoteAction("chk_es_taster", value=True)]
+        actions = [DensiRemoteAction("chk_es_taster", value=True)]
 
-        def _drain(limit: int = 100) -> list[DensiRemoteAction]:
+        def _drain(limit: int = 100) -> list[object]:
             _ = limit
-            drained = list(actions)
+            drained = cast(list[object], list(actions))
             actions.clear()
             return drained
 
@@ -288,5 +288,93 @@ def test_supervisor_smoke_action_input_can_latch_chk_es_taster(
             and getattr(action, "value", None) is True
             for action in published_actions
         )
+    finally:
+        rt.shutdown()
+
+
+def test_supervisor_smoke_action_input_can_open_hip(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(sys.modules, "PySide6", types.ModuleType("PySide6"))
+    monkeypatch.setitem(sys.modules, "PySide6.QtCore", _qtcore_module())
+    monkeypatch.setitem(sys.modules, "PySide6.QtWidgets", _qtwidgets_module())
+    monkeypatch.setitem(
+        sys.modules,
+        "steuerung3d.apps.supervisor.gui.window",
+        _dummy_window_module(),
+    )
+
+    runtime_mod = importlib.import_module("steuerung3d.apps.supervisor.runtime")
+
+    monkeypatch.setattr(runtime_mod.UdpTelemetryIn, "bind", _drain_telemetry_stub)
+    monkeypatch.setattr(runtime_mod.UdpIntentOut, "connect", _publish_intent_stub([]))
+
+    def _noop_publish_action(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    def _action_out_connect_noop(*_args: object, **_kwargs: object) -> object:
+        return SimpleNamespace(
+            publish_action=_noop_publish_action,
+            tx=SimpleNamespace(link=SimpleNamespace(close=_noop_close)),
+        )
+
+    monkeypatch.setattr(
+        runtime_mod.UdpDensiActionOut,
+        "connect",
+        _action_out_connect_noop,
+    )
+
+    def _action_in_bind(*_args: object, **_kwargs: object) -> object:
+        from steuerung3d.apps.supervisor.models import DensiRemoteAction
+
+        actions: list[DensiRemoteAction] = [DensiRemoteAction("open_hip:anton")]
+
+        def _drain(limit: int = 100) -> list[object]:
+            _ = limit
+            drained: list[object] = list(actions)
+            actions.clear()
+            return drained
+
+        return SimpleNamespace(
+            drain_actions=_drain,
+            rx=SimpleNamespace(link=SimpleNamespace(close=_noop_close)),
+        )
+
+    monkeypatch.setattr(runtime_mod.UdpDensiActionIn, "bind", _action_in_bind)
+    monkeypatch.setenv("STEUERUNG3D_SUPERVISOR_ACTION_IN", "127.0.0.1:55001")
+
+    from steuerung3d.apps.supervisor.models import PairConfig, SupervisorProfile
+
+    profile = SupervisorProfile(
+        supervisor_id="sup",
+        title="Supervisor",
+        cycle_ms=50,
+        telem_in="127.0.0.1:51002",
+        intent_out="127.0.0.1:51001",
+        gui=False,
+        pairs=(
+            PairConfig(
+                pair_id="anton",
+                axis_id="Anton",
+                unit_id="anton",
+                densi_id="Anton",
+                hip_id="hip_anton",
+                selected=True,
+                densi_action_out="127.0.0.1:53001",
+                hip_launch="python -m steuerung3d.apps.hi_p --axis Anton",
+            ),
+        ),
+    )
+
+    rt = runtime_mod.SupervisorRuntime(profile)
+    called: list[str] = []
+
+    def _open_hip_for_axis(unit_id: object) -> None:
+        called.append(str(unit_id))
+
+    rt.open_hip_for_axis = _open_hip_for_axis
+    try:
+        rt.tick()
+        assert called == ["anton"]
     finally:
         rt.shutdown()

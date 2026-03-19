@@ -20,6 +20,7 @@ from typing import Callable, TypeVar, cast
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QWidget
 
+from steuerung3d.apps.hi_p.smoke_control import UdpHiPSmokeControlIn
 from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.intents import Intent
 from steuerung3d.core.telemetry import TelemetrySnapshot
@@ -27,7 +28,7 @@ from steuerung3d.util.heartbeat import ChangeTracker, Heartbeat
 from steuerung3d.util.ratelimit import rl_log_exc
 
 from ..binders.hip_qt_binder import HipQtBinder
-from ..engines.hip.engine import HipEngine, HipUiInputs
+from ..engines.hip.engine import HipEngine, HipParamAction, HipUiInputs
 from ..engines.hip.viewmodel import HipViewModel
 from ..ports import IntentOut, TelemetryIn
 from ..qtutil.bindings import YellowBindings
@@ -103,6 +104,7 @@ class HiPController:
     _last_fault: bool = field(init=False, default=False)
     _last_estate: str = field(init=False, default="ESTOP")
     _hip_id: str = field(init=False, default="")
+    _smoke_control_in: UdpHiPSmokeControlIn | None = field(init=False, default=None)
 
     def __post_init__(self) -> None:
         self.ui = YellowBindings.from_window(self.win)
@@ -290,6 +292,43 @@ class HiPController:
         best_effort(_apply_vm, on_error=_on_apply_error)
         return True
 
+    def set_smoke_control_in(self, control_in: UdpHiPSmokeControlIn | None) -> None:
+        self._smoke_control_in = control_in
+
+    def _merge_smoke_inputs(self, ui_inputs: HipUiInputs) -> HipUiInputs:
+        control_in = self._smoke_control_in
+        if control_in is None:
+            return ui_inputs
+        actions = list(ui_inputs.param_actions or [])
+        param_values = {str(k): dict(v) for k, v in dict(ui_inputs.param_values or {}).items()}
+        axis_selected = str(ui_inputs.axis_selected or "")
+        axis_selection_changed = bool(ui_inputs.axis_selection_changed)
+        for command in control_in.drain_commands(limit=50):
+            action = str(command.action or "").strip().lower()
+            group = str(command.group or "").strip()
+            if action in {"edit", "write", "cancel"} and group:
+                actions.append(HipParamAction(kind=action, group=group))
+            elif action == "edit_write" and group:
+                actions.append(HipParamAction(kind="edit", group=group))
+                actions.append(HipParamAction(kind="write", group=group))
+            if action in {"write", "edit_write"} and group:
+                param_values[group] = {
+                    str(k): float(v) for k, v in dict(command.values or {}).items()
+                }
+            if action == "select_axis":
+                axis_selected = str(command.group or axis_selected)
+                axis_selection_changed = True
+        return HipUiInputs(
+            axis_selected=axis_selected,
+            axis_selection_changed=axis_selection_changed,
+            estop_reset_clicked=bool(ui_inputs.estop_reset_clicked),
+            resync_clicked=bool(ui_inputs.resync_clicked),
+            main_reset_clicked=bool(ui_inputs.main_reset_clicked),
+            guider_reset_clicked=bool(ui_inputs.guider_reset_clicked),
+            param_actions=actions,
+            param_values=param_values,
+        )
+
     def _emit_runtime_outputs(self, *, rt_result: HipRuntimeResult) -> None:
         if rt_result.snap is not None:
             estate = ""
@@ -321,7 +360,7 @@ class HiPController:
                 self._wd.mark("rx")
                 now_ns = time.monotonic_ns()
 
-                ui_inputs = self._read_ui_inputs()
+                ui_inputs = self._merge_smoke_inputs(self._read_ui_inputs())
                 rt_inputs = self._hip_runtime.collect_inputs(
                     snaps=snaps, now_ns=now_ns, ui=ui_inputs
                 )

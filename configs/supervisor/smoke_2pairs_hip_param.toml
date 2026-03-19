@@ -1,0 +1,29 @@
+[supervisor]
+id = "sup_smoke_2pairs"
+title = "Supervisor Smoke 2 Axes"
+cycle_ms = 50
+telem_in = "127.0.0.1:51002"
+intent_out = "127.0.0.1:51001"
+stale_after_ms = 800
+gui = true
+
+[launch]
+stack_profile = "configs/profiles/supervisor_2axes_core_fanout_hip_param.toml"
+
+[[axes]]
+unit_id = "anton"
+axis_id = "Anton"
+densi_id = "Anton"
+hip_id = "hip_anton"
+selected = true
+densi_action_out = "127.0.0.1:53001"
+hip_launch = "python -m steuerung3d.apps.hi_p --axis Anton --hip-id hip_anton --telem-in 127.0.0.1:51003 --intent-out 127.0.0.1:51001"
+
+[[axes]]
+unit_id = "debby"
+axis_id = "Debby"
+densi_id = "Debby"
+hip_id = "hip_debby"
+selected = true
+densi_action_out = "127.0.0.1:53002"
+hip_launch = "python -m steuerung3d.apps.hi_p --axis Debby --hip-id hip_debby --telem-in 127.0.0.1:51004 --intent-out 127.0.0.1:51001"

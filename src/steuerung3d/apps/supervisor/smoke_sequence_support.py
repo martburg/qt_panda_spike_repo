@@ -9,8 +9,10 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
+from steuerung3d.apps.hi_p.smoke_control import HiPSmokeCommand, UdpHiPSmokeControlOut
+from steuerung3d.apps.hi_p.smoke_param_specs import SAFE_HIP_SMOKE_PARAMS, HiPSmokeParamSpec
 from steuerung3d.apps.inputd_sim.config import load_inputd_sim_config
 from steuerung3d.apps.inputd_sim.control import InputdSimControl, UdpInputdSimControlOut
 from steuerung3d.core.intents import RequestEstopReset, RequestResync
@@ -19,7 +21,6 @@ from steuerung3d.core.process_liveness import pid_is_alive
 from steuerung3d.core.stack_loader import load_stack_profile
 from steuerung3d.core.stack_meta import ChildMeta, StackMeta, find_latest_session_dir, load_meta
 from steuerung3d.core.stack_spec import StackSpec
-from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
 from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn, close_udp_json_endpoint
 
 from .actions_transport import UdpDensiActionOut
@@ -30,6 +31,69 @@ from .row_estate import estate_from_word
 _RESET_LOG_TOKEN: Final[str] = "cmd_estop_reset=True"
 _ESTART_LOG_TOKEN: Final[str] = "ESStart pressed"
 _CORE_IDLE_TOKEN: Final[str] = "core_mode=IDLE"
+_HIP_SMOKE_CONTROL_BASE: Final[int] = 54001
+
+
+def _as_str_object_mapping(value: object) -> Mapping[str, object]:
+    if not isinstance(value, Mapping):
+        return {}
+    return cast(Mapping[str, object], value)
+
+
+def _mapping_attr(obj: object, name: str) -> Mapping[str, object]:
+    return _as_str_object_mapping(getattr(obj, name, None))
+
+
+def _mapping_value(mapping: Mapping[str, object], key: str) -> object | None:
+    return mapping.get(key)
+
+
+def _text_attr(obj: object, name: str) -> str:
+    return str(getattr(obj, name, "") or "")
+
+
+def _coerce_float(value: object) -> float | None:
+    if isinstance(value, bool):
+        return float(value)
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except Exception:
+            return None
+    return None
+
+
+def _coerce_int(value: object) -> int | None:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return int(value)
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except Exception:
+            return None
+    return None
+
+
+def _float_attr(obj: object, name: str, default: float = 0.0) -> float:
+    raw = getattr(obj, name, default)
+    value = _coerce_float(raw)
+    if value is None:
+        return float(default)
+    return value
+
+
+def _int_attr(obj: object, name: str, default: int = 0) -> int:
+    raw = getattr(obj, name, default)
+    value = _coerce_int(raw)
+    if value is None:
+        return int(default)
+    return value
 
 
 @dataclass(frozen=True)
@@ -46,6 +110,8 @@ class SmokeSequenceConfig:
     motion_vel_move_eps: float = 0.05
     motion_vel_zero_eps: float = 0.05
     motion_release_settle_s: float = 0.5
+    hip_param_axis_id: str = ""
+    hip_param_restore_after_write: bool = True
 
 
 @dataclass(frozen=True)
@@ -84,6 +150,47 @@ class SmokeSequenceError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class HiPParamSmokeResult:
+    session_dir: Path
+    axis_id: str
+    hip_id: str
+    observed_reset_log_names: tuple[str, ...]
+    observed_estart_log_names: tuple[str, ...]
+    observed_system_time_axis_ids: tuple[str, ...]
+    reset_publish_count: int
+    estart_publish_count: int
+    resync_publish_count: int
+    open_hip_command_count: int
+    param_command_count: int
+    param_restore_command_count: int
+    selected_axis_ids: tuple[str, ...] = ()
+    owner_before: str = ""
+    owner_after_open: str = ""
+    parameter_name: str = ""
+    parameter_group: str = ""
+    original_value: float = 0.0
+    edited_value: float = 0.0
+    observed_value_after_write: float = 0.0
+    observed_commit_status_after_write: str = ""
+    observed_value_after_restore: float = 0.0
+    observed_commit_status_after_restore: str = ""
+    restored: bool = False
+
+
+@dataclass(frozen=True)
+class HiPOpenObservation:
+    axis_id: str
+    owner_before: str
+    owner_after: str
+
+
+@dataclass(frozen=True)
+class HiPParamObservation:
+    observed_value: float
+    commit_status: str
+
+
+@dataclass(frozen=True)
 class SystemTimeProgressObservation:
     observed_axis_ids: tuple[str, ...]
     first_by_axis: Mapping[str, str]
@@ -113,6 +220,18 @@ class MotionObservation:
     final_abs_vel_by_axis: Mapping[str, float]
 
 
+@dataclass(frozen=True)
+class _IdleSyncedBootstrap:
+    launched: _LaunchedSupervisor
+    selected_axis_ids: tuple[str, ...]
+    observed_reset: set[str]
+    observed_estart: set[str]
+    system_time_progress: SystemTimeProgressObservation
+    reset_publish_count: int
+    estart_publish_count: int
+    resync_publish_count: int
+
+
 @dataclass
 class _LaunchedSupervisor:
     process: subprocess.Popen[str]
@@ -121,6 +240,7 @@ class _LaunchedSupervisor:
     stack_profile_path: Path
     supervisor_action_in_addr: str
     inputd_sim_control_in_addr: str
+    hip_smoke_control_base: int
 
 
 @dataclass(frozen=True)
@@ -190,6 +310,14 @@ def infer_observer_telemetry_candidates(profile: SupervisorProfile) -> tuple[tup
     return tuple((host, int(port) + offset) for offset in range(1, highest_offset + 1))
 
 
+def infer_hip_observer_telemetry_candidates(
+    profile: SupervisorProfile,
+) -> tuple[tuple[str, int], ...]:
+    host, port = parse_hostport(profile.telem_in)
+    reserved_offsets = 1 + len(tuple(profile.axes or ()))
+    return ((host, int(port) + reserved_offsets + 1),)
+
+
 def parse_system_time_token(token: str) -> datetime | None:
     raw = str(token or "").strip()
     if not raw or not raw.endswith(" ms"):
@@ -214,64 +342,141 @@ def system_time_tokens_advanced(previous: str, current: str) -> bool:
     return curr_raw != prev_raw
 
 
-def extract_axis_system_time_tokens(
-    snap: TelemetrySnapshot, axis_ids: Sequence[str]
-) -> dict[str, str]:
-    tail_by_axis = snap.axis_plc_uplink_tail
+def extract_axis_system_time_tokens(snap: object, axis_ids: Sequence[str]) -> dict[str, str]:
+    tail_by_axis = _mapping_attr(snap, "axis_plc_uplink_tail")
     tokens: dict[str, str] = {}
     for axis_id in axis_ids:
-        axis_tail = tail_by_axis.get(axis_id)
-        if axis_tail is None:
-            continue
-        token = axis_tail.get("SystemTime", "").strip()
+        axis_tail = _as_str_object_mapping(_mapping_value(tail_by_axis, axis_id))
+        token = str(_mapping_value(axis_tail, "SystemTime") or "").strip()
         if token:
-            tokens[axis_id] = token
+            tokens[str(axis_id)] = token
     return tokens
 
 
-def _axis_telem_for(snap: TelemetrySnapshot, axis_id: str) -> AxisTelemetry | None:
-    return snap.axes.get(axis_id)
-
-
-def extract_axis_device_ticks(snap: TelemetrySnapshot, axis_ids: Sequence[str]) -> dict[str, int]:
+def extract_axis_device_ticks(snap: object, axis_ids: Sequence[str]) -> dict[str, int]:
+    axes = _mapping_attr(snap, "axes")
     ticks: dict[str, int] = {}
     for axis_id in axis_ids:
-        axis_telem = _axis_telem_for(snap, axis_id)
+        axis_telem = _mapping_value(axes, axis_id)
         if axis_telem is None:
             continue
-        ticks[axis_id] = int(axis_telem.device_tick)
+        ticks[str(axis_id)] = _int_attr(axis_telem, "device_tick", 0)
     return ticks
 
 
-def extract_axis_estates(snap: TelemetrySnapshot, axis_ids: Sequence[str]) -> dict[str, str]:
-    word_by_axis = snap.axis_estop_status_word
+def extract_axis_estates(snap: object, axis_ids: Sequence[str]) -> dict[str, str]:
+    word_by_axis = _mapping_attr(snap, "axis_estop_status_word")
     estates: dict[str, str] = {}
     for axis_id in axis_ids:
-        raw_word = word_by_axis.get(axis_id)
+        raw_word = _mapping_value(word_by_axis, axis_id)
         if raw_word is None:
             continue
-        estates[axis_id] = str(estate_from_word(int(raw_word))).upper()
+        word = _coerce_int(raw_word)
+        if word is None:
+            continue
+        try:
+            estates[str(axis_id)] = str(estate_from_word(word)).upper()
+        except Exception:
+            continue
     return estates
 
 
-def extract_axis_positions(snap: TelemetrySnapshot, axis_ids: Sequence[str]) -> dict[str, float]:
+def extract_axis_positions(snap: object, axis_ids: Sequence[str]) -> dict[str, float]:
+    axes = _mapping_attr(snap, "axes")
     positions: dict[str, float] = {}
     for axis_id in axis_ids:
-        axis_telem = _axis_telem_for(snap, axis_id)
+        axis_telem = _mapping_value(axes, axis_id)
         if axis_telem is None:
             continue
-        positions[axis_id] = float(axis_telem.pos)
+        positions[str(axis_id)] = _float_attr(axis_telem, "pos", 0.0)
     return positions
 
 
-def extract_axis_velocities(snap: TelemetrySnapshot, axis_ids: Sequence[str]) -> dict[str, float]:
+def extract_axis_velocities(snap: object, axis_ids: Sequence[str]) -> dict[str, float]:
+    axes = _mapping_attr(snap, "axes")
     velocities: dict[str, float] = {}
     for axis_id in axis_ids:
-        axis_telem = _axis_telem_for(snap, axis_id)
+        axis_telem = _mapping_value(axes, axis_id)
         if axis_telem is None:
             continue
-        velocities[axis_id] = float(axis_telem.vel)
+        velocities[str(axis_id)] = _float_attr(axis_telem, "vel", 0.0)
     return velocities
+
+
+def extract_axis_owner(snap: object, axis_id: str) -> str:
+    densis = _mapping_attr(snap, "densis")
+    densi = _mapping_value(densis, axis_id)
+    if densi is None:
+        return ""
+    densi_map = _as_str_object_mapping(densi)
+    if densi_map:
+        claimed = str(_mapping_value(densi_map, "claimed_by_hip") or "").strip()
+        owner = str(_mapping_value(densi_map, "owner") or "").strip()
+        return claimed or owner
+    return _text_attr(densi, "claimed_by_hip") or _text_attr(densi, "owner")
+
+
+def extract_axis_param_value(snap: object, axis_id: str, name: str) -> float | None:
+    axis_params = _mapping_attr(snap, "axis_params")
+    params = _mapping_value(axis_params, axis_id)
+    if params is not None:
+        params_map = _as_str_object_mapping(params)
+        if params_map:
+            raw = _mapping_value(params_map, name)
+        else:
+            raw = getattr(params, name, None)
+        if raw is not None:
+            value = _coerce_float(raw)
+            if value is not None:
+                return value
+
+    params_top = _mapping_attr(snap, "params")
+    raw_top = _mapping_value(params_top, name)
+    if raw_top is None:
+        return None
+    return _coerce_float(raw_top)
+
+
+def extract_axis_param_commit_status(snap: object, axis_id: str) -> str:
+    statuses = _mapping_attr(snap, "axis_param_commit_status")
+    raw = _mapping_value(statuses, axis_id)
+    raw_map = _as_str_object_mapping(raw)
+    if raw_map:
+        status = str(_mapping_value(raw_map, "status") or _mapping_value(raw_map, "state") or "")
+        if status:
+            return status
+    elif raw is not None:
+        status = str(raw or "")
+        if status:
+            return status
+
+    return _text_attr(snap, "param_commit_status")
+
+
+def _axis_config_by_axis_id(profile: SupervisorProfile, axis_id: str) -> object | None:
+    for axis in profile.axes:
+        if str(axis.axis_id) == str(axis_id):
+            return axis
+    return None
+
+
+def infer_hip_smoke_control_addr(profile: SupervisorProfile, axis_id: str, *, base: int) -> str:
+    for idx, axis in enumerate(profile.axes):
+        if str(axis.axis_id) == str(axis_id):
+            return f"127.0.0.1:{int(base) + idx}"
+    return ""
+
+
+def _select_safe_hip_param_spec(name: str = "") -> HiPSmokeParamSpec:
+    requested = str(name or "").strip()
+    if requested:
+        for spec in SAFE_HIP_SMOKE_PARAMS:
+            if str(spec.name) == requested:
+                return spec
+        raise SmokeSequenceError(f"unknown safe HiP smoke parameter {requested!r}")
+    if not SAFE_HIP_SMOKE_PARAMS:
+        raise SmokeSequenceError("no safe HiP smoke parameters configured")
+    return SAFE_HIP_SMOKE_PARAMS[0]
 
 
 def _hostport_to_str(addr: tuple[str, int] | None) -> str:
@@ -294,7 +499,7 @@ def _resolve_inputd_sim_control_in_addr(stack_spec: StackSpec, *, cwd: Path) -> 
     return _hostport_to_str(cfg.control_in_addr)
 
 
-def run_esreset_estart_resync_sequence(config: SmokeSequenceConfig) -> SmokeSequenceResult:
+def _bootstrap_to_idle_synced(config: SmokeSequenceConfig) -> _IdleSyncedBootstrap:
     launched = _launch_supervisor(config)
     try:
         if config.ready_grace_s > 0.0:
@@ -334,6 +539,141 @@ def run_esreset_estart_resync_sequence(config: SmokeSequenceConfig) -> SmokeSequ
             publish_interval_s=float(config.publish_interval_s),
             settle_s=float(config.settle_s),
         )
+        return _IdleSyncedBootstrap(
+            launched=launched,
+            selected_axis_ids=selected_axis_ids,
+            observed_reset=observed_reset,
+            observed_estart=observed_estart,
+            system_time_progress=system_time_progress,
+            reset_publish_count=reset_publish_count,
+            estart_publish_count=estart_publish_count,
+            resync_publish_count=resync_publish_count,
+        )
+    except Exception:
+        if not config.keep_running:
+            _shutdown_supervisor_stack(launched)
+        raise
+
+
+def run_hip_param_sequence(config: SmokeSequenceConfig) -> HiPParamSmokeResult:
+    boot = _bootstrap_to_idle_synced(config)
+    launched = boot.launched
+    axis_id = str(
+        config.hip_param_axis_id or (boot.selected_axis_ids[0] if boot.selected_axis_ids else "")
+    )
+    if not axis_id:
+        raise SmokeSequenceError("no axis available for HiP parameter smoke scenario")
+    axis_cfg = _axis_config_by_axis_id(launched.profile, axis_id)
+    if axis_cfg is None:
+        raise SmokeSequenceError(f"axis {axis_id!r} not found in supervisor profile")
+    hip_id = str(getattr(axis_cfg, "hip_id", "") or "")
+    if not hip_id:
+        raise SmokeSequenceError(f"axis {axis_id!r} has no hip_id configured")
+    spec = _select_safe_hip_param_spec()
+    try:
+        open_obs, open_count = _drive_open_hip_until_owned(
+            profile=launched.profile,
+            process=launched.process,
+            session_dir=launched.session_dir,
+            axis_id=axis_id,
+            supervisor_action_in_addr=launched.supervisor_action_in_addr,
+            hip_id=hip_id,
+            hip_smoke_control_base=int(launched.hip_smoke_control_base),
+            timeout_s=float(config.observe_timeout_s),
+        )
+        baseline_from_observer = True
+        try:
+            original_value = _read_axis_param_baseline(
+                profile=launched.profile,
+                process=launched.process,
+                axis_id=axis_id,
+                param_name=spec.name,
+                timeout_s=float(config.observe_timeout_s),
+            )
+        except SmokeSequenceError:
+            baseline_from_observer = False
+            if spec.restore_value is None:
+                raise
+            original_value = float(spec.restore_value)
+        write_obs, param_cmd_count = _drive_hip_param_command_until_observed(
+            axis_id=axis_id,
+            param_name=spec.name,
+            group=spec.group,
+            desired_value=float(spec.test_value),
+            hip_control_addr=infer_hip_smoke_control_addr(
+                launched.profile, axis_id, base=int(launched.hip_smoke_control_base)
+            ),
+            session_dir=launched.session_dir,
+            profile=launched.profile,
+            process=launched.process,
+            timeout_s=float(config.observe_timeout_s),
+        )
+        restored = bool(
+            config.hip_param_restore_after_write
+            and (baseline_from_observer or spec.restore_value is not None)
+        )
+        restore_obs = HiPParamObservation(
+            observed_value=write_obs.observed_value, commit_status=write_obs.commit_status
+        )
+        restore_count = 0
+        if restored:
+            restore_obs, restore_count = _drive_hip_param_command_until_observed(
+                axis_id=axis_id,
+                param_name=spec.name,
+                group=spec.group,
+                desired_value=float(original_value),
+                hip_control_addr=infer_hip_smoke_control_addr(
+                    launched.profile, axis_id, base=int(launched.hip_smoke_control_base)
+                ),
+                session_dir=launched.session_dir,
+                profile=launched.profile,
+                process=launched.process,
+                timeout_s=float(config.observe_timeout_s),
+            )
+        return HiPParamSmokeResult(
+            session_dir=launched.session_dir,
+            axis_id=axis_id,
+            hip_id=hip_id,
+            observed_reset_log_names=tuple(sorted(boot.observed_reset)),
+            observed_estart_log_names=tuple(sorted(boot.observed_estart)),
+            observed_system_time_axis_ids=tuple(
+                sorted(boot.system_time_progress.observed_axis_ids)
+            ),
+            reset_publish_count=boot.reset_publish_count,
+            estart_publish_count=boot.estart_publish_count,
+            resync_publish_count=boot.resync_publish_count,
+            open_hip_command_count=open_count,
+            param_command_count=param_cmd_count,
+            param_restore_command_count=restore_count,
+            selected_axis_ids=boot.selected_axis_ids,
+            owner_before=open_obs.owner_before,
+            owner_after_open=open_obs.owner_after,
+            parameter_name=spec.name,
+            parameter_group=spec.group,
+            original_value=float(original_value),
+            edited_value=float(spec.test_value),
+            observed_value_after_write=float(write_obs.observed_value),
+            observed_commit_status_after_write=str(write_obs.commit_status),
+            observed_value_after_restore=float(restore_obs.observed_value),
+            observed_commit_status_after_restore=str(restore_obs.commit_status),
+            restored=restored,
+        )
+    finally:
+        if not config.keep_running:
+            _shutdown_supervisor_stack(launched)
+
+
+def run_esreset_estart_resync_sequence(config: SmokeSequenceConfig) -> SmokeSequenceResult:
+    boot = _bootstrap_to_idle_synced(config)
+    launched = boot.launched
+    try:
+        selected_axis_ids = boot.selected_axis_ids
+        observed_reset = boot.observed_reset
+        reset_publish_count = boot.reset_publish_count
+        observed_estart = boot.observed_estart
+        estart_publish_count = boot.estart_publish_count
+        system_time_progress = boot.system_time_progress
+        resync_publish_count = boot.resync_publish_count
         chk_taster_progress, chk_taster_publish_count = _drive_chk_es_taster_until_ready(
             profile=launched.profile,
             process=launched.process,
@@ -402,6 +742,7 @@ def _launch_supervisor(config: SmokeSequenceConfig) -> _LaunchedSupervisor:
     inputd_sim_control_in_addr = _resolve_inputd_sim_control_in_addr(stack_spec, cwd=Path.cwd())
     env = os.environ.copy()
     env["STEUERUNG3D_SUPERVISOR_ACTION_IN"] = supervisor_action_in_addr
+    env["STEUERUNG3D_SUPERVISOR_HIP_SMOKE_BASE"] = str(_HIP_SMOKE_CONTROL_BASE)
 
     proc = subprocess.Popen(
         [
@@ -437,6 +778,7 @@ def _launch_supervisor(config: SmokeSequenceConfig) -> _LaunchedSupervisor:
         stack_profile_path=stack_profile_path,
         supervisor_action_in_addr=supervisor_action_in_addr,
         inputd_sim_control_in_addr=inputd_sim_control_in_addr,
+        hip_smoke_control_base=int(_HIP_SMOKE_CONTROL_BASE),
     )
 
 
@@ -581,6 +923,28 @@ def _bind_observer_telemetry_in(
         )
     raise SmokeSequenceError(
         f"unable to infer smoke telemetry observer address from {profile.telem_in}"
+    )
+
+
+def _bind_hip_observer_telemetry_in(
+    profile: SupervisorProfile,
+) -> tuple[UdpTelemetryIn, tuple[str, int]]:
+    last_error: OSError | None = None
+    for addr in infer_hip_observer_telemetry_candidates(profile):
+        try:
+            return UdpTelemetryIn.bind(addr), addr
+        except OSError as exc:
+            last_error = exc
+            continue
+    candidates = ", ".join(
+        f"{host}:{port}" for host, port in infer_hip_observer_telemetry_candidates(profile)
+    )
+    if last_error is not None:
+        raise SmokeSequenceError(
+            f"unable to bind HiP smoke telemetry observer on any of [{candidates}]: {last_error}"
+        )
+    raise SmokeSequenceError(
+        f"unable to infer HiP smoke telemetry observer address from {profile.telem_in}"
     )
 
 
@@ -1060,6 +1424,180 @@ def _raise_if_process_exited(process: subprocess.Popen[str], prefix: str) -> Non
     if rc is None:
         return
     raise SmokeSequenceError(f"{prefix} (rc={rc})")
+
+
+def _core_log_reports_owner(session_dir: Path, *, axis_id: str, hip_id: str) -> bool:
+    core_log = session_dir / "core.log"
+    try:
+        text = core_log.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    axis_token_single = f"'{axis_id}'"
+    axis_token_double = f'"{axis_id}"'
+    owner_token_single = f"'owner': '{hip_id}'"
+    owner_token_double = f'"owner": "{hip_id}"'
+    for line in text.splitlines():
+        if axis_token_single not in line and axis_token_double not in line:
+            continue
+        if owner_token_single in line or owner_token_double in line:
+            return True
+    return False
+
+
+def _drive_open_hip_until_owned(
+    *,
+    profile: SupervisorProfile,
+    process: subprocess.Popen[str],
+    session_dir: Path,
+    axis_id: str,
+    supervisor_action_in_addr: str,
+    hip_id: str,
+    hip_smoke_control_base: int,
+    timeout_s: float,
+) -> tuple[HiPOpenObservation, int]:
+    if not supervisor_action_in_addr:
+        raise SmokeSequenceError("no supervisor smoke action input available for open_hip")
+    axis_cfg = _axis_config_by_axis_id(profile, axis_id)
+    if axis_cfg is None:
+        raise SmokeSequenceError(f"axis {axis_id!r} not found for open_hip")
+    control_out = UdpDensiActionOut.connect(parse_hostport(supervisor_action_in_addr))
+    observer_in, _ = _bind_hip_observer_telemetry_in(profile)
+    owner_before = ""
+    owner_after = ""
+    try:
+        command = DensiRemoteAction(f"open_hip:{getattr(axis_cfg, 'unit_id', axis_id)}")
+        control_out.publish_action(command)
+        deadline = time.monotonic() + max(0.5, float(timeout_s))
+        while time.monotonic() < deadline:
+            _raise_if_process_exited(process, "supervisor exited while opening HiP")
+            for snap in observer_in.drain_telemetry(limit=50):
+                current_owner = extract_axis_owner(snap, axis_id)
+                if not owner_before:
+                    owner_before = current_owner
+                if current_owner == hip_id:
+                    owner_after = current_owner
+                    return HiPOpenObservation(
+                        axis_id=axis_id, owner_before=owner_before, owner_after=owner_after
+                    ), 1
+            if _core_log_reports_owner(session_dir, axis_id=axis_id, hip_id=hip_id):
+                owner_after = hip_id
+                return HiPOpenObservation(
+                    axis_id=axis_id, owner_before=owner_before, owner_after=owner_after
+                ), 1
+            time.sleep(0.05)
+    finally:
+        close_udp_json_endpoint(observer_in)
+        close_udp_json_endpoint(control_out)
+    raise SmokeSequenceError(
+        f"timed out waiting for axis {axis_id} to be owned by {hip_id!r} after open_hip"
+    )
+
+
+def _read_axis_param_baseline(
+    *,
+    profile: SupervisorProfile,
+    process: subprocess.Popen[str],
+    axis_id: str,
+    param_name: str,
+    timeout_s: float,
+) -> float:
+    observer_in, _ = _bind_hip_observer_telemetry_in(profile)
+    try:
+        deadline = time.monotonic() + max(0.5, float(timeout_s))
+        while time.monotonic() < deadline:
+            _raise_if_process_exited(process, "supervisor exited while reading parameter baseline")
+            for snap in observer_in.drain_telemetry(limit=50):
+                value = extract_axis_param_value(snap, axis_id, param_name)
+                if value is not None:
+                    return float(value)
+            time.sleep(0.05)
+    finally:
+        close_udp_json_endpoint(observer_in)
+    raise SmokeSequenceError(
+        f"timed out waiting for baseline parameter {param_name!r} on axis {axis_id}"
+    )
+
+
+def _densi_log_reports_param_apply(
+    session_dir: Path, *, axis_id: str, param_name: str, desired_value: float
+) -> bool:
+    log_path = session_dir / f"densi-{axis_id}.log"
+    if not log_path.exists():
+        return False
+    try:
+        tail = log_path.read_text(encoding="utf-8", errors="replace")[-20000:]
+    except OSError:
+        return False
+    desired_tokens = {
+        f"{param_name}={desired_value:g}",
+        f"{param_name}={desired_value}",
+    }
+    if "param_write_applied" not in tail:
+        return False
+    if not any(token in tail for token in desired_tokens):
+        return False
+    return True
+
+
+def _drive_hip_param_command_until_observed(
+    *,
+    axis_id: str,
+    param_name: str,
+    group: str,
+    desired_value: float,
+    hip_control_addr: str,
+    session_dir: Path,
+    profile: SupervisorProfile,
+    process: subprocess.Popen[str],
+    timeout_s: float,
+) -> tuple[HiPParamObservation, int]:
+    if not hip_control_addr:
+        raise SmokeSequenceError("no HiP smoke control address available")
+    control_out = UdpHiPSmokeControlOut.connect(parse_hostport(hip_control_addr))
+    observer_in, _ = _bind_hip_observer_telemetry_in(profile)
+    try:
+        control_out.publish_command(
+            HiPSmokeCommand(
+                action="edit_write", group=group, values={param_name: float(desired_value)}
+            )
+        )
+        deadline = time.monotonic() + max(0.5, float(timeout_s))
+        while time.monotonic() < deadline:
+            _raise_if_process_exited(
+                process, "supervisor exited while waiting for HiP parameter write"
+            )
+            for snap in observer_in.drain_telemetry(limit=50):
+                value = extract_axis_param_value(snap, axis_id, param_name)
+                status = extract_axis_param_commit_status(snap, axis_id)
+                status_norm = str(status).lower()
+                if (
+                    value is not None
+                    and abs(float(value) - float(desired_value)) <= 1e-6
+                    and status_norm == "applied"
+                ):
+                    return HiPParamObservation(
+                        observed_value=float(value), commit_status=str(status)
+                    ), 1
+                if value is None and status_norm == "applied":
+                    return HiPParamObservation(
+                        observed_value=float(desired_value), commit_status=str(status)
+                    ), 1
+            if _densi_log_reports_param_apply(
+                session_dir,
+                axis_id=axis_id,
+                param_name=param_name,
+                desired_value=float(desired_value),
+            ):
+                return HiPParamObservation(
+                    observed_value=float(desired_value), commit_status="applied(log)"
+                ), 1
+            time.sleep(0.05)
+    finally:
+        close_udp_json_endpoint(observer_in)
+        close_udp_json_endpoint(control_out)
+    raise SmokeSequenceError(
+        f"timed out waiting for HiP parameter {param_name}={desired_value:g} to apply on axis {axis_id}"
+    )
 
 
 run_esreset_estart_sequence = run_esreset_estart_resync_sequence
