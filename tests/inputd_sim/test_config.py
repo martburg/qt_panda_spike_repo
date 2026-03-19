@@ -118,7 +118,9 @@ def test_prepare_scenario_persists_omitted_values_between_steps(tmp_path: Path) 
 def test_interpolate_axes_ramps_linearly() -> None:
     axes = interpolate_axes((0.0, -1.0), (1.0, 1.0), elapsed_s=0.1, ramp_s=0.2)
 
-    assert axes == pytest.approx((0.5, 0.0))
+    assert len(axes) == 2
+    assert abs(axes[0] - 0.5) < 1e-9
+    assert abs(axes[1] - 0.0) < 1e-9
 
 
 def test_load_inputd_sim_config_rejects_out_of_range_axis_value(tmp_path: Path) -> None:

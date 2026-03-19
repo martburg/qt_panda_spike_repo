@@ -19,6 +19,7 @@ from steuerung3d.core.process_liveness import pid_is_alive
 from steuerung3d.core.stack_loader import load_stack_profile
 from steuerung3d.core.stack_meta import ChildMeta, StackMeta, find_latest_session_dir, load_meta
 from steuerung3d.core.stack_spec import StackSpec
+from steuerung3d.core.telemetry import AxisTelemetry, TelemetrySnapshot
 from steuerung3d.protocol.udp_channels import UdpIntentOut, UdpTelemetryIn, close_udp_json_endpoint
 
 from .actions_transport import UdpDensiActionOut
@@ -213,82 +214,63 @@ def system_time_tokens_advanced(previous: str, current: str) -> bool:
     return curr_raw != prev_raw
 
 
-def extract_axis_system_time_tokens(snap: object, axis_ids: Sequence[str]) -> dict[str, str]:
-    tail_by_axis = getattr(snap, "axis_plc_uplink_tail", {}) or {}
-    if not isinstance(tail_by_axis, Mapping):
-        return {}
+def extract_axis_system_time_tokens(
+    snap: TelemetrySnapshot, axis_ids: Sequence[str]
+) -> dict[str, str]:
+    tail_by_axis = snap.axis_plc_uplink_tail
     tokens: dict[str, str] = {}
     for axis_id in axis_ids:
-        axis_tail = tail_by_axis.get(axis_id, {})
-        if not isinstance(axis_tail, Mapping):
+        axis_tail = tail_by_axis.get(axis_id)
+        if axis_tail is None:
             continue
-        token = str(axis_tail.get("SystemTime", "") or "").strip()
+        token = axis_tail.get("SystemTime", "").strip()
         if token:
-            tokens[str(axis_id)] = token
+            tokens[axis_id] = token
     return tokens
 
 
-def extract_axis_device_ticks(snap: object, axis_ids: Sequence[str]) -> dict[str, int]:
-    axes = getattr(snap, "axes", {}) or {}
-    if not isinstance(axes, Mapping):
-        return {}
+def _axis_telem_for(snap: TelemetrySnapshot, axis_id: str) -> AxisTelemetry | None:
+    return snap.axes.get(axis_id)
+
+
+def extract_axis_device_ticks(snap: TelemetrySnapshot, axis_ids: Sequence[str]) -> dict[str, int]:
     ticks: dict[str, int] = {}
     for axis_id in axis_ids:
-        axis_telem = axes.get(axis_id)
+        axis_telem = _axis_telem_for(snap, axis_id)
         if axis_telem is None:
             continue
-        try:
-            ticks[str(axis_id)] = int(getattr(axis_telem, "device_tick", 0) or 0)
-        except Exception:
-            continue
+        ticks[axis_id] = int(axis_telem.device_tick)
     return ticks
 
 
-def extract_axis_estates(snap: object, axis_ids: Sequence[str]) -> dict[str, str]:
-    word_by_axis = getattr(snap, "axis_estop_status_word", {}) or {}
-    if not isinstance(word_by_axis, Mapping):
-        return {}
+def extract_axis_estates(snap: TelemetrySnapshot, axis_ids: Sequence[str]) -> dict[str, str]:
+    word_by_axis = snap.axis_estop_status_word
     estates: dict[str, str] = {}
     for axis_id in axis_ids:
         raw_word = word_by_axis.get(axis_id)
-        try:
-            if raw_word is None:
-                continue
-            estates[str(axis_id)] = str(estate_from_word(int(raw_word))).upper()
-        except Exception:
+        if raw_word is None:
             continue
+        estates[axis_id] = str(estate_from_word(int(raw_word))).upper()
     return estates
 
 
-def extract_axis_positions(snap: object, axis_ids: Sequence[str]) -> dict[str, float]:
-    axes = getattr(snap, "axes", {}) or {}
-    if not isinstance(axes, Mapping):
-        return {}
+def extract_axis_positions(snap: TelemetrySnapshot, axis_ids: Sequence[str]) -> dict[str, float]:
     positions: dict[str, float] = {}
     for axis_id in axis_ids:
-        axis_telem = axes.get(axis_id)
+        axis_telem = _axis_telem_for(snap, axis_id)
         if axis_telem is None:
             continue
-        try:
-            positions[str(axis_id)] = float(getattr(axis_telem, "pos", 0.0) or 0.0)
-        except Exception:
-            continue
+        positions[axis_id] = float(axis_telem.pos)
     return positions
 
 
-def extract_axis_velocities(snap: object, axis_ids: Sequence[str]) -> dict[str, float]:
-    axes = getattr(snap, "axes", {}) or {}
-    if not isinstance(axes, Mapping):
-        return {}
+def extract_axis_velocities(snap: TelemetrySnapshot, axis_ids: Sequence[str]) -> dict[str, float]:
     velocities: dict[str, float] = {}
     for axis_id in axis_ids:
-        axis_telem = axes.get(axis_id)
+        axis_telem = _axis_telem_for(snap, axis_id)
         if axis_telem is None:
             continue
-        try:
-            velocities[str(axis_id)] = float(getattr(axis_telem, "vel", 0.0) or 0.0)
-        except Exception:
-            continue
+        velocities[axis_id] = float(axis_telem.vel)
     return velocities
 
 

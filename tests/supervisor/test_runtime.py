@@ -206,9 +206,9 @@ def test_supervisor_smoke_action_input_can_latch_chk_es_taster(
     def _action_in_bind(*_args: object, **_kwargs: object) -> object:
         from steuerung3d.apps.supervisor.models import DensiRemoteAction
 
-        actions = [DensiRemoteAction("chk_es_taster", value=True)]
+        actions: list[DensiRemoteAction] = [DensiRemoteAction("chk_es_taster", value=True)]
 
-        def _drain(limit: int = 100) -> list[object]:
+        def _drain(limit: int = 100) -> list[DensiRemoteAction]:
             _ = limit
             drained = list(actions)
             actions.clear()
