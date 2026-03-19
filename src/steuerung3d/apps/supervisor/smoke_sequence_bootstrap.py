@@ -22,7 +22,9 @@ from .smoke_sequence_extract import (
     infer_observer_telemetry_candidates,
 )
 from .smoke_sequence_types import (
+    _CORE_IDLE_TOKEN,
     _HIP_SMOKE_CONTROL_BASE,
+    IdleSyncedBootstrap,
     SmokeSequenceConfig,
     SmokeSequenceError,
     _LaunchedSupervisor,
@@ -125,6 +127,73 @@ def launch_supervisor(config: SmokeSequenceConfig) -> _LaunchedSupervisor:
         inputd_sim_control_in_addr=inputd_sim_control_in_addr,
         hip_smoke_control_base=int(_HIP_SMOKE_CONTROL_BASE),
     )
+
+
+def bootstrap_to_idle_synced(config: SmokeSequenceConfig) -> IdleSyncedBootstrap:
+    from .smoke_sequence_drive import (
+        drive_estart_until_observed,
+        drive_estop_reset_until_observed,
+        drive_resync_until_system_time_observed,
+        wait_for_core_log_token,
+    )
+    from .smoke_sequence_targets import (
+        build_selected_estop_reset_intents,
+        densi_process_names_for_axes,
+    )
+
+    launched = launch_supervisor(config)
+    try:
+        if config.ready_grace_s > 0.0:
+            time.sleep(float(config.ready_grace_s))
+        selected_axis_ids = tuple(
+            intent.axis_id for intent in build_selected_estop_reset_intents(launched.profile)
+        )
+        densi_names = densi_process_names_for_axes(selected_axis_ids)
+        observed_reset, reset_publish_count = drive_estop_reset_until_observed(
+            session_dir=launched.session_dir,
+            process=launched.process,
+            profile=launched.profile,
+            densi_process_names=densi_names,
+            timeout_s=float(config.observe_timeout_s),
+            publish_interval_s=float(config.publish_interval_s),
+            settle_s=float(config.settle_s),
+        )
+        wait_for_core_log_token(
+            session_dir=launched.session_dir,
+            process=launched.process,
+            token=_CORE_IDLE_TOKEN,
+            timeout_s=min(max(1.0, float(config.observe_timeout_s)), 5.0),
+        )
+        observed_estart, estart_publish_count = drive_estart_until_observed(
+            session_dir=launched.session_dir,
+            process=launched.process,
+            profile=launched.profile,
+            timeout_s=float(config.observe_timeout_s),
+            publish_interval_s=float(config.publish_interval_s),
+            settle_s=float(config.settle_s),
+        )
+        system_time_progress, resync_publish_count = drive_resync_until_system_time_observed(
+            profile=launched.profile,
+            process=launched.process,
+            axis_ids=selected_axis_ids,
+            timeout_s=float(config.observe_timeout_s),
+            publish_interval_s=float(config.publish_interval_s),
+            settle_s=float(config.settle_s),
+        )
+        return IdleSyncedBootstrap(
+            launched=launched,
+            selected_axis_ids=selected_axis_ids,
+            observed_reset=observed_reset,
+            observed_estart=observed_estart,
+            system_time_progress=system_time_progress,
+            reset_publish_count=reset_publish_count,
+            estart_publish_count=estart_publish_count,
+            resync_publish_count=resync_publish_count,
+        )
+    except Exception:
+        if not config.keep_running:
+            shutdown_supervisor_stack(launched)
+        raise
 
 
 def _reserve_loopback_udp_addr() -> str:

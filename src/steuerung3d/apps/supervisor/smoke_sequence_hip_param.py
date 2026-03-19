@@ -14,6 +14,7 @@ from .smoke_sequence_bootstrap import (
     _raise_if_process_exited,
     axis_config_by_axis_id,
     bind_hip_observer_telemetry_in,
+    bootstrap_to_idle_synced,
     infer_hip_smoke_control_addr,
     select_safe_hip_param_spec,
     shutdown_supervisor_stack,
@@ -23,7 +24,6 @@ from .smoke_sequence_extract import (
     extract_axis_param_commit_status,
     extract_axis_param_value,
 )
-from .smoke_sequence_ready_motion import _bootstrap_to_idle_synced
 from .smoke_sequence_types import (
     HiPOpenObservation,
     HiPParamObservation,
@@ -34,7 +34,7 @@ from .smoke_sequence_types import (
 
 
 def run_hip_param_sequence(config: SmokeSequenceConfig) -> HiPParamSmokeResult:
-    boot = _bootstrap_to_idle_synced(config)
+    boot = bootstrap_to_idle_synced(config)
     launched = boot.launched
     axis_id = str(
         config.hip_param_axis_id or (boot.selected_axis_ids[0] if boot.selected_axis_ids else "")

@@ -14,12 +14,12 @@ from .smoke_sequence_extract import (
     system_time_tokens_advanced,
 )
 from .smoke_sequence_hip_param import run_hip_param_sequence
-from .smoke_sequence_ready_motion import (
+from .smoke_sequence_ready_motion import run_esreset_estart_resync_sequence
+from .smoke_sequence_targets import (
     build_selected_estart_targets,
     build_selected_estop_reset_intents,
     build_selected_resync_intents,
     densi_process_names_for_axes,
-    run_esreset_estart_resync_sequence,
 )
 from .smoke_sequence_types import (
     HiPParamSmokeResult,
