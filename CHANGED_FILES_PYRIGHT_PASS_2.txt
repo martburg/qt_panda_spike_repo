@@ -1,9 +1,0 @@
-pyrightconfig.json
-src/steuerung3d/apps/inputd/pygame_backend.py
-typings/PySide6/__init__.pyi
-typings/PySide6/QtCore.pyi
-typings/PySide6/QtGui.pyi
-typings/PySide6/QtUiTools.pyi
-typings/PySide6/QtWidgets.pyi
-typings/transitions/__init__.pyi
-pyright_out.txt
