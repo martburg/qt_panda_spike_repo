@@ -130,3 +130,19 @@ def test_supervisor_stack_debug_profile_opens_visible_densi(tmp_path: Path):
 
     densi_anton = next(p for p in procs if p.name == "densi-Anton")
     assert "--headless" not in densi_anton.argv
+
+
+def test_supervisor_smoke_motion_profile_swaps_inputd_for_inputd_sim(tmp_path: Path) -> None:
+    profile = Path("configs/profiles/supervisor_2axes_core_fanout_smoke_motion.toml")
+    spec = load_stack_profile(profile)
+    procs = expand_processes(spec, session_dir=tmp_path)
+    names = [p.name for p in procs]
+
+    assert "inputd" not in names
+    assert "inputd_sim" in names
+    assert "joy2intent" in names
+
+    inputd_sim = next(p for p in procs if p.name == "inputd_sim")
+    assert "--config" in inputd_sim.argv
+    cfg_path = inputd_sim.argv[inputd_sim.argv.index("--config") + 1]
+    assert cfg_path.endswith("configs/services/inputd_sim_smoke.toml")

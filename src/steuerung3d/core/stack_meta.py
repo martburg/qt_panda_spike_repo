@@ -7,35 +7,19 @@ operations. The goal is to stay dependency-free and work on Windows + POSIX.
 from __future__ import annotations
 
 import json
-import os
 import time
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional, cast
 
+from steuerung3d.core.process_liveness import pid_is_alive as _pid_is_alive
+
 META_FILENAME = "stack_meta.json"
 
 
 def _now_s() -> float:
     return float(time.time())
-
-
-def _pid_is_alive(pid: int) -> bool:
-    """Best-effort check whether a process exists.
-
-    On POSIX, os.kill(pid, 0) is the usual way. On Windows, os.kill also works
-    for this check with signal 0 in modern Python.
-    """
-
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except OSError:
-        return False
-    else:
-        return True
 
 
 def _as_table(value: object) -> dict[str, object]:

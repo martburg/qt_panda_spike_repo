@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import sys
 
@@ -8,12 +9,15 @@ from PySide6.QtCore import QObject, QTimer
 from PySide6.QtWidgets import QApplication
 
 from steuerung3d.core.intents import ReleaseAxis, ReleaseAxisLease
+from steuerung3d.core.net import parse_hostport
 from steuerung3d.core.telemetry import TelemetrySnapshot
 from steuerung3d.protocol.udp_channels import (
     UdpIntentOut as UdpIntentOut,
     UdpTelemetryIn as UdpTelemetryIn,
+    close_udp_json_endpoint,
 )
 
+from .actions_transport import UdpDensiActionIn as UdpDensiActionIn
 from .actions_transport import UdpDensiActionOut as UdpDensiActionOut
 from .engine import SupervisorEngine
 from .gui.window import SupervisorWindow
@@ -44,6 +48,7 @@ class SupervisorRuntime(QObject):
         self._hip_children: dict[str, list[subprocess.Popen[str]]] = {}
         self._merged_snapshot: TelemetrySnapshot | None = None
         self._axes_by_unit_id = {axis.unit_id: axis for axis in profile.axes}
+        self._smoke_action_in: UdpDensiActionIn | None = None
 
         self._init_transports()
         self._init_window_and_signals()
@@ -59,6 +64,7 @@ class SupervisorRuntime(QObject):
     def tick(self) -> None:
         self._refresh_hip_processes()
         self._ingest_telemetry()
+        self._ingest_smoke_actions()
         self._apply_window_snapshot()
         self._publish_outbound()
 
@@ -99,6 +105,13 @@ class SupervisorRuntime(QObject):
         self.telemetry_in, self.intent_out, self.action_outs_by_unit_id = init_transports(
             profile=self.profile
         )
+        smoke_action_in_addr = str(os.environ.get("STEUERUNG3D_SUPERVISOR_ACTION_IN", "") or "").strip()
+        if smoke_action_in_addr:
+            try:
+                self._smoke_action_in = UdpDensiActionIn.bind(parse_hostport(smoke_action_in_addr))
+            except Exception:
+                log.exception("failed to bind supervisor smoke action input %s", smoke_action_in_addr)
+                self._smoke_action_in = None
 
     def _init_window_and_signals(self) -> None:
         self.window = SupervisorWindow()
@@ -128,6 +141,28 @@ class SupervisorRuntime(QObject):
             return
         self.engine.ingest(merged)
 
+
+    def _ingest_smoke_actions(self) -> None:
+        if self._smoke_action_in is None:
+            return
+        try:
+            actions = list(self._smoke_action_in.drain_actions(limit=100) or [])
+        except Exception:
+            log.exception("failed to drain supervisor smoke actions")
+            return
+        for action in actions:
+            name = str(getattr(action, "action", "") or "")
+            if name == "estop_reset":
+                self.engine.queue_reset_estop()
+            elif name == "estart":
+                self.engine.queue_estart()
+            elif name == "resync":
+                self.engine.queue_resync()
+            elif name == "chk_es_taster":
+                self.engine.set_chk_requested(bool(getattr(action, "value", False)))
+            elif name == "recover":
+                self.engine.queue_recover()
+
     def _apply_window_snapshot(self) -> None:
         snapshot = self.engine.snapshot()
         self.window.apply_snapshot(snapshot)
@@ -151,6 +186,9 @@ class SupervisorRuntime(QObject):
             intent_out=self.intent_out,
             action_outs_by_unit_id=self.action_outs_by_unit_id,
         )
+        if self._smoke_action_in is not None:
+            close_udp_json_endpoint(self._smoke_action_in)
+            self._smoke_action_in = None
 
     def _launch_children(self) -> None:
         self._children.extend(launch_children(profile=self.profile))

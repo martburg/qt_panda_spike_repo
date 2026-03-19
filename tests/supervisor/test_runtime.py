@@ -176,3 +176,113 @@ def test_refresh_hip_processes_releases_claim_and_lease_when_last_child_exits(
         )
     finally:
         rt.shutdown()
+
+
+
+def test_supervisor_smoke_action_input_can_latch_chk_es_taster(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    published_actions: list[object] = []
+
+    monkeypatch.setitem(sys.modules, "PySide6", types.ModuleType("PySide6"))
+    monkeypatch.setitem(sys.modules, "PySide6.QtCore", _qtcore_module())
+    monkeypatch.setitem(sys.modules, "PySide6.QtWidgets", _qtwidgets_module())
+    monkeypatch.setitem(
+        sys.modules,
+        "steuerung3d.apps.supervisor.gui.window",
+        _dummy_window_module(),
+    )
+
+    runtime_mod = importlib.import_module("steuerung3d.apps.supervisor.runtime")
+
+    monkeypatch.setattr(runtime_mod.UdpTelemetryIn, "bind", _drain_telemetry_stub)
+    monkeypatch.setattr(runtime_mod.UdpIntentOut, "connect", _publish_intent_stub([]))
+
+    def _action_out_connect(*_args: object, **_kwargs: object) -> object:
+        return SimpleNamespace(
+            publish_action=published_actions.append,
+            tx=SimpleNamespace(link=SimpleNamespace(close=_noop_close)),
+        )
+
+    def _action_in_bind(*_args: object, **_kwargs: object) -> object:
+        from steuerung3d.apps.supervisor.models import DensiRemoteAction
+
+        actions = [DensiRemoteAction("chk_es_taster", value=True)]
+
+        def _drain(limit: int = 100) -> list[object]:
+            _ = limit
+            drained = list(actions)
+            actions.clear()
+            return drained
+
+        return SimpleNamespace(
+            drain_actions=_drain,
+            rx=SimpleNamespace(link=SimpleNamespace(close=_noop_close)),
+        )
+
+    monkeypatch.setattr(runtime_mod.UdpDensiActionOut, "connect", _action_out_connect)
+    monkeypatch.setattr(runtime_mod.UdpDensiActionIn, "bind", _action_in_bind)
+    monkeypatch.setenv("STEUERUNG3D_SUPERVISOR_ACTION_IN", "127.0.0.1:55001")
+
+    from steuerung3d.apps.supervisor.models import PairConfig, SupervisorProfile
+    from steuerung3d.core.telemetry import AxisTelemetry, DensiTelemetry, TelemetrySnapshot
+    from steuerung3d.protocol.estop_bits import ESTOP_CAUSE_KEYS, ESTOP_OK_KEYS, ESTOP_SPECS, encode_estop_word
+
+    bits: dict[str, bool] = {}
+    for key in ESTOP_SPECS:
+        if key in ESTOP_OK_KEYS:
+            bits[key] = True
+        elif key in ESTOP_CAUSE_KEYS:
+            bits[key] = False
+        else:
+            bits[key] = False
+    bits["schuetz"] = True
+    estop_word = int(encode_estop_word(bits))
+
+    profile = SupervisorProfile(
+        supervisor_id="sup",
+        title="Supervisor",
+        cycle_ms=50,
+        telem_in="127.0.0.1:51002",
+        intent_out="127.0.0.1:51001",
+        gui=False,
+        pairs=(
+            PairConfig(
+                pair_id="anton",
+                axis_id="Anton",
+                densi_id="Anton",
+                hip_id="hip_anton",
+                selected=True,
+                densi_action_out="127.0.0.1:53001",
+            ),
+        ),
+    )
+
+    rt = runtime_mod.SupervisorRuntime(profile)
+    try:
+        rt.engine.ingest(
+            TelemetrySnapshot(
+                tick=1,
+                t_s=0.0,
+                core_mode="IDLE",
+                estop=False,
+                fault=False,
+                axes={
+                    "Anton": AxisTelemetry(
+                        pos=0.0, vel=0.0, enabled=False, fault=False, device_tick=1
+                    )
+                },
+                densis={"Anton": DensiTelemetry(device_id="Anton", online=True)},
+                axis_estop_status_word={"Anton": estop_word},
+            )
+        )
+
+        rt.tick()
+
+        assert any(
+            getattr(action, "action", "") == "chk_es_taster"
+            and getattr(action, "value", None) is True
+            for action in published_actions
+        )
+    finally:
+        rt.shutdown()

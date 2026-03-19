@@ -12,6 +12,7 @@ import signal
 import time
 from pathlib import Path
 
+from steuerung3d.core.process_liveness import pid_is_alive
 from steuerung3d.core.stack_loader import load_stack_profile
 from steuerung3d.core.stack_meta import find_latest_session_dir, load_meta
 from steuerung3d.core.stack_preflight import cleanup_residual_bind_ports, extract_bind_ports
@@ -54,11 +55,7 @@ def default_profile_path(name_or_path: str) -> Path:
 
 
 def pid_alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except OSError:
-        return False
-    return True
+    return pid_is_alive(pid)
 
 
 def _kill_pid_hard(pid: int) -> bool:

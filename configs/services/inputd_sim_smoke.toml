@@ -1,0 +1,17 @@
+[io]
+out = "127.0.0.1:50100"
+tick_hz = 60
+
+[control]
+bind = "127.0.0.1:50101"
+autostart = false
+
+[input]
+num_axes = 8
+num_buttons = 16
+default_axis = 0.0
+default_button = false
+src = "inputd_sim"
+
+[scenario]
+path = "../inputd_sim/smoke_deadman_forward.toml"

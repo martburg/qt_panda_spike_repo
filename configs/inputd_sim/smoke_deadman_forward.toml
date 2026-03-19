@@ -1,0 +1,34 @@
+[aliases.axes]
+manual_jog = 1
+soll_speed = 1
+
+[aliases.buttons]
+deadman = 5
+select_anton = 0
+select_debby = 1
+
+[[steps]]
+name = "neutral_before_drive"
+hold_s = 0.40
+
+[[steps]]
+name = "drive_forward"
+hold_s = 1.50
+ramp_s = 0.20
+
+[steps.buttons]
+deadman = true
+
+[steps.axes]
+manual_jog = 0.30
+
+[[steps]]
+name = "release"
+hold_s = 0.60
+ramp_s = 0.15
+
+[steps.buttons]
+deadman = false
+
+[steps.axes]
+manual_jog = 0.0
