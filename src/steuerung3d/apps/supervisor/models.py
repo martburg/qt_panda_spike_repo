@@ -126,6 +126,12 @@ class AxisRow:
     livetick: int
     pos: float
     vel: float
+    pos_user_min: float = 0.0
+    pos_user_max: float = 0.0
+    load_pct: float = 0.0
+    temp_c: float = 0.0
+    pos_diff_m: float = 0.0
+    system_time_token: str = ""
     estop_word: int = 0
     estop_dots: tuple[bool | None, ...] = ()
     livetick_diff: int = 0
@@ -146,6 +152,12 @@ class AxisRow:
         vel: float,
         unit_id: str = "",
         pair_id: str = "",
+        pos_user_min: float = 0.0,
+        pos_user_max: float = 0.0,
+        load_pct: float = 0.0,
+        temp_c: float = 0.0,
+        pos_diff_m: float = 0.0,
+        system_time_token: str = "",
         estop_word: int = 0,
         estop_dots: tuple[bool | None, ...] = (),
         livetick_diff: int = 0,
@@ -167,6 +179,12 @@ class AxisRow:
         object.__setattr__(self, "livetick_diff", int(livetick_diff))
         object.__setattr__(self, "pos", float(pos))
         object.__setattr__(self, "vel", float(vel))
+        object.__setattr__(self, "pos_user_min", float(pos_user_min))
+        object.__setattr__(self, "pos_user_max", float(pos_user_max))
+        object.__setattr__(self, "load_pct", float(load_pct))
+        object.__setattr__(self, "temp_c", float(temp_c))
+        object.__setattr__(self, "pos_diff_m", float(pos_diff_m))
+        object.__setattr__(self, "system_time_token", str(system_time_token))
         object.__setattr__(self, "stale", bool(stale))
         object.__setattr__(self, "hip_open_count", int(hip_open_count))
 

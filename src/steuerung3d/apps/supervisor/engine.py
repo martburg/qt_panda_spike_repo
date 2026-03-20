@@ -121,6 +121,12 @@ class SupervisorEngine:
                         livetick_diff=row.livetick_diff,
                         pos=row.pos,
                         vel=row.vel,
+                        pos_user_min=row.pos_user_min,
+                        pos_user_max=row.pos_user_max,
+                        load_pct=row.load_pct,
+                        temp_c=row.temp_c,
+                        pos_diff_m=row.pos_diff_m,
+                        system_time_token=row.system_time_token,
                         stale=row.stale,
                         hip_open_count=int(self._hip_open_counts.get(row.unit_id, 0)),
                     )
