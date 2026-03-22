@@ -1,0 +1,65 @@
+Metadata-Version: 2.4
+Name: qt-panda-spike
+Version: 0.1.0
+Summary: Small Panda3D + Qt integration spike
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: PySide6>=6.6
+Requires-Dist: panda3d>=1.10.16
+
+# qt_panda_spike
+
+A small standalone spike repo to compare two Panda3D + Qt integration strategies on Windows:
+
+- `native` — Qt hosts Panda as a native child window
+- `offscreen` — Panda renders offscreen and Qt displays the latest frame
+
+This repo is intentionally isolated from Steuerung3D runtime complexity. It is meant to answer one practical question:
+
+> Which Panda + Qt integration path is stable enough on this machine?
+
+## Goals
+
+The spike is successful when one backend can:
+
+- open and remain alive
+- orbit the camera with left-drag
+- zoom with mouse wheel
+- survive window resizes
+- keep input responsive
+- render a simple scene consistently for several minutes
+
+## Quick start
+
+Create a virtual environment and install dependencies:
+
+```bash
+python -m venv .venv
+. .venv/Scripts/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+```
+
+Run native embedding:
+
+```bash
+python -m qt_panda_spike --backend native
+```
+
+Run offscreen mode:
+
+```bash
+python -m qt_panda_spike --backend offscreen
+```
+
+## Controls
+
+- Left mouse drag: orbit camera
+- Mouse wheel: zoom
+- Resize the main window and observe stability
+
+## Notes
+
+- The native backend is the most direct Panda integration path but may run into Windows focus/activation issues.
+- The offscreen backend is designed to avoid native child-window focus issues by letting Qt own the visible widget.
+- This repo avoids any application-specific control logic on purpose.
