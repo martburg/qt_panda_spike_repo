@@ -4,7 +4,7 @@ import logging
 
 from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.intents import EchoLifeTick, JoyStateUpdate, SetControlMode, SmoothStop
-from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
+from steuerung3d.core.joy_state import JoyState, clamp_norm, clamp_soll_speed
 from steuerung3d.core.state import MachineState
 
 log = logging.getLogger("core")
@@ -38,5 +38,7 @@ def handle_joy_state_update(state: MachineState, intent: JoyStateUpdate) -> None
     state.joy = JoyState(
         deadman=bool(getattr(intent, "deadman", False)),
         soll_speed=clamp_soll_speed(float(getattr(intent, "soll_speed", 0.0))),
+        look_pan=clamp_norm(float(getattr(intent, "look_pan", 0.0))),
+        look_tilt=clamp_norm(float(getattr(intent, "look_tilt", 0.0))),
         selected_axes=selected_axes,
     )

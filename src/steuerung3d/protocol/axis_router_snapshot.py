@@ -69,6 +69,8 @@ def project_joy_for_axis(snap: TelemetrySnapshot, axis_id: str) -> JoyState:
         deadman=bool(getattr(joy, "deadman", False)),
         select_hip=axis_key in selected_axes,
         soll_speed=float(getattr(joy, "soll_speed", 0.0)),
+        look_pan=float(getattr(joy, "look_pan", 0.0)),
+        look_tilt=float(getattr(joy, "look_tilt", 0.0)),
         selected_axes=selected_axes,
     )
 

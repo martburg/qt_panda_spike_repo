@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from steuerung3d.core.axis_ids import normalize_axis_id
 from steuerung3d.core.axis_selection import authoritative_selected_axis, visible_axis_ids_for_hip
 from steuerung3d.core.intents import ClaimAxis, Intent, ReleaseAxis
-from steuerung3d.core.joy_state import JoyState, clamp_soll_speed
+from steuerung3d.core.joy_state import JoyState, clamp_norm, clamp_soll_speed
 from steuerung3d.core.telemetry import TelemetrySnapshot
 
 from .attach_state import NOT_ATTACHED, build_attach_combo
@@ -30,6 +30,9 @@ def _sync_joy_state(runtime: HipStepContextEngineLike, hip_id: str, joy: JoyStat
         deadman=bool(getattr(joy_in, "deadman", False)),
         select_hip=bool(getattr(joy_in, "select_hip", False)),
         soll_speed=clamp_soll_speed(getattr(joy_in, "soll_speed", 0.0)),
+        look_pan=clamp_norm(getattr(joy_in, "look_pan", 0.0)),
+        look_tilt=clamp_norm(getattr(joy_in, "look_tilt", 0.0)),
+        selected_axes=getattr(joy_in, "selected_axes", ()),
     )
     if getattr(runtime._param_txn, "hip_id", "") != hip_id:
         runtime._param_txn.hip_id = hip_id

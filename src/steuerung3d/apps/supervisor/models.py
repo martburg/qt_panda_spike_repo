@@ -6,6 +6,7 @@ from typing import cast
 
 from steuerung3d.core.intents import Intent
 from steuerung3d.core.telemetry import JoyState
+from steuerung3d.rig.kinematics.two_axis_head import TwoAxisHeadControlMap, TwoAxisHeadGeometry
 
 
 class AxisPhase(str, Enum):
@@ -83,6 +84,8 @@ class SupervisorProfile:
     stale_after_ms: int
     launch_stack: str
     axes: tuple[AxisConfig, ...]
+    kinematics: TwoAxisHeadGeometry | None
+    kinematics_control_map: TwoAxisHeadControlMap | None
 
     def __init__(
         self,
@@ -97,6 +100,8 @@ class SupervisorProfile:
         launch_stack: str = "",
         axes: tuple[AxisConfig, ...] = (),
         pairs: tuple[AxisConfig, ...] = (),
+        kinematics: TwoAxisHeadGeometry | None = None,
+        kinematics_control_map: TwoAxisHeadControlMap | None = None,
     ) -> None:
         resolved_axes = tuple(axes or pairs)
         object.__setattr__(self, "supervisor_id", str(supervisor_id))
@@ -108,6 +113,14 @@ class SupervisorProfile:
         object.__setattr__(self, "stale_after_ms", int(stale_after_ms))
         object.__setattr__(self, "launch_stack", str(launch_stack))
         object.__setattr__(self, "axes", resolved_axes)
+        object.__setattr__(self, "kinematics", kinematics)
+        object.__setattr__(
+            self,
+            "kinematics_control_map",
+            kinematics_control_map
+            if kinematics_control_map is not None
+            else (TwoAxisHeadControlMap() if kinematics is not None else None),
+        )
 
     @property
     def pairs(self) -> tuple[AxisConfig, ...]:
@@ -215,8 +228,86 @@ class DensiRemoteAction:
 
 @dataclass(frozen=True)
 class OutboundBatch:
-    intents: tuple[Intent, ...] = ()
-    densi_actions: dict[str, tuple[DensiRemoteAction, ...]] = field(
-        default_factory=lambda: cast(dict[str, tuple[DensiRemoteAction, ...]], {})
+    intents: tuple[Intent, ...]
+    densi_actions: dict[str, tuple[DensiRemoteAction, ...]]
+    joy_update_changed: bool
+
+
+@dataclass(frozen=True)
+class SelectedContext:
+    selected_unit_ids: tuple[str, ...]
+    selected_axis_ids: tuple[str, ...]
+
+    @property
+    def selected_pair_ids(self) -> tuple[str, ...]:
+        return self.selected_unit_ids
+
+
+@dataclass(frozen=True)
+class PhaseAggregate:
+    any_estop: bool
+    any_fault: bool
+    all_ready: bool
+    any_live: bool
+    any_stale: bool
+    selected: SelectedContext
+
+
+@dataclass(frozen=True)
+class HiPWindowState:
+    unit_id: str
+    hip_id: str
+    open_count: int
+
+
+def selected_context(rows: tuple[AxisRow, ...]) -> SelectedContext:
+    selected_units = tuple(row.unit_id for row in rows if row.selected)
+    selected_axis_ids = tuple(row.axis_id for row in rows if row.selected)
+    return SelectedContext(selected_unit_ids=selected_units, selected_axis_ids=selected_axis_ids)
+
+
+def aggregate(rows: tuple[AxisRow, ...]) -> PhaseAggregate:
+    selected_rows = tuple(row for row in rows if row.selected)
+    rows_for_state = selected_rows if selected_rows else rows
+    any_estop = any(row.estop for row in rows_for_state)
+    any_fault = any(row.phase == AxisPhase.STALE for row in rows_for_state)
+    all_ready = bool(rows_for_state) and all(
+        row.phase in (AxisPhase.READY, AxisPhase.LIVE) for row in rows_for_state
     )
-    joy_update_changed: bool = False
+    any_live = any(row.phase == AxisPhase.LIVE for row in rows_for_state)
+    any_stale = any(row.stale for row in rows_for_state)
+    return PhaseAggregate(
+        any_estop=any_estop,
+        any_fault=any_fault,
+        all_ready=all_ready,
+        any_live=any_live,
+        any_stale=any_stale,
+        selected=selected_context(rows),
+    )
+
+
+def status_text(rows: tuple[AxisRow, ...]) -> str:
+    agg = aggregate(rows)
+    if agg.any_estop:
+        return "ESTOP"
+    if agg.any_fault:
+        return "FAULT"
+    if agg.any_stale:
+        return "STALE"
+    if agg.any_live:
+        return "LIVE"
+    if agg.all_ready:
+        return "READY"
+    return "IDLE"
+
+
+def selected_rows(snapshot: SupervisorSnapshot) -> tuple[AxisRow, ...]:
+    return tuple(row for row in snapshot.rows if row.selected)
+
+
+def total_hip_open(rows: tuple[AxisRow, ...]) -> int:
+    return sum(int(row.hip_open_count) for row in rows)
+
+
+def cast_snapshot(obj: object) -> SupervisorSnapshot:
+    return cast(SupervisorSnapshot, obj)

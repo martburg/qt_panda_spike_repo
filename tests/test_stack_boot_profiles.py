@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from steuerung3d.apps.supervisor.profile_loader import load_profile as load_supervisor_profile
 from steuerung3d.core.stack_loader import load_stack_profile
 from steuerung3d.core.stack_runtime import expand_processes
 
@@ -146,3 +147,34 @@ def test_supervisor_smoke_motion_profile_swaps_inputd_for_inputd_sim(tmp_path: P
     assert "--config" in inputd_sim.argv
     cfg_path = inputd_sim.argv[inputd_sim.argv.index("--config") + 1]
     assert cfg_path.endswith("configs/services/inputd_sim_smoke.toml")
+
+
+def test_two_axis_head_non_vertical_all_in_one_profile_includes_supervisor(tmp_path: Path) -> None:
+    profile = Path("configs/profiles/two_axis_head_non_vertical_all_in_one.toml")
+    spec = load_stack_profile(profile)
+    assert spec.name == "two_axis_head_non_vertical_all_in_one"
+    assert spec.axes == ["HeadJoint1", "HeadJoint2"]
+
+    procs = expand_processes(spec, session_dir=tmp_path)
+    names = [p.name for p in procs]
+
+    assert "core" in names
+    assert "densi-HeadJoint1" in names
+    assert "densi-HeadJoint2" in names
+    assert "inputd" in names
+    assert "joy2intent" in names
+    assert "supervisor" in names
+
+    supervisor = next(p for p in procs if p.name == "supervisor")
+    assert (
+        supervisor.argv[0].endswith("python")
+        or supervisor.argv[0].endswith("python3")
+        or "python" in supervisor.argv[0].lower()
+    )
+    assert supervisor.argv[1:5] == ["-m", "steuerung3d", "sup", "--profile"]
+
+    supervisor_profile = Path(supervisor.argv[5])
+    assert supervisor_profile.name == "smoke_two_axis_head_non_vertical_embedded.toml"
+
+    sup_cfg = load_supervisor_profile(supervisor_profile)
+    assert not sup_cfg.launch_stack

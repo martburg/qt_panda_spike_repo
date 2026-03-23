@@ -20,6 +20,8 @@ def build_joy_state_update(
         deadman=bool(facts.deadman),
         select_hip=bool(selected_axes),
         soll_speed=float(facts.soll_speed),
+        look_pan=float(facts.look_pan),
+        look_tilt=float(facts.look_tilt),
         selected_axes=selected_axes,
     )
 

@@ -17,7 +17,15 @@ def test_joy_state_update_reaches_snapshot() -> None:
     bus = InMemTransport()
     snaps: list[TelemetrySnapshot] = []
 
-    bus.publish_intent(JoyStateUpdate(deadman=True, soll_speed=-0.75, selected_axes=("Anton",)))
+    bus.publish_intent(
+        JoyStateUpdate(
+            deadman=True,
+            soll_speed=-0.75,
+            look_pan=0.5,
+            look_tilt=-0.25,
+            selected_axes=("Anton",),
+        )
+    )
 
     eng = CoreEngine(
         timebase=tb,
@@ -34,6 +42,8 @@ def test_joy_state_update_reaches_snapshot() -> None:
     assert joy.selected_axes == ("Anton",)
     assert joy.select_hip is True
     assert abs(joy.soll_speed - (-0.75)) < 1e-6
+    assert abs(joy.look_pan - 0.5) < 1e-6
+    assert abs(joy.look_tilt - (-0.25)) < 1e-6
 
 
 def test_joy_state_defaults_when_absent() -> None:

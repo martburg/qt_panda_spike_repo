@@ -69,6 +69,7 @@ def _dummy_window_module() -> types.ModuleType:
         open_hip_clicked=_NullSignal(),
         status_label=SimpleNamespace(setText=_noop_text),
         apply_snapshot=_noop_apply_snapshot,
+        apply_scene_snapshot=_noop_apply_snapshot,
         show=_noop_show,
         show_recover_placeholder=_noop_show,
     )

@@ -126,6 +126,27 @@ def test_setup_manual_multi_select_targets_all_selected_lanes(tmp_path: Path) ->
         assert j.rate <= lim.max_winch_mps
 
 
+def test_semantic_look_channels_are_published_in_joy_state_update(tmp_path: Path) -> None:
+    st = _TestJoyState()
+    bind = JoyBindings(
+        axes={"manual_jog": 1, "look_pan": 0, "look_tilt": 1},
+        buttons={"deadman": 5, "fine": 7},
+        select_buttons=[0, 1, 2, 3],
+        invert={"look_tilt": True},
+        deadzone=0.05,
+        expo=1.5,
+    )
+    rig = _rig()
+    lim = _lim_from_config(tmp_path)
+
+    rc = _rc(axes=[0.4, -0.25], pressed=(5, 0))
+    intents = synthesize_intents(st, rc, bind, rig, lim)
+
+    joy = next(i for i in intents if isinstance(i, JoyStateUpdate))
+    assert joy.look_pan == 0.4
+    assert joy.look_tilt == 0.25
+
+
 def test_deadman_release_disables_previously_enabled_winches(tmp_path: Path) -> None:
     st = _TestJoyState()
     bind = _bind()

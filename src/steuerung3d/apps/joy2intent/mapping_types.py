@@ -80,6 +80,8 @@ class JoyInputFacts:
     deadman: bool
     fine: bool
     soll_speed: float
+    look_pan: float
+    look_tilt: float
     selected_set: set[str]
     rig_ids: list[str]
     use_contextual_local_manual: bool

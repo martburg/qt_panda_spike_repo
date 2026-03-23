@@ -6,7 +6,9 @@ from steuerung3d.apps.supervisor.engine import SupervisorEngine
 from steuerung3d.apps.supervisor.models import AxisConfig, AxisPhase, SupervisorProfile
 from steuerung3d.core.intents import (
     EchoLifeTick,
+    EnableAxis,
     Intent,
+    JogAxis,
     JoyStateUpdate,
     LocalAxisManualRequest,
     ReleaseAxisLease,
@@ -21,6 +23,7 @@ from steuerung3d.protocol.estop_bits import (
     ESTOP_SPECS,
     encode_estop_word,
 )
+from steuerung3d.rig.kinematics.two_axis_head import TwoAxisHeadControlMap, TwoAxisHeadGeometry
 
 
 def _single_joy_update(intents: Sequence[Intent]) -> JoyStateUpdate:
@@ -51,6 +54,36 @@ def _release_axis_leases(intents: Sequence[Intent]) -> list[ReleaseAxisLease]:
 
 def _local_manual_requests(intents: Sequence[Intent]) -> list[LocalAxisManualRequest]:
     return [intent for intent in intents if isinstance(intent, LocalAxisManualRequest)]
+
+
+def _kinematic_profile(*, control_map: TwoAxisHeadControlMap | None = None) -> SupervisorProfile:
+    return SupervisorProfile(
+        supervisor_id="sup",
+        title="Supervisor",
+        cycle_ms=50,
+        telem_in="127.0.0.1:51002",
+        intent_out="127.0.0.1:51001",
+        axes=(
+            AxisConfig(unit_id="joint1", axis_id="Pan", selected=True),
+            AxisConfig(unit_id="joint2", axis_id="Tilt", selected=True),
+        ),
+        kinematics=TwoAxisHeadGeometry(
+            machine_id="head",
+            joint1_axis_id="Pan",
+            joint2_axis_id="Tilt",
+            joint1_max_rate_deg_s=90.0,
+            joint2_max_rate_deg_s=45.0,
+        ),
+        kinematics_control_map=control_map,
+    )
+
+
+def _request_enables(intents: Sequence[Intent]) -> list[EnableAxis]:
+    return [intent for intent in intents if isinstance(intent, EnableAxis)]
+
+
+def _jog_axes(intents: Sequence[Intent]) -> list[JogAxis]:
+    return [intent for intent in intents if isinstance(intent, JogAxis)]
 
 
 def _profile() -> SupervisorProfile:
@@ -95,6 +128,8 @@ def _snap(
     vel: float = 0.0,
     joy_deadman: bool = False,
     soll_speed: float = 0.0,
+    look_pan: float = 0.0,
+    look_tilt: float = 0.0,
     age_ticks: int = 0,
 ) -> TelemetrySnapshot:
     return TelemetrySnapshot(
@@ -117,7 +152,35 @@ def _snap(
             "Anton": DensiTelemetry(device_id="Anton", online=True, last_seen_age_ticks=age_ticks)
         },
         axis_estop_status_word={"Anton": estop_word},
-        joy=JoyState(deadman=joy_deadman, soll_speed=soll_speed),
+        joy=JoyState(
+            deadman=joy_deadman, soll_speed=soll_speed, look_pan=look_pan, look_tilt=look_tilt
+        ),
+    )
+
+
+def _kinematic_snap(
+    *, joy_deadman: bool = False, look_pan: float = 0.0, look_tilt: float = 0.0
+) -> TelemetrySnapshot:
+    return TelemetrySnapshot(
+        tick=1,
+        t_s=0.05,
+        core_mode="RUN",
+        estop=False,
+        fault=False,
+        axes={
+            "Pan": AxisTelemetry(
+                pos=0.0, vel=0.0, enabled=True, fault=False, device_tick=12, lifetick_age=7
+            ),
+            "Tilt": AxisTelemetry(
+                pos=0.0, vel=0.0, enabled=True, fault=False, device_tick=13, lifetick_age=7
+            ),
+        },
+        densis={
+            "Pan": DensiTelemetry(device_id="Pan", online=True, last_seen_age_ticks=0),
+            "Tilt": DensiTelemetry(device_id="Tilt", online=True, last_seen_age_ticks=0),
+        },
+        axis_estop_status_word={"Pan": 1 << 11, "Tilt": 1 << 11},
+        joy=JoyState(deadman=joy_deadman, look_pan=look_pan, look_tilt=look_tilt),
     )
 
 
@@ -290,6 +353,47 @@ def test_supervisor_requests_leases_and_drives_selected_axes_with_simple_1to1_ki
     assert manuals[0].axis_ids == ("Anton",)
     assert manuals[0].enable is True
     assert manuals[0].rate == 0.5
+
+
+def test_two_axis_head_consumes_semantic_look_channels_and_emits_per_axis_motion() -> None:
+    eng = SupervisorEngine(_kinematic_profile())
+    eng.ingest(_kinematic_snap(joy_deadman=True, look_pan=0.5, look_tilt=-1.0))
+
+    batch = eng.consume_outbound()
+
+    enables = _request_enables(batch.intents)
+    jogs = _jog_axes(batch.intents)
+    joy_update = _single_joy_update(batch.intents)
+
+    assert {(intent.axis_id, intent.enable) for intent in enables} == {
+        ("Pan", True),
+        ("Tilt", True),
+    }
+    assert [(intent.axis_id, intent.vel) for intent in jogs] == [("Pan", 45.0), ("Tilt", -45.0)]
+    assert joy_update.look_pan == 0.5
+    assert joy_update.look_tilt == -1.0
+
+    eng.ingest(_kinematic_snap(joy_deadman=False, look_pan=0.0, look_tilt=0.0))
+    batch = eng.consume_outbound()
+    disables = [intent for intent in _request_enables(batch.intents) if not intent.enable]
+    assert {(intent.axis_id, intent.enable) for intent in disables} == {
+        ("Pan", False),
+        ("Tilt", False),
+    }
+
+
+def test_two_axis_head_respects_configured_control_map() -> None:
+    eng = SupervisorEngine(
+        _kinematic_profile(
+            control_map=TwoAxisHeadControlMap(joint1_channel="look_tilt", joint2_channel="look_pan")
+        )
+    )
+    eng.ingest(_kinematic_snap(joy_deadman=True, look_pan=-0.25, look_tilt=0.75))
+
+    batch = eng.consume_outbound()
+    jogs = _jog_axes(batch.intents)
+
+    assert [(intent.axis_id, intent.vel) for intent in jogs] == [("Pan", 67.5), ("Tilt", -11.25)]
 
 
 def test_supervisor_releases_leases_and_stops_manual_motion_when_hip_opens() -> None:

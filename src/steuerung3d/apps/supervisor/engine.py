@@ -3,6 +3,7 @@ from __future__ import annotations
 from steuerung3d.core.intents import Intent
 from steuerung3d.core.telemetry import JoyState, TelemetrySnapshot
 
+from .kinematics_integration import build_scene_snapshot, sync_kinematic_motion
 from .models import AxisConfig, AxisRow, OutboundBatch, SupervisorProfile, SupervisorSnapshot
 from .outbound import (
     append_joy_update_if_changed,
@@ -178,13 +179,24 @@ class SupervisorEngine:
         self._pending_estart = False
 
         joy = self._current_joy()
-        self._manual_active_axis_ids = sync_manual_motion(
-            intents=intents,
-            locked=context.locked,
-            joy=joy,
-            selected_axis_ids=context.selected_axis_ids,
-            manual_active_axis_ids=self._manual_active_axis_ids,
-        )
+        if self.profile.kinematics is None:
+            self._manual_active_axis_ids = sync_manual_motion(
+                intents=intents,
+                locked=context.locked,
+                joy=joy,
+                selected_axis_ids=context.selected_axis_ids,
+                manual_active_axis_ids=self._manual_active_axis_ids,
+            )
+        else:
+            self._manual_active_axis_ids = sync_kinematic_motion(
+                intents=intents,
+                profile=self.profile,
+                joy=joy,
+                snap=self._last_snapshot,
+                locked=context.locked,
+                selected_axis_ids=context.selected_axis_ids,
+                active_axis_ids=self._manual_active_axis_ids,
+            )
         append_lifetick_echoes(
             intents=intents,
             profile_axes=self.profile.axes,
@@ -219,6 +231,11 @@ class SupervisorEngine:
             stale_after_ms=int(self.profile.stale_after_ms),
             hip_open_count=int(self._hip_open_counts.get(axis.unit_id, 0)),
         )
+
+    def scene_snapshot(self):
+        if self._last_snapshot is None:
+            return None
+        return build_scene_snapshot(profile=self.profile, snap=self._last_snapshot)
 
     def _current_joy(self) -> JoyState:
         if self._last_snapshot is None:

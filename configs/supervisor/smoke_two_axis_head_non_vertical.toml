@@ -1,0 +1,47 @@
+[supervisor]
+id = "sup_two_axis_head_non_vertical_smoke"
+title = "Two-Axis Head Smoke (Non-Vertical Joint1)"
+cycle_ms = 50
+telem_in = "127.0.0.1:51002"
+intent_out = "127.0.0.1:51001"
+stale_after_ms = 800
+gui = true
+
+[launch]
+stack_profile = "configs/profiles/two_axis_head_non_vertical_debug.toml"
+
+[[axes]]
+unit_id = "joint1"
+axis_id = "HeadJoint1"
+densi_id = "HeadJoint1"
+selected = true
+densi_action_out = "127.0.0.1:53001"
+
+[[axes]]
+unit_id = "joint2"
+axis_id = "HeadJoint2"
+densi_id = "HeadJoint2"
+selected = true
+densi_action_out = "127.0.0.1:53002"
+
+[kinematics]
+kind = "two_axis_head"
+machine_id = "head_non_vertical_a"
+joint1_axis_id = "HeadJoint1"
+joint2_axis_id = "HeadJoint2"
+joint1_min_deg = -120.0
+joint1_max_deg = 120.0
+joint2_min_deg = -45.0
+joint2_max_deg = 60.0
+joint1_max_rate_deg_s = 60.0
+joint2_max_rate_deg_s = 45.0
+joint1_axis_base_xyz = [0.0, 1.0, 0.0]
+joint2_axis_joint1_xyz = [0.0, 0.0, 1.0]
+tool_forward_xyz = [1.0, 0.0, 0.0]
+base_origin_xyz = [0.0, 0.0, 1.2]
+tool_offset_xyz = [0.0, 0.0, 0.15]
+aim_ray_length_m = 2.5
+
+[kinematics.control_map]
+joint1 = "look_pan"
+joint2 = "look_tilt"

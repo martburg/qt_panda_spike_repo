@@ -211,6 +211,8 @@ def _decode_joy(value: object) -> JoyState:
     return JoyState(
         deadman=bool(value_dict.get("deadman", False)),
         soll_speed=clamp_soll_speed(_as_float(value_dict.get("soll_speed", 0.0))),
+        look_pan=clamp_soll_speed(_as_float(value_dict.get("look_pan", 0.0))),
+        look_tilt=clamp_soll_speed(_as_float(value_dict.get("look_tilt", 0.0))),
         selected_axes=selected_axes,
     )
 

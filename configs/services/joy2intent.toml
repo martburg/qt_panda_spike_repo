@@ -43,8 +43,13 @@ max_v = { x = 0.60, y = 0.60, z = 0.40 }
 
 [bindings.axes]
 # Axis indices as reported by your joystick.
+# `soll_speed` remains the legacy scalar lane for selected-axis jogging.
+# `look_pan` / `look_tilt` are semantic channels. Individual kinematic
+# profiles can map them onto joint1/joint2 via [kinematics.control_map].
 manual_jog = 1
 soll_speed = 1
+look_pan = 0
+look_tilt = 1
 x = 0
 y = 1
 z = 2
@@ -56,4 +61,4 @@ fine = 7
 [filters]
 deadzone = 0.08
 expo = 0.25
-invert = { manual_jog = true, y = true }
+invert = { manual_jog = true, look_tilt = true, y = true }

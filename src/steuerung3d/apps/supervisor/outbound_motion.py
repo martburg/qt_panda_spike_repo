@@ -72,6 +72,8 @@ def build_joy_update(
     return JoyState(
         deadman=(False if motion_blocked else bool(joy.deadman)),
         soll_speed=(0.0 if motion_blocked else float(joy.soll_speed)),
+        look_pan=(0.0 if motion_blocked else float(joy.look_pan)),
+        look_tilt=(0.0 if motion_blocked else float(joy.look_tilt)),
         selected_axes=(() if motion_blocked else selected_axis_ids),
     )
 
@@ -88,6 +90,8 @@ def append_joy_update_if_changed(
             JoyStateUpdate(
                 deadman=joy_update.deadman,
                 soll_speed=joy_update.soll_speed,
+                look_pan=joy_update.look_pan,
+                look_tilt=joy_update.look_tilt,
                 selected_axes=joy_update.selected_axes,
             )
         )

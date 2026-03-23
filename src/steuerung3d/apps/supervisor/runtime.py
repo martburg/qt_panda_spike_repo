@@ -167,6 +167,9 @@ class SupervisorRuntime(QObject):
     def _apply_window_snapshot(self) -> None:
         snapshot = self.engine.snapshot()
         self.window.apply_snapshot(snapshot)
+        apply_scene = getattr(self.window, "apply_scene_snapshot", None)
+        if callable(apply_scene):
+            apply_scene(self.engine.scene_snapshot())
 
     def _publish_outbound(self) -> None:
         publish_outbound(

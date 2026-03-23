@@ -19,8 +19,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from steuerung3d.rig.scene.two_axis_head_snapshot import SceneSnapshot
+
 from ..models import AxisRow, SupervisorSnapshot
 from ..row_estop_dots import ESTOP_GRID_COLUMNS, ESTOP_GRID_ROWS, SUPERVISOR_ESTOP_COLUMNS
+from .viewport.selection_bridge import ViewportSelectionEvent, selection_summary_from_event
+from .viewport.viewport_host import ViewportHost
 
 DISPLAY_SLIDER_MAX = 1000
 DISPLAY_SLIDER_CENTER = DISPLAY_SLIDER_MAX // 2
@@ -224,9 +228,13 @@ class SupervisorWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Supervisor")
         root = QWidget(self)
-        lay = QVBoxLayout(root)
+        root_layout = QVBoxLayout(root)
+        root_layout.setContentsMargins(6, 6, 6, 6)
+        root_layout.setSpacing(6)
+
         self.status_label = QLabel("System: NO PAIRS")
-        lay.addWidget(self.status_label)
+        root_layout.addWidget(self.status_label)
+
         toolbar = QHBoxLayout()
         self.btn_reset = QPushButton("Reset EStop")
         self.btn_estart = QPushButton("EStart")
@@ -239,11 +247,51 @@ class SupervisorWindow(QMainWindow):
         toolbar.addWidget(self.btn_recover)
         toolbar.addWidget(self.chk_taster)
         toolbar.addStretch(1)
-        lay.addLayout(toolbar)
+        root_layout.addLayout(toolbar)
+
+        body = QHBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(8)
+
+        self.left_panel = self._make_side_panel(
+            title="Components",
+            body_text=(
+                "Current slice keeps the shell/viewport split narrow. "
+                "Two-axis head remains the only machine target."
+            ),
+        )
+        body.addWidget(self.left_panel, 0)
+
+        center = QWidget(root)
+        center_layout = QVBoxLayout(center)
+        center_layout.setContentsMargins(0, 0, 0, 0)
+        center_layout.setSpacing(8)
+
+        self.viewport_host = ViewportHost(center)
+        center_layout.addWidget(self.viewport_host, 1)
+
+        table_wrap = QFrame(center)
+        table_wrap.setFrameShape(QFrame.Shape.StyledPanel)
+        table_layout = QVBoxLayout(table_wrap)
+        table_layout.setContentsMargins(4, 4, 4, 4)
+        table_layout.setSpacing(4)
+        table_title = QLabel("Supervisor Axis Table", table_wrap)
+        table_title.setStyleSheet("font-weight: 600;")
+        table_layout.addWidget(table_title)
         self.table = QTableWidget(0, len(HEADERS))
         self.table.setHorizontalHeaderLabels(HEADERS)
         self._configure_column_widths()
-        lay.addWidget(self.table)
+        table_layout.addWidget(self.table, 1)
+        center_layout.addWidget(table_wrap, 1)
+
+        body.addWidget(center, 1)
+
+        self.right_panel = self._make_side_panel(
+            title="Selection / Diagnostics", body_text="No viewport selection"
+        )
+        body.addWidget(self.right_panel, 0)
+
+        root_layout.addLayout(body, 1)
         self.setCentralWidget(root)
         self.setStyleSheet("QToolTip { font-size: 12pt; padding: 8px 10px; }")
         self.btn_reset.clicked.connect(self.reset_estop_clicked.emit)
@@ -251,8 +299,10 @@ class SupervisorWindow(QMainWindow):
         self.btn_resync.clicked.connect(self.resync_clicked.emit)
         self.btn_recover.clicked.connect(self.recover_clicked.emit)
         self.chk_taster.toggled.connect(self.chk_es_taster_changed.emit)
+        self.viewport_host.selection_changed.connect(self._on_viewport_selection_changed)
         self._updating = False
         self._sync_progress: dict[str, tuple[str, int]] = {}
+        self._last_scene_snapshot: SceneSnapshot | None = None
 
     def apply_snapshot(self, snap: SupervisorSnapshot) -> None:
         self._updating = True
@@ -331,6 +381,44 @@ class SupervisorWindow(QMainWindow):
 
     def show_recover_placeholder(self) -> None:
         QMessageBox.information(self, "Recover", "Recover not implemented yet.")
+
+    def apply_scene_snapshot(self, scene: SceneSnapshot | None) -> None:
+        self._last_scene_snapshot = scene
+        self.viewport_host.apply_scene_snapshot(scene)
+        if scene is None:
+            self._selection_body_label.setText("No viewport selection")
+            return
+        warning_text = ", ".join(scene.warnings) if scene.warnings else "none"
+        self._selection_hint_label.setText(
+            f"scene machine={scene.machine_id} | warnings={warning_text}"
+        )
+
+    def _on_viewport_selection_changed(self, event: ViewportSelectionEvent | None) -> None:
+        state = selection_summary_from_event(event)
+        self._selection_body_label.setText(state.summary_text)
+
+    def _make_side_panel(self, *, title: str, body_text: str) -> QFrame:
+        panel = QFrame(self)
+        panel.setFrameShape(QFrame.Shape.StyledPanel)
+        cast(Any, panel).setMinimumWidth(180)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
+        title_label = QLabel(title, panel)
+        title_label.setStyleSheet("font-weight: 600;")
+        body_label = QLabel(body_text, panel)
+        cast(Any, body_label).setWordWrap(True)
+        hint_label = QLabel("Stack-led shell; Panda viewport in center panel.", panel)
+        cast(Any, hint_label).setWordWrap(True)
+        hint_label.setStyleSheet("color: #66707d; font-size: 11px;")
+        layout.addWidget(title_label)
+        layout.addWidget(body_label)
+        layout.addStretch(1)
+        layout.addWidget(hint_label)
+        if title.startswith("Selection"):
+            self._selection_body_label = body_label
+            self._selection_hint_label = hint_label
+        return panel
 
     def _emit_unit_selected(self, unit_id: str, checked: bool) -> None:
         if self._updating:

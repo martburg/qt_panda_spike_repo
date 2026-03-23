@@ -23,6 +23,8 @@ class JoyStateUpdate:
     deadman: bool = False
     select_hip: bool = False
     soll_speed: float = 0.0
+    look_pan: float = 0.0
+    look_tilt: float = 0.0
     selected_axes: Tuple[str, ...] = ()
 
 

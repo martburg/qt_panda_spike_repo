@@ -1,0 +1,41 @@
+[io]
+raw_in = "127.0.0.1:50100"
+intent_out = "127.0.0.1:51001"
+context_in = "127.0.0.1:51010"
+tick_hz = 50
+stale_after_ms = 200
+
+[identity]
+hip_id = "hip"
+
+[rig]
+winches = ["HeadJoint1", "HeadJoint2"]
+select_buttons = [0, 1]
+
+[mode]
+default = "setup_manual"
+
+[limits.manual]
+max_winch_mps = 6
+fine_scale = 0.20
+
+[limits.sync]
+max_v = { x = 0.60, y = 0.60, z = 0.40 }
+
+[bindings.axes]
+manual_jog = 1
+soll_speed = 1
+look_pan = 0
+look_tilt = 1
+x = 0
+y = 1
+z = 2
+
+[bindings.buttons]
+deadman = 5
+fine = 7
+
+[filters]
+deadzone = 0.08
+expo = 0.25
+invert = { manual_jog = true, look_tilt = true, y = true }

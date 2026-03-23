@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from steuerung3d.core.control_context import ControlContext
-from steuerung3d.core.joy_state import clamp_soll_speed
+from steuerung3d.core.joy_state import clamp_norm, clamp_soll_speed
 
 from .axis_math import apply_deadzone_only
 from .mapping_types import JoyInputFacts, _JoyBindingsLike, _JoyReportLike
@@ -64,6 +64,17 @@ def selected_winch_ids(
     return set(selected)
 
 
+def _read_normalized_axis(*, axes: list[float], bind: _JoyBindingsLike, name: str) -> float:
+    axis_index = bind.axes.get(name)
+    if axis_index is None or axis_index < 0 or axis_index >= len(axes):
+        return 0.0
+    value = float(axes[axis_index])
+    if bind.invert.get(name, False):
+        value = -value
+    value = apply_deadzone_only(value, bind.deadzone)
+    return clamp_norm(value)
+
+
 def collect_input_facts(
     *,
     rc: _JoyReportLike,
@@ -88,6 +99,9 @@ def collect_input_facts(
         soll_speed = apply_deadzone_only(soll_speed, bind.deadzone)
     soll_speed = clamp_soll_speed(soll_speed)
 
+    look_pan = _read_normalized_axis(axes=axes, bind=bind, name="look_pan")
+    look_tilt = _read_normalized_axis(axes=axes, bind=bind, name="look_tilt")
+
     use_contextual_local_manual = bool(
         control_context is not None
         and str(getattr(control_context, "mode", "")) == "independent_axes"
@@ -101,6 +115,8 @@ def collect_input_facts(
         deadman=deadman,
         fine=fine,
         soll_speed=float(soll_speed),
+        look_pan=float(look_pan),
+        look_tilt=float(look_tilt),
         selected_set=selected_winch_ids(
             select_buttons=bind.select_buttons or [],
             pressed=pressed,
