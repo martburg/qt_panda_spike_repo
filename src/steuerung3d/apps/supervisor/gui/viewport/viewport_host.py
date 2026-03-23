@@ -2,18 +2,20 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 
 from steuerung3d.rig.scene.two_axis_head_snapshot import SceneSnapshot
 
+from .panda_backend import PandaViewportBackend
+from .selection_bridge import selection_event_from_pick_result, selection_summary_from_event
+
 
 class ViewportHost(QWidget):
-    """Qt-facing viewport contract stub.
+    """Qt-facing viewport host using a native Panda child window.
 
-    This host intentionally contains no Panda3D logic yet. It gives the shell a
-    stable center widget, accepts scene snapshots, and exposes the signals that
-    the later native Panda implementation will satisfy.
+    The public contract intentionally matches the earlier placeholder host so the
+    rest of the supervisor shell stays unchanged.
     """
 
     selection_changed = Signal(object)
@@ -23,6 +25,10 @@ class ViewportHost(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._scene: SceneSnapshot | None = None
+        self._backend = PandaViewportBackend()
+        self._backend_started = False
+        self._backend_failed = False
+        self._selected_summary_text = "No viewport selection"
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -33,58 +39,149 @@ class ViewportHost(QWidget):
         self.title_label.setStyleSheet("font-weight: 600;")
         layout.addWidget(self.title_label)
 
-        self.viewport_frame = QFrame(self)
-        self.viewport_frame.setFrameShape(QFrame.Shape.StyledPanel)
-        self.viewport_frame.setMinimumHeight(220)
-        self.viewport_frame.setStyleSheet(
+        self.viewport_container = QFrame(self)
+        self.viewport_container.setFrameShape(QFrame.Shape.StyledPanel)
+        self.viewport_container.setMinimumHeight(260)
+        self.viewport_container.setStyleSheet(
             "QFrame { background-color: #161a20; border: 1px solid #404650; }"
         )
-        frame_layout = QVBoxLayout(self.viewport_frame)
-        frame_layout.setContentsMargins(12, 10, 12, 10)
-        frame_layout.setSpacing(6)
+        container_layout = QVBoxLayout(self.viewport_container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(0)
 
-        self.viewport_status_label = QLabel("", self.viewport_frame)
+        self.viewport_frame = QWidget(self.viewport_container)
+        self.viewport_frame.setMinimumHeight(260)
+        self.viewport_frame.setStyleSheet("")
+        widget_attributes = cast(Any, Qt.WidgetAttribute)
+        native_window_attr = widget_attributes.WA_NativeWindow
+        dont_create_ancestors_attr = widget_attributes.WA_DontCreateNativeAncestors
+        cast(Any, self.viewport_frame).setAttribute(native_window_attr, True)
+        cast(Any, self.viewport_frame).setAttribute(dont_create_ancestors_attr, True)
+        cast(Any, self.viewport_frame).setAutoFillBackground(False)
+        container_layout.addWidget(self.viewport_frame, 1)
+        layout.addWidget(self.viewport_container, 1)
+
+        self.viewport_status_label = QLabel("", self)
         cast(Any, self.viewport_status_label).setWordWrap(True)
         self.viewport_status_label.setAlignment(
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         )
         self.viewport_status_label.setStyleSheet("QLabel { color: #d9dde3; }")
-        frame_layout.addWidget(self.viewport_status_label, 1)
+        layout.addWidget(self.viewport_status_label)
 
-        self.viewport_hint_label = QLabel("", self.viewport_frame)
+        self.viewport_hint_label = QLabel("", self)
         cast(Any, self.viewport_hint_label).setWordWrap(True)
         self.viewport_hint_label.setStyleSheet("QLabel { color: #96a0ad; font-size: 11px; }")
-        frame_layout.addWidget(self.viewport_hint_label)
+        layout.addWidget(self.viewport_hint_label)
 
-        layout.addWidget(self.viewport_frame, 1)
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._tick)
+        self._timer.start(16)
+
+        self._resize_timer = QTimer(self)
+        cast(Any, self._resize_timer).setSingleShot(True)
+        self._resize_timer.timeout.connect(self._apply_deferred_resize)
+
         self._refresh_labels()
         self.viewport_ready.emit()
 
+    def showEvent(self, event: Any) -> None:
+        cast(Any, super()).showEvent(event)
+        self._ensure_backend_started()
+        self._schedule_resize()
+
+    def resizeEvent(self, event: Any) -> None:
+        cast(Any, super()).resizeEvent(event)
+        self._schedule_resize()
+
+    def closeEvent(self, event: Any) -> None:
+        self._timer.stop()
+        self._resize_timer.stop()
+        self._backend.shutdown()
+        self._backend_started = False
+        cast(Any, super()).closeEvent(event)
+
     def apply_scene_snapshot(self, scene: SceneSnapshot | None) -> None:
         self._scene = scene
+        if self._backend_started:
+            self._backend.apply_scene_snapshot(scene)
         self._refresh_labels()
 
     def viewport_status_text(self) -> str:
         return self.viewport_status_label.text()
 
-    def _refresh_labels(self) -> None:
-        scene = self._scene
-        if scene is None:
-            state_text = "Viewport placeholder. Waiting for supervisor/kinematics scene snapshot."
-        else:
-            frame_names = ", ".join(frame.name for frame in scene.frames) or "-"
-            line_names = ", ".join(line.name for line in scene.lines) or "-"
-            debug_line_names = ", ".join(line.name for line in scene.debug_lines) or "-"
-            warnings = ", ".join(scene.warnings) or "none"
-            state_text = (
-                f"machine={scene.machine_id}\n"
-                f"frames={len(scene.frames)} [{frame_names}]\n"
-                f"lines={len(scene.lines)} [{line_names}]\n"
-                f"debug_lines={len(scene.debug_lines)} [{debug_line_names}]\n"
-                f"warnings={warnings}"
+    def _ensure_backend_started(self) -> None:
+        if self._backend_started or self._backend_failed:
+            return
+        try:
+            self._backend.start(self.viewport_frame)
+            self._backend_started = True
+            if self._scene is not None:
+                self._backend.apply_scene_snapshot(self._scene)
+        except Exception as exc:
+            self._backend_failed = True
+            self.viewport_status_label.setText(f"Native Panda backend failed to start: {exc}")
+            self.viewport_hint_label.setText(
+                "Fallback active. Check Panda3D availability and native child-window support."
             )
-        self.viewport_status_label.setText(state_text)
-        self.viewport_hint_label.setText(
-            "Panda hook point prepared. Native Panda backend and floating overlay are not "
-            "enabled in this slice yet."
-        )
+
+    def _schedule_resize(self) -> None:
+        if not self.isVisible():
+            return
+        self._resize_timer.start(40)
+
+    def _apply_deferred_resize(self) -> None:
+        if not self.isVisible():
+            return
+        self._ensure_backend_started()
+        if self._backend_started:
+            self._backend.resize(
+                int(self.viewport_frame.width()), int(self.viewport_frame.height())
+            )
+
+    def _tick(self) -> None:
+        if not self.isVisible():
+            return
+        self._ensure_backend_started()
+        if not self._backend_started:
+            return
+        self._backend.step()
+        for pick in self._backend.drain_pick_results():
+            event = selection_event_from_pick_result(pick)
+            summary = selection_summary_from_event(event)
+            self._selected_summary_text = summary.summary_text
+            if event is not None:
+                self.selection_changed.emit(event)
+                self.scene_object_selected.emit(event.object_name)
+        messages = self._backend.drain_status_messages()
+        if messages:
+            self.viewport_status_label.setText(messages[-1])
+            self._refresh_labels(status_override=messages[-1])
+
+    def _refresh_labels(self, status_override: str | None = None) -> None:
+        scene = self._scene
+        if status_override is None:
+            if scene is None:
+                status_text = "Native Panda demo scene active. Waiting for supervisor/kinematic scene snapshot."
+            else:
+                status_text = (
+                    f"Native Panda demo scene active. scene frames={len(scene.frames)} "
+                    f"lines={len(scene.lines)}"
+                )
+        else:
+            status_text = status_override
+
+        self.viewport_status_label.setText(status_text)
+        hint_lines = [
+            "Left-drag = orbit | mouse wheel = zoom | right-click = pick.",
+            f"Selection: {self._selected_summary_text}",
+        ]
+        if scene is None:
+            hint_lines.append(
+                "Demo nodes remain visible until a real Panda scene adapter is added."
+            )
+        else:
+            hint_lines.append(
+                "Scene snapshot is connected; this slice still renders generic demo nodes."
+            )
+        self.viewport_hint_label.setText("\n".join(hint_lines))

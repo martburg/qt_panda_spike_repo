@@ -1,178 +1,110 @@
-# Steuerung3D Remake (v0.x)
+# qt_panda_spike
 
-A small, test-driven “walking skeleton” for the Steuerung3D control stack.
+A small standalone spike repo for Panda3D + Qt integration on Windows.
 
-The repo intentionally starts simple:
+The spike originally compared two viewport paths:
 
-- **Core**: deterministic tick loop (`Timebase`), single source of truth (`MachineState`), intent handling, snapshot publishing.
-- **Protocol**: in-memory transport + optional JSONL recording/replay.
-- **Devices**:
-  - `sim`: a minimal plant + device adapter for local development.
-  - `plc (toy)`: a tiny semicolon-separated UDP device adapter (`UdpPlcDevice`) used as an early boundary.
-  - `plc_twincat_legacy`: TwinCAT/Beckhoff legacy UDP protocol adapter (Anton/Burt/Cecil/Debby …) with **fleet** support.
+- `native` — Qt hosts Panda as a native child window
+- `offscreen` — Panda renders offscreen and Qt displays the latest frame
 
-If you only read one doc, start here:
+The current focus is now explicit:
 
-- `docs/DEV_STACK.md` – how to run the demo app (SIM, legacy PLC, and UDP-sim fallback)
-- `docs/PLC_TWINCAT_LEGACY.md` – protocol notes + field mapping + design constraints
+> Use the **native** path as the main route and keep the scene deliberately simple so we can stabilize resize, orbit, zoom, and picking.
 
----
+## Goals
+
+The spike is successful when the native backend can:
+
+- open and remain alive
+- resize with the Qt window without losing the Panda content
+- orbit the camera with left-drag
+- zoom with mouse wheel
+- right-click to pick simple scene nodes
+- keep input responsive for several minutes
 
 ## Quick start
 
-### Create an environment
+Create a virtual environment and install dependencies:
 
-**Windows (venv)**
-
-```powershell
-cd <repo-root>
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -U pip
-pip install -e .
-pip install pytest
+```bash
+python -m venv .venv
+. .venv/Scripts/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
 ```
 
-**Conda**
+Run the native path:
 
-```powershell
-conda create -n steuerung3d python=3.11 -y
-conda activate steuerung3d
-pip install -e .
-pip install pytest
+```bash
+python -m qt_panda_spike --backend native
 ```
 
-### Run tests
+The offscreen backend is still present as a comparison path:
 
-```powershell
-pytest -q
+```bash
+python -m qt_panda_spike --backend offscreen
 ```
 
-Recommended local gate (lint + format + optional typecheck + tests):
+Enable the debug dome:
 
-```powershell
-python tools/check.py
+```bash
+python -m qt_panda_spike --backend native --show-dome
 ```
 
-Manual runbook:
+Enable pick diagnostics and debug hit markers:
 
-- `docs/MANUAL_TESTING.md` (recommended after `pytest -q` stays green)
-
----
-
-## Boot a stack (profile-driven)
-
-The current recommended entry point is the **profile-driven supervisor**:
-
-```powershell
-python -m steuerung3d up --profile dev_sim
+```bash
+python -m qt_panda_spike --backend native --pick-debug
 ```
 
-Companion tools:
+Write diagnostics to a specific file:
 
-```powershell
-python -m steuerung3d plan   --profile dev_sim
-python -m steuerung3d doctor --profile dev_sim
-python -m steuerung3d status --profile dev_sim
-python -m steuerung3d logs core --profile dev_sim --follow
-python -m steuerung3d down   --profile dev_sim
+```bash
+python -m qt_panda_spike --backend native --pick-debug --pick-log logs/pick_diagnostics.jsonl
 ```
 
-Profiles live in `configs/profiles/*.toml` and own the **rig axes + wiring** (ports, services enabled, per-axis expansion).
+## Controls
 
-Profiles live under `configs/profiles/`; treat that directory as the single source of truth for named stack profiles.
+- Left mouse drag: orbit camera
+- Mouse wheel: zoom
+- Right mouse click: cast a pick ray
+- Resize the main window and observe whether the Panda child window tracks the Qt viewport area
 
-### Session logging (per run, per process)
+## Scene
 
-Each `up` creates a fresh session directory:
+The scene is intentionally generic and not domain-specific yet. It contains:
 
-```
-.run/<stack>/sessions/<timestamp>/
-  core.log
-  densi-Anton.log
-  hip-Debby.log
-  ...
-  meta.json
-```
+- ground plane and grid
+- axis lines
+- a handful of simple pickable nodes with stable names
 
-- keeps the last **5** sessions by default (older sessions are deleted)
-- `.run/<stack>/LATEST` points to the newest session (portable, no symlink)
+That keeps the spike focused on viewport behavior rather than scene meaning.
 
-### Structured birds-eye status
+## Pick diagnostics
 
-Stacks can enable a UDP JSON heartbeat side-channel (does **not** touch PLC UDP formats).
-When enabled, the supervisor prints a compact “birds-eye” table and can still fall back to a log tail on crash.
+When `--pick-debug` is enabled, each right-click appends one JSON record to `pick_diagnostics.jsonl` by default.
 
-See: `docs/STACK_BOOT_STATUS.md`
+The record includes:
 
-### Run the HiP ↔ Core ↔ DenSi UDP demo (Yellow UI)
+- raw Qt widget click coordinates
+- the displayed image rectangle inside the widget
+- the mapped Panda image coordinates
+- normalized device coordinates for the ray
+- camera position, HPR, and forward vector
+- center-of-view ray origin/direction plus its scene hit
+- clicked ray origin/direction plus its scene hit
+- dome hit too, if `--show-dome` is also enabled
 
-Open three terminals:
+## Integration notes
 
-**Windows Terminal tip:** open in repo folder (`wt`), then split panes (`Alt+Shift+D`) to get 3 terminals in the right folder.
+See:
 
-```powershell
-python -m steuerung3d.apps.core_udp_service --dt 0.1
-```
+- `docs/integration_findings.md` for the current comparison and the native-first decision
+- `docs/overlay_experiments.md` for the earlier overlay findings
 
-```powershell
-python -m steuerung3d.apps.den_si
-```
+## Notes
 
-```powershell
-python -m steuerung3d.apps.hi_p
-```
-
-This demo exercises the intent/telemetry seam over UDP and supports axis-agnostic parameter editing
-(Edit → Write → Cancel) from HiP.
-
-Notes:
-
-- Editing is **modal** in HiP: once you press Edit for a group, other Edit buttons and tab switching are disabled until Write/Cancel.
-- HiP↔Core delivery is guarded with `req_id` acks; device-side acceptance is confirmed by observing DenSi’s reported `params` in telemetry.
-- After Write, HiP shows a **modal dialog** once the device is observed as applied (or after a timeout if not confirmed).
-- If **pos limits** are auto-adjusted to satisfy `HardMax ≥ UserMax ≥ UserMin ≥ HardMin`, HiP shows an info dialog listing the adjusted values.
-- For **Guider** limits, `PosMin` is **clamped** to ensure `PosMin ≤ PosMax` (no swapping).
-
-> Note: the above “3 terminals” demo still works, but most local development is now done via
-> `python -m steuerung3d up --profile ...`.
-
-### Run the dev stack
-
-From the **repo root**:
-
-```powershell
-python -m steuerung3d.apps.dev_stack --config configs\dev_plc.toml
-```
-
-- If the configured `controller_ip` (e.g. `172.16.17.5`) is **not present** on this host, the dev stack automatically falls back to **loopback UDP PLC simulators** and still exercises the real legacy codec/device.
-
----
-
-## Repo map
-
-- `src/steuerung3d/core/…` – tick loop, state, intents, engine.
-- `src/steuerung3d/protocol/…` – runner thread, transport, JSONL logging.
-- `src/steuerung3d/adapters/sim/…` – local simulation.
-- `src/steuerung3d/adapters/plc/udp_device.py` – early “toy” UDP boundary.
-- `src/steuerung3d/adapters/plc_twincat_legacy/…` – **real legacy TwinCAT UDP** (fleet + config + UDP simulators).
-
----
-
-## Status
-
-This is a foundation for incremental expansion:
-
-- ✅ deterministic core tick & snapshots
-- ✅ in-memory transport + JSONL recorder
-- ✅ command vs measured separation in `MachineState`
-- ✅ TwinCAT legacy UDP codec/device/fleet + Windows-safe UDP behavior
-- ✅ config-driven selection in `apps/dev_stack`
-- ✅ profile-driven boot supervisor + per-session logs + structured birds-eye status
-
-Next milestones typically include:
-
-- real PLC endpoint construction + integration tests
-- richer axis commands (position setpoints, limits, fault handling)
-- CLI log viewer / regression guards
-
+- The native backend is now the preferred route for the spike.
+- Offscreen remains available only as a comparison path and fallback.
+- The viewport overlay is intentionally out of the active runtime path for now so it does not obscure the native Panda child window while resize/input behavior is being stabilized.
+- The picker uses the real render camera (`base.cam`) consistently.
