@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 import pytest
 
 PySide6 = pytest.importorskip("PySide6")
+
+from PySide6.QtWidgets import QApplication
 
 from steuerung3d.apps.supervisor.gui.window import (
     DISPLAY_SLIDER_MAX,
@@ -31,3 +35,17 @@ def test_posdiff_formatter_uses_centimeters_with_precision() -> None:
 
 def test_load_bar_max_matches_supervisor_ui_target() -> None:
     assert LOAD_BAR_MAX_PCT == 170.0
+
+
+def test_axis_table_content_height_tracks_row_count() -> None:
+    app = QApplication.instance() or QApplication([])
+    window = SupervisorWindow()
+    zero_height = window._axis_table_content_height_for_rows(0)
+    three_height = window._axis_table_content_height_for_rows(3)
+    row_height = int(cast(Any, window.table.verticalHeader()).defaultSectionSize())
+
+    assert three_height > zero_height
+    assert three_height - zero_height == 3 * row_height
+
+    window.close()
+    _ = app

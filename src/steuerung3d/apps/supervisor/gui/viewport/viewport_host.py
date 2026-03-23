@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any, cast
 
 from PySide6.QtCore import Qt, QTimer, Signal
@@ -7,12 +8,13 @@ from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 
 from steuerung3d.rig.scene.two_axis_head_snapshot import SceneSnapshot
 
+from .overlay_window import FloatingOverlay
 from .panda_backend import PandaViewportBackend
 from .selection_bridge import selection_event_from_pick_result, selection_summary_from_event
 
 
 class ViewportHost(QWidget):
-    """Qt-facing viewport host using a native Panda child window.
+    """Qt-facing viewport host using a native Panda child window plus floating overlay.
 
     The public contract intentionally matches the earlier placeholder host so the
     rest of the supervisor shell stays unchanged.
@@ -29,6 +31,9 @@ class ViewportHost(QWidget):
         self._backend_started = False
         self._backend_failed = False
         self._selected_summary_text = "No viewport selection"
+        self._steady_status_text = "Viewport booting"
+        self._flash_status_text: str | None = None
+        self._flash_until_monotonic = 0.0
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -74,6 +79,9 @@ class ViewportHost(QWidget):
         self.viewport_hint_label.setStyleSheet("QLabel { color: #96a0ad; font-size: 11px; }")
         layout.addWidget(self.viewport_hint_label)
 
+        self._floating_overlay = FloatingOverlay(self.viewport_frame)
+        self._floating_overlay.set_text(self._overlay_text())
+
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
         self._timer.start(16)
@@ -89,16 +97,27 @@ class ViewportHost(QWidget):
         cast(Any, super()).showEvent(event)
         self._ensure_backend_started()
         self._schedule_resize()
+        self._reposition_overlay()
 
     def resizeEvent(self, event: Any) -> None:
         cast(Any, super()).resizeEvent(event)
         self._schedule_resize()
+        self._reposition_overlay()
+
+    def moveEvent(self, event: Any) -> None:
+        cast(Any, super()).moveEvent(event)
+        self._reposition_overlay()
+
+    def hideEvent(self, event: Any) -> None:
+        self._floating_overlay.hide()
+        cast(Any, super()).hideEvent(event)
 
     def closeEvent(self, event: Any) -> None:
         self._timer.stop()
         self._resize_timer.stop()
         self._backend.shutdown()
         self._backend_started = False
+        self._floating_overlay.close()
         cast(Any, super()).closeEvent(event)
 
     def apply_scene_snapshot(self, scene: SceneSnapshot | None) -> None:
@@ -106,6 +125,7 @@ class ViewportHost(QWidget):
         if self._backend_started:
             self._backend.apply_scene_snapshot(scene)
         self._refresh_labels()
+        self._update_overlay_text()
 
     def viewport_status_text(self) -> str:
         return self.viewport_status_label.text()
@@ -120,10 +140,12 @@ class ViewportHost(QWidget):
                 self._backend.apply_scene_snapshot(self._scene)
         except Exception as exc:
             self._backend_failed = True
-            self.viewport_status_label.setText(f"Native Panda backend failed to start: {exc}")
+            self._steady_status_text = f"Native Panda backend failed to start: {exc}"
+            self.viewport_status_label.setText(self._steady_status_text)
             self.viewport_hint_label.setText(
                 "Fallback active. Check Panda3D availability and native child-window support."
             )
+            self._update_overlay_text()
 
     def _schedule_resize(self) -> None:
         if not self.isVisible():
@@ -138,11 +160,14 @@ class ViewportHost(QWidget):
             self._backend.resize(
                 int(self.viewport_frame.width()), int(self.viewport_frame.height())
             )
+        self._reposition_overlay()
 
     def _tick(self) -> None:
         if not self.isVisible():
             return
         self._ensure_backend_started()
+        self._expire_flash_status_if_needed()
+        self._reposition_overlay()
         if not self._backend_started:
             return
         self._backend.step()
@@ -155,8 +180,35 @@ class ViewportHost(QWidget):
                 self.scene_object_selected.emit(event.object_name)
         messages = self._backend.drain_status_messages()
         if messages:
-            self.viewport_status_label.setText(messages[-1])
+            self._show_flash_status(messages[-1])
             self._refresh_labels(status_override=messages[-1])
+        self._update_overlay_text()
+
+    def _overlay_text(self) -> str:
+        status_text = (
+            self._flash_status_text if self._is_flash_active() else self._steady_status_text
+        )
+        return f"{status_text} | {self._selected_summary_text}"
+
+    def _update_overlay_text(self) -> None:
+        self._floating_overlay.set_text(self._overlay_text())
+
+    def _is_flash_active(self) -> bool:
+        return (
+            self._flash_status_text is not None and time.monotonic() < self._flash_until_monotonic
+        )
+
+    def _show_flash_status(self, text: str, duration_s: float = 1.75) -> None:
+        self._flash_status_text = str(text)
+        self._flash_until_monotonic = time.monotonic() + duration_s
+
+    def _expire_flash_status_if_needed(self) -> None:
+        if self._flash_status_text is not None and time.monotonic() >= self._flash_until_monotonic:
+            self._flash_status_text = None
+            self._refresh_labels()
+
+    def _reposition_overlay(self) -> None:
+        self._floating_overlay.anchor_to(self.viewport_frame)
 
     def _refresh_labels(self, status_override: str | None = None) -> None:
         scene = self._scene
@@ -168,6 +220,7 @@ class ViewportHost(QWidget):
                     f"Native Panda demo scene active. scene frames={len(scene.frames)} "
                     f"lines={len(scene.lines)}"
                 )
+            self._steady_status_text = status_text
         else:
             status_text = status_override
 
@@ -175,6 +228,7 @@ class ViewportHost(QWidget):
         hint_lines = [
             "Left-drag = orbit | mouse wheel = zoom | right-click = pick.",
             f"Selection: {self._selected_summary_text}",
+            "Floating overlay follows the native Panda viewport.",
         ]
         if scene is None:
             hint_lines.append(
@@ -185,3 +239,4 @@ class ViewportHost(QWidget):
                 "Scene snapshot is connected; this slice still renders generic demo nodes."
             )
         self.viewport_hint_label.setText("\n".join(hint_lines))
+        self._update_overlay_text()

@@ -278,11 +278,16 @@ class SupervisorWindow(QMainWindow):
         table_title = QLabel("Supervisor Axis Table", table_wrap)
         table_title.setStyleSheet("font-weight: 600;")
         table_layout.addWidget(table_title)
+        self._table_wrap = table_wrap
+        self._table_title = table_title
         self.table = QTableWidget(0, len(HEADERS))
         self.table.setHorizontalHeaderLabels(HEADERS)
+        qt_any = cast(Any, Qt)
+        scrollbar_policy = qt_any.ScrollBarPolicy.ScrollBarAlwaysOff
+        cast(Any, self.table).setVerticalScrollBarPolicy(scrollbar_policy)
         self._configure_column_widths()
-        table_layout.addWidget(self.table, 1)
-        center_layout.addWidget(table_wrap, 1)
+        table_layout.addWidget(self.table)
+        center_layout.addWidget(table_wrap)
 
         body.addWidget(center, 1)
 
@@ -376,6 +381,7 @@ class SupervisorWindow(QMainWindow):
                 btn.setText(self._hip_button_text(int(row.hip_open_count)))
             while self.table.rowCount() > len(rows):
                 self.table.removeRow(self.table.rowCount() - 1)
+            self._fit_axis_table_height(len(rows))
         finally:
             self._updating = False
 
@@ -598,6 +604,37 @@ class SupervisorWindow(QMainWindow):
         layout.addWidget(chk)
         container._checkbox = chk
         return container
+
+    def _fit_axis_table_height(self, row_count: int) -> None:
+        title_height = self._table_title.sizeHint().height()
+        table_height = self._axis_table_content_height_for_rows(row_count)
+        wrap_layout = cast(QVBoxLayout, self._table_wrap.layout())
+        margins = cast(Any, wrap_layout).contentsMargins()
+        frame_width = int(cast(Any, self._table_wrap).frameWidth())
+        spacing = int(cast(Any, wrap_layout).spacing())
+        wrap_height = (
+            frame_width * 2
+            + int(margins.top())
+            + title_height
+            + spacing
+            + table_height
+            + int(margins.bottom())
+        )
+        cast(Any, self.table).setFixedHeight(table_height)
+        cast(Any, self._table_wrap).setFixedHeight(wrap_height)
+
+    def _axis_table_content_height_for_rows(self, row_count: int) -> int:
+        header_height = int(cast(Any, self.table).horizontalHeader().height())
+        row_height = int(cast(Any, self.table.verticalHeader()).defaultSectionSize())
+        rows_height = max(0, row_count) * row_height
+        horizontal_scroll_bar = cast(Any, self.table).horizontalScrollBar()
+        horizontal_scroll_height = (
+            int(horizontal_scroll_bar.sizeHint().height())
+            if horizontal_scroll_bar.isVisible()
+            else 0
+        )
+        frame_width = int(cast(Any, self.table).frameWidth())
+        return frame_width * 2 + header_height + rows_height + horizontal_scroll_height
 
     def _configure_column_widths(self) -> None:
         self.table.setColumnWidth(COL_AXIS, 118)

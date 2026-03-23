@@ -5,6 +5,8 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
+from steuerung3d.rig.scene.two_axis_head_snapshot import SceneSnapshot
+
 from .selection_bridge import RawPickResult
 
 
@@ -17,8 +19,8 @@ class PandaViewportBackend:
     """Native Panda3D child-window backend for the supervisor viewport.
 
     This slice intentionally uses a tiny generic demo scene so we can focus on
-    startup visibility, resize, orbit, zoom, and picking without coupling to the
-    current rig geometry yet.
+    startup visibility, resize, orbit, zoom, picking, and overlay behavior
+    without coupling to the current rig geometry yet.
     """
 
     def __init__(self) -> None:
@@ -41,7 +43,7 @@ class PandaViewportBackend:
         self._orbit_distance = 13.5
         self._status_queue: list[_QueuedStatus] = []
         self._pick_queue: list[RawPickResult] = []
-        self._scene_snapshot: object | None = None
+        self._scene_snapshot: SceneSnapshot | None = None
         self._requested_size: tuple[int, int] | None = None
         self._resize_retry_frames = 0
 
@@ -78,45 +80,31 @@ class PandaViewportBackend:
         base.accept("wheel_down", self._on_wheel_down)
         self._started = True
         self._ready = True
-        self._status_queue.append(
-            _QueuedStatus(
-                "Native Panda viewport ready | left-drag=orbit | wheel=zoom | right-click=pick"
-            )
-        )
+        self._status_queue.append(_QueuedStatus("Panda viewport ready"))
 
-    def apply_scene_snapshot(self, scene: object | None) -> None:
+    def apply_scene_snapshot(self, scene: SceneSnapshot | None) -> None:
         self._scene_snapshot = scene
-        if scene is None:
-            return
-        self._status_queue.append(
-            _QueuedStatus("Scene snapshot received; demo scene remains active")
-        )
+        machine_id = "none" if scene is None else str(scene.machine_id or "") or "anonymous"
+        self._status_queue.append(_QueuedStatus(f"Scene snapshot received | machine={machine_id}"))
 
     def step(self) -> None:
         if self._base is None:
             return
         self._base.task_mgr.step()
-        self._drain_resize_retries()
         self._poll_native_input()
+        self._drain_resize_retries()
 
     def resize(self, width: int, height: int) -> None:
-        width = max(1, int(width))
-        height = max(1, int(height))
-        self._requested_size = (width, height)
-        self._resize_retry_frames = 12
-        if self._lens is not None and width > 0 and height > 0:
-            self._lens.set_aspect_ratio(width / height)
+        self._requested_size = (max(1, int(width)), max(1, int(height)))
+        self._resize_retry_frames = 6
         self._request_window_size(force=True)
 
     def _request_window_size(self, *, force: bool) -> None:
         if self._base is None or self._base.win is None or self._requested_size is None:
             return
         width, height = self._requested_size
-        current_width = int(self._base.win.get_x_size())
-        current_height = int(self._base.win.get_y_size())
-        if not force and current_width == width and current_height == height:
-            self._resize_retry_frames = 0
-            return
+        if self._lens is not None:
+            self._lens.set_aspect_ratio(width / height)
         try:
             from panda3d.core import WindowProperties
 
@@ -131,7 +119,10 @@ class PandaViewportBackend:
             if callable(render_frame):
                 render_frame()
         except Exception:
-            pass
+            if force:
+                self._status_queue.append(
+                    _QueuedStatus("Resize request fell back to lens aspect only")
+                )
 
     def _drain_resize_retries(self) -> None:
         if self._resize_retry_frames <= 0:
@@ -330,7 +321,8 @@ class PandaViewportBackend:
             return
         self._orbit_heading_deg -= float(delta_x) * 0.35
         self._orbit_pitch_deg = max(
-            -80.0, min(80.0, self._orbit_pitch_deg + (float(delta_y) * 0.25))
+            -80.0,
+            min(80.0, self._orbit_pitch_deg + (float(delta_y) * 0.25)),
         )
         self._apply_camera_pose()
 
@@ -366,7 +358,8 @@ class PandaViewportBackend:
         height = float(max(1, self._base.win.get_y_size()))
         mouse_x = ((float(pointer_x) / width) * 2.0) - 1.0
         mouse_y = 1.0 - ((float(pointer_y) / height) * 2.0)
-        self._picker_ray.set_from_lens(self._lens, mouse_x, mouse_y)
+        cam_node = self._base.cam.node()
+        self._picker_ray.set_from_lens(cam_node, mouse_x, mouse_y)
         self._picker_queue.clear_entries()
         self._picker_traverser.traverse(self._base.render)
         if self._picker_queue.get_num_entries() == 0:
